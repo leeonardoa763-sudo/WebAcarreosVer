@@ -149,7 +149,7 @@ export const AuthProvider = ({ children }) => {
    */
   const canViewAllVales = () => {
     const role = userProfile?.roles?.role;
-    return role === "ADMINISTRADOR" || role === "FINANZAS";
+    return role === "Administrador" || role === "Finanzas";
   };
 
   /**

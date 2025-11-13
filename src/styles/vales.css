@@ -1,0 +1,530 @@
+/**
+ * src/styles/vales.css
+ * 
+ * Estilos para página de vales y componentes relacionados
+ */
+
+/* ========================================
+   PÁGINA VALES
+======================================== */
+
+.vales-page {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.vales-page__header {
+  margin-bottom: 24px;
+}
+
+.vales-page__title-section {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.vales-page__title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.vales-page__subtitle {
+  font-size: 16px;
+  color: #7f8c8d;
+  margin: 0;
+}
+
+/* ========================================
+   TOOLBAR (Búsqueda y Filtros)
+======================================== */
+
+.vales-page__toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  align-items: center;
+}
+
+.vales-page__search {
+  flex: 1;
+  position: relative;
+  max-width: 500px;
+}
+
+.vales-page__search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #7f8c8d;
+  pointer-events: none;
+}
+
+.vales-page__search-input {
+  width: 100%;
+  padding: 12px 48px 12px 48px;
+  font-size: 15px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.vales-page__search-input:focus {
+  outline: none;
+  border-color: #ff6b35;
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+}
+
+.vales-page__search-clear {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #7f8c8d;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.vales-page__search-clear:hover {
+  background: #f5f6fa;
+  color: #2c3e50;
+}
+
+.vales-page__filter-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  color: #2c3e50;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.vales-page__filter-button:hover {
+  border-color: #ff6b35;
+  color: #ff6b35;
+}
+
+.vales-page__filter-button.active {
+  background: #ff6b35;
+  border-color: #ff6b35;
+  color: #ffffff;
+}
+
+.vales-page__filter-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  background: #ff6b35;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+}
+
+.vales-page__filter-button.active .vales-page__filter-badge {
+  background: #ffffff;
+}
+
+.vales-page__clear-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: #fee2e2;
+  border: 2px solid #fca5a5;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vales-page__clear-button:hover {
+  background: #fecaca;
+}
+
+/* ========================================
+   PANEL DE FILTROS
+======================================== */
+
+.vales-page__filters {
+  margin-bottom: 24px;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========================================
+   FILTROS COMPONENT
+======================================== */
+
+.vale-filters {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.vale-filters__header {
+  margin-bottom: 20px;
+}
+
+.vale-filters__title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.vale-filters__body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.vale-filters__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vale-filters__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.vale-filters__select,
+.vale-filters__input {
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.vale-filters__select:focus,
+.vale-filters__input:focus {
+  outline: none;
+  border-color: #ff6b35;
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+}
+
+.vale-filters__select:disabled {
+  background: #f5f6fa;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.vale-filters__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.vale-filters__button {
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vale-filters__button--secondary {
+  background: #f5f6fa;
+  color: #2c3e50;
+}
+
+.vale-filters__button--secondary:hover {
+  background: #e5e7eb;
+}
+
+.vale-filters__button--primary {
+  color: #ffffff;
+}
+
+.vale-filters__button--primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* ========================================
+   CONTENIDO Y ESTADOS
+======================================== */
+
+.vales-page__content {
+  min-height: 400px;
+}
+
+.vales-page__loading,
+.vales-page__error,
+.vales-page__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 16px;
+}
+
+.vales-page__loading p,
+.vales-page__error p,
+.vales-page__empty p {
+  font-size: 16px;
+  color: #7f8c8d;
+  margin: 0;
+}
+
+.vales-page__error p {
+  color: #dc2626;
+}
+
+/* ========================================
+   LISTA DE VALES
+======================================== */
+
+.vales-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+/* ========================================
+   TARJETA DE VALE
+======================================== */
+
+.vale-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vale-card:hover {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+}
+
+.vale-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.vale-card__folio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.vale-card__badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.vale-card__badge {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.vale-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vale-card__info-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.vale-card__icon {
+  color: #7f8c8d;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.vale-card__info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.vale-card__info-label {
+  font-size: 12px;
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.vale-card__info-value {
+  font-size: 14px;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.vale-card__detalles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.vale-card__detalle-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #f5f6fa;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.vale-card__detalle-icon {
+  color: #7f8c8d;
+}
+
+.vale-card__footer {
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.vale-card__empresa {
+  font-size: 12px;
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+/* ========================================
+   PAGINACIÓN
+======================================== */
+
+.vales-page__pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 0;
+}
+
+.vales-page__pagination-button {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  color: #2c3e50;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vales-page__pagination-button:hover:not(:disabled) {
+  border-color: #ff6b35;
+  color: #ff6b35;
+}
+
+.vales-page__pagination-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vales-page__pagination-info {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+  padding: 0 12px;
+}
+
+/* ========================================
+   RESPONSIVE
+======================================== */
+
+@media (max-width: 768px) {
+  .vales-page__title {
+    font-size: 24px;
+  }
+
+  .vales-page__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .vales-page__search {
+    max-width: none;
+  }
+
+  .vale-filters__body {
+    grid-template-columns: 1fr;
+  }
+
+  .vales-list {
+    grid-template-columns: 1fr;
+  }
+
+  .vale-card__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .vale-card__badges {
+    justify-content: flex-start;
+  }
+}

@@ -21,7 +21,7 @@ import Layout from "./components/layout/Layout";
 // 4. Pages
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-// import Vales from './pages/Vales';
+import Vales from "./pages/Vales";
 // import Conciliaciones from './pages/Conciliaciones';
 // import VerificarVale from './pages/VerificarVale';
 
@@ -56,7 +56,7 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <Layout>
-                  <div>Vales - Por implementar</div>
+                  <Vales />
                 </Layout>
               </ProtectedRoute>
             }
