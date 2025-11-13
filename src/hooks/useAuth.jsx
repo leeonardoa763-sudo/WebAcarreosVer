@@ -1,23 +1,23 @@
 /**
  * src/hooks/useAuth.js
- * 
+ *
  * Hook personalizado para manejar autenticación y perfil de usuario
- * 
+ *
  * Funcionalidades:
  * - Inicio de sesión con email/password
  * - Validación de roles permitidos (ADMINISTRADOR, FINANZAS, SINDICATO)
  * - Obtención de perfil completo con relaciones
  * - Cierre de sesión
  * - Persistencia de sesión
- * 
+ *
  * Usado en: LoginForm.jsx, ProtectedRoute.jsx, Navbar.jsx
  */
 
 // 1. React y hooks
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext } from "react";
 
 // 2. Config
-import { supabase } from '../config/supabase';
+import { supabase } from "../config/supabase";
 
 // Crear contexto de autenticación
 const AuthContext = createContext({});
@@ -26,7 +26,7 @@ const AuthContext = createContext({});
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth debe usarse dentro de AuthProvider');
+    throw new Error("useAuth debe usarse dentro de AuthProvider");
   }
   return context;
 };
@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   // Roles permitidos para acceso web
-  const ROLES_PERMITIDOS = ['Administrador', 'Finanzas', 'Sindicato'];
+  const ROLES_PERMITIDOS = ["Administrador", "Finanzas", "Sindicato"];
 
   /**
    * Obtener perfil completo del usuario con relaciones
@@ -47,8 +47,9 @@ export const AuthProvider = ({ children }) => {
   const fetchUserProfile = async (authUserId) => {
     try {
       const { data, error } = await supabase
-        .from('persona')
-        .select(`
+        .from("persona")
+        .select(
+          `
           *,
           roles:id_role (
             id_roles,
@@ -65,20 +66,21 @@ export const AuthProvider = ({ children }) => {
               logo
             )
           )
-        `)
-        .eq('auth_user_id', authUserId)
+        `
+        )
+        .eq("auth_user_id", authUserId)
         .single();
 
       if (error) throw error;
 
       // Validar que el rol esté permitido para acceso web
       if (!data || !ROLES_PERMITIDOS.includes(data.roles?.role)) {
-        throw new Error('No tiene permisos para acceder al sistema web');
+        throw new Error("No tiene permisos para acceder al sistema web");
       }
 
       return data;
     } catch (error) {
-      console.error('Error en fetchUserProfile:', error);
+      console.error("Error en fetchUserProfile:", error);
       throw error;
     }
   };
@@ -92,10 +94,11 @@ export const AuthProvider = ({ children }) => {
       setError(null);
 
       // Autenticar con Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
       if (authError) throw authError;
 
@@ -107,7 +110,7 @@ export const AuthProvider = ({ children }) => {
 
       return { success: true, user: authData.user, profile };
     } catch (error) {
-      console.error('Error en signIn:', error);
+      console.error("Error en signIn:", error);
       setError(error.message);
       return { success: false, error: error.message };
     } finally {
@@ -127,7 +130,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setUserProfile(null);
     } catch (error) {
-      console.error('Error en signOut:', error);
+      console.error("Error en signOut:", error);
       setError(error.message);
     } finally {
       setLoading(false);
@@ -146,81 +149,106 @@ export const AuthProvider = ({ children }) => {
    */
   const canViewAllVales = () => {
     const role = userProfile?.roles?.role;
-    return role === 'ADMINISTRADOR' || role === 'FINANZAS';
+    return role === "ADMINISTRADOR" || role === "FINANZAS";
   };
 
   /**
    * Obtener nombre completo del usuario
    */
   const getFullName = () => {
-    if (!userProfile) return '';
+    if (!userProfile) return "";
     const { nombre, primer_apellido, segundo_apellido } = userProfile;
-    return `${nombre} ${primer_apellido || ''} ${segundo_apellido || ''}`.trim();
+    return `${nombre} ${primer_apellido || ""} ${segundo_apellido || ""}`.trim();
   };
 
   /**
    * Verificar sesión al cargar la app
    */
-
   useEffect(() => {
-  const checkSession = async () => {
-    try {
-      setLoading(true);
-      
-      // Timeout de 10 segundos
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 10000)
-      );
-      
-      const sessionPromise = supabase.auth.getSession();
-      
-      const { data: { session }, error } = await Promise.race([
-        sessionPromise,
-        timeoutPromise
-      ]);
-      
-      if (error) throw error;
+    let mounted = true;
 
-      if (session?.user) {
-        const profile = await fetchUserProfile(session.user.id);
-        setUser(session.user);
-        setUserProfile(profile);
-      }
-    } catch (error) {
-      console.error('Error en checkSession:', error);
-      setError(error.message);
-      setUser(null);
-      setUserProfile(null);
-      // Limpiar sesión corrupta
-      await supabase.auth.signOut();
-    } finally {
-      setLoading(false);
-    }
-  };
+    const checkSession = async () => {
+      try {
+        // Obtener sesión actual
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
-  checkSession();
+        // Si hay error al obtener la sesión, simplemente marcar como no cargando
+        if (sessionError) {
+          console.error("Error al obtener sesión:", sessionError);
+          if (mounted) {
+            setLoading(false);
+          }
+          return;
+        }
 
-    // Suscribirse a cambios de autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
+        // Si hay sesión válida, obtener el perfil
+        if (session?.user && mounted) {
           try {
             const profile = await fetchUserProfile(session.user.id);
+            if (mounted) {
+              setUser(session.user);
+              setUserProfile(profile);
+            }
+          } catch (profileError) {
+            console.error("Error al obtener perfil:", profileError);
+            // Si falla el perfil pero hay sesión, limpiar todo
+            if (mounted) {
+              setUser(null);
+              setUserProfile(null);
+              // Solo hacer signOut si el error es de permisos
+              if (profileError.message.includes("permisos")) {
+                await supabase.auth.signOut();
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error general en checkSession:", error);
+        // No cerrar sesión automáticamente en caso de error de red
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    checkSession();
+
+    // Suscribirse a cambios de autenticación
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event);
+
+      if (event === "SIGNED_IN" && session?.user) {
+        try {
+          const profile = await fetchUserProfile(session.user.id);
+          if (mounted) {
             setUser(session.user);
             setUserProfile(profile);
-          } catch (error) {
-            console.error('Error al obtener perfil:', error);
+          }
+        } catch (error) {
+          console.error("Error al obtener perfil en auth change:", error);
+          if (mounted) {
             setError(error.message);
           }
-        } else if (event === 'SIGNED_OUT') {
+        }
+      } else if (event === "SIGNED_OUT") {
+        if (mounted) {
           setUser(null);
           setUserProfile(null);
         }
+      } else if (event === "TOKEN_REFRESHED") {
+        console.log("Token refrescado correctamente");
       }
-    );
+    });
 
     // Cleanup
     return () => {
+      mounted = false;
       subscription?.unsubscribe();
     };
   }, []);
@@ -235,12 +263,8 @@ export const AuthProvider = ({ children }) => {
     hasRole,
     canViewAllVales,
     getFullName,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
