@@ -7,22 +7,41 @@
  * - Verificar si el usuario está autenticado
  * - Redireccionar a login si no hay sesión
  * - Mostrar loading mientras verifica sesión
+ * - Botón de cerrar sesión si tarda más de 5 segundos
  * - Validar roles específicos si se requiere
- * - Timeout visual si tarda mucho
  *
  * Usado en: App.jsx para envolver rutas protegidas
  */
 
 // 1. React y hooks
 import { useState, useEffect } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 
 // 2. Hooks personalizados
 import { useAuth } from "../../hooks/useAuth";
 
 const ProtectedRoute = ({ children, requiredRole = null }) => {
-  const { user, userProfile, loading, error } = useAuth();
+  const { user, userProfile, loading, error, signOut } = useAuth();
   const [showTimeout, setShowTimeout] = useState(false);
+  const navigate = useNavigate();
+
+  // Función para cerrar sesión y empezar de cero
+  const handleForceLogout = async () => {
+    try {
+      // Limpiar localStorage completamente
+      localStorage.clear();
+
+      // Cerrar sesión en Supabase
+      await signOut();
+
+      // Recargar la página para limpiar todo el estado
+      window.location.href = "/login";
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+      // Forzar recarga incluso si hay error
+      window.location.href = "/login";
+    }
+  };
 
   // Mostrar mensaje de timeout si tarda más de 5 segundos
   useEffect(() => {
@@ -53,24 +72,60 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
               marginTop: "20px",
               textAlign: "center",
               color: "#F59E0B",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+              alignItems: "center",
             }}
           >
-            <p>La verificación está tomando más tiempo del esperado</p>
-            <button
-              onClick={() => window.location.reload()}
+            <p style={{ margin: "0 0 8px 0" }}>
+              La verificación está tomando más tiempo del esperado
+            </p>
+
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  padding: "10px 20px",
+                  backgroundColor: "#004E89",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: "600",
+                  fontSize: "14px",
+                }}
+              >
+                Reintentar
+              </button>
+
+              <button
+                onClick={handleForceLogout}
+                style={{
+                  padding: "10px 20px",
+                  backgroundColor: "#DC2626",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: "600",
+                  fontSize: "14px",
+                }}
+              >
+                Cerrar Sesión
+              </button>
+            </div>
+
+            <p
               style={{
-                marginTop: "12px",
-                padding: "10px 20px",
-                backgroundColor: "#FF6B35",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontWeight: "600",
+                fontSize: "12px",
+                color: "#7F8C8D",
+                margin: "8px 0 0 0",
+                maxWidth: "300px",
               }}
             >
-              Reintentar
-            </button>
+              Si el problema persiste, intenta cerrar sesión y volver a iniciar
+            </p>
           </div>
         )}
       </div>

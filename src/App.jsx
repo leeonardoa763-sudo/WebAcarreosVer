@@ -1,32 +1,32 @@
 /**
  * src/App.jsx
- * 
+ *
  * Componente principal con router
- * 
+ *
  * Define todas las rutas de la aplicación
  * Envuelve la app con AuthProvider
  * Rutas protegidas con ProtectedRoute
  */
 
 // 1. React y hooks
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 // 2. Config y Context
-import { AuthProvider } from './hooks/useAuth';
+import { AuthProvider } from "./hooks/useAuth";
 
 // 3. Componentes
-import ProtectedRoute from './components/auth/ProtectedRoute';
-import Layout from './components/layout/Layout';
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import Layout from "./components/layout/Layout";
 
 // 4. Pages
-import Login from './pages/Login';
-// import Dashboard from './pages/Dashboard';
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
 // import Vales from './pages/Vales';
 // import Conciliaciones from './pages/Conciliaciones';
 // import VerificarVale from './pages/VerificarVale';
 
 // 5. Estilos
-import './styles/global.css';
+import "./styles/global.css";
 
 const App = () => {
   return (
@@ -45,7 +45,7 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <Layout>
-                  <div>Dashboard - Por implementar</div>
+                  <Dashboard />
                 </Layout>
               </ProtectedRoute>
             }
@@ -74,7 +74,10 @@ const App = () => {
           />
 
           {/* Ruta pública - Verificación de vale sin auth */}
-          <Route path="/vale/:folio" element={<div>Verificar Vale - Por implementar</div>} />
+          <Route
+            path="/vale/:folio"
+            element={<div>Verificar Vale - Por implementar</div>}
+          />
 
           {/* Ruta 404 */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
