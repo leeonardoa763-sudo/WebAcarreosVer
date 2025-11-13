@@ -16,6 +16,7 @@ import { AuthProvider } from './hooks/useAuth';
 
 // 3. Componentes
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import Layout from './components/layout/Layout';
 
 // 4. Pages
 import Login from './pages/Login';
@@ -43,7 +44,9 @@ const App = () => {
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <div>Dashboard - Por implementar</div>
+                <Layout>
+                  <div>Dashboard - Por implementar</div>
+                </Layout>
               </ProtectedRoute>
             }
           />
@@ -52,7 +55,9 @@ const App = () => {
             path="/vales"
             element={
               <ProtectedRoute>
-                <div>Vales - Por implementar</div>
+                <Layout>
+                  <div>Vales - Por implementar</div>
+                </Layout>
               </ProtectedRoute>
             }
           />
@@ -61,7 +66,9 @@ const App = () => {
             path="/conciliaciones"
             element={
               <ProtectedRoute>
-                <div>Conciliaciones - Por implementar</div>
+                <Layout>
+                  <div>Conciliaciones - Por implementar</div>
+                </Layout>
               </ProtectedRoute>
             }
           />

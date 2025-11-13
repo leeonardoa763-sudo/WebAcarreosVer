@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   // Roles permitidos para acceso web
-  const ROLES_PERMITIDOS = ['ADMINISTRADOR', 'FINANZAS', 'SINDICATO'];
+  const ROLES_PERMITIDOS = ['Administrador', 'Finanzas', 'Sindicato'];
 
   /**
    * Obtener perfil completo del usuario con relaciones
@@ -161,34 +161,44 @@ export const AuthProvider = ({ children }) => {
   /**
    * Verificar sesión al cargar la app
    */
+
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        setLoading(true);
-        
-        // Obtener sesión actual
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) throw error;
+  const checkSession = async () => {
+    try {
+      setLoading(true);
+      
+      // Timeout de 10 segundos
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 10000)
+      );
+      
+      const sessionPromise = supabase.auth.getSession();
+      
+      const { data: { session }, error } = await Promise.race([
+        sessionPromise,
+        timeoutPromise
+      ]);
+      
+      if (error) throw error;
 
-        if (session?.user) {
-          // Obtener perfil si hay sesión
-          const profile = await fetchUserProfile(session.user.id);
-          setUser(session.user);
-          setUserProfile(profile);
-        }
-      } catch (error) {
-        console.error('Error en checkSession:', error);
-        setError(error.message);
-        // Si hay error, limpiar sesión
-        setUser(null);
-        setUserProfile(null);
-      } finally {
-        setLoading(false);
+      if (session?.user) {
+        const profile = await fetchUserProfile(session.user.id);
+        setUser(session.user);
+        setUserProfile(profile);
       }
-    };
+    } catch (error) {
+      console.error('Error en checkSession:', error);
+      setError(error.message);
+      setUser(null);
+      setUserProfile(null);
+      // Limpiar sesión corrupta
+      await supabase.auth.signOut();
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    checkSession();
+  checkSession();
 
     // Suscribirse a cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(

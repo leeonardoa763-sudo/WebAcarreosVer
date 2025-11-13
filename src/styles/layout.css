@@ -1,0 +1,184 @@
+/**
+ * src/styles/layout.css
+ * 
+ * Estilos para Navbar, Sidebar y Layout
+ */
+
+/* ========================================
+   LAYOUT PRINCIPAL
+======================================== */
+
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.layout__container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.layout__content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  background: #F5F6FA;
+}
+
+/* ========================================
+   NAVBAR
+======================================== */
+
+.navbar {
+  height: 64px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E5E7EB;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.navbar__left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.navbar__logo {
+  height: 40px;
+  width: auto;
+}
+
+.navbar__title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2C3E50;
+  margin: 0;
+}
+
+.navbar__right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.navbar__user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.navbar__user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2C3E50;
+}
+
+.navbar__user-role {
+  font-size: 12px;
+  color: #7F8C8D;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.navbar__logout {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.navbar__logout:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* ========================================
+   SIDEBAR
+======================================== */
+
+.sidebar {
+  width: 240px;
+  background: #FFFFFF;
+  border-right: 1px solid #E5E7EB;
+  padding: 20px 0;
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 12px;
+}
+
+.sidebar__link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  color: #7F8C8D;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.sidebar__link:hover {
+  background: #F5F6FA;
+  color: #2C3E50;
+}
+
+.sidebar__link--active {
+  background: #FEF3EF;
+  color: #FF6B35;
+  font-weight: 600;
+}
+
+.sidebar__icon {
+  flex-shrink: 0;
+}
+
+.sidebar__text {
+  flex: 1;
+}
+
+/* ========================================
+   RESPONSIVE
+======================================== */
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 200px;
+  }
+
+  .navbar__title {
+    display: none;
+  }
+
+  .layout__content {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .sidebar {
+    position: fixed;
+    left: -240px;
+    height: calc(100vh - 64px);
+    z-index: 100;
+    transition: left 0.3s ease;
+  }
+
+  .navbar__user-name {
+    display: none;
+  }
+}
