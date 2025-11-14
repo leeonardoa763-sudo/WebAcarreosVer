@@ -160,49 +160,6 @@ export const useVales = () => {
   };
 
   /**
-   * Aplicar filtros a la query
-   */
-  const applyFilters = (query) => {
-    // Filtro por obra
-    if (filters.id_obra) {
-      query = query.eq("id_obra", filters.id_obra);
-    }
-
-    // Filtro por tipo de vale
-    if (filters.tipo_vale) {
-      query = query.eq("tipo_vale", filters.tipo_vale);
-    }
-
-    // Filtro por estado
-    if (filters.estado) {
-      query = query.eq("estado", filters.estado);
-    }
-
-    // Filtro por rango de fechas
-    if (filters.fecha_inicio) {
-      query = query.gte("fecha_creacion", filters.fecha_inicio);
-    }
-
-    if (filters.fecha_fin) {
-      // Agregar un día para incluir todo el día final
-      const fechaFinAjustada = new Date(filters.fecha_fin);
-      fechaFinAjustada.setDate(fechaFinAjustada.getDate() + 1);
-      query = query.lt("fecha_creacion", fechaFinAjustada.toISOString());
-    }
-
-    // Búsqueda por término (folio, operador, placas)
-    if (filters.searchTerm) {
-      // Nota: Supabase no soporta OR en el mismo nivel con .select()
-      // Por lo tanto, filtraremos en cliente después de obtener resultados
-      // o usaremos .or() si está disponible
-      const searchUpper = filters.searchTerm.toUpperCase();
-      query = query.or(`folio.ilike.%${searchUpper}%`);
-    }
-
-    return query;
-  };
-
-  /**
    * Obtener vales con filtros y paginación
    */
   const fetchVales = useCallback(async () => {
@@ -213,8 +170,8 @@ export const useVales = () => {
       // Construir query base
       let query = buildBaseQuery();
 
-      // Aplicar filtros
-      query = applyFilters(query);
+      // NO aplicar filtros en el servidor, solo en cliente
+      // query = applyFilters(query);
 
       // RLS filtra automáticamente según el rol del usuario
       // ADMINISTRADOR/FINANZAS: ven todas las obras
@@ -232,18 +189,61 @@ export const useVales = () => {
       // Ejecutar query
       const { data, error, count } = await query;
 
-      //   console.log("=== DEBUG VALES ===");
-      //   console.log("User profile:", userProfile);
-      //   console.log("Role:", userProfile?.roles?.role);
-      //   console.log("Can view all:", canViewAllVales());
-      //   console.log("Vales encontrados:", count);
-      //   console.log("Filtros aplicados:", filters);
-      //   console.log("==================");
+      // console.log("=== DATOS CRUDOS DE SUPABASE ===");
+      // console.log("Total vales:", count);
+      // if (data && data.length > 0) {
+      //   console.log("Primer vale:", data[0]);
+      //   console.log("Detalles material:", data[0].vale_material_detalles);
+      //   console.log("Detalles renta:", data[0].vale_renta_detalle);
+      // }
+      // console.log("================================");
 
       if (error) throw error;
 
-      // Filtrar adicional en cliente si hay búsqueda de operador/placas
+      // FILTRAR TODO EN CLIENTE
       let filteredData = data || [];
+
+      // 1. Filtro por obra
+      if (filters.id_obra) {
+        filteredData = filteredData.filter(
+          (vale) => vale.id_obra === filters.id_obra
+        );
+      }
+
+      // 2. Filtro por tipo de vale
+      if (filters.tipo_vale) {
+        filteredData = filteredData.filter(
+          (vale) => vale.tipo_vale === filters.tipo_vale
+        );
+      }
+
+      // 3. Filtro por estado
+      if (filters.estado) {
+        filteredData = filteredData.filter(
+          (vale) => vale.estado === filters.estado
+        );
+      }
+
+      // 4. Filtro por fecha inicio
+      if (filters.fecha_inicio) {
+        const fechaInicio = new Date(filters.fecha_inicio);
+        filteredData = filteredData.filter((vale) => {
+          const fechaVale = new Date(vale.fecha_creacion);
+          return fechaVale >= fechaInicio;
+        });
+      }
+
+      // 5. Filtro por fecha fin
+      if (filters.fecha_fin) {
+        const fechaFin = new Date(filters.fecha_fin);
+        fechaFin.setDate(fechaFin.getDate() + 1); // Incluir todo el día
+        filteredData = filteredData.filter((vale) => {
+          const fechaVale = new Date(vale.fecha_creacion);
+          return fechaVale < fechaFin;
+        });
+      }
+
+      // 6. Filtro por búsqueda (folio, operador, placas, materiales)
       if (filters.searchTerm) {
         const searchLower = filters.searchTerm.toLowerCase();
         filteredData = filteredData.filter((vale) => {
@@ -252,13 +252,37 @@ export const useVales = () => {
             vale.operadores?.nombre_completo?.toLowerCase() || "";
           const placas = vale.vehiculos?.placas?.toLowerCase() || "";
 
+          // Buscar también en materiales
+          let enMateriales = false;
+          if (vale.tipo_vale === "material" && vale.vale_material_detalles) {
+            enMateriales = vale.vale_material_detalles.some(
+              (detalle) =>
+                detalle.material?.material
+                  ?.toLowerCase()
+                  .includes(searchLower) ||
+                detalle.bancos?.banco?.toLowerCase().includes(searchLower)
+            );
+          }
+
+          // Buscar también en renta
+          let enRenta = false;
+          if (vale.tipo_vale === "renta" && vale.vale_renta_detalle) {
+            enRenta = vale.vale_renta_detalle.some((detalle) =>
+              detalle.material?.material?.toLowerCase().includes(searchLower)
+            );
+          }
+
           return (
             folio.includes(searchLower) ||
             operador.includes(searchLower) ||
-            placas.includes(searchLower)
+            placas.includes(searchLower) ||
+            enMateriales ||
+            enRenta
           );
         });
       }
+
+      setVales(filteredData);
 
       setVales(filteredData);
 
