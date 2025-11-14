@@ -28,17 +28,14 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   // Función para cerrar sesión y empezar de cero
   const handleForceLogout = async () => {
     try {
-      // Limpiar localStorage completamente
+      // Limpiar localStorage
       localStorage.clear();
 
-      // Cerrar sesión en Supabase
+      // Cerrar sesión (ya redirige automáticamente)
       await signOut();
-
-      // Recargar la página para limpiar todo el estado
-      window.location.href = "/login";
     } catch (error) {
       console.error("Error al cerrar sesión:", error);
-      // Forzar recarga incluso si hay error
+      // Forzar redirección
       window.location.href = "/login";
     }
   };

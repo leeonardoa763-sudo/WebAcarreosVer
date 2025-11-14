@@ -123,17 +123,19 @@ export const AuthProvider = ({ children }) => {
    */
   const signOut = async () => {
     try {
-      setLoading(true);
+      // No mostrar loading en signOut para evitar bloqueo visual
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
       setUser(null);
       setUserProfile(null);
+
+      // Redirigir inmediatamente a login
+      window.location.href = "/login";
     } catch (error) {
       console.error("Error en signOut:", error);
-      setError(error.message);
-    } finally {
-      setLoading(false);
+      // Forzar redirección incluso si hay error
+      window.location.href = "/login";
     }
   };
 

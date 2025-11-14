@@ -1,26 +1,28 @@
 /**
  * src/components/layout/Navbar.jsx
- * 
+ *
  * Barra de navegación superior
  * Muestra logo, nombre usuario y botón logout
  */
 
 // 1. React y hooks
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 
 // 2. Hooks personalizados
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from "../../hooks/useAuth";
 
 // 3. Config
-import { colors } from '../../config/colors';
+import { colors } from "../../config/colors";
+import { supabase } from "../../config/supabase";
 
 const Navbar = () => {
-  const { userProfile, getFullName, signOut } = useAuth();
+  const { userProfile, getFullName } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/login');
+  const handleLogout = () => {
+    localStorage.clear();
+    supabase.auth.signOut();
+    window.location.href = "/login";
   };
 
   return (
@@ -35,8 +37,8 @@ const Navbar = () => {
           <span className="navbar__user-name">{getFullName()}</span>
           <span className="navbar__user-role">{userProfile?.roles?.role}</span>
         </div>
-        
-        <button 
+
+        <button
           onClick={handleLogout}
           className="navbar__logout"
           style={{ backgroundColor: colors.primary }}

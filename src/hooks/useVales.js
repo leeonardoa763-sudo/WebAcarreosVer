@@ -232,13 +232,13 @@ export const useVales = () => {
       // Ejecutar query
       const { data, error, count } = await query;
 
-      console.log("=== DEBUG VALES ===");
-      console.log("User profile:", userProfile);
-      console.log("Role:", userProfile?.roles?.role);
-      console.log("Can view all:", canViewAllVales());
-      console.log("Vales encontrados:", count);
-      console.log("Filtros aplicados:", filters);
-      console.log("==================");
+      //   console.log("=== DEBUG VALES ===");
+      //   console.log("User profile:", userProfile);
+      //   console.log("Role:", userProfile?.roles?.role);
+      //   console.log("Can view all:", canViewAllVales());
+      //   console.log("Vales encontrados:", count);
+      //   console.log("Filtros aplicados:", filters);
+      //   console.log("==================");
 
       if (error) throw error;
 
@@ -515,7 +515,13 @@ export const useVales = () => {
     if (userProfile) {
       fetchVales();
     }
-  }, [fetchVales, userProfile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    filters,
+    pagination.currentPage,
+    pagination.pageSize,
+    userProfile?.id_persona,
+  ]);
 
   return {
     // Datos
