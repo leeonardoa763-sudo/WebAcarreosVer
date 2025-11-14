@@ -23,7 +23,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Vales from "./pages/Vales";
 // import Conciliaciones from './pages/Conciliaciones';
-// import VerificarVale from './pages/VerificarVale';
+import VerificarVales from "./pages/VerificarVales";
 
 // 5. Estilos
 import "./styles/global.css";
@@ -57,6 +57,17 @@ const App = () => {
               <ProtectedRoute>
                 <Layout>
                   <Vales />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/verificar-vales"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <VerificarVales />
                 </Layout>
               </ProtectedRoute>
             }
