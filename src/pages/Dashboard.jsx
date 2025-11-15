@@ -103,8 +103,10 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    fetchStats();
-  }, []);
+    if (userProfile) {
+      fetchStats();
+    }
+  }, [userProfile?.id_persona, canViewAllVales()]);
 
   if (loading) {
     return (

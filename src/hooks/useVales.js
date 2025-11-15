@@ -56,29 +56,16 @@ export const useVales = () => {
   /**
    * Obtener catálogo de obras
    */
-  const fetchObras = async () => {
+  const fetchObras = useCallback(async () => {
     try {
+      setLoadingCatalogos(true);
+
       let query = supabase
         .from("obras")
-        .select(
-          `
-          id_obra,
-          obra,
-          cc,
-          empresas:id_empresa (
-            empresa,
-            sufijo
-          )
-        `
-        )
+        .select(/* ... */)
         .order("obra", { ascending: true });
 
-      // RLS maneja el filtrado automáticamente
-      // ADMINISTRADOR/FINANZAS: ven todas las obras
-      // Otros roles: solo su obra actual
-
       const { data, error } = await query;
-
       if (error) throw error;
       setObras(data || []);
     } catch (error) {
@@ -86,7 +73,7 @@ export const useVales = () => {
     } finally {
       setLoadingCatalogos(false);
     }
-  };
+  }, []); // Sin dependencias porque no usa nada externo
 
   /**
    * Construir query base con relaciones
@@ -530,18 +517,22 @@ export const useVales = () => {
    */
   useEffect(() => {
     fetchObras();
-  }, []);
+  }, [fetchObras]);
 
   /**
    * Efecto para cargar vales cuando cambian filtros o paginación
    */
   useEffect(() => {
-    if (userProfile) {
+    if (userProfile?.id_persona) {
       fetchVales();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    filters,
+    filters.searchTerm,
+    filters.id_obra,
+    filters.tipo_vale,
+    filters.estado,
+    filters.fecha_inicio,
+    filters.fecha_fin,
     pagination.currentPage,
     pagination.pageSize,
     userProfile?.id_persona,

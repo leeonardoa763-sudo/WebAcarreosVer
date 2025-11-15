@@ -113,14 +113,16 @@ const VerificarVales = () => {
 
     const results = await verificarBatch(valesParaVerificar);
 
+    await fetchValesVerificados();
+
     const totalVerified = results.verified.length;
     const totalErrors = results.errors.length;
 
     if (totalVerified > 0) {
       setSuccessMessage(
-        `${totalVerified} vale${totalVerified !== 1 ? "s" : ""} verificado${totalVerified !== 1 ? "s" : ""} correctamente${
-          totalErrors > 0 ? `. ${totalErrors} con errores` : ""
-        }`
+        `${totalVerified} vale${totalVerified !== 1 ? "s" : ""} verificado${
+          totalVerified !== 1 ? "s" : ""
+        } correctamente${totalErrors > 0 ? `. ${totalErrors} con errores` : ""}`
       );
       setStep("success");
 
@@ -150,10 +152,10 @@ const VerificarVales = () => {
   };
 
   useEffect(() => {
-    if (userProfile) {
+    if (userProfile?.id_persona) {
       fetchValesVerificados();
     }
-  }, [userProfile?.id_persona]); // Solo cuando cambie el ID del usuario
+  }, [userProfile?.id_persona]);
 
   return (
     <div className="verificar-vales__main">

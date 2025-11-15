@@ -285,6 +285,8 @@ export const useVerificacion = () => {
    * Obtener vales verificados recientemente
    */
   const fetchValesVerificados = useCallback(async () => {
+    if (!userProfile?.id_persona) return;
+
     try {
       setLoadingVerificados(true);
 
@@ -296,13 +298,8 @@ export const useVerificacion = () => {
           folio,
           fecha_verificacion,
           tipo_vale,
-          obras:id_obra (
-            obra
-          ),
-          persona:id_persona_verificador (
-            nombre,
-            primer_apellido
-          )
+          obras:id_obra (obra),
+          persona:id_persona_verificador (nombre, primer_apellido)
         `
         )
         .eq("verificado_por_sindicato", true)
@@ -310,12 +307,12 @@ export const useVerificacion = () => {
         .limit(10);
 
       // Si es sindicato, solo mostrar los que él verificó
-      if (hasRole("Sindicato")) {
+      const roleSindicato = userProfile?.roles?.role === "Sindicato";
+      if (roleSindicato) {
         query = query.eq("id_persona_verificador", userProfile.id_persona);
       }
 
       const { data, error: fetchError } = await query;
-
       if (fetchError) throw fetchError;
 
       setValesVerificados(data || []);
@@ -324,7 +321,7 @@ export const useVerificacion = () => {
     } finally {
       setLoadingVerificados(false);
     }
-  }, [userProfile, hasRole]);
+  }, [userProfile?.id_persona, userProfile?.roles?.role]);
 
   /**
    * Limpiar estados
@@ -396,11 +393,10 @@ export const useVerificacion = () => {
       console.log(`❌ Errores: ${results.errors.length}`);
 
       setProcessing(false);
-      await fetchValesVerificados();
 
       return results;
     },
-    [userProfile, fetchValesVerificados]
+    [userProfile?.id_persona]
   );
 
   /**

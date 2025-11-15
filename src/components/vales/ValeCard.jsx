@@ -74,7 +74,7 @@ const ValeCard = ({ vale, empresaColor }) => {
     return (
       <div className="vale-card__detalles-section">
         <h4 className="vale-card__section-title">
-          <Package size={16} />
+          <Package size={16} aria-hidden="true" />
           Detalles de Material
         </h4>
 
@@ -175,7 +175,7 @@ const ValeCard = ({ vale, empresaColor }) => {
     return (
       <div className="vale-card__detalles-section">
         <h4 className="vale-card__section-title">
-          <Clock size={16} />
+          <Clock size={16} aria-hidden="true" />
           Detalles de Renta
         </h4>
 
@@ -349,18 +349,38 @@ const ValeCard = ({ vale, empresaColor }) => {
           </div>
         </div>
 
-        <button className="vale-card-compact__toggle" aria-label="Ver detalles">
-          {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="vale-card-compact__toggle"
+          aria-expanded={isExpanded}
+          aria-label={`${isExpanded ? "Contraer" : "Expandir"} detalles del vale ${formatearFolio(vale.folio)}`}
+          aria-controls={`vale-details-${vale.id_vale}`}
+          type="button"
+        >
+          {isExpanded ? (
+            <ChevronUp size={20} aria-hidden="true" />
+          ) : (
+            <ChevronDown size={20} aria-hidden="true" />
+          )}
         </button>
       </div>
 
       {/* Detalles expandidos */}
       {isExpanded && (
-        <div className="vale-card-compact__body">
+        <div
+          id={`vale-details-${vale.id_vale}`}
+          className="vale-card-compact__body"
+          role="region"
+          aria-label={`Detalles completos del vale ${formatearFolio(vale.folio)}`}
+        >
           {/* Información general */}
           <div className="vale-card__info-general">
             <div className="vale-card__info-row-expanded">
-              <Building2 size={16} className="vale-card__icon" />
+              <Building2
+                size={16}
+                className="vale-card__icon"
+                aria-hidden="true"
+              />
               <div>
                 <span className="vale-card__label">Obra:</span>
                 <span className="vale-card__value">
@@ -374,7 +394,11 @@ const ValeCard = ({ vale, empresaColor }) => {
             </div>
 
             <div className="vale-card__info-row-expanded">
-              <Calendar size={16} className="vale-card__icon" />
+              <Calendar
+                size={16}
+                className="vale-card__icon"
+                aria-hidden="true"
+              />
               <div>
                 <span className="vale-card__label">Fecha de Creación:</span>
                 <span className="vale-card__value">
@@ -384,7 +408,11 @@ const ValeCard = ({ vale, empresaColor }) => {
             </div>
 
             <div className="vale-card__info-row-expanded">
-              <UserCheck size={16} className="vale-card__icon" />
+              <UserCheck
+                size={16}
+                className="vale-card__icon"
+                aria-hidden="true"
+              />
               <div>
                 <span className="vale-card__label">Residente:</span>
                 <span className="vale-card__value">{getNombreResidente()}</span>
@@ -393,7 +421,11 @@ const ValeCard = ({ vale, empresaColor }) => {
 
             {vale.operadores && (
               <div className="vale-card__info-row-expanded">
-                <User size={16} className="vale-card__icon" />
+                <User
+                  size={16}
+                  className="vale-card__icon"
+                  aria-hidden="true"
+                />
                 <div>
                   <span className="vale-card__label">Operador:</span>
                   <span className="vale-card__value">

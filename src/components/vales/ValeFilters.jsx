@@ -9,6 +9,7 @@
  * - Filtro por estado
  * - Filtro por rango de fechas
  * - Aplicar y limpiar filtros
+ * - Accesibilidad completa con labels y ARIA
  *
  * Usado en: Vales.jsx
  */
@@ -71,6 +72,17 @@ const ValeFilters = ({ filters, updateFilters, onClose }) => {
    * Aplicar filtros
    */
   const handleApplyFilters = () => {
+    // Validar rango de fechas
+    if (localFilters.fecha_inicio && localFilters.fecha_fin) {
+      const inicio = new Date(localFilters.fecha_inicio);
+      const fin = new Date(localFilters.fecha_fin);
+
+      if (inicio > fin) {
+        alert("La fecha de inicio no puede ser posterior a la fecha fin");
+        return;
+      }
+    }
+
     // Convertir valores vacíos a null
     const filtersToApply = {
       id_obra: localFilters.id_obra ? parseInt(localFilters.id_obra) : null,
@@ -112,7 +124,13 @@ const ValeFilters = ({ filters, updateFilters, onClose }) => {
         ? formatearFechaInput(filters.fecha_fin)
         : "",
     });
-  }, [filters]);
+  }, [
+    filters.id_obra,
+    filters.tipo_vale,
+    filters.estado,
+    filters.fecha_inicio,
+    filters.fecha_fin,
+  ]);
 
   return (
     <div className="vale-filters">
@@ -123,15 +141,17 @@ const ValeFilters = ({ filters, updateFilters, onClose }) => {
       <div className="vale-filters__body">
         {/* Filtro por Obra */}
         <div className="vale-filters__field">
-          <label className="vale-filters__label">
-            <Building2 size={16} />
+          <label htmlFor="filter-obra" className="vale-filters__label">
+            <Building2 size={16} aria-hidden="true" />
             <span>Obra</span>
           </label>
           <select
+            id="filter-obra"
             value={localFilters.id_obra}
             onChange={(e) => handleInputChange("id_obra", e.target.value)}
             className="vale-filters__select"
             disabled={loadingCatalogos}
+            aria-label="Seleccionar obra para filtrar"
           >
             <option value="">Todas las obras</option>
             {obras.map((obra) => (
@@ -144,14 +164,16 @@ const ValeFilters = ({ filters, updateFilters, onClose }) => {
 
         {/* Filtro por Tipo de Vale */}
         <div className="vale-filters__field">
-          <label className="vale-filters__label">
-            <FileType size={16} />
+          <label htmlFor="filter-tipo-vale" className="vale-filters__label">
+            <FileType size={16} aria-hidden="true" />
             <span>Tipo de Vale</span>
           </label>
           <select
+            id="filter-tipo-vale"
             value={localFilters.tipo_vale}
             onChange={(e) => handleInputChange("tipo_vale", e.target.value)}
             className="vale-filters__select"
+            aria-label="Seleccionar tipo de vale para filtrar"
           >
             <option value="">Todos los tipos</option>
             {tipos.map((tipo) => (
@@ -164,14 +186,16 @@ const ValeFilters = ({ filters, updateFilters, onClose }) => {
 
         {/* Filtro por Estado */}
         <div className="vale-filters__field">
-          <label className="vale-filters__label">
-            <AlertCircle size={16} />
+          <label htmlFor="filter-estado" className="vale-filters__label">
+            <AlertCircle size={16} aria-hidden="true" />
             <span>Estado</span>
           </label>
           <select
+            id="filter-estado"
             value={localFilters.estado}
             onChange={(e) => handleInputChange("estado", e.target.value)}
             className="vale-filters__select"
+            aria-label="Seleccionar estado del vale para filtrar"
           >
             <option value="">Todos los estados</option>
             {estados.map((estado) => (
@@ -184,30 +208,43 @@ const ValeFilters = ({ filters, updateFilters, onClose }) => {
 
         {/* Filtro por Rango de Fechas */}
         <div className="vale-filters__field">
-          <label className="vale-filters__label">
-            <Calendar size={16} />
+          <label htmlFor="filter-fecha-inicio" className="vale-filters__label">
+            <Calendar size={16} aria-hidden="true" />
             <span>Fecha Inicio</span>
           </label>
           <input
+            id="filter-fecha-inicio"
             type="date"
             value={localFilters.fecha_inicio}
             onChange={(e) => handleInputChange("fecha_inicio", e.target.value)}
             className="vale-filters__input"
+            aria-label="Seleccionar fecha de inicio para filtrar"
+            aria-describedby="fecha-inicio-help"
           />
+          <span id="fecha-inicio-help" className="sr-only">
+            Fecha desde la cual buscar vales
+          </span>
         </div>
 
         <div className="vale-filters__field">
-          <label className="vale-filters__label">
-            <Calendar size={16} />
+          <label htmlFor="filter-fecha-fin" className="vale-filters__label">
+            <Calendar size={16} aria-hidden="true" />
             <span>Fecha Fin</span>
           </label>
           <input
+            id="filter-fecha-fin"
             type="date"
             value={localFilters.fecha_fin}
             onChange={(e) => handleInputChange("fecha_fin", e.target.value)}
             className="vale-filters__input"
             min={localFilters.fecha_inicio}
+            aria-label="Seleccionar fecha fin para filtrar"
+            aria-describedby="fecha-fin-help"
           />
+          <span id="fecha-fin-help" className="sr-only">
+            Fecha hasta la cual buscar vales. Debe ser posterior a la fecha de
+            inicio
+          </span>
         </div>
       </div>
 
@@ -216,6 +253,8 @@ const ValeFilters = ({ filters, updateFilters, onClose }) => {
         <button
           onClick={handleClearLocal}
           className="vale-filters__button vale-filters__button--secondary"
+          type="button"
+          aria-label="Limpiar todos los filtros"
         >
           Limpiar
         </button>
@@ -223,6 +262,8 @@ const ValeFilters = ({ filters, updateFilters, onClose }) => {
           onClick={handleApplyFilters}
           className="vale-filters__button vale-filters__button--primary"
           style={{ backgroundColor: colors.primary }}
+          type="button"
+          aria-label="Aplicar los filtros seleccionados"
         >
           Aplicar Filtros
         </button>

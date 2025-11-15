@@ -9,6 +9,7 @@
  * - Dentro de obra/material, agrupar por tipo de material (solo para material)
  * - Grupos colapsables/expandibles
  * - Tarjetas compactas con desplegable
+ * - Accesibilidad completa con ARIA
  *
  * Usado en: Vales.jsx
  */
@@ -136,17 +137,31 @@ const ValesList = ({ vales }) => {
         <button
           className="vales-group-tipo__header"
           onClick={() => toggleGroup(tipoGroupId)}
+          aria-expanded={!tipoCollapsed}
+          aria-controls={tipoGroupId}
+          aria-label={`${tipoCollapsed ? "Expandir" : "Contraer"} grupo de vales de material. ${Object.values(
+            valesAgrupados.material
+          ).reduce(
+            (total, obra) =>
+              total +
+              Object.values(obra.materiales).reduce(
+                (sum, vales) => sum + vales.length,
+                0
+              ),
+            0
+          )} vales`}
+          type="button"
         >
           <div className="vales-group-tipo__title">
             {tipoCollapsed ? (
-              <ChevronRight size={20} />
+              <ChevronRight size={20} aria-hidden="true" />
             ) : (
-              <ChevronDown size={20} />
+              <ChevronDown size={20} aria-hidden="true" />
             )}
-            <Package size={22} />
+            <Package size={22} aria-hidden="true" />
             <h3>VALES DE MATERIAL</h3>
           </div>
-          <span className="vales-group-tipo__count">
+          <span className="vales-group-tipo__count" aria-hidden="true">
             {Object.values(valesAgrupados.material).reduce(
               (total, obra) =>
                 total +
@@ -161,7 +176,12 @@ const ValesList = ({ vales }) => {
         </button>
 
         {!tipoCollapsed && (
-          <div className="vales-group-tipo__content">
+          <div
+            id={tipoGroupId}
+            className="vales-group-tipo__content"
+            role="region"
+            aria-label="Contenido de vales de material"
+          >
             {materialObras.map(([idObra, obraData]) => {
               const obraGroupId = `material-obra-${idObra}`;
               const obraCollapsed = isCollapsed(obraGroupId);
@@ -173,12 +193,18 @@ const ValesList = ({ vales }) => {
                     className="vales-group-obra__header"
                     onClick={() => toggleGroup(obraGroupId)}
                     style={{ borderLeft: `4px solid ${empresaColor}` }}
+                    aria-expanded={!obraCollapsed}
+                    aria-controls={obraGroupId}
+                    aria-label={`${obraCollapsed ? "Expandir" : "Contraer"} obra ${obraData.nombre}. ${Object.values(
+                      obraData.materiales
+                    ).reduce((sum, vales) => sum + vales.length, 0)} vales`}
+                    type="button"
                   >
                     <div className="vales-group-obra__title">
                       {obraCollapsed ? (
-                        <ChevronRight size={18} />
+                        <ChevronRight size={18} aria-hidden="true" />
                       ) : (
-                        <ChevronDown size={18} />
+                        <ChevronDown size={18} aria-hidden="true" />
                       )}
                       <div>
                         <h4>{obraData.nombre}</h4>
@@ -187,7 +213,10 @@ const ValesList = ({ vales }) => {
                         </span>
                       </div>
                     </div>
-                    <span className="vales-group-obra__count">
+                    <span
+                      className="vales-group-obra__count"
+                      aria-hidden="true"
+                    >
                       {Object.values(obraData.materiales).reduce(
                         (sum, vales) => sum + vales.length,
                         0
@@ -197,7 +226,12 @@ const ValesList = ({ vales }) => {
                   </button>
 
                   {!obraCollapsed && (
-                    <div className="vales-group-obra__content">
+                    <div
+                      id={obraGroupId}
+                      className="vales-group-obra__content"
+                      role="region"
+                      aria-label={`Contenido de la obra ${obraData.nombre}`}
+                    >
                       {Object.entries(obraData.materiales).map(
                         ([nombreMaterial, valesMaterial]) => {
                           const materialGroupId = `material-obra-${idObra}-${nombreMaterial}`;
@@ -212,16 +246,26 @@ const ValesList = ({ vales }) => {
                               <button
                                 className="vales-group-material__header"
                                 onClick={() => toggleGroup(materialGroupId)}
+                                aria-expanded={!materialCollapsed}
+                                aria-controls={materialGroupId}
+                                aria-label={`${materialCollapsed ? "Expandir" : "Contraer"} material ${nombreMaterial}. ${valesMaterial.length} ${valesMaterial.length === 1 ? "vale" : "vales"}`}
+                                type="button"
                               >
                                 <div className="vales-group-material__title">
                                   {materialCollapsed ? (
-                                    <ChevronRight size={16} />
+                                    <ChevronRight
+                                      size={16}
+                                      aria-hidden="true"
+                                    />
                                   ) : (
-                                    <ChevronDown size={16} />
+                                    <ChevronDown size={16} aria-hidden="true" />
                                   )}
                                   <span>{nombreMaterial}</span>
                                 </div>
-                                <span className="vales-group-material__count">
+                                <span
+                                  className="vales-group-material__count"
+                                  aria-hidden="true"
+                                >
                                   {valesMaterial.length}{" "}
                                   {valesMaterial.length === 1
                                     ? "vale"
@@ -230,7 +274,12 @@ const ValesList = ({ vales }) => {
                               </button>
 
                               {!materialCollapsed && (
-                                <div className="vales-group-material__content">
+                                <div
+                                  id={materialGroupId}
+                                  className="vales-group-material__content"
+                                  role="region"
+                                  aria-label={`Contenido de vales de material ${nombreMaterial}`}
+                                >
                                   {valesMaterial.map((vale) => (
                                     <ValeCard
                                       key={vale.id_vale}
@@ -271,17 +320,23 @@ const ValesList = ({ vales }) => {
         <button
           className="vales-group-tipo__header"
           onClick={() => toggleGroup(tipoGroupId)}
+          aria-expanded={!tipoCollapsed}
+          aria-controls={tipoGroupId}
+          aria-label={`${tipoCollapsed ? "Expandir" : "Contraer"} grupo de vales de renta. ${Object.values(
+            valesAgrupados.renta
+          ).reduce((total, obra) => total + obra.vales.length, 0)} vales`}
+          type="button"
         >
           <div className="vales-group-tipo__title">
             {tipoCollapsed ? (
-              <ChevronRight size={20} />
+              <ChevronRight size={20} aria-hidden="true" />
             ) : (
-              <ChevronDown size={20} />
+              <ChevronDown size={20} aria-hidden="true" />
             )}
-            <Truck size={22} />
+            <Truck size={22} aria-hidden="true" />
             <h3>VALES DE RENTA</h3>
           </div>
-          <span className="vales-group-tipo__count">
+          <span className="vales-group-tipo__count" aria-hidden="true">
             {Object.values(valesAgrupados.renta).reduce(
               (total, obra) => total + obra.vales.length,
               0
@@ -291,7 +346,12 @@ const ValesList = ({ vales }) => {
         </button>
 
         {!tipoCollapsed && (
-          <div className="vales-group-tipo__content">
+          <div
+            id={tipoGroupId}
+            className="vales-group-tipo__content"
+            role="region"
+            aria-label="Contenido de vales de renta"
+          >
             {rentaObras.map(([idObra, obraData]) => {
               const obraGroupId = `renta-obra-${idObra}`;
               const obraCollapsed = isCollapsed(obraGroupId);
@@ -303,12 +363,16 @@ const ValesList = ({ vales }) => {
                     className="vales-group-obra__header"
                     onClick={() => toggleGroup(obraGroupId)}
                     style={{ borderLeft: `4px solid ${empresaColor}` }}
+                    aria-expanded={!obraCollapsed}
+                    aria-controls={obraGroupId}
+                    aria-label={`${obraCollapsed ? "Expandir" : "Contraer"} obra ${obraData.nombre}. ${obraData.vales.length} ${obraData.vales.length === 1 ? "vale" : "vales"}`}
+                    type="button"
                   >
                     <div className="vales-group-obra__title">
                       {obraCollapsed ? (
-                        <ChevronRight size={18} />
+                        <ChevronRight size={18} aria-hidden="true" />
                       ) : (
-                        <ChevronDown size={18} />
+                        <ChevronDown size={18} aria-hidden="true" />
                       )}
                       <div>
                         <h4>{obraData.nombre}</h4>
@@ -317,14 +381,22 @@ const ValesList = ({ vales }) => {
                         </span>
                       </div>
                     </div>
-                    <span className="vales-group-obra__count">
+                    <span
+                      className="vales-group-obra__count"
+                      aria-hidden="true"
+                    >
                       {obraData.vales.length}{" "}
                       {obraData.vales.length === 1 ? "vale" : "vales"}
                     </span>
                   </button>
 
                   {!obraCollapsed && (
-                    <div className="vales-group-obra__content">
+                    <div
+                      id={obraGroupId}
+                      className="vales-group-obra__content"
+                      role="region"
+                      aria-label={`Contenido de la obra ${obraData.nombre}`}
+                    >
                       <div className="vales-group-material__content">
                         {obraData.vales.map((vale) => (
                           <ValeCard
