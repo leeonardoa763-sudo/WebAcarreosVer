@@ -40,7 +40,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storageKey: "vales-auth-token",
 
     // Debug en desarrollo (solo aparece en consola)
-    debug: import.meta.env.DEV,
+    debug: false,
   },
   global: {
     headers: {
@@ -50,14 +50,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 // Listener para debugging (solo en desarrollo)
-if (import.meta.env.DEV) {
-  supabase.auth.onAuthStateChange((event, session) => {
-    console.log(`[Supabase Auth] Event: ${event}`, {
-      hasSession: !!session,
-      userId: session?.user?.id,
-      expiresAt: session?.expires_at
-        ? new Date(session.expires_at * 1000).toLocaleString()
-        : "N/A",
-    });
-  });
-}
+// if (import.meta.env.DEV) {
+//   supabase.auth.onAuthStateChange((event, session) => {
+//     console.log(`[Supabase Auth] Event: ${event}`, {
+//       hasSession: !!session,
+//       userId: session?.user?.id,
+//       expiresAt: session?.expires_at
+//         ? new Date(session.expires_at * 1000).toLocaleString()
+//         : "N/A",
+//     });
+//   });
+// }

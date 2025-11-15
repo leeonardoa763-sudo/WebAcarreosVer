@@ -174,30 +174,48 @@ export const useVerificacion = () => {
         `
           )
           .eq("folio", folio)
-          .single();
+          .maybeSingle(); // Cambio aquí
 
-        if (searchError) throw searchError;
-        if (!data) throw new Error("Vale no encontrado en el sistema.");
-
-        // Validaciones
-        if (data.verificado_por_sindicato) {
-          throw new Error("Este vale ya fue verificado anteriormente.");
+        // Si hay error de query
+        if (searchError) {
+          throw new Error(`Error al buscar vale: ${searchError.message}`);
         }
 
-        if (data.estado !== "emitido") {
-          throw new Error(
-            `El vale no está en estado emitido. Estado actual: ${data.estado}`
-          );
+        // Si no se encontró el vale (RLS lo bloqueó o no existe)
+        if (!data) {
+          // Si es sindicato, el RLS puede estar bloqueando el acceso
+          if (hasRole("Sindicato")) {
+            throw new Error(
+              "Vale no encontrado o no pertenece a su sindicato."
+            );
+          }
+          throw new Error("Vale no encontrado en el sistema.");
         }
 
-        // Validación de sindicato
+        // VALIDACIÓN 1: Verificar sindicato (solo para rol Sindicato)
         if (hasRole("Sindicato")) {
           const sindicatoOperador = data.operadores?.sindicatos?.id_sindicato;
           const sindicatoUsuario = userProfile?.id_sindicato;
 
+          if (!sindicatoOperador) {
+            throw new Error("El vale no tiene operador asignado.");
+          }
+
           if (sindicatoOperador !== sindicatoUsuario) {
             throw new Error("Este vale no pertenece a su sindicato.");
           }
+        }
+
+        // VALIDACIÓN 2: Verificar si ya fue verificado
+        if (data.verificado_por_sindicato) {
+          throw new Error("Este vale ya fue verificado anteriormente.");
+        }
+
+        // VALIDACIÓN 3: Verificar estado
+        if (data.estado !== "emitido") {
+          throw new Error(
+            `El vale no está en estado emitido. Estado actual: ${data.estado}`
+          );
         }
 
         setCurrentVale(data);
@@ -205,10 +223,10 @@ export const useVerificacion = () => {
       } catch (error) {
         console.error("Error en buscarValePorFolio:", error);
         setError(error.message);
-        setCurrentVale(null); // Limpiar vale actual
+        setCurrentVale(null);
         return { success: false, error: error.message };
       } finally {
-        setProcessing(false); // Siempre ejecutar
+        setProcessing(false);
       }
     },
     [userProfile, hasRole]
@@ -317,6 +335,171 @@ export const useVerificacion = () => {
     setError(null);
   }, []);
 
+  /**
+   * Verificar múltiples vales en lote
+   */
+  const verificarBatch = useCallback(
+    async (valesParaVerificar) => {
+      console.log(
+        `=== INICIANDO VERIFICACIÓN MASIVA: ${valesParaVerificar.length} vales ===`
+      );
+
+      const results = {
+        verified: [],
+        errors: [],
+      };
+
+      setProcessing(true);
+
+      for (let i = 0; i < valesParaVerificar.length; i++) {
+        const item = valesParaVerificar[i];
+        console.log(
+          `\n[${i + 1}/${valesParaVerificar.length}] Verificando: ${item.folio}`
+        );
+
+        try {
+          const { data, error: rpcError } = await supabase.rpc(
+            "verificar_vale",
+            {
+              p_folio: item.folio,
+              p_id_persona_verificador: userProfile.id_persona,
+            }
+          );
+
+          if (rpcError) throw rpcError;
+          if (!data.success) throw new Error(data.error);
+
+          console.log(`  ✓ Vale ${item.folio} verificado correctamente`);
+
+          // Registrar acción
+          await supabase.from("vale_accesos").insert({
+            id_vale: item.vale.id_vale,
+            id_persona: userProfile.id_persona,
+            tipo_accion: "verificacion_sindicato",
+            user_agent: navigator.userAgent,
+          });
+
+          results.verified.push(item);
+        } catch (error) {
+          console.log(
+            `  ❌ Error al verificar ${item.folio}: ${error.message}`
+          );
+          results.errors.push({
+            ...item,
+            error: error.message,
+          });
+        }
+      }
+
+      console.log("\n=== VERIFICACIÓN COMPLETADA ===");
+      console.log(`✓ Verificados: ${results.verified.length}`);
+      console.log(`❌ Errores: ${results.errors.length}`);
+
+      setProcessing(false);
+      await fetchValesVerificados();
+
+      return results;
+    },
+    [userProfile, fetchValesVerificados]
+  );
+
+  /**
+   * Procesar múltiples PDFs en lote
+   */
+  const processBatch = useCallback(
+    async (files) => {
+      console.log(
+        `=== INICIANDO PROCESAMIENTO MASIVO: ${files.length} archivos ===`
+      );
+
+      const results = {
+        success: [],
+        alreadyVerified: [],
+        errors: [],
+      };
+
+      setProcessing(true);
+      setError(null);
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        console.log(`\n[${i + 1}/${files.length}] Procesando: ${file.name}`);
+
+        try {
+          // Extraer folio
+          console.log("  - Extrayendo folio...");
+          const extractResult = await processPDF(file);
+
+          if (!extractResult.success) {
+            console.log("  ❌ Error al extraer folio:", extractResult.error);
+            results.errors.push({
+              fileName: file.name,
+              error: extractResult.error,
+            });
+            continue;
+          }
+
+          console.log(`  ✓ Folio extraído: ${extractResult.folio}`);
+
+          // Buscar vale
+          console.log("  - Buscando vale en BD...");
+          const searchResult = await buscarValePorFolio(extractResult.folio);
+
+          if (!searchResult.success) {
+            console.log("  ❌ Error al buscar vale:", searchResult.error);
+
+            if (searchResult.error.includes("ya fue verificado")) {
+              console.log("  ⚠️ Vale ya verificado anteriormente");
+              results.alreadyVerified.push({
+                fileName: file.name,
+                folio: extractResult.folio,
+              });
+            } else {
+              results.errors.push({
+                fileName: file.name,
+                folio: extractResult.folio,
+                error: searchResult.error,
+              });
+            }
+
+            // Limpiar estados antes de continuar
+            setCurrentVale(null);
+            setExtractedFolio(null);
+            continue;
+          }
+
+          console.log("  ✓ Vale encontrado y válido");
+
+          // Agregar a lista de éxitos
+          results.success.push({
+            fileName: file.name,
+            folio: extractResult.folio,
+            vale: searchResult.vale,
+          });
+        } catch (error) {
+          console.log(`  ❌ Error inesperado: ${error.message}`);
+          results.errors.push({
+            fileName: file.name,
+            error: error.message,
+          });
+        }
+
+        // Limpiar estados entre archivos
+        setCurrentVale(null);
+        setExtractedFolio(null);
+      }
+
+      console.log("\n=== RESULTADOS FINALES ===");
+      console.log(`✓ Éxitos: ${results.success.length}`);
+      console.log(`⚠️ Ya verificados: ${results.alreadyVerified.length}`);
+      console.log(`❌ Errores: ${results.errors.length}`);
+
+      setProcessing(false);
+      return results;
+    },
+    [processPDF, buscarValePorFolio]
+  );
+
   return {
     // Estados
     processing,
@@ -332,5 +515,7 @@ export const useVerificacion = () => {
     verificarVale,
     fetchValesVerificados,
     clearStates,
+    processBatch,
+    verificarBatch,
   };
 };
