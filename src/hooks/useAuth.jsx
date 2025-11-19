@@ -1,166 +1,72 @@
 /**
- * src/hooks/useAuth.js
+ * src/hooks/useAuth.jsx
  *
- * Hook personalizado para manejar autenticación y perfil de usuario
+ * Hook principal de autenticación (orquestador)
  *
  * Funcionalidades:
- * - Inicio de sesión con email/password
- * - Validación de roles permitidos (ADMINISTRADOR, FINANZAS, SINDICATO)
- * - Obtención de perfil completo con relaciones
- * - Cierre de sesión
- * - Persistencia de sesión
+ * - Exporta contexto y provider
+ * - Integra todos los módulos de auth
+ * - Gestiona estados globales
+ * - Expone API unificada
  *
- * Usado en: LoginForm.jsx, ProtectedRoute.jsx, Navbar.jsx
+ * Usado en: App.jsx, LoginForm.jsx, ProtectedRoute.jsx, Navbar.jsx
  */
 
 // 1. React y hooks
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect } from "react";
 
-// 2. Config
-import { supabase } from "../config/supabase";
+// 2. Módulos de autenticación
+import {
+  AuthContext,
+  useAuthContext,
+  initialAuthState,
+} from "./auth/useAuthState";
+import { useAuthSession } from "./auth/useAuthSession";
+import { useAuthActions } from "./auth/useAuthActions";
+import { useAuthHelpers } from "./auth/useAuthHelpers";
 
-// Crear contexto de autenticación
-const AuthContext = createContext({});
-
-// Hook para usar el contexto
+/**
+ * Hook para usar el contexto de autenticación
+ * Este es el hook que se exporta para uso en componentes
+ */
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth debe usarse dentro de AuthProvider");
-  }
-  return context;
+  return useAuthContext();
 };
 
-// Provider de autenticación
+/**
+ * Provider de autenticación
+ * Orquesta todos los módulos y expone la API completa
+ */
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Estados principales
+  const [user, setUser] = useState(initialAuthState.user);
+  const [userProfile, setUserProfile] = useState(initialAuthState.userProfile);
+  const [loading, setLoading] = useState(initialAuthState.loading);
+  const [error, setError] = useState(initialAuthState.error);
 
-  // Roles permitidos para acceso web
-  const ROLES_PERMITIDOS = ["Administrador", "Finanzas", "Sindicato"];
-
-  /**
-   * Obtener perfil completo del usuario con relaciones
-   */
-  const fetchUserProfile = async (authUserId) => {
-    try {
-      const { data, error } = await supabase
-        .from("persona")
-        .select(
-          `
-          *,
-          roles:id_role (
-            id_roles,
-            role
-          ),
-          obras:id_current_obra (
-            id_obra,
-            obra,
-            cc,
-            empresas:id_empresa (
-              id_empresa,
-              empresa,
-              sufijo,
-              logo
-            )
-          )
-        `
-        )
-        .eq("auth_user_id", authUserId)
-        .single();
-
-      if (error) throw error;
-
-      // Validar que el rol esté permitido para acceso web
-      if (!data || !ROLES_PERMITIDOS.includes(data.roles?.role)) {
-        throw new Error("No tiene permisos para acceder al sistema web");
-      }
-
-      return data;
-    } catch (error) {
-      console.error("Error en fetchUserProfile:", error);
-      throw error;
-    }
-  };
+  // Hooks de módulos
+  const { checkSession, fetchUserProfile, setupAuthListener } =
+    useAuthSession();
+  const { signIn, signOut } = useAuthActions(fetchUserProfile);
+  const { hasRole, canViewAllVales, getFullName } = useAuthHelpers(userProfile);
 
   /**
-   * Iniciar sesión
+   * Callback para manejar cambios de autenticación
    */
-  const signIn = async (email, password) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Autenticar con Supabase Auth
-      const { data: authData, error: authError } =
-        await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-      if (authError) throw authError;
-
-      // Obtener perfil completo
-      const profile = await fetchUserProfile(authData.user.id);
-
-      setUser(authData.user);
-      setUserProfile(profile);
-
-      return { success: true, user: authData.user, profile };
-    } catch (error) {
-      console.error("Error en signIn:", error);
-      setError(error.message);
-      return { success: false, error: error.message };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * Cerrar sesión
-   */
-  const signOut = async () => {
-    try {
-      // No mostrar loading en signOut para evitar bloqueo visual
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-
+  const handleAuthChange = (event, session, profile, errorMsg = null) => {
+    if (errorMsg) {
+      setError(errorMsg);
       setUser(null);
       setUserProfile(null);
-
-      // Redirigir inmediatamente a login
-      window.location.href = "/login";
-    } catch (error) {
-      console.error("Error en signOut:", error);
-      // Forzar redirección incluso si hay error
-      window.location.href = "/login";
+    } else if (event === "SIGNED_IN" && session && profile) {
+      setUser(session.user);
+      setUserProfile(profile);
+      setError(null);
+    } else if (event === "SIGNED_OUT") {
+      setUser(null);
+      setUserProfile(null);
+      setError(null);
     }
-  };
-
-  /**
-   * Verificar si el usuario tiene un rol específico
-   */
-  const hasRole = (role) => {
-    return userProfile?.roles?.role === role;
-  };
-
-  /**
-   * Verificar si el usuario puede ver todos los vales
-   */
-  const canViewAllVales = () => {
-    const role = userProfile?.roles?.role;
-    return role === "Administrador" || role === "Finanzas";
-  };
-
-  /**
-   * Obtener nombre completo del usuario
-   */
-  const getFullName = () => {
-    if (!userProfile) return "";
-    const { nombre, primer_apellido, segundo_apellido } = userProfile;
-    return `${nombre} ${primer_apellido || ""} ${segundo_apellido || ""}`.trim();
   };
 
   /**
@@ -169,103 +75,54 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let mounted = true;
 
-    const checkSession = async () => {
+    const initializeAuth = async () => {
       try {
-        // Obtener sesión actual
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
+        const { session, profile } = await checkSession();
 
-        // Si hay error al obtener la sesión, simplemente marcar como no cargando
-        if (sessionError) {
-          console.error("Error al obtener sesión:", sessionError);
-          if (mounted) {
-            setLoading(false);
+        if (mounted) {
+          if (session && profile) {
+            setUser(session.user);
+            setUserProfile(profile);
           }
-          return;
-        }
-
-        // Si hay sesión válida, obtener el perfil
-        if (session?.user && mounted) {
-          try {
-            const profile = await fetchUserProfile(session.user.id);
-            if (mounted) {
-              setUser(session.user);
-              setUserProfile(profile);
-            }
-          } catch (profileError) {
-            console.error("Error al obtener perfil:", profileError);
-            // Si falla el perfil pero hay sesión, limpiar todo
-            if (mounted) {
-              setUser(null);
-              setUserProfile(null);
-              // Solo hacer signOut si el error es de permisos
-              if (profileError.message.includes("permisos")) {
-                await supabase.auth.signOut();
-              }
-            }
-          }
+          setLoading(false);
         }
       } catch (error) {
-        console.error("Error general en checkSession:", error);
-        // No cerrar sesión automáticamente en caso de error de red
-      } finally {
+        console.error("Error en initializeAuth:", error);
         if (mounted) {
           setLoading(false);
         }
       }
     };
 
-    checkSession();
+    initializeAuth();
 
-    // Suscribirse a cambios de autenticación
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event);
-
-      if (event === "SIGNED_IN" && session?.user) {
-        try {
-          const profile = await fetchUserProfile(session.user.id);
-          if (mounted) {
-            setUser(session.user);
-            setUserProfile(profile);
-          }
-        } catch (error) {
-          console.error("Error al obtener perfil en auth change:", error);
-          if (mounted) {
-            setError(error.message);
-          }
-        }
-      } else if (event === "SIGNED_OUT") {
-        if (mounted) {
-          setUser(null);
-          setUserProfile(null);
-        }
-      } else if (event === "TOKEN_REFRESHED") {
-        console.log("Token refrescado correctamente");
-      }
-    });
+    // Configurar listener de cambios
+    const subscription = setupAuthListener(handleAuthChange);
 
     // Cleanup
     return () => {
       mounted = false;
       subscription?.unsubscribe();
     };
-  }, []);
+  }, [checkSession, setupAuthListener]);
 
+  // Valor del contexto
   const value = {
+    // Estados
     user,
     userProfile,
     loading,
     error,
+    isAuthenticated: !!user,
+
+    // Acciones
     signIn,
     signOut,
+
+    // Helpers
     hasRole,
     canViewAllVales,
     getFullName,
-    isAuthenticated: !!user,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
