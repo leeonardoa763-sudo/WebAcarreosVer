@@ -100,6 +100,7 @@ export const useVerificacion = () => {
 
   /**
    * Buscar vale en BD por folio
+   * IMPORTANTE: Incluye es_renta_por_dia para lógica condicional
    */
   const buscarValePorFolio = useCallback(
     async (folio) => {
@@ -144,9 +145,13 @@ export const useVerificacion = () => {
             distancia_km,
             cantidad_pedida_m3,
             peso_ton,
+            volumen_real_m3,
+            precio_m3,
+            costo_total,
             material:id_material (
               material,
               tipo_de_material:id_tipo_de_material (
+                id_tipo_de_material,
                 tipo_de_material
               )
             ),
@@ -163,6 +168,7 @@ export const useVerificacion = () => {
             total_dias,
             costo_total,
             numero_viajes,
+            es_renta_por_dia,
             material:id_material (
               material
             ),
@@ -174,7 +180,7 @@ export const useVerificacion = () => {
         `
           )
           .eq("folio", folio)
-          .maybeSingle(); // Cambio aquí
+          .maybeSingle();
 
         // Si hay error de query
         if (searchError) {

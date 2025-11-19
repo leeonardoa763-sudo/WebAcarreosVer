@@ -76,6 +76,7 @@ export const useVales = () => {
       setError(null);
 
       // Construir query base
+
       let query = buildBaseQuery();
 
       // Aplicar paginación
@@ -89,19 +90,28 @@ export const useVales = () => {
         .range(from, to);
 
       // Ejecutar query
+
       const { data, error, count } = await query;
 
       if (error) throw error;
 
       // Aplicar filtros en el cliente
+
       const filteredData = applyFilters(data || [], filters);
 
       setVales(filteredData);
 
       // Actualizar paginación
-      setPagination((prev) => updatePaginationState(prev, count));
+
+      setPagination((prev) => {
+        const newState = updatePaginationState(prev, count);
+
+        return newState;
+      });
+
+      console.log("✅ fetchVales - FIN exitoso");
     } catch (error) {
-      console.error("Error en fetchVales:", error);
+      console.error("❌ Error en fetchVales:", error);
       setError("No se pudieron cargar los vales");
     } finally {
       setLoading(false);
@@ -111,7 +121,12 @@ export const useVales = () => {
     calculateRange,
     applyFilters,
     updatePaginationState,
-    filters,
+    filters.searchTerm,
+    filters.id_obra,
+    filters.tipo_vale,
+    filters.estado,
+    filters.fecha_inicio,
+    filters.fecha_fin,
     pagination.currentPage,
     pagination.pageSize,
   ]);
@@ -120,15 +135,18 @@ export const useVales = () => {
    * Actualizar filtros
    */
   const updateFilters = useCallback((newFilters) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...newFilters,
-    }));
+    setFilters((prev) => {
+      const updated = { ...prev, ...newFilters };
+
+      return updated;
+    });
+
     // Reset a primera página cuando cambian filtros
-    setPagination((prev) => ({
-      ...prev,
-      currentPage: 1,
-    }));
+    setPagination((prev) => {
+      const updated = { ...prev, currentPage: 1 };
+
+      return updated;
+    });
   }, []);
 
   /**
@@ -166,11 +184,16 @@ export const useVales = () => {
 
   /**
    * Efecto para cargar vales cuando cambian filtros o paginación
+   *
+   * IMPORTANTE: NO incluir fetchVales en las dependencias
+   * para evitar bucles infinitos
    */
   useEffect(() => {
     if (userProfile?.id_persona) {
       fetchVales();
+    } else {
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filters.searchTerm,
     filters.id_obra,
@@ -181,7 +204,7 @@ export const useVales = () => {
     pagination.currentPage,
     pagination.pageSize,
     userProfile?.id_persona,
-    fetchVales,
+    // ❌ NO incluir fetchVales aquí - causa bucle infinito
   ]);
 
   return {
