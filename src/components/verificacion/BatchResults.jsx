@@ -2,6 +2,11 @@
  * src/components/verificacion/BatchResults.jsx
  *
  * Muestra resultados del procesamiento masivo con detalles
+ *
+ * Funcionalidades:
+ * - Muestra vales exitosos, ya verificados y con errores
+ * - Para RENTA: usa lógica de es_renta_por_dia
+ * - Permite confirmar verificación masiva
  */
 
 import {
@@ -52,7 +57,7 @@ const BatchResults = ({
 
       const cantidadDisplay =
         totalM3Tipo3 > 0 && totalM3Otros > 0
-          ? `${formatearVolumen(totalM3Tipo3)} (Pedidos) + ${formatearVolumen(totalM3Otros)} (Reales)`
+          ? `${formatearVolumen(totalM3Tipo3)} (Pedidos) + ${formatearVolumen(totalM3Otros)} (Reales)}`
           : totalM3Tipo3 > 0
             ? `${formatearVolumen(totalM3Tipo3)} (Pedidos)`
             : `${formatearVolumen(totalM3Otros)} (Reales)`;
@@ -67,26 +72,42 @@ const BatchResults = ({
     }
 
     if (vale.tipo_vale === "renta" && vale.vale_renta_detalle) {
-      const primerDetalle = vale.vale_renta_detalle[0];
-
       // Sumar número de viajes
       const totalViajes = vale.vale_renta_detalle.reduce(
         (sum, detalle) => sum + (detalle.numero_viajes || 0),
         0
       );
 
+      // Calcular totales basados en es_renta_por_dia
+      let totalHorasPorHora = 0;
+      let totalDiasPorDia = 0;
+      let tieneRentaPorDia = false;
+      let tieneRentaPorHora = false;
+
+      vale.vale_renta_detalle.forEach((detalle) => {
+        const esRentaPorDia = detalle.es_renta_por_dia === true;
+
+        if (esRentaPorDia) {
+          totalDiasPorDia += Number(detalle.total_dias || 0);
+          tieneRentaPorDia = true;
+        } else {
+          totalHorasPorHora += Number(detalle.total_horas || 0);
+          tieneRentaPorHora = true;
+        }
+      });
+
+      // Determinar qué cantidad mostrar
       let cantidad = "Pendiente";
 
-      // Verificar si tiene días >= 1 (días completos), convertir a número
-      const totalDias = Number(primerDetalle.total_dias || 0);
-      const totalHoras = Number(primerDetalle.total_horas || 0);
+      if (tieneRentaPorDia && totalDiasPorDia > 0) {
+        cantidad = `${totalDiasPorDia} ${totalDiasPorDia === 1 ? "día" : "días"}`;
 
-      if (totalDias >= 1) {
-        cantidad = `${totalDias} ${totalDias === 1 ? "día" : "días"}`;
-      }
-      // Si tiene horas, mostrar horas
-      else if (totalHoras > 0) {
-        cantidad = formatearDuracion(totalHoras);
+        // Si también tiene horas, agregar
+        if (tieneRentaPorHora && totalHorasPorHora > 0) {
+          cantidad += ` + ${formatearDuracion(totalHorasPorHora)}`;
+        }
+      } else if (tieneRentaPorHora && totalHorasPorHora > 0) {
+        cantidad = formatearDuracion(totalHorasPorHora);
       }
 
       // Usar el costo_total que viene de la BD, convertir a número

@@ -10,6 +10,7 @@
  * - Paginación
  * - Control de permisos por rol (respeta RLS)
  * - Cálculo de totales y estadísticas
+ * - Incluye es_renta_por_dia en queries de renta
  *
  * Usado en: Vales.jsx, Conciliaciones.jsx
  */
@@ -87,6 +88,7 @@ export const useVales = () => {
 
   /**
    * Construir query base con relaciones
+   * IMPORTANTE: Incluye es_renta_por_dia para lógica condicional
    */
   const buildBaseQuery = () => {
     return supabase.from("vales").select(
@@ -152,6 +154,7 @@ export const useVales = () => {
           costo_total,
           numero_viajes,
           notas_adicionales,
+          es_renta_por_dia,
           material:id_material (
             id_material,
             material
@@ -296,6 +299,7 @@ export const useVales = () => {
 
   /**
    * Obtener un vale específico por ID
+   * IMPORTANTE: Incluye es_renta_por_dia
    */
   const fetchValeById = async (id_vale) => {
     try {
@@ -364,6 +368,7 @@ export const useVales = () => {
             costo_total,
             numero_viajes,
             notas_adicionales,
+            es_renta_por_dia,
             material:id_material (
               id_material,
               material
@@ -388,6 +393,7 @@ export const useVales = () => {
 
   /**
    * Obtener vale por folio (para verificación pública)
+   * IMPORTANTE: Incluye es_renta_por_dia
    */
   const fetchValeByFolio = async (folio) => {
     try {
@@ -442,8 +448,13 @@ export const useVales = () => {
             total_dias,
             costo_total,
             numero_viajes,
+            es_renta_por_dia,
             material:id_material (
               material
+            ),
+            precios_renta:id_precios_renta (
+              costo_hr,
+              costo_dia
             )
           )
         `

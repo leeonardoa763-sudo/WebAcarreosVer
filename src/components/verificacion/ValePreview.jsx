@@ -2,6 +2,14 @@
  * src/components/verificacion/ValePreview.jsx
  *
  * Preview del vale encontrado antes de verificar
+ *
+ * Funcionalidades:
+ * - Muestra información general del vale
+ * - Para RENTA: usa lógica de es_renta_por_dia
+ *   - Si es_renta_por_dia = true: muestra días
+ *   - Si es_renta_por_dia = false: muestra horas
+ * - Para MATERIAL: muestra volúmenes según tipo
+ * - Costo total siempre de la BD
  */
 
 // 1. React y hooks
@@ -37,28 +45,42 @@ const ValePreview = ({ vale }) => {
   const badgeTipo = getBadgeTipo(vale.tipo_vale);
   const { fecha, hora } = formatearFechaHora(vale.fecha_creacion);
 
-  // Calcular totales para vales de renta
+  // Calcular totales para vales de renta basado en es_renta_por_dia
   const rentaCalculos = useMemo(() => {
     if (vale.tipo_vale !== "renta" || !vale.vale_renta_detalle) {
       return null;
     }
 
-    let totalHoras = 0;
-    let totalDias = 0;
+    let totalHorasPorHora = 0; // Solo detalles con es_renta_por_dia = false
+    let totalDiasPorDia = 0; // Solo detalles con es_renta_por_dia = true
     let costoTotal = 0;
+    let tieneRentaPorDia = false;
+    let tieneRentaPorHora = false;
 
     vale.vale_renta_detalle.forEach((detalle) => {
-      const horas = Number(detalle.total_horas || 0);
-      const dias = Number(detalle.total_dias || 0);
+      const esRentaPorDia = detalle.es_renta_por_dia === true;
 
-      totalHoras += horas;
-      totalDias += dias;
+      if (esRentaPorDia) {
+        // Sumar solo días de detalles que son por día
+        totalDiasPorDia += Number(detalle.total_dias || 0);
+        tieneRentaPorDia = true;
+      } else {
+        // Sumar solo horas de detalles que son por hora
+        totalHorasPorHora += Number(detalle.total_horas || 0);
+        tieneRentaPorHora = true;
+      }
 
-      // Usar el costo_total que viene de la BD, convertir a número
+      // Siempre sumar el costo total de la BD
       costoTotal += Number(detalle.costo_total || 0);
     });
 
-    return { totalHoras, totalDias, costoTotal };
+    return {
+      totalHorasPorHora,
+      totalDiasPorDia,
+      costoTotal,
+      tieneRentaPorDia,
+      tieneRentaPorHora,
+    };
   }, [vale]);
 
   // Calcular totales para vales de material
@@ -102,7 +124,7 @@ const ValePreview = ({ vale }) => {
 
       <div className="vale-preview__content">
         <div className="vale-preview__row">
-          <FileText size={18} />
+          <FileText size={18} aria-hidden="true" />
           <div>
             <span className="vale-preview__label">Folio</span>
             <span className="vale-preview__value">{vale.folio}</span>
@@ -110,7 +132,7 @@ const ValePreview = ({ vale }) => {
         </div>
 
         <div className="vale-preview__row">
-          <Calendar size={18} />
+          <Calendar size={18} aria-hidden="true" />
           <div>
             <span className="vale-preview__label">Fecha de Emisión</span>
             <span className="vale-preview__value">
@@ -120,7 +142,7 @@ const ValePreview = ({ vale }) => {
         </div>
 
         <div className="vale-preview__row">
-          <Building2 size={18} />
+          <Building2 size={18} aria-hidden="true" />
           <div>
             <span className="vale-preview__label">Obra</span>
             <span className="vale-preview__value">{vale.obras?.obra}</span>
@@ -131,7 +153,7 @@ const ValePreview = ({ vale }) => {
         </div>
 
         <div className="vale-preview__row">
-          <UserCheck size={18} />
+          <UserCheck size={18} aria-hidden="true" />
           <div>
             <span className="vale-preview__label">Residente</span>
             <span className="vale-preview__value">
@@ -141,7 +163,7 @@ const ValePreview = ({ vale }) => {
         </div>
 
         <div className="vale-preview__row">
-          <Package size={18} />
+          <Package size={18} aria-hidden="true" />
           <div>
             <span className="vale-preview__label">Tipo de Vale</span>
             <span className="vale-preview__value">{badgeTipo.label}</span>
@@ -150,7 +172,7 @@ const ValePreview = ({ vale }) => {
 
         {vale.operadores && (
           <div className="vale-preview__row">
-            <User size={18} />
+            <User size={18} aria-hidden="true" />
             <div>
               <span className="vale-preview__label">Operador</span>
               <span className="vale-preview__value">
@@ -167,7 +189,7 @@ const ValePreview = ({ vale }) => {
 
         {vale.vehiculos && (
           <div className="vale-preview__row">
-            <Truck size={18} />
+            <Truck size={18} aria-hidden="true" />
             <div>
               <span className="vale-preview__label">Placas</span>
               <span className="vale-preview__value">
@@ -182,7 +204,7 @@ const ValePreview = ({ vale }) => {
           <>
             {materialCalculos.totalM3Tipo3 > 0 && (
               <div className="vale-preview__row">
-                <Package size={18} />
+                <Package size={18} aria-hidden="true" />
                 <div>
                   <span className="vale-preview__label">
                     Total M³ Pedidos (Tipo 3)
@@ -196,7 +218,7 @@ const ValePreview = ({ vale }) => {
 
             {materialCalculos.totalM3Otros > 0 && (
               <div className="vale-preview__row">
-                <Package size={18} />
+                <Package size={18} aria-hidden="true" />
                 <div>
                   <span className="vale-preview__label">
                     Total M³ Reales (Otros)
@@ -210,7 +232,7 @@ const ValePreview = ({ vale }) => {
 
             {materialCalculos.costoTotal > 0 && (
               <div className="vale-preview__row vale-preview__row--cost">
-                <DollarSign size={18} />
+                <DollarSign size={18} aria-hidden="true" />
                 <div>
                   <span className="vale-preview__label">Costo Total</span>
                   <span className="vale-preview__value vale-preview__value--cost">
@@ -222,36 +244,41 @@ const ValePreview = ({ vale }) => {
           </>
         )}
 
-        {/* Detalles de RENTA */}
+        {/* Detalles de RENTA - Nueva lógica basada en es_renta_por_dia */}
         {vale.tipo_vale === "renta" && rentaCalculos && (
           <>
-            {rentaCalculos.totalDias > 0 && (
-              <div className="vale-preview__row">
-                <Clock size={18} />
-                <div>
-                  <span className="vale-preview__label">Total Días</span>
-                  <span className="vale-preview__value vale-preview__value--highlight">
-                    {rentaCalculos.totalDias}{" "}
-                    {rentaCalculos.totalDias === 1 ? "día" : "días"}
-                  </span>
+            {/* Mostrar días solo si hay rentas por día */}
+            {rentaCalculos.tieneRentaPorDia &&
+              rentaCalculos.totalDiasPorDia > 0 && (
+                <div className="vale-preview__row">
+                  <Clock size={18} aria-hidden="true" />
+                  <div>
+                    <span className="vale-preview__label">Total Días</span>
+                    <span className="vale-preview__value vale-preview__value--highlight">
+                      {rentaCalculos.totalDiasPorDia}{" "}
+                      {rentaCalculos.totalDiasPorDia === 1 ? "día" : "días"}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {rentaCalculos.totalHoras > 0 && (
-              <div className="vale-preview__row">
-                <Clock size={18} />
-                <div>
-                  <span className="vale-preview__label">Total Horas</span>
-                  <span className="vale-preview__value vale-preview__value--highlight">
-                    {formatearDuracion(rentaCalculos.totalHoras)}
-                  </span>
+            {/* Mostrar horas solo si hay rentas por hora */}
+            {rentaCalculos.tieneRentaPorHora &&
+              rentaCalculos.totalHorasPorHora > 0 && (
+                <div className="vale-preview__row">
+                  <Clock size={18} aria-hidden="true" />
+                  <div>
+                    <span className="vale-preview__label">Total Horas</span>
+                    <span className="vale-preview__value vale-preview__value--highlight">
+                      {formatearDuracion(rentaCalculos.totalHorasPorHora)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
+            {/* Costo total siempre se muestra */}
             <div className="vale-preview__row vale-preview__row--cost">
-              <DollarSign size={18} />
+              <DollarSign size={18} aria-hidden="true" />
               <div>
                 <span className="vale-preview__label">Costo Total</span>
                 <span className="vale-preview__value vale-preview__value--cost">
@@ -264,7 +291,7 @@ const ValePreview = ({ vale }) => {
       </div>
 
       <div className="vale-preview__footer">
-        <AlertCircle size={16} />
+        <AlertCircle size={16} aria-hidden="true" />
         <p className="vale-preview__warning">
           Verifica que los datos coincidan con el PDF físico antes de confirmar
         </p>
