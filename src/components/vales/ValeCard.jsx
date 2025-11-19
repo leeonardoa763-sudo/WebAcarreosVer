@@ -65,12 +65,6 @@ const ValeCard = ({ vale, empresaColor }) => {
       return <p className="vale-card__no-data">Sin detalles de material</p>;
     }
 
-    // Calcular total m3
-    const totalM3 = vale.vale_material_detalles.reduce(
-      (sum, detalle) => sum + (detalle.cantidad_pedida_m3 || 0),
-      0
-    );
-
     return (
       <div className="vale-card__detalles-section">
         <h4 className="vale-card__section-title">
@@ -78,72 +72,131 @@ const ValeCard = ({ vale, empresaColor }) => {
           Detalles de Material
         </h4>
 
-        {vale.vale_material_detalles.map((detalle, index) => (
-          <div
-            key={detalle.id_detalle_material}
-            className="vale-card__detalle-material"
-          >
-            <div className="vale-card__detalle-header">
-              <span className="vale-card__detalle-number">#{index + 1}</span>
-              <span className="vale-card__detalle-material-name">
-                {detalle.material?.material || "N/A"}
-              </span>
-            </div>
+        {vale.vale_material_detalles.map((detalle, index) => {
+          // Determinar qué volumen mostrar según tipo de material
+          const esTipo3 =
+            detalle.material?.tipo_de_material?.id_tipo_de_material === 3;
 
-            <div className="vale-card__detalle-grid">
-              <div className="vale-card__detalle-item-small">
-                <span className="vale-card__detalle-label">Tipo:</span>
-                <span className="vale-card__detalle-value">
-                  {detalle.material?.tipo_de_material?.tipo_de_material ||
-                    "N/A"}
+          // Convertir a número para evitar problemas con strings de Supabase
+          const volumen = esTipo3
+            ? Number(detalle.cantidad_pedida_m3)
+            : Number(detalle.volumen_real_m3);
+
+          const labelVolumen = esTipo3 ? "M³ Pedidos" : "M³ Reales";
+
+          // Convertir otros valores numéricos
+          const precioM3 = Number(detalle.precio_m3);
+          const costoTotal = Number(detalle.costo_total);
+          const pesoTon = Number(detalle.peso_ton);
+
+          return (
+            <div
+              key={detalle.id_detalle_material}
+              className="vale-card__detalle-material"
+            >
+              <div className="vale-card__detalle-header">
+                <span className="vale-card__detalle-number">#{index + 1}</span>
+                <span className="vale-card__detalle-material-name">
+                  {detalle.material?.material || "N/A"}
                 </span>
               </div>
 
-              <div className="vale-card__detalle-item-small">
-                <span className="vale-card__detalle-label">Banco:</span>
-                <span className="vale-card__detalle-value">
-                  {detalle.bancos?.banco || "N/A"}
-                </span>
-              </div>
-
-              <div className="vale-card__detalle-item-small">
-                <span className="vale-card__detalle-label">Capacidad:</span>
-                <span className="vale-card__detalle-value">
-                  {formatearVolumen(detalle.capacidad_m3 || 0)}
-                </span>
-              </div>
-
-              <div className="vale-card__detalle-item-small">
-                <span className="vale-card__detalle-label">Distancia:</span>
-                <span className="vale-card__detalle-value">
-                  {formatearDistancia(detalle.distancia_km || 0)}
-                </span>
-              </div>
-
-              <div className="vale-card__detalle-item-small">
-                <span className="vale-card__detalle-label">M³ Pedidos:</span>
-                <span className="vale-card__detalle-value highlight">
-                  {formatearVolumen(detalle.cantidad_pedida_m3 || 0)}
-                </span>
-              </div>
-
-              {detalle.peso_ton && (
+              <div className="vale-card__detalle-grid">
                 <div className="vale-card__detalle-item-small">
-                  <span className="vale-card__detalle-label">Peso:</span>
+                  <span className="vale-card__detalle-label">Tipo:</span>
                   <span className="vale-card__detalle-value">
-                    {formatearPeso(detalle.peso_ton)}
+                    {detalle.material?.tipo_de_material?.tipo_de_material ||
+                      "N/A"}
                   </span>
+                </div>
+
+                <div className="vale-card__detalle-item-small">
+                  <span className="vale-card__detalle-label">Banco:</span>
+                  <span className="vale-card__detalle-value">
+                    {detalle.bancos?.banco || "N/A"}
+                  </span>
+                </div>
+
+                <div className="vale-card__detalle-item-small">
+                  <span className="vale-card__detalle-label">Capacidad:</span>
+                  <span className="vale-card__detalle-value">
+                    {formatearVolumen(detalle.capacidad_m3 || 0)}
+                  </span>
+                </div>
+
+                <div className="vale-card__detalle-item-small">
+                  <span className="vale-card__detalle-label">Distancia:</span>
+                  <span className="vale-card__detalle-value">
+                    {formatearDistancia(detalle.distancia_km || 0)}
+                  </span>
+                </div>
+
+                {/* Volumen según tipo de material */}
+                <div className="vale-card__detalle-item-small">
+                  <span className="vale-card__detalle-label">
+                    {labelVolumen}:
+                  </span>
+                  <span className="vale-card__detalle-value highlight">
+                    {!isNaN(volumen) && volumen > 0
+                      ? formatearVolumen(volumen)
+                      : "Pendiente"}
+                  </span>
+                </div>
+
+                {/* Precio por M³ */}
+                <div className="vale-card__detalle-item-small">
+                  <span className="vale-card__detalle-label">Precio/M³:</span>
+                  <span className="vale-card__detalle-value">
+                    {!isNaN(precioM3) && precioM3 > 0
+                      ? formatearMoneda(precioM3)
+                      : "Pendiente"}
+                  </span>
+                </div>
+
+                {/* Peso (opcional, solo si existe) */}
+                {!isNaN(pesoTon) && pesoTon > 0 && (
+                  <div className="vale-card__detalle-item-small">
+                    <span className="vale-card__detalle-label">Peso:</span>
+                    <span className="vale-card__detalle-value">
+                      {formatearPeso(pesoTon)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Importe Total del detalle */}
+                <div className="vale-card__detalle-item-small full-width">
+                  <span className="vale-card__detalle-label">Importe:</span>
+                  <span className="vale-card__detalle-value cost">
+                    {!isNaN(costoTotal) && costoTotal > 0
+                      ? formatearMoneda(costoTotal)
+                      : "Pendiente"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Notas adicionales */}
+              {detalle.notas_adicionales && (
+                <div className="vale-card__notas">
+                  <span className="vale-card__detalle-label">Notas:</span>
+                  <p className="vale-card__notas-text">
+                    {detalle.notas_adicionales}
+                  </p>
                 </div>
               )}
             </div>
-          </div>
-        ))}
+          );
+        })}
 
-        {/* Total M3 */}
+        {/* Total General del Vale */}
         <div className="vale-card__total">
-          <span className="vale-card__total-label">Total M³ Pedidos:</span>
-          <span className="vale-card__total-value">
-            {formatearVolumen(totalM3)}
+          <span className="vale-card__total-label">Total del Vale:</span>
+          <span className="vale-card__total-value cost">
+            {formatearMoneda(
+              vale.vale_material_detalles.reduce(
+                (sum, detalle) => sum + (detalle.costo_total || 0),
+                0
+              )
+            )}
           </span>
         </div>
       </div>

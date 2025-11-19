@@ -48,20 +48,14 @@ const ValePreview = ({ vale }) => {
     let costoTotal = 0;
 
     vale.vale_renta_detalle.forEach((detalle) => {
-      const horas = detalle.total_horas || 0;
-      const dias = detalle.total_dias || 0;
+      const horas = Number(detalle.total_horas || 0);
+      const dias = Number(detalle.total_dias || 0);
 
       totalHoras += horas;
       totalDias += dias;
 
-      // Calcular costo
-      if (dias > 0 && detalle.precios_renta?.costo_dia) {
-        costoTotal += dias * detalle.precios_renta.costo_dia;
-      } else if (horas > 0 && detalle.precios_renta?.costo_hr) {
-        costoTotal += horas * detalle.precios_renta.costo_hr;
-      } else if (detalle.costo_total) {
-        costoTotal += detalle.costo_total;
-      }
+      // Usar el costo_total que viene de la BD, convertir a número
+      costoTotal += Number(detalle.costo_total || 0);
     });
 
     return { totalHoras, totalDias, costoTotal };
@@ -73,12 +67,22 @@ const ValePreview = ({ vale }) => {
       return null;
     }
 
-    const totalM3 = vale.vale_material_detalles.reduce(
-      (sum, detalle) => sum + (detalle.cantidad_pedida_m3 || 0),
+    // Separar por tipo de material y convertir a número
+    const totalM3Tipo3 = vale.vale_material_detalles
+      .filter((d) => d.material?.tipo_de_material?.id_tipo_de_material === 3)
+      .reduce((sum, d) => sum + Number(d.cantidad_pedida_m3 || 0), 0);
+
+    const totalM3Otros = vale.vale_material_detalles
+      .filter((d) => d.material?.tipo_de_material?.id_tipo_de_material !== 3)
+      .reduce((sum, d) => sum + Number(d.volumen_real_m3 || 0), 0);
+
+    // Usar el costo_total que viene de la BD, convertir a número
+    const costoTotal = vale.vale_material_detalles.reduce(
+      (sum, d) => sum + Number(d.costo_total || 0),
       0
     );
 
-    return { totalM3 };
+    return { totalM3Tipo3, totalM3Otros, costoTotal };
   }, [vale]);
 
   return (
@@ -175,15 +179,47 @@ const ValePreview = ({ vale }) => {
 
         {/* Detalles de MATERIAL */}
         {vale.tipo_vale === "material" && materialCalculos && (
-          <div className="vale-preview__row">
-            <Package size={18} />
-            <div>
-              <span className="vale-preview__label">Total M³ Pedidos</span>
-              <span className="vale-preview__value vale-preview__value--highlight">
-                {formatearVolumen(materialCalculos.totalM3)}
-              </span>
-            </div>
-          </div>
+          <>
+            {materialCalculos.totalM3Tipo3 > 0 && (
+              <div className="vale-preview__row">
+                <Package size={18} />
+                <div>
+                  <span className="vale-preview__label">
+                    Total M³ Pedidos (Tipo 3)
+                  </span>
+                  <span className="vale-preview__value vale-preview__value--highlight">
+                    {formatearVolumen(materialCalculos.totalM3Tipo3)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {materialCalculos.totalM3Otros > 0 && (
+              <div className="vale-preview__row">
+                <Package size={18} />
+                <div>
+                  <span className="vale-preview__label">
+                    Total M³ Reales (Otros)
+                  </span>
+                  <span className="vale-preview__value vale-preview__value--highlight">
+                    {formatearVolumen(materialCalculos.totalM3Otros)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {materialCalculos.costoTotal > 0 && (
+              <div className="vale-preview__row vale-preview__row--cost">
+                <DollarSign size={18} />
+                <div>
+                  <span className="vale-preview__label">Costo Total</span>
+                  <span className="vale-preview__value vale-preview__value--cost">
+                    {formatearMoneda(materialCalculos.costoTotal)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Detalles de RENTA */}

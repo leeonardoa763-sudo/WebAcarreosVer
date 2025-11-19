@@ -61,8 +61,6 @@ const Vales = () => {
    * Manejar clic en vale para ver detalle
    */
   const handleValeClick = (vale) => {
-    // Por ahora solo mostramos en consola
-    // Después implementaremos modal o página de detalle
     console.log("Vale seleccionado:", vale);
   };
 

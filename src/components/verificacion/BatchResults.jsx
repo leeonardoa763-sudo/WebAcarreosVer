@@ -11,9 +11,14 @@ import {
   FileCheck,
   Package,
   Clock,
+  DollarSign,
 } from "lucide-react";
 import { colors } from "../../config/colors";
-import { formatearVolumen, formatearDuracion } from "../../utils/formatters";
+import {
+  formatearVolumen,
+  formatearDuracion,
+  formatearMoneda,
+} from "../../utils/formatters";
 
 const BatchResults = ({
   results,
@@ -25,19 +30,38 @@ const BatchResults = ({
 
   const getValeDetails = (vale) => {
     if (vale.tipo_vale === "material" && vale.vale_material_detalles) {
-      const totalM3 = vale.vale_material_detalles.reduce(
-        (sum, detalle) => sum + (detalle.cantidad_pedida_m3 || 0),
-        0
-      );
       const materiales = vale.vale_material_detalles
         .map((d) => d.material?.material)
         .filter(Boolean)
         .join(", ");
 
+      // Usar el costo_total que viene de la BD, convertir a número
+      const costoTotal = vale.vale_material_detalles.reduce(
+        (sum, d) => sum + Number(d.costo_total || 0),
+        0
+      );
+
+      // Calcular volumen según tipo, convertir a número
+      const totalM3Tipo3 = vale.vale_material_detalles
+        .filter((d) => d.material?.tipo_de_material?.id_tipo_de_material === 3)
+        .reduce((sum, d) => sum + Number(d.cantidad_pedida_m3 || 0), 0);
+
+      const totalM3Otros = vale.vale_material_detalles
+        .filter((d) => d.material?.tipo_de_material?.id_tipo_de_material !== 3)
+        .reduce((sum, d) => sum + Number(d.volumen_real_m3 || 0), 0);
+
+      const cantidadDisplay =
+        totalM3Tipo3 > 0 && totalM3Otros > 0
+          ? `${formatearVolumen(totalM3Tipo3)} (Pedidos) + ${formatearVolumen(totalM3Otros)} (Reales)`
+          : totalM3Tipo3 > 0
+            ? `${formatearVolumen(totalM3Tipo3)} (Pedidos)`
+            : `${formatearVolumen(totalM3Otros)} (Reales)`;
+
       return {
         tipo: "Material",
         detalle: materiales || "Sin especificar",
-        cantidad: formatearVolumen(totalM3),
+        cantidad: cantidadDisplay,
+        costo: formatearMoneda(costoTotal),
         icon: Package,
       };
     }
@@ -53,19 +77,29 @@ const BatchResults = ({
 
       let cantidad = "Pendiente";
 
-      // Verificar si tiene días >= 1 (días completos)
-      if (primerDetalle.total_dias && primerDetalle.total_dias >= 1) {
-        cantidad = `${primerDetalle.total_dias} ${primerDetalle.total_dias === 1 ? "día" : "días"}`;
+      // Verificar si tiene días >= 1 (días completos), convertir a número
+      const totalDias = Number(primerDetalle.total_dias || 0);
+      const totalHoras = Number(primerDetalle.total_horas || 0);
+
+      if (totalDias >= 1) {
+        cantidad = `${totalDias} ${totalDias === 1 ? "día" : "días"}`;
       }
       // Si tiene horas, mostrar horas
-      else if (primerDetalle.total_horas && primerDetalle.total_horas > 0) {
-        cantidad = formatearDuracion(primerDetalle.total_horas);
+      else if (totalHoras > 0) {
+        cantidad = formatearDuracion(totalHoras);
       }
+
+      // Usar el costo_total que viene de la BD, convertir a número
+      const costoTotal = vale.vale_renta_detalle.reduce(
+        (sum, d) => sum + Number(d.costo_total || 0),
+        0
+      );
 
       return {
         tipo: "Renta",
         detalle: `${totalViajes} ${totalViajes === 1 ? "viaje" : "viajes"}`,
         cantidad: cantidad,
+        costo: formatearMoneda(costoTotal),
         icon: Clock,
       };
     }
@@ -74,9 +108,11 @@ const BatchResults = ({
       tipo: vale.tipo_vale,
       detalle: "Sin detalles",
       cantidad: "N/A",
+      costo: "N/A",
       icon: FileCheck,
     };
   };
+
   return (
     <div className="batch-results">
       <h3 className="batch-results__title">Resultados del Análisis</h3>
@@ -158,6 +194,18 @@ const BatchResults = ({
                         {details.cantidad}
                       </span>
                     </div>
+
+                    {details.costo && details.costo !== "$0.00" && (
+                      <div className="batch-results__detail">
+                        <DollarSign size={14} />
+                        <span className="batch-results__detail-label">
+                          Costo Total:
+                        </span>
+                        <span className="batch-results__detail-value batch-results__detail-value--highlight">
+                          {details.costo}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

@@ -62,7 +62,17 @@ export const useVales = () => {
 
       let query = supabase
         .from("obras")
-        .select(/* ... */)
+        .select(
+          `
+          id_obra,
+          obra,
+          cc,
+          empresas:id_empresa (
+            empresa,
+            sufijo
+          )
+        `
+        )
         .order("obra", { ascending: true });
 
       const { data, error } = await query;
@@ -73,7 +83,7 @@ export const useVales = () => {
     } finally {
       setLoadingCatalogos(false);
     }
-  }, []); // Sin dependencias porque no usa nada externo
+  }, []);
 
   /**
    * Construir query base con relaciones
@@ -114,13 +124,21 @@ export const useVales = () => {
           distancia_km,
           cantidad_pedida_m3,
           peso_ton,
+          volumen_real_m3,
+          precio_m3,
+          costo_total,
+          folio_banco,
+          notas_adicionales,
           material:id_material (
+            id_material,
             material,
             tipo_de_material:id_tipo_de_material (
+              id_tipo_de_material,
               tipo_de_material
             )
           ),
           bancos:id_banco (
+            id_banco,
             banco
           )
         ),
@@ -133,7 +151,9 @@ export const useVales = () => {
           total_dias,
           costo_total,
           numero_viajes,
+          notas_adicionales,
           material:id_material (
+            id_material,
             material
           ),
           precios_renta:id_precios_renta (
@@ -157,14 +177,6 @@ export const useVales = () => {
       // Construir query base
       let query = buildBaseQuery();
 
-      // NO aplicar filtros en el servidor, solo en cliente
-      // query = applyFilters(query);
-
-      // RLS filtra automáticamente según el rol del usuario
-      // ADMINISTRADOR/FINANZAS: ven todas las obras
-      // SINDICATO: filtrado por sindicato en RLS
-      // No agregamos filtros adicionales aquí
-
       // Aplicar paginación
       const from = (pagination.currentPage - 1) * pagination.pageSize;
       const to = from + pagination.pageSize - 1;
@@ -175,15 +187,6 @@ export const useVales = () => {
 
       // Ejecutar query
       const { data, error, count } = await query;
-
-      // console.log("=== DATOS CRUDOS DE SUPABASE ===");
-      // console.log("Total vales:", count);
-      // if (data && data.length > 0) {
-      //   console.log("Primer vale:", data[0]);
-      //   console.log("Detalles material:", data[0].vale_material_detalles);
-      //   console.log("Detalles renta:", data[0].vale_renta_detalle);
-      // }
-      // console.log("================================");
 
       if (error) throw error;
 
@@ -271,8 +274,6 @@ export const useVales = () => {
 
       setVales(filteredData);
 
-      setVales(filteredData);
-
       // Actualizar paginación
       setPagination((prev) => ({
         ...prev,
@@ -335,13 +336,21 @@ export const useVales = () => {
             distancia_km,
             cantidad_pedida_m3,
             peso_ton,
+            volumen_real_m3,
+            precio_m3,
+            costo_total,
+            folio_banco,
+            notas_adicionales,
             material:id_material (
+              id_material,
               material,
               tipo_de_material:id_tipo_de_material (
+                id_tipo_de_material,
                 tipo_de_material
               )
             ),
             bancos:id_banco (
+              id_banco,
               banco
             )
           ),
@@ -354,7 +363,9 @@ export const useVales = () => {
             total_dias,
             costo_total,
             numero_viajes,
+            notas_adicionales,
             material:id_material (
+              id_material,
               material
             ),
             precios_renta:id_precios_renta (
@@ -408,8 +419,16 @@ export const useVales = () => {
             distancia_km,
             cantidad_pedida_m3,
             peso_ton,
+            volumen_real_m3,
+            precio_m3,
+            costo_total,
             material:id_material (
-              material
+              id_material,
+              material,
+              tipo_de_material:id_tipo_de_material (
+                id_tipo_de_material,
+                tipo_de_material
+              )
             ),
             bancos:id_banco (
               banco
@@ -492,19 +511,15 @@ export const useVales = () => {
     if (!vale) return 0;
 
     if (vale.tipo_vale === "material") {
-      // Sumar todos los detalles de material
       return (
         vale.vale_material_detalles?.reduce((total, detalle) => {
-          // Aquí se calcularía el precio según la lógica de negocio
-          // Por ahora retornamos 0 hasta implementar cálculo completo
-          return total + 0;
+          return total + Number(detalle.costo_total || 0);
         }, 0) || 0
       );
     } else if (vale.tipo_vale === "renta") {
-      // Sumar todos los detalles de renta
       return (
         vale.vale_renta_detalle?.reduce((total, detalle) => {
-          return total + (detalle.costo_total || 0);
+          return total + Number(detalle.costo_total || 0);
         }, 0) || 0
       );
     }
