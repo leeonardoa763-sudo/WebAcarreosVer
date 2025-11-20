@@ -6,47 +6,61 @@
 
 /* ========================================
    PÁGINA CONCILIACIONES
-======================================== */
+   ======================================== */
 
 .conciliaciones-page {
-  width: 100%;
   max-width: 1400px;
   margin: 0 auto;
+  padding: 2rem;
 }
 
 .conciliaciones-page__header {
-  margin-bottom: 32px;
+  margin-bottom: 2rem;
 }
 
-.conciliaciones-page__title {
-  font-size: 32px;
-  font-weight: 700;
-  color: #2c3e50;
-  margin: 0 0 8px 0;
+.conciliaciones-page__header h1 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
 }
 
 .conciliaciones-page__subtitle {
-  font-size: 16px;
-  color: #7f8c8d;
   margin: 0;
+  color: #666;
+  font-size: 0.95rem;
 }
 
-.conciliaciones-page__content {
-  display: grid;
-  grid-template-columns: 1fr 400px;
-  gap: 24px;
+.conciliaciones-message {
+  padding: 1rem;
+  border-radius: 6px;
+  margin-bottom: 1.5rem;
+  font-weight: 500;
 }
 
-.conciliaciones-page__main {
+.conciliaciones-message--success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.conciliaciones-message--error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.conciliaciones-actions {
   display: flex;
-  flex-direction: column;
-  gap: 24px;
+  justify-content: center;
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 2px solid #e0e0e0;
 }
 
-.conciliaciones-page__sidebar {
-  position: sticky;
-  top: 24px;
-  height: fit-content;
+/* Responsive */
+@media (max-width: 768px) {
+  .conciliaciones-page {
+    padding: 1rem;
+  }
 }
 
 /* ========================================

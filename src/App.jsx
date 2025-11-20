@@ -22,7 +22,7 @@ import Layout from "./components/layout/Layout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Vales from "./pages/Vales";
-// import Conciliaciones from './pages/Conciliaciones';
+import Conciliaciones from "./pages/Conciliaciones";
 import VerificarVales from "./pages/VerificarVales";
 
 // 5. Estilos
@@ -78,7 +78,7 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <Layout>
-                  <div>Conciliaciones - Por implementar</div>
+                  <Conciliaciones />
                 </Layout>
               </ProtectedRoute>
             }
