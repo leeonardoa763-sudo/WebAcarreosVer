@@ -1,0 +1,566 @@
+/**
+ * src/styles/conciliaciones.css
+ * 
+ * Estilos para página de conciliaciones y componentes relacionados
+ */
+
+/* ========================================
+   PÁGINA CONCILIACIONES
+======================================== */
+
+.conciliaciones-page {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.conciliaciones-page__header {
+  margin-bottom: 32px;
+}
+
+.conciliaciones-page__title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0 0 8px 0;
+}
+
+.conciliaciones-page__subtitle {
+  font-size: 16px;
+  color: #7f8c8d;
+  margin: 0;
+}
+
+.conciliaciones-page__content {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 24px;
+}
+
+.conciliaciones-page__main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.conciliaciones-page__sidebar {
+  position: sticky;
+  top: 24px;
+  height: fit-content;
+}
+
+/* ========================================
+   FILTROS CONCILIACION
+======================================== */
+
+.filtros-conciliacion {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.filtros-conciliacion__header {
+  margin-bottom: 24px;
+}
+
+.filtros-conciliacion__title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0 0 8px 0;
+}
+
+.filtros-conciliacion__subtitle {
+  font-size: 14px;
+  color: #7f8c8d;
+  margin: 0;
+}
+
+.filtros-conciliacion__body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.filtros-conciliacion__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filtros-conciliacion__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.filtros-conciliacion__select {
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  background: #ffffff;
+}
+
+.filtros-conciliacion__select:focus {
+  outline: none;
+  border-color: #ff6b35;
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+}
+
+.filtros-conciliacion__select:disabled {
+  background: #f5f6fa;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.filtros-conciliacion__select--error {
+  border-color: #dc2626;
+}
+
+.filtros-conciliacion__error {
+  font-size: 12px;
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.filtros-conciliacion__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.filtros-conciliacion__button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filtros-conciliacion__button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+}
+
+.filtros-conciliacion__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   TABLA CONCILIACION
+======================================== */
+
+.tabla-conciliacion {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.tabla-conciliacion__header {
+  padding: 20px 24px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.tabla-conciliacion__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.tabla-conciliacion__grupos {
+  display: flex;
+  flex-direction: column;
+}
+
+.tabla-conciliacion-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  gap: 16px;
+}
+
+.tabla-conciliacion-empty p {
+  font-size: 16px;
+  color: #7f8c8d;
+  margin: 0;
+}
+
+/* ========================================
+   GRUPO PLACAS
+======================================== */
+
+.grupo-placas {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.grupo-placas:last-child {
+  border-bottom: none;
+}
+
+.grupo-placas__header {
+  width: 100%;
+  padding: 16px 24px;
+  background: #ffffff;
+  border: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.grupo-placas__header:hover {
+  background: #f5f6fa;
+}
+
+.grupo-placas__header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.grupo-placas__placas {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.grupo-placas__header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.grupo-placas__count {
+  font-size: 13px;
+  font-weight: 600;
+  color: #7f8c8d;
+  background: #f5f6fa;
+  padding: 4px 10px;
+  border-radius: 10px;
+}
+
+.grupo-placas__stat {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ff6b35;
+}
+
+.grupo-placas__subtotal {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a936f;
+}
+
+.grupo-placas__content {
+  padding: 16px 24px 24px;
+  background: #fafbfc;
+  animation: expandDown 0.2s ease;
+}
+
+@keyframes expandDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 2000px;
+  }
+}
+
+.grupo-placas__footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 2px solid #e5e7eb;
+}
+
+.grupo-placas__footer-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.grupo-placas__footer-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a936f;
+}
+
+/* ========================================
+   TABLA VALES
+======================================== */
+
+.tabla-vales {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tabla-vales thead {
+  background: #f5f6fa;
+}
+
+.tabla-vales th {
+  padding: 12px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2c3e50;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tabla-vales td {
+  padding: 12px;
+  font-size: 13px;
+  color: #2c3e50;
+  border-top: 1px solid #f5f6fa;
+}
+
+.tabla-vales tbody tr:hover {
+  background: #f5f6fa;
+}
+
+.tabla-vales__folio {
+  font-weight: 600;
+  color: #ff6b35;
+}
+
+.tabla-vales__material {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tabla-vales__viajes {
+  text-align: center;
+  font-weight: 600;
+}
+
+.tabla-vales__dias,
+.tabla-vales__horas {
+  font-weight: 600;
+  color: #ff6b35;
+}
+
+.tabla-vales__costo {
+  font-weight: 700;
+  color: #1a936f;
+  text-align: right;
+}
+
+/* ========================================
+   RESUMEN TOTALES
+======================================== */
+
+.resumen-totales {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.resumen-totales__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.resumen-totales__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.resumen-totales__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.resumen-totales__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.resumen-totales__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #7f8c8d;
+}
+
+.resumen-totales__label--total {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.resumen-totales__value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.resumen-totales__value--highlight {
+  color: #ff6b35;
+  font-size: 15px;
+}
+
+.resumen-totales__value--total {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a936f;
+}
+
+.resumen-totales__divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 8px 0;
+}
+
+.resumen-totales__divider--bold {
+  height: 2px;
+  background: #2c3e50;
+}
+
+.resumen-totales__row--total {
+  margin-top: 8px;
+}
+
+/* ========================================
+   ACCIONES CONCILIACION
+======================================== */
+
+.acciones-conciliacion {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.acciones-conciliacion__button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.acciones-conciliacion__button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  opacity: 0.9;
+}
+
+.acciones-conciliacion__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.acciones-conciliacion__button--pdf {
+  box-shadow: 0 2px 8px rgba(26, 147, 111, 0.2);
+}
+
+.acciones-conciliacion__button--pdf:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(26, 147, 111, 0.3);
+}
+
+.acciones-conciliacion__button--excel {
+  box-shadow: 0 2px 8px rgba(0, 78, 137, 0.2);
+}
+
+.acciones-conciliacion__button--excel:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(0, 78, 137, 0.3);
+}
+
+.acciones-conciliacion__spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ========================================
+   RESPONSIVE
+======================================== */
+
+@media (max-width: 1024px) {
+  .conciliaciones-page__content {
+    grid-template-columns: 1fr;
+  }
+
+  .conciliaciones-page__sidebar {
+    position: static;
+  }
+}
+
+@media (max-width: 768px) {
+  .conciliaciones-page__title {
+    font-size: 24px;
+  }
+
+  .tabla-vales {
+    font-size: 12px;
+  }
+
+  .tabla-vales th,
+  .tabla-vales td {
+    padding: 8px;
+  }
+
+  .grupo-placas__header-right {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .acciones-conciliacion {
+    flex-direction: column;
+  }
+
+  .acciones-conciliacion__button {
+    width: 100%;
+  }
+}
