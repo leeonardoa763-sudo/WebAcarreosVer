@@ -1,15 +1,5 @@
 /**
  * src/pages/Conciliaciones.jsx
- *
- * Página principal de gestión de conciliaciones
- *
- * Funcionalidades:
- * - Filtros de selección (semana, obra, sindicato)
- * - Vista previa de vales agrupados
- * - Resumen de totales
- * - Generación de conciliación
- *
- * Requiere: Rol Sindicato o Administrador
  */
 
 // 1. React y hooks
@@ -17,42 +7,35 @@ import { useState } from "react";
 
 // 2. Hooks personalizados
 import { useConciliaciones } from "../hooks/useConciliaciones";
+// 2. Config
+import { supabase } from "../config/supabase";
 
 // 3. Componentes
-
 import FiltrosConciliacion from "../components/conciliaciones/FiltrosConciliacion";
 import TablaConciliacionRenta from "../components/conciliaciones/TablaConciliacionRenta";
 import ResumenTotales from "../components/conciliaciones/ResumenTotales";
+import BotonGenerarPDF from "../components/conciliaciones/BotonGenerarPDF";
 
 // 4. Estilos
 import "../styles/conciliaciones.css";
 
 const Conciliaciones = () => {
   const {
-    // Catálogos
     semanas,
     obras,
     loadingCatalogos,
-
-    // Filtros
     filtros,
     updateFiltros,
     clearFiltros,
-
-    // Vista previa
     vistaPrevia,
     cargarVistaPrevia,
-
-    // Acciones
     generarConciliacion,
   } = useConciliaciones();
 
   const [generando, setGenerando] = useState(false);
   const [mensaje, setMensaje] = useState({ tipo: null, texto: "" });
+  const [conciliacionGenerada, setConciliacionGenerada] = useState(null);
 
-  /**
-   * Handler para generar conciliación
-   */
   const handleGenerar = async () => {
     if (
       !vistaPrevia.valesAgrupados ||
@@ -72,6 +55,36 @@ const Conciliaciones = () => {
       const resultado = await generarConciliacion();
 
       if (resultado.success) {
+        // Cargar datos completos con relaciones
+        const { data: conciliacionCompleta, error } = await supabase
+          .from("conciliaciones")
+          .select(
+            `
+          *,
+          obras:id_obra (
+            id_obra,
+            obra,
+            cc
+          ),
+          sindicatos:id_sindicato (
+            id_sindicato,
+            sindicato,
+            nombre_completo,
+            nombre_firma_conciliacion
+          ),
+          empresas:id_empresa (
+            id_empresa,
+            empresa,
+            sufijo
+          )
+        `
+          )
+          .eq("id_conciliacion", resultado.data.id_conciliacion)
+          .single();
+
+        if (error) throw error;
+
+        setConciliacionGenerada(conciliacionCompleta);
         setMensaje({
           tipo: "success",
           texto: `Conciliación generada exitosamente: ${resultado.data.folio}`,
@@ -89,7 +102,6 @@ const Conciliaciones = () => {
       setGenerando(false);
     }
   };
-
   return (
     <div className="conciliaciones-page">
       <div className="conciliaciones-page__header">
@@ -99,7 +111,6 @@ const Conciliaciones = () => {
         </p>
       </div>
 
-      {/* Mensaje de éxito/error */}
       {mensaje.tipo && (
         <div
           className={`conciliaciones-message conciliaciones-message--${mensaje.tipo}`}
@@ -108,7 +119,6 @@ const Conciliaciones = () => {
         </div>
       )}
 
-      {/* Filtros */}
       <FiltrosConciliacion
         semanas={semanas}
         obras={obras}
@@ -120,7 +130,6 @@ const Conciliaciones = () => {
         vistaPreviaLoading={vistaPrevia.loading}
       />
 
-      {/* Vista previa y totales */}
       {vistaPrevia.error && (
         <div className="conciliaciones-message conciliaciones-message--error">
           {vistaPrevia.error}
@@ -136,15 +145,22 @@ const Conciliaciones = () => {
             loading={vistaPrevia.loading}
           />
 
-          {/* Botón generar */}
           <div className="conciliaciones-actions">
-            <button
-              onClick={handleGenerar}
-              disabled={generando}
-              className="btn btn--primary"
-            >
-              {generando ? "Generando..." : "Generar Conciliación"}
-            </button>
+            {!conciliacionGenerada ? (
+              <button
+                onClick={handleGenerar}
+                disabled={generando}
+                className="btn btn--primary"
+              >
+                {generando ? "Generando..." : "Generar Conciliación"}
+              </button>
+            ) : (
+              <BotonGenerarPDF
+                conciliacion={conciliacionGenerada}
+                valesAgrupados={vistaPrevia.valesAgrupados}
+                totalesGenerales={vistaPrevia.totalesGenerales}
+              />
+            )}
           </div>
         </>
       )}

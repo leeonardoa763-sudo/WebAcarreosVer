@@ -14,6 +14,9 @@
 // 1. React y hooks
 import { useCallback } from "react";
 
+// 2. Config
+import { supabase } from "../../config/supabase";
+
 /**
  * Hook para lógica de generación de conciliaciones
  */
@@ -29,6 +32,15 @@ export const useConciliacionesGenerar = (queries, helpers, userProfile) => {
         if (!validacion.valid) {
           return { success: false, error: validacion.error };
         }
+
+        // Obtener datos del sindicato
+        const idSindicato = userProfile.id_sindicato;
+
+        const { data: sindicatoData } = await supabase
+          .from("sindicatos")
+          .select("nombre_completo, nombre_firma_conciliacion")
+          .eq("id_sindicato", idSindicato)
+          .single();
 
         // Preparar datos
         const dataConciliacion = helpers.prepararDatosConciliacion(
