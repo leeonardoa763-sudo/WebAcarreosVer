@@ -95,13 +95,29 @@ export const useConciliaciones = () => {
         sindicatoFiltro
       );
 
+      console.log("DEBUG cargarVistaPrevia - Resultado completo:", resultado);
+      console.log("DEBUG - resultado.success:", resultado.success);
+      console.log("DEBUG - resultado.data:", resultado.data);
+      console.log("DEBUG - resultado.error:", resultado.error);
+
       if (!resultado.success) throw new Error(resultado.error);
 
       const validacion = helpers.validarValesDisponibles(resultado.data);
+
+      console.log("DEBUG - Validación:", validacion);
+
       if (!validacion.valid) throw new Error(validacion.error);
 
+      console.log("DEBUG - Antes de agrupar vales");
       const gruposPorPlacas = helpers.agruparValesPorPlacas(resultado.data);
+      console.log("DEBUG - Grupos por placas:", gruposPorPlacas);
+      console.log(
+        "DEBUG - Cantidad de grupos:",
+        Object.keys(gruposPorPlacas).length
+      );
+
       const totales = helpers.calcularTotalesGenerales(gruposPorPlacas);
+      console.log("DEBUG - Totales calculados:", totales);
 
       setVistaPrevia({
         valesAgrupados: gruposPorPlacas,
@@ -110,6 +126,7 @@ export const useConciliaciones = () => {
         loading: false,
         error: null,
       });
+      console.log("DEBUG - setVistaPrevia ejecutado");
     } catch (error) {
       console.error("Error en cargarVistaPrevia:", error);
       setVistaPrevia((prev) => ({

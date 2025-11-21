@@ -54,30 +54,52 @@ export const AuthProvider = ({ children }) => {
    * Callback para manejar cambios de autenticación
    */
   const handleAuthChange = (event, session, profile, errorMsg = null) => {
+    console.log("handleAuthChange:", {
+      event,
+      hasSession: !!session,
+      hasProfile: !!profile,
+    });
+
     if (errorMsg) {
       setError(errorMsg);
       setUser(null);
       setUserProfile(null);
+      setLoading(false); // ← AGREGA
     } else if (event === "SIGNED_IN" && session && profile) {
       setUser(session.user);
       setUserProfile(profile);
       setError(null);
+      setLoading(false); // ← AGREGA
     } else if (event === "SIGNED_OUT") {
       setUser(null);
       setUserProfile(null);
       setError(null);
+      setLoading(false); // ← AGREGA
     }
   };
 
   /**
    * Verificar sesión al cargar la app
+   * Sin dependencias para evitar bucle infinito
    */
   useEffect(() => {
     let mounted = true;
+    let timeoutId;
 
     const initializeAuth = async () => {
       try {
+        // Timeout de seguridad (5 segundos máximo)
+        timeoutId = setTimeout(() => {
+          if (mounted) {
+            console.log("Timeout de autenticación - forzando fin de carga");
+            setLoading(false);
+          }
+        }, 5000);
+
         const { session, profile } = await checkSession();
+
+        // Limpiar timeout si la verificación terminó
+        clearTimeout(timeoutId);
 
         if (mounted) {
           if (session && profile) {
@@ -87,6 +109,7 @@ export const AuthProvider = ({ children }) => {
           setLoading(false);
         }
       } catch (error) {
+        clearTimeout(timeoutId);
         console.error("Error en initializeAuth:", error);
         if (mounted) {
           setLoading(false);
@@ -102,9 +125,10 @@ export const AuthProvider = ({ children }) => {
     // Cleanup
     return () => {
       mounted = false;
+      clearTimeout(timeoutId);
       subscription?.unsubscribe();
     };
-  }, [checkSession, setupAuthListener]);
+  }, []); // Sin dependencias - solo ejecuta al montar
 
   // Valor del contexto
   const value = {

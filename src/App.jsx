@@ -24,6 +24,7 @@ import Dashboard from "./pages/Dashboard";
 import Vales from "./pages/Vales";
 import Conciliaciones from "./pages/Conciliaciones";
 import VerificarVales from "./pages/VerificarVales";
+import DebugConciliaciones from "./pages/DebugConciliaciones";
 
 // 5. Estilos
 import "./styles/global.css";
@@ -82,6 +83,17 @@ const App = () => {
                 </Layout>
               </ProtectedRoute>
             }
+          />
+
+          {/* 
+            DEBUG CONCILIACIONES - TEMPORAL
+            IMPORTANTE: Esta ruta NO está protegida para evitar loops de carga
+            Se accede desde el botón en Dashboard (que SÍ está protegido)
+            ELIMINAR después de terminar el debugging
+          */}
+          <Route
+            path="/debug-conciliaciones"
+            element={<DebugConciliaciones />}
           />
 
           {/* Ruta pública - Verificación de vale sin auth */}

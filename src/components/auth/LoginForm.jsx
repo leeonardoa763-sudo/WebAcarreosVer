@@ -1,33 +1,33 @@
 /**
  * src/components/auth/LoginForm.jsx
- * 
+ *
  * Componente de formulario de inicio de sesión
- * 
+ *
  * Funcionalidades:
  * - Input de email y password
  * - Validación básica de campos
  * - Manejo de errores de autenticación
  * - Redirección después de login exitoso
- * 
+ *
  * Usado en: Login.jsx
  */
 
 // 1. React y hooks
-import { useState } from 'react';
+import { useState } from "react";
 
 // 2. React Router
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 
 // 3. Hooks personalizados
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from "../../hooks/useAuth";
 
 // 4. Config
-import { colors } from '../../config/colors';
+import { colors } from "../../config/colors";
 
 const LoginForm = () => {
   // Estados del formulario
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [localError, setLocalError] = useState(null);
 
   // Hooks
@@ -39,17 +39,17 @@ const LoginForm = () => {
    */
   const validateForm = () => {
     if (!email.trim()) {
-      setLocalError('El email es requerido');
+      setLocalError("El email es requerido");
       return false;
     }
 
-    if (!email.includes('@')) {
-      setLocalError('Email inválido');
+    if (!email.includes("@")) {
+      setLocalError("Email inválido");
       return false;
     }
 
     if (!password) {
-      setLocalError('La contraseña es requerida');
+      setLocalError("La contraseña es requerida");
       return false;
     }
 
@@ -63,27 +63,21 @@ const LoginForm = () => {
     e.preventDefault();
     setLocalError(null);
 
-    // Validar campos
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
-    // Intentar iniciar sesión
     const result = await signIn(email, password);
 
-    if (result.success) {
-      // Redireccionar al dashboard
-      navigate('/dashboard');
-    } else {
-      // Mostrar error amigable
-      if (result.error.includes('Invalid login credentials')) {
-        setLocalError('Email o contraseña incorrectos');
-      } else if (result.error.includes('No tiene permisos')) {
-        setLocalError('Tu cuenta no tiene acceso al sistema web. Contacta al administrador.');
+    if (!result.success) {
+      // Solo maneja errores, NO redirijas en success
+      if (result.error.includes("Invalid login credentials")) {
+        setLocalError("Email o contraseña incorrectos");
+      } else if (result.error.includes("No tiene permisos")) {
+        setLocalError("Tu cuenta no tiene acceso al sistema web.");
       } else {
         setLocalError(result.error);
       }
     }
+    // El useEffect en Login.jsx hará la redirección automática
   };
 
   return (
@@ -96,10 +90,7 @@ const LoginForm = () => {
       <form className="login-form__form" onSubmit={handleSubmit}>
         {/* Campo Email */}
         <div className="login-form__field">
-          <label 
-            htmlFor="email" 
-            className="login-form__label"
-          >
+          <label htmlFor="email" className="login-form__label">
             Email
           </label>
           <input
@@ -116,10 +107,7 @@ const LoginForm = () => {
 
         {/* Campo Password */}
         <div className="login-form__field">
-          <label 
-            htmlFor="password" 
-            className="login-form__label"
-          >
+          <label htmlFor="password" className="login-form__label">
             Contraseña
           </label>
           <input
@@ -135,20 +123,18 @@ const LoginForm = () => {
         </div>
 
         {/* Mostrar error si existe */}
-        {localError && (
-          <div className="login-form__error">
-            {localError}
-          </div>
-        )}
+        {localError && <div className="login-form__error">{localError}</div>}
 
         {/* Botón de submit */}
         <button
           type="submit"
           className="login-form__button"
           disabled={loading}
-          style={{ backgroundColor: loading ? colors.textSecondary : colors.primary }}
+          style={{
+            backgroundColor: loading ? colors.textSecondary : colors.primary,
+          }}
         >
-          {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+          {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
         </button>
       </form>
 

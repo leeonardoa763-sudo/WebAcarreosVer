@@ -12,13 +12,10 @@
  * Usado en: useAuth.jsx
  */
 
-// 1. React y hooks
-import { useCallback } from "react";
-
-// 2. Config
+// 1. Config
 import { supabase } from "../../config/supabase";
 
-// 3. Estados
+// 2. Estados
 import { ROLES_PERMITIDOS } from "./useAuthState";
 
 /**
@@ -28,7 +25,7 @@ export const useAuthSession = () => {
   /**
    * Obtener perfil completo del usuario con relaciones
    */
-  const fetchUserProfile = useCallback(async (authUserId) => {
+  const fetchUserProfile = async (authUserId) => {
     try {
       const { data, error } = await supabase
         .from("persona")
@@ -67,12 +64,12 @@ export const useAuthSession = () => {
       console.error("Error en fetchUserProfile:", error);
       throw error;
     }
-  }, []);
+  };
 
   /**
    * Verificar sesión actual
    */
-  const checkSession = useCallback(async () => {
+  const checkSession = async () => {
     try {
       // Obtener sesión actual
       const {
@@ -107,37 +104,34 @@ export const useAuthSession = () => {
       console.error("Error general en checkSession:", error);
       return { session: null, profile: null };
     }
-  }, [fetchUserProfile]);
+  };
 
   /**
    * Configurar listener de cambios de autenticación
    */
-  const setupAuthListener = useCallback(
-    (onAuthChange) => {
-      const {
-        data: { subscription },
-      } = supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log("Auth state changed:", event);
+  const setupAuthListener = (onAuthChange) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event);
 
-        if (event === "SIGNED_IN" && session?.user) {
-          try {
-            const profile = await fetchUserProfile(session.user.id);
-            onAuthChange(event, session, profile);
-          } catch (error) {
-            console.error("Error al obtener perfil en auth change:", error);
-            onAuthChange(event, null, null, error.message);
-          }
-        } else if (event === "SIGNED_OUT") {
-          onAuthChange(event, null, null);
-        } else if (event === "TOKEN_REFRESHED") {
-          console.log("Token refrescado correctamente");
+      if (event === "SIGNED_IN" && session?.user) {
+        try {
+          const profile = await fetchUserProfile(session.user.id);
+          onAuthChange(event, session, profile);
+        } catch (error) {
+          console.error("Error al obtener perfil en auth change:", error);
+          onAuthChange(event, null, null, error.message);
         }
-      });
+      } else if (event === "SIGNED_OUT") {
+        onAuthChange(event, null, null);
+      } else if (event === "TOKEN_REFRESHED") {
+        console.log("Token refrescado correctamente");
+      }
+    });
 
-      return subscription;
-    },
-    [fetchUserProfile]
-  );
+    return subscription;
+  };
 
   return {
     checkSession,

@@ -12,9 +12,16 @@
 
 // 1. React y hooks
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 // 2. Icons
-import { FileText, Calendar, TrendingUp, CalendarDays } from "lucide-react";
+import {
+  FileText,
+  Calendar,
+  TrendingUp,
+  CalendarDays,
+  Bug,
+} from "lucide-react";
 
 // 3. Config
 import { supabase } from "../config/supabase";
@@ -29,6 +36,7 @@ import StatsCard from "../components/dashboard/StatsCard";
 import "../styles/dashboard.css";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const { userProfile, canViewAllVales } = useAuth();
   const [stats, setStats] = useState({
     totalVales: 0,
@@ -130,6 +138,29 @@ const Dashboard = () => {
       <div className="dashboard__header">
         <h1 className="dashboard__title">Dashboard</h1>
         <p className="dashboard__subtitle">Bienvenido, {userProfile?.nombre}</p>
+
+        {/* BOTÓN TEMPORAL DE DEBUG - ELIMINAR DESPUÉS */}
+        <button
+          onClick={() => navigate("/debug-conciliaciones")}
+          className="debug-button"
+          style={{
+            marginTop: "16px",
+            padding: "12px 20px",
+            backgroundColor: "#ff9800",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontSize: "14px",
+            fontWeight: "600",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <Bug size={20} />
+          🔧 Debug Conciliaciones (Temporal)
+        </button>
       </div>
 
       <div className="dashboard__stats">

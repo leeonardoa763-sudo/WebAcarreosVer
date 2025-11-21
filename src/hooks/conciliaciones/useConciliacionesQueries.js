@@ -114,6 +114,10 @@ export const useConciliacionesQueries = () => {
         query = query.order("fecha_creacion", { ascending: true });
 
         const { data, error } = await query;
+        console.log("DEBUG fetchValesVerificadosRenta - Filtros:", filtros);
+        console.log("DEBUG - Data cruda:", data);
+        console.log("DEBUG - Cantidad:", data?.length);
+        console.log("DEBUG - Error:", error);
 
         if (error) throw error;
 
@@ -457,6 +461,7 @@ export const useConciliacionesQueries = () => {
         if (errorRel) throw errorRel;
 
         // 3. Actualizar estado de vales a 'conciliado'
+
         const { error: errorUpdate } = await supabase
           .from("vales")
           .update({ estado: "conciliado" })

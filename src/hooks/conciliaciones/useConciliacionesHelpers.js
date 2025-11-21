@@ -82,6 +82,9 @@ export const useConciliacionesHelpers = () => {
    * Validar que hay vales disponibles para conciliación
    */
   const validarValesDisponibles = (vales) => {
+    console.log("DEBUG validarValesDisponibles - Input:", vales);
+    console.log("DEBUG - Cantidad de vales:", vales?.length);
+
     if (!vales || vales.length === 0) {
       return {
         valid: false,
@@ -92,6 +95,13 @@ export const useConciliacionesHelpers = () => {
     // Validar que todos los vales tengan detalles de renta
     const sinDetalles = vales.filter(
       (v) => !v.vale_renta_detalle || v.vale_renta_detalle.length === 0
+    );
+
+    console.log("DEBUG - Vales sin detalles:", sinDetalles);
+    console.log("DEBUG - Primer vale completo:", vales[0]);
+    console.log(
+      "DEBUG - vale_renta_detalle del primero:",
+      vales[0]?.vale_renta_detalle
     );
 
     if (sinDetalles.length > 0) {
@@ -105,8 +115,20 @@ export const useConciliacionesHelpers = () => {
     const sinCosto = vales.filter((v) =>
       v.vale_renta_detalle.some((d) => !d.costo_total || d.costo_total === 0)
     );
+    console.log("DEBUG - Vales sin costo:", sinCosto);
+    console.log("DEBUG - sinCosto.length:", sinCosto.length);
 
     if (sinCosto.length > 0) {
+      console.log(
+        "DEBUG - Vales sin costo detallados:",
+        sinCosto.map((v) => ({
+          folio: v.folio,
+          detalles: v.vale_renta_detalle.map((d) => ({
+            costo_total: d.costo_total,
+            tipo: typeof d.costo_total,
+          })),
+        }))
+      );
       return {
         valid: false,
         error: `${sinCosto.length} vale(s) sin costo calculado`,
