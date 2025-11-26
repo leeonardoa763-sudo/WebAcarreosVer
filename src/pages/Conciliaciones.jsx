@@ -35,6 +35,8 @@ const Conciliaciones = () => {
   const [generando, setGenerando] = useState(false);
   const [mensaje, setMensaje] = useState({ tipo: null, texto: "" });
   const [conciliacionGenerada, setConciliacionGenerada] = useState(null);
+  // ✅ NUEVO: Estado para guardar los totales y vales agrupados
+  const [datosParaPDF, setDatosParaPDF] = useState(null);
 
   const handleGenerar = async () => {
     if (
@@ -51,6 +53,12 @@ const Conciliaciones = () => {
     try {
       setGenerando(true);
       setMensaje({ tipo: null, texto: "" });
+
+      // ✅ NUEVO: Guardar los datos ANTES de que se limpien
+      const datosGuardados = {
+        valesAgrupados: vistaPrevia.valesAgrupados,
+        totalesGenerales: vistaPrevia.totalesGenerales,
+      };
 
       const resultado = await generarConciliacion();
 
@@ -85,6 +93,9 @@ const Conciliaciones = () => {
         if (error) throw error;
 
         setConciliacionGenerada(conciliacionCompleta);
+        // ✅ NUEVO: Guardar los datos para el PDF
+        setDatosParaPDF(datosGuardados);
+
         setMensaje({
           tipo: "success",
           texto: `Conciliación generada exitosamente: ${resultado.data.folio}`,
@@ -102,6 +113,7 @@ const Conciliaciones = () => {
       setGenerando(false);
     }
   };
+
   return (
     <div className="conciliaciones-page">
       <div className="conciliaciones-page__header">
@@ -141,7 +153,7 @@ const Conciliaciones = () => {
           <TablaConciliacionRenta valesAgrupados={vistaPrevia.valesAgrupados} />
 
           <ResumenTotales
-            totalesGenerales={vistaPrevia.totalesGenerales}
+            totales={vistaPrevia.totalesGenerales}
             loading={vistaPrevia.loading}
           />
 
@@ -155,10 +167,11 @@ const Conciliaciones = () => {
                 {generando ? "Generando..." : "Generar Conciliación"}
               </button>
             ) : (
+              // ✅ MODIFICADO: Usar los datos guardados
               <BotonGenerarPDF
                 conciliacion={conciliacionGenerada}
-                valesAgrupados={vistaPrevia.valesAgrupados}
-                totalesGenerales={vistaPrevia.totalesGenerales}
+                valesAgrupados={datosParaPDF.valesAgrupados}
+                totales={datosParaPDF.totalesGenerales}
               />
             )}
           </div>

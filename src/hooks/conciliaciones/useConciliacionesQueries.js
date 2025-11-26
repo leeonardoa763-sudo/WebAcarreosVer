@@ -460,14 +460,18 @@ export const useConciliacionesQueries = () => {
 
         if (errorRel) throw errorRel;
 
-        // 3. Actualizar estado de vales a 'conciliado'
+        // 3. ⚠️ COMENTAR TEMPORALMENTE - Actualizar estado de vales a 'conciliado'
+        // const { error: errorUpdate } = await supabase
+        //   .from("vales")
+        //   .update({ estado: "conciliado" })
+        //   .in("id_vale", idsVales);
 
-        const { error: errorUpdate } = await supabase
-          .from("vales")
-          .update({ estado: "conciliado" })
-          .in("id_vale", idsVales);
+        // if (errorUpdate) throw errorUpdate;
 
-        if (errorUpdate) throw errorUpdate;
+        // ✅ TEMPORAL: Log para ver que se saltó la actualización
+        console.log(
+          "⚠️ MODO PRUEBAS: [useConciliacionesQueries] No se cambió el estado de los vales a 'conciliado'"
+        );
 
         return { success: true, data: conciliacion };
       } catch (error) {

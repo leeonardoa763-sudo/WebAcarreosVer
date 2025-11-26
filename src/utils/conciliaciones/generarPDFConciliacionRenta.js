@@ -1,186 +1,246 @@
 /**
  * src/utils/conciliaciones/generarPDFConciliacionRenta.js
  *
- * Genera PDF de conciliación con formato oficial
+ * Generación de PDF para conciliaciones de renta
+ *
+ * VERSIÓN ULTRA SIMPLE: Sin autoTable, solo texto y líneas
+ *
+ * Dependencias: jspdf
+ * Usado en: BotonGenerarPDF.jsx
  */
 
-import jsPDF from "jspdf";
-import "jspdf-autotable";
+// 1. Imports
+import { jsPDF } from "jspdf";
 
-export const generarPDFConciliacionRenta = (conciliacion, valesAgrupados) => {
-  const doc = new jsPDF("portrait", "mm", "letter");
-  let yPos = 20;
-
-  // Formatear fecha
-  const formatearFecha = (fecha) => {
-    const date = new Date(fecha);
-    const dia = date.getDate();
-    const mes = date.toLocaleDateString("es-MX", { month: "long" });
-    const año = date.getFullYear();
-    return `${dia} de ${mes} de ${año}`;
-  };
-
-  const formatearFechaCorta = (fecha) => {
-    const date = new Date(fecha);
-    return date.toLocaleDateString("es-MX", {
-      day: "2-digit",
-      month: "short",
-      year: "2-digit",
+/**
+ * Generar PDF de conciliación de renta
+ *
+ * @param {Object} conciliacion - Datos completos de la conciliación
+ * @param {Object} valesAgrupados - Vales agrupados por placas
+ * @param {Object} totales - Totales generales
+ */
+export const generarPDFConciliacionRenta = (
+  conciliacion,
+  valesAgrupados,
+  totales
+) => {
+  try {
+    // Crear documento PDF (tamaño carta)
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "letter",
     });
-  };
 
-  // Header - Nombre del sindicato
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text(conciliacion.sindicatos.nombre_completo.toUpperCase(), 105, yPos, {
-    align: "center",
-  });
-  yPos += 8;
+    let yPos = 20; // Posición Y inicial
+    const marginLeft = 20;
+    const pageHeight = 279; // Altura página carta
+    const marginBottom = 20;
 
-  // Título
-  doc.setFontSize(14);
-  doc.text("REPORTE DE CONCILIACION", 105, yPos, { align: "center" });
-  yPos += 10;
+    // Función para agregar nueva página si es necesario
+    const checkPageBreak = (neededSpace = 10) => {
+      if (yPos + neededSpace > pageHeight - marginBottom) {
+        doc.addPage();
+        yPos = 20;
+        return true;
+      }
+      return false;
+    };
 
-  // Info general
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Empresa: ${conciliacion.empresas.empresa}`, 20, yPos);
-  yPos += 5;
-  doc.text(`Obra: ${conciliacion.obras.obra}`, 20, yPos);
-  yPos += 5;
-  doc.text(
-    `Periodo: ${formatearFechaCorta(conciliacion.fecha_inicio)} - ${formatearFechaCorta(conciliacion.fecha_fin)}`,
-    20,
-    yPos
-  );
-  yPos += 5;
-  doc.text(
-    `Fecha de generación: ${formatearFecha(conciliacion.fecha_generacion)}`,
-    20,
-    yPos
-  );
-  yPos += 10;
+    // ========================================
+    // ENCABEZADO
+    // ========================================
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("CONCILIACIÓN DE RENTA", 105, yPos, { align: "center" });
+    yPos += 10;
 
-  // Preparar datos de la tabla
-  const tableData = [];
-  Object.values(valesAgrupados).forEach((grupo) => {
-    grupo.vales.forEach((vale) => {
-      vale.vale_renta_detalle.forEach((detalle) => {
-        tableData.push([
-          formatearFechaCorta(vale.fecha_creacion),
-          grupo.placas,
-          vale.folio,
-          detalle.material?.material || "N/A",
-          detalle.capacidad_m3 || 0,
-          detalle.numero_viajes || 0,
-          detalle.total_dias || 0,
-          detalle.total_horas || 0,
-        ]);
+    // Línea decorativa
+    doc.setLineWidth(0.5);
+    doc.line(marginLeft, yPos, 195, yPos);
+    yPos += 8;
+
+    // ========================================
+    // INFORMACIÓN GENERAL
+    // ========================================
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+
+    doc.text(`Folio: ${conciliacion.folio}`, marginLeft, yPos);
+    yPos += 6;
+
+    doc.text(
+      `Sindicato: ${conciliacion.sindicatos.nombre_completo}`,
+      marginLeft,
+      yPos
+    );
+    yPos += 6;
+
+    doc.text(`Obra: ${conciliacion.obras.obra}`, marginLeft, yPos);
+    yPos += 6;
+
+    doc.text(
+      `Semana: ${conciliacion.numero_semana} / ${conciliacion.año}`,
+      marginLeft,
+      yPos
+    );
+    yPos += 6;
+
+    doc.text(
+      `Periodo: ${conciliacion.fecha_inicio} al ${conciliacion.fecha_fin}`,
+      marginLeft,
+      yPos
+    );
+    yPos += 10;
+
+    // ========================================
+    // DESGLOSE POR VEHÍCULO
+    // ========================================
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("DESGLOSE POR VEHÍCULO", marginLeft, yPos);
+    yPos += 8;
+
+    // Iterar por cada grupo de placas
+    Object.entries(valesAgrupados).forEach(([placas, grupo]) => {
+      checkPageBreak(30);
+
+      // Encabezado del grupo (placas)
+      doc.setFillColor(230, 230, 230);
+      doc.rect(marginLeft, yPos - 5, 175, 8, "F");
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text(`VEHÍCULO: ${placas}`, marginLeft + 2, yPos);
+      yPos += 10;
+
+      // Encabezados de columnas
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.text("Folio", marginLeft, yPos);
+      doc.text("Fecha", marginLeft + 35, yPos);
+      doc.text("Material", marginLeft + 60, yPos);
+      doc.text("Días", marginLeft + 110, yPos);
+      doc.text("Horas", marginLeft + 130, yPos);
+      doc.text("Importe", marginLeft + 155, yPos);
+      yPos += 5;
+
+      // Línea separadora
+      doc.setLineWidth(0.3);
+      doc.line(marginLeft, yPos, 195, yPos);
+      yPos += 5;
+
+      // Iterar por cada vale del grupo
+      doc.setFont("helvetica", "normal");
+      grupo.vales.forEach((vale) => {
+        vale.vale_renta_detalle.forEach((detalle) => {
+          checkPageBreak(8);
+
+          const fecha = vale.fecha_creacion.split("T")[0];
+          const material = detalle.material?.material || "N/A";
+          const dias = detalle.total_dias || 0;
+          const horas = detalle.total_horas || 0;
+          const costo = detalle.costo_total.toFixed(2);
+
+          doc.text(vale.folio, marginLeft, yPos);
+          doc.text(fecha, marginLeft + 35, yPos);
+          doc.text(material.substring(0, 20), marginLeft + 60, yPos);
+          doc.text(`${dias}`, marginLeft + 110, yPos);
+          doc.text(`${horas}`, marginLeft + 130, yPos);
+          doc.text(`$${costo}`, marginLeft + 155, yPos);
+          yPos += 5;
+        });
       });
+
+      // Subtotal del grupo
+      yPos += 2;
+      doc.setFont("helvetica", "bold");
+      doc.text(`Subtotal ${placas}:`, marginLeft + 110, yPos);
+      doc.text(`$${grupo.subtotal.toFixed(2)}`, marginLeft + 155, yPos);
+      yPos += 8;
+
+      doc.setFont("helvetica", "normal");
     });
-  });
 
-  // Tabla principal
-  doc.autoTable({
-    startY: yPos,
-    head: [
-      ["FECHA", "PLACAS", "FOLIO", "MATERIAL", "CAP", "VIAJES", "DIAS", "HRS"],
-    ],
-    body: tableData,
-    styles: { fontSize: 8, cellPadding: 2 },
-    headStyles: {
-      fillColor: [41, 128, 185],
-      textColor: 255,
-      fontStyle: "bold",
-    },
-    columnStyles: {
-      0: { cellWidth: 20 },
-      1: { cellWidth: 22 },
-      2: { cellWidth: 28 },
-      3: { cellWidth: 45 },
-      4: { cellWidth: 15, halign: "center" },
-      5: { cellWidth: 18, halign: "center" },
-      6: { cellWidth: 15, halign: "center" },
-      7: { cellWidth: 15, halign: "center" },
-    },
-    margin: { left: 20, right: 20 },
-  });
+    // ========================================
+    // RESUMEN DE TOTALES
+    // ========================================
+    checkPageBreak(40);
 
-  yPos = doc.lastAutoTable.finalY + 10;
-
-  // Totales
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-
-  const totales = conciliacion.totalesGenerales || {
-    totalDias: 0,
-    totalHoras: 0,
-  };
-
-  if (totalesGenerales.totalDias > 0) {
-    doc.text(`TOTAL TURNOS: ${totalesGenerales.totalDias}`, 20, yPos);
     yPos += 5;
+    doc.setLineWidth(0.5);
+    doc.line(marginLeft, yPos, 195, yPos);
+    yPos += 8;
+
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("RESUMEN", marginLeft, yPos);
+    yPos += 8;
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+
+    // Total días
+    if (totales.totalDias > 0) {
+      doc.text(`Total Días:`, marginLeft, yPos);
+      doc.text(`${totales.totalDias}`, 190, yPos, { align: "right" });
+      yPos += 6;
+    }
+
+    // Total horas
+    if (totales.totalHoras > 0) {
+      doc.text(`Total Horas:`, marginLeft, yPos);
+      doc.text(`${totales.totalHoras}`, 190, yPos, { align: "right" });
+      yPos += 6;
+    }
+
+    yPos += 4;
+
+    // Subtotal
+    doc.text(`Subtotal:`, marginLeft, yPos);
+    doc.text(`$${totales.subtotal.toFixed(2)} MXN`, 190, yPos, {
+      align: "right",
+    });
+    yPos += 6;
+
+    // IVA
+    doc.text(`IVA 16%:`, marginLeft, yPos);
+    doc.text(`$${totales.iva.toFixed(2)} MXN`, 190, yPos, { align: "right" });
+    yPos += 6;
+
+    // Línea antes del total
+    doc.setLineWidth(0.3);
+    doc.line(marginLeft, yPos, 195, yPos);
+    yPos += 6;
+
+    // Total
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text(`TOTAL:`, marginLeft, yPos);
+    doc.text(`$${totales.total.toFixed(2)} MXN`, 190, yPos, { align: "right" });
+
+    // ========================================
+    // PIE DE PÁGINA
+    // ========================================
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Página ${i} de ${pageCount}`, 105, 270, { align: "center" });
+      doc.text(`Generado: ${new Date().toLocaleString("es-MX")}`, 105, 275, {
+        align: "center",
+      });
+    }
+
+    // ========================================
+    // DESCARGAR PDF
+    // ========================================
+    const nombreArchivo = `Conciliacion_${conciliacion.folio}.pdf`;
+    doc.save(nombreArchivo);
+
+    console.log("PDF generado exitosamente:", nombreArchivo);
+  } catch (error) {
+    console.error("Error al generar PDF:", error);
+    throw error;
   }
-
-  if (totalesGenerales.totalHoras > 0) {
-    doc.text(`TOTAL HORAS: ${totalesGenerales.totalHoras}`, 20, yPos);
-    yPos += 5;
-  }
-
-  yPos += 5;
-  doc.text(
-    `SUBTOTAL: $${conciliacion.subtotal.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`,
-    20,
-    yPos
-  );
-  yPos += 5;
-  doc.text(
-    `IVA 16%: $${conciliacion.iva_16_porciento.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`,
-    20,
-    yPos
-  );
-  yPos += 5;
-  doc.setFontSize(12);
-  doc.text(
-    `TOTAL: $${conciliacion.total_final.toLocaleString("es-MX", { minimumFractionDigits: 2 })} MXN`,
-    20,
-    yPos
-  );
-  yPos += 15;
-
-  // Firmas
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-
-  const firmaY = yPos + 20;
-
-  // Línea sindicato
-  doc.line(30, firmaY, 90, firmaY);
-  doc.text("SINDICATO", 60, firmaY + 5, { align: "center" });
-  doc.setFont("helvetica", "bold");
-  doc.text(
-    conciliacion.nombre_firma_sindicato ||
-      conciliacion.sindicatos.nombre_firma_conciliacion,
-    60,
-    firmaY + 10,
-    { align: "center" }
-  );
-
-  // Línea empresa
-  doc.setFont("helvetica", "normal");
-  doc.line(125, firmaY, 185, firmaY);
-  doc.text("EMPRESA", 155, firmaY + 5, { align: "center" });
-  doc.setFont("helvetica", "bold");
-  doc.text("ING. BRUNO LEONARDO AGUILAR SAUCEDO", 155, firmaY + 10, {
-    align: "center",
-  });
-
-  // Folio en footer
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "italic");
-  doc.text(`Folio: ${conciliacion.folio}`, 105, 270, { align: "center" });
-
-  // Descargar
-  doc.save(`Conciliacion_${conciliacion.folio}.pdf`);
 };

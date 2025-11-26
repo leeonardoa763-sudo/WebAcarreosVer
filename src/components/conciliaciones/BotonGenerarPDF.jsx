@@ -15,6 +15,14 @@ const BotonGenerarPDF = ({
   const [generando, setGenerando] = useState(false);
 
   const handleGenerar = () => {
+    // ⬇️ AGREGAR ESTOS CONSOLE.LOGS
+    console.log("=== DEBUG BOTON PDF ===");
+    console.log("1. conciliacion:", conciliacion);
+    console.log("2. valesAgrupados:", valesAgrupados);
+    console.log("3. totales:", totales);
+    console.log("======================");
+    // ⬆️ FIN CONSOLE.LOGS
+
     try {
       setGenerando(true);
       generarPDFConciliacionRenta(conciliacion, valesAgrupados, totales);
