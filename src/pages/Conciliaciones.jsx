@@ -159,15 +159,18 @@ const Conciliaciones = () => {
 
           <div className="conciliaciones-actions">
             {!conciliacionGenerada ? (
-              <button
-                onClick={handleGenerar}
-                disabled={generando}
-                className="btn btn--primary"
-              >
-                {generando ? "Generando..." : "Generar Conciliación"}
-              </button>
+              // ✅ AGREGAR CONDICIÓN: Solo mostrar si hay vista previa
+              Object.keys(vistaPrevia.valesAgrupados || {}).length > 0 && (
+                <button
+                  onClick={handleGenerar}
+                  disabled={generando}
+                  className="btn btn--primary btn--generar-conciliacion"
+                  style={{ backgroundColor: "#1a936f" }} // Verde más llamativo
+                >
+                  {generando ? "Generando..." : "Generar Conciliación"}
+                </button>
+              )
             ) : (
-              // ✅ MODIFICADO: Usar los datos guardados
               <BotonGenerarPDF
                 conciliacion={conciliacionGenerada}
                 valesAgrupados={datosParaPDF.valesAgrupados}
