@@ -333,21 +333,25 @@ export const useConciliacionesMaterial = () => {
     }
   }, [idPersona, isAdmin, idSindicato, queriesGenerales]);
 
-  // Cargar sindicatos SOLO cuando cambia idPersona o isAdmin
+  // Cargar obras SOLO cuando cambia la semana
   useEffect(() => {
-    if (idPersona && isAdmin) {
-      loadSindicatos();
-    } else if (!isAdmin) {
-      clearSindicatos();
+    if (filtros.semanaSeleccionada) {
+      loadObras(filtros.semanaSeleccionada);
     }
-  }, [idPersona, isAdmin, loadSindicatos, clearSindicatos]);
+  }, [filtros.semanaSeleccionada?.numero, filtros.semanaSeleccionada?.año]); // ✅ REMOVIDO: loadObras
 
   // Cargar semanas cuando cambia idPersona O sindicatoSeleccionado
   useEffect(() => {
+    console.log("🔄 [useConciliacionesMaterial] useEffect SEMANAS ejecutado", {
+      idPersona,
+      sindicatoSeleccionado: filtros.sindicatoSeleccionado,
+      timestamp: new Date().toISOString(),
+    });
+
     if (idPersona) {
       loadSemanas();
     }
-  }, [idPersona, filtros.sindicatoSeleccionado, loadSemanas]);
+  }, [idPersona, filtros.sindicatoSeleccionado]);
 
   // Cargar obras SOLO cuando cambia la semana
   useEffect(() => {

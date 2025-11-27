@@ -68,12 +68,18 @@ const Conciliaciones = () => {
    * Cambiar de tab y limpiar estados
    */
   const handleCambiarTab = (nuevoTab) => {
-    console.log("[Conciliaciones] Cambiando a tab:", nuevoTab);
+    console.log("🔀 [Conciliaciones] handleCambiarTab INICIO", {
+      tabAnterior: tabActivo,
+      nuevoTab,
+      timestamp: new Date().toISOString(),
+    });
 
     // Limpiar estados del tab anterior
     if (tabActivo === "renta") {
+      console.log("  → Limpiando filtros de RENTA");
       rentaHook.clearFiltros();
     } else {
+      console.log("  → Limpiando filtros de MATERIAL");
       materialHook.clearFiltros();
     }
 
