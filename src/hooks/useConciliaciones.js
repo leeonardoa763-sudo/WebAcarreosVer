@@ -13,6 +13,7 @@ import {
 import { useConciliacionesQueries } from "./conciliaciones/useConciliacionesQueries";
 import { useConciliacionesHelpers } from "./conciliaciones/useConciliacionesHelpers";
 import { useConciliacionesGenerar } from "./conciliaciones/useConciliacionesGenerar";
+import { useSindicatos } from "./conciliaciones/useSindicatos";
 
 export const useConciliaciones = () => {
   const { userProfile, hasRole } = useAuth();
@@ -32,6 +33,13 @@ export const useConciliaciones = () => {
   const helpers = useConciliacionesHelpers();
   const generar = useConciliacionesGenerar(queries, helpers, userProfile);
 
+  const {
+    sindicatos,
+    loading: loadingSindicatos,
+    loadSindicatos,
+    clearSindicatos,
+  } = useSindicatos();
+
   // Memoizar valores estables
   const isAdmin = useMemo(() => hasRole("Administrador"), [hasRole]);
   const idPersona = userProfile?.id_persona;
@@ -44,13 +52,19 @@ export const useConciliaciones = () => {
     if (!idPersona) return;
 
     setLoadingCatalogos(true);
-    const sindicatoFiltro = isAdmin ? null : idSindicato;
+
+    // ✅ Para Admin: usar el sindicato seleccionado en filtros
+    // ✅ Para no-Admin: usar su sindicato asignado
+    const sindicatoFiltro = isAdmin
+      ? filtros.sindicatoSeleccionado
+      : idSindicato;
 
     const resultado =
       await queries.fetchSemanasConValesVerificados(sindicatoFiltro);
+
     setSemanas(resultado.data);
     setLoadingCatalogos(false);
-  }, [idPersona, isAdmin, idSindicato, queries]);
+  }, [idPersona, isAdmin, idSindicato, filtros.sindicatoSeleccionado, queries]);
 
   /**
    * Cargar obras - SIN dependencias de callbacks
@@ -68,6 +82,7 @@ export const useConciliaciones = () => {
         semana,
         sindicatoFiltro
       );
+
       setObras(resultado.data);
       setLoadingCatalogos(false);
     },
@@ -104,7 +119,6 @@ export const useConciliaciones = () => {
       const gruposPorPlacas = helpers.agruparValesPorPlacas(resultado.data);
 
       const totales = helpers.calcularTotalesGenerales(gruposPorPlacas);
-      console.log("DEBUG - Totales calculados:", totales);
 
       setVistaPrevia({
         valesAgrupados: gruposPorPlacas,
@@ -113,9 +127,8 @@ export const useConciliaciones = () => {
         loading: false,
         error: null,
       });
-      console.log("DEBUG - setVistaPrevia ejecutado");
     } catch (error) {
-      console.error("Error en cargarVistaPrevia:", error);
+      console.error("[useConciliaciones] Error en cargarVistaPrevia:", error);
       setVistaPrevia((prev) => ({
         ...prev,
         loading: false,
@@ -149,6 +162,7 @@ export const useConciliaciones = () => {
     setFiltros(initialFiltrosState);
     setVistaPrevia(initialVistaPreviaState);
     setObras([]);
+    setSemanas([]); // ← NUEVO: Limpiar semanas también
   }, []);
 
   /**
@@ -197,7 +211,7 @@ export const useConciliaciones = () => {
 
       setConciliaciones(resultado.data);
     } catch (error) {
-      console.error("Error en loadHistorial:", error);
+      console.error("[useConciliaciones] Error en loadHistorial:", error);
       setError(error.message);
     } finally {
       setLoading(false);
@@ -214,26 +228,39 @@ export const useConciliaciones = () => {
     [generar]
   );
 
-  // Cargar semanas SOLO cuando cambia idPersona
+  // Cargar sindicatos SOLO cuando cambia idPersona o isAdmin
+  useEffect(() => {
+    if (idPersona && isAdmin) {
+      loadSindicatos();
+    } else if (!isAdmin) {
+      clearSindicatos();
+    }
+  }, [idPersona, isAdmin]);
+
+  // ✅ CORREGIDO: Cargar semanas cuando cambia idPersona O sindicatoSeleccionado
   useEffect(() => {
     if (idPersona) {
       loadSemanas();
     }
-  }, [idPersona]); // ← SOLO idPersona
+  }, [
+    idPersona,
+    filtros.sindicatoSeleccionado, // ← NUEVO: Recargar cuando cambie el sindicato
+  ]);
 
   // Cargar obras SOLO cuando cambia la semana
   useEffect(() => {
     if (filtros.semanaSeleccionada) {
       loadObras(filtros.semanaSeleccionada);
     }
-  }, [filtros.semanaSeleccionada?.numero, filtros.semanaSeleccionada?.año]); // ← Valores primitivos
+  }, [filtros.semanaSeleccionada?.numero, filtros.semanaSeleccionada?.año]);
 
   return {
     conciliaciones,
     semanas,
     obras,
+    sindicatos,
     loading,
-    loadingCatalogos,
+    loadingCatalogos: loadingCatalogos || loadingSindicatos,
     error,
     filtros,
     updateFiltros,

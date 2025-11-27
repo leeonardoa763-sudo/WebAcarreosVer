@@ -114,10 +114,6 @@ export const useConciliacionesQueries = () => {
         query = query.order("fecha_creacion", { ascending: true });
 
         const { data, error } = await query;
-        console.log("DEBUG fetchValesVerificadosRenta - Filtros:", filtros);
-        console.log("DEBUG - Data cruda:", data);
-        console.log("DEBUG - Cantidad:", data?.length);
-        console.log("DEBUG - Error:", error);
 
         if (error) throw error;
 
@@ -214,6 +210,7 @@ export const useConciliacionesQueries = () => {
             `
           fecha_creacion,
           operadores:id_operador (
+            id_sindicato,
             sindicatos:id_sindicato (
               id_sindicato
             )
@@ -225,22 +222,24 @@ export const useConciliacionesQueries = () => {
           .neq("estado", "conciliado")
           .order("fecha_creacion", { ascending: false });
 
-        // Filtrar por sindicato
-        if (idSindicatoUsuario) {
-          query = query.eq(
-            "operadores.sindicatos.id_sindicato",
-            idSindicatoUsuario
-          );
-        }
-
         const { data, error } = await query;
 
         if (error) throw error;
 
+        // ✅ CORRECCIÓN: Filtrar en el cliente por sindicato
+        let valesFiltrados = data;
+
+        if (idSindicatoUsuario) {
+          valesFiltrados = data.filter((vale) => {
+            const sindicatoOperador = vale.operadores?.id_sindicato;
+            return sindicatoOperador === idSindicatoUsuario;
+          });
+        }
+
         // Agrupar por semana (calcular en cliente)
         const semanas = {};
 
-        data.forEach((vale) => {
+        valesFiltrados.forEach((vale) => {
           const fecha = new Date(vale.fecha_creacion);
           const semanaInfo = calcularSemanaISO(fecha);
           const key = `${semanaInfo.año}-${semanaInfo.numero}`;
@@ -263,6 +262,11 @@ export const useConciliacionesQueries = () => {
           if (a.año !== b.año) return b.año - a.año;
           return b.numero - a.numero;
         });
+
+        console.log(
+          "[fetchSemanasConValesVerificados] Semanas finales:",
+          semanasArray.length
+        );
 
         return { success: true, data: semanasArray };
       } catch (error) {

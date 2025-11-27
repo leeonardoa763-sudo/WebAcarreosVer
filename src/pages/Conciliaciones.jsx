@@ -7,22 +7,24 @@ import { useState } from "react";
 
 // 2. Hooks personalizados
 import { useConciliaciones } from "../hooks/useConciliaciones";
-// 2. Config
+
+// 3. Config
 import { supabase } from "../config/supabase";
 
-// 3. Componentes
+// 4. Componentes
 import FiltrosConciliacion from "../components/conciliaciones/FiltrosConciliacion";
 import TablaConciliacionRenta from "../components/conciliaciones/TablaConciliacionRenta";
 import ResumenTotales from "../components/conciliaciones/ResumenTotales";
 import BotonGenerarPDF from "../components/conciliaciones/BotonGenerarPDF";
 
-// 4. Estilos
+// 5. Estilos
 import "../styles/conciliaciones.css";
 
 const Conciliaciones = () => {
   const {
     semanas,
     obras,
+    sindicatos, // ← NUEVO: Desestructurar sindicatos
     loadingCatalogos,
     filtros,
     updateFiltros,
@@ -35,7 +37,6 @@ const Conciliaciones = () => {
   const [generando, setGenerando] = useState(false);
   const [mensaje, setMensaje] = useState({ tipo: null, texto: "" });
   const [conciliacionGenerada, setConciliacionGenerada] = useState(null);
-  // ✅ NUEVO: Estado para guardar los totales y vales agrupados
   const [datosParaPDF, setDatosParaPDF] = useState(null);
 
   const handleGenerar = async () => {
@@ -54,7 +55,7 @@ const Conciliaciones = () => {
       setGenerando(true);
       setMensaje({ tipo: null, texto: "" });
 
-      // ✅ NUEVO: Guardar los datos ANTES de que se limpien
+      // Guardar los datos ANTES de que se limpien
       const datosGuardados = {
         valesAgrupados: vistaPrevia.valesAgrupados,
         totalesGenerales: vistaPrevia.totalesGenerales,
@@ -93,7 +94,6 @@ const Conciliaciones = () => {
         if (error) throw error;
 
         setConciliacionGenerada(conciliacionCompleta);
-        // ✅ NUEVO: Guardar los datos para el PDF
         setDatosParaPDF(datosGuardados);
 
         setMensaje({
@@ -104,7 +104,7 @@ const Conciliaciones = () => {
         throw new Error(resultado.error);
       }
     } catch (error) {
-      console.error("Error al generar conciliación:", error);
+      console.error("[Conciliaciones] Error al generar conciliación:", error);
       setMensaje({
         tipo: "error",
         texto: error.message || "Error al generar conciliación",
@@ -134,6 +134,7 @@ const Conciliaciones = () => {
       <FiltrosConciliacion
         semanas={semanas}
         obras={obras}
+        sindicatos={sindicatos} // ← NUEVO: Pasar sindicatos como prop
         filtros={filtros}
         onFiltrosChange={updateFiltros}
         onCargarVistaPrevia={cargarVistaPrevia}
@@ -159,13 +160,12 @@ const Conciliaciones = () => {
 
           <div className="conciliaciones-actions">
             {!conciliacionGenerada ? (
-              // ✅ AGREGAR CONDICIÓN: Solo mostrar si hay vista previa
               Object.keys(vistaPrevia.valesAgrupados || {}).length > 0 && (
                 <button
                   onClick={handleGenerar}
                   disabled={generando}
                   className="btn btn--primary btn--generar-conciliacion"
-                  style={{ backgroundColor: "#1a936f" }} // Verde más llamativo
+                  style={{ backgroundColor: "#1a936f" }}
                 >
                   {generando ? "Generando..." : "Generar Conciliación"}
                 </button>
