@@ -28,6 +28,46 @@
   color: #666;
   font-size: 0.95rem;
 }
+/* ========================================
+   TABS DE NAVEGACIÓN
+   ======================================== */
+
+.conciliaciones-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 2rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.conciliaciones-tabs__tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  color: #2c3e50;
+  border-bottom: 3px solid transparent;
+}
+
+.conciliaciones-tabs__tab:hover:not(.conciliaciones-tabs__tab--active) {
+  background: #f5f6fa;
+}
+
+.conciliaciones-tabs__tab--active {
+  border-bottom: 3px solid currentColor;
+}
+
+.conciliaciones-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
 
 .conciliaciones-message {
   padding: 1rem;
@@ -388,6 +428,11 @@
   text-align: right;
 }
 
+.tabla-vales__folio-banco {
+  font-weight: 600;
+  color: #004e89;
+}
+
 /* ========================================
    RESUMEN TOTALES
 ======================================== */
@@ -473,6 +518,31 @@
   margin-top: 8px;
 }
 
+.resumen-totales__value--retencion {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+/* Secciones de tipo de material */
+.resumen-totales__seccion {
+  padding: 12px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.resumen-totales__seccion:last-of-type {
+  border-bottom: none;
+  margin-bottom: 8px;
+}
+
+.resumen-totales__subtitulo {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #ff6b35;
+}
+
 /* ========================================
    ACCIONES CONCILIACION
 ======================================== */
@@ -553,6 +623,16 @@
 @media (max-width: 768px) {
   .conciliaciones-page__title {
     font-size: 24px;
+  }
+
+  .conciliaciones-tabs {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .conciliaciones-tabs__tab {
+    border-radius: 0;
+    justify-content: center;
   }
 
   .tabla-vales {
