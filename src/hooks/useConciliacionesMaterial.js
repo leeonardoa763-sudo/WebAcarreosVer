@@ -37,6 +37,7 @@ export const useConciliacionesMaterial = () => {
   const [vistaPrevia, setVistaPrevia] = useState(initialVistaPreviaState);
   const [semanas, setSemanas] = useState([]);
   const [obras, setObras] = useState([]);
+  const [materiales, setMateriales] = useState([]); // 👈 NUEVO
   const [loadingCatalogos, setLoadingCatalogos] = useState(false);
 
   const queriesMaterial = useConciliacionesMaterialQueries();
@@ -119,6 +120,43 @@ export const useConciliacionesMaterial = () => {
       idSindicato,
       filtros.sindicatoSeleccionado,
       queriesMaterial,
+    ]
+  );
+
+  /**
+   * Cargar materiales con vales verificados de material
+   */
+  const loadMateriales = useCallback(
+    async (semana, idObra) => {
+      if (!semana || !idObra || !idPersona) return;
+
+      console.log("[useConciliacionesMaterial] loadMateriales - Inicio");
+      setLoadingCatalogos(true);
+
+      const sindicatoFiltro = isAdmin
+        ? filtros.sindicatoSeleccionado
+        : idSindicato;
+
+      const resultado = await queriesMaterial.fetchMaterialesConVales(
+        semana,
+        idObra,
+        sindicatoFiltro
+      );
+
+      setMateriales(resultado.data);
+      setLoadingCatalogos(false);
+
+      console.log(
+        "[useConciliacionesMaterial] Materiales cargados:",
+        resultado.data.length
+      );
+    },
+    [
+      idPersona,
+      isAdmin,
+      idSindicato,
+      queriesMaterial,
+      filtros.sindicatoSeleccionado,
     ]
   );
 
@@ -217,6 +255,7 @@ export const useConciliacionesMaterial = () => {
     setVistaPrevia(initialVistaPreviaState);
     setObras([]);
     setSemanas([]);
+    setMateriales([]); // 👈 NUEVO
   }, []);
 
   /**
@@ -340,18 +379,16 @@ export const useConciliacionesMaterial = () => {
     }
   }, [filtros.semanaSeleccionada?.numero, filtros.semanaSeleccionada?.año]); // ✅ REMOVIDO: loadObras
 
-  // Cargar semanas cuando cambia idPersona O sindicatoSeleccionado
+  //  CORREGIDO: Cargar semanas cuando cambia idPersona O sindicatoSeleccionado
   useEffect(() => {
-    console.log("🔄 [useConciliacionesMaterial] useEffect SEMANAS ejecutado", {
-      idPersona,
-      sindicatoSeleccionado: filtros.sindicatoSeleccionado,
-      timestamp: new Date().toISOString(),
-    });
-
     if (idPersona) {
       loadSemanas();
     }
-  }, [idPersona, filtros.sindicatoSeleccionado]);
+  }, [
+    idPersona,
+    filtros.sindicatoSeleccionado,
+    //  NO incluir loadSemanas aquí
+  ]);
 
   // Cargar obras SOLO cuando cambia la semana
   useEffect(() => {
@@ -361,13 +398,27 @@ export const useConciliacionesMaterial = () => {
   }, [
     filtros.semanaSeleccionada?.numero,
     filtros.semanaSeleccionada?.año,
-    loadObras,
+    // NO incluir loadObras aquí
+  ]);
+
+  // Cargar materiales SOLO cuando cambia la obra
+  useEffect(() => {
+    if (filtros.semanaSeleccionada && filtros.obraSeleccionada) {
+      loadMateriales(filtros.semanaSeleccionada, filtros.obraSeleccionada);
+    } else {
+      setMateriales([]); // Limpiar materiales si no hay obra seleccionada
+    }
+  }, [
+    filtros.semanaSeleccionada?.numero,
+    filtros.semanaSeleccionada?.año,
+    filtros.obraSeleccionada,
   ]);
 
   return {
     conciliaciones,
     semanas,
     obras,
+    materiales,
     sindicatos,
     loading,
     loadingCatalogos: loadingCatalogos || loadingSindicatos,

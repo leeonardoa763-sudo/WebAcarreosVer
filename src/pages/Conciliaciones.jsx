@@ -241,13 +241,14 @@ const Conciliaciones = () => {
         <FiltrosConciliacion
           semanas={hookActivo.semanas}
           obras={hookActivo.obras}
+          materiales={hookActivo.materiales} //  NUEVO
           sindicatos={hookActivo.sindicatos}
           filtros={hookActivo.filtros}
           onFiltrosChange={hookActivo.updateFiltros}
           onCargarVistaPrevia={hookActivo.cargarVistaPrevia}
-          onLimpiar={hookActivo.clearFiltros}
-          loading={hookActivo.loadingCatalogos}
-          vistaPreviaLoading={hookActivo.vistaPrevia.loading}
+          loadingCatalogos={hookActivo.loadingCatalogos}
+          disabled={false}
+          tipoActivo={tabActivo} //  NUEVO: Pasar 'renta' o 'material'
         />
 
         {/* Error de vista previa */}

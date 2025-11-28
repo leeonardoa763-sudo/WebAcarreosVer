@@ -22,6 +22,7 @@ export const initialFiltrosState = {
   semanaSeleccionada: null, // { numero, año, fechaInicio, fechaFin }
   obraSeleccionada: null, // id_obra
   sindicatoSeleccionado: null, // id_sindicato (solo para Admin)
+  materialSeleccionado: null, // 👈 NUEVO: id_material
 };
 
 /**

@@ -6,6 +6,7 @@
  * Funcionalidades:
  * - Selector de semana (solo semanas con vales verificados)
  * - Selector de obra (solo obras con vales en la semana)
+ * - Selector de material (solo para Material, solo materiales con vales en obra/semana)
  * - Selector de sindicato (solo para Admin)
  * - Botón para cargar vista previa
  *
@@ -16,7 +17,7 @@
 import { useState } from "react";
 
 // 2. Icons
-import { Calendar, Building2, Users, Search } from "lucide-react";
+import { Calendar, Building2, Users, Search, Package } from "lucide-react";
 
 // 3. Hooks personalizados
 import { useAuth } from "../../hooks/useAuth";
@@ -27,12 +28,14 @@ import { colors } from "../../config/colors";
 const FiltrosConciliacion = ({
   semanas,
   obras,
+  materiales, // 👈 NUEVO
   sindicatos,
   filtros,
   onFiltrosChange,
   onCargarVistaPrevia,
   loadingCatalogos,
   disabled,
+  tipoActivo, // 👈 NUEVO: 'renta' o 'material'
 }) => {
   const { hasRole } = useAuth();
   const [errors, setErrors] = useState({});
@@ -43,6 +46,7 @@ const FiltrosConciliacion = ({
       onFiltrosChange({
         semanaSeleccionada: null,
         obraSeleccionada: null,
+        materialSeleccionado: null, // 👈 NUEVO
       });
       return;
     }
@@ -51,14 +55,24 @@ const FiltrosConciliacion = ({
 
     onFiltrosChange({
       semanaSeleccionada: semana,
-      obraSeleccionada: null, // Reset obra cuando cambia semana
+      obraSeleccionada: null,
+      materialSeleccionado: null, // 👈 NUEVO
     });
     setErrors({});
   };
 
   const handleObraChange = (e) => {
     const obraId = e.target.value ? parseInt(e.target.value) : null;
-    onFiltrosChange({ obraSeleccionada: obraId });
+    onFiltrosChange({
+      obraSeleccionada: obraId,
+      materialSeleccionado: null, // 👈 NUEVO: Reset material cuando cambia obra
+    });
+    setErrors({});
+  };
+
+  const handleMaterialChange = (e) => {
+    const materialId = e.target.value ? parseInt(e.target.value) : null;
+    onFiltrosChange({ materialSeleccionado: materialId });
     setErrors({});
   };
 
@@ -66,7 +80,8 @@ const FiltrosConciliacion = ({
     const sindicatoId = e.target.value ? parseInt(e.target.value) : null;
     onFiltrosChange({
       sindicatoSeleccionado: sindicatoId,
-      obraSeleccionada: null, // Reset obra cuando cambia sindicato
+      obraSeleccionada: null,
+      materialSeleccionado: null, // 👈 NUEVO
     });
     setErrors({});
   };
@@ -80,6 +95,11 @@ const FiltrosConciliacion = ({
 
     if (!filtros.obraSeleccionada) {
       newErrors.obra = "Debe seleccionar una obra";
+    }
+
+    // 👇 NUEVO: Validar material solo si es tipo Material
+    if (tipoActivo === "material" && !filtros.materialSeleccionado) {
+      newErrors.material = "Debe seleccionar un material";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -105,7 +125,7 @@ const FiltrosConciliacion = ({
     <div className="filtros-conciliacion">
       <div className="filtros-conciliacion__header">
         <h3 className="filtros-conciliacion__title">
-          Nueva Conciliación de Renta
+          Nueva Conciliación de {tipoActivo === "renta" ? "Renta" : "Material"}
         </h3>
         <p className="filtros-conciliacion__subtitle">
           Seleccione los filtros para generar la conciliación
@@ -220,6 +240,47 @@ const FiltrosConciliacion = ({
             </span>
           )}
         </div>
+
+        {/* 👇 NUEVO: Selector de Material (solo para tipo Material) */}
+        {tipoActivo === "material" && (
+          <div className="filtros-conciliacion__field">
+            <label
+              htmlFor="filtro-material"
+              className="filtros-conciliacion__label"
+            >
+              <Package size={16} aria-hidden="true" />
+              <span>Material</span>
+            </label>
+            <select
+              id="filtro-material"
+              value={filtros.materialSeleccionado || ""}
+              onChange={handleMaterialChange}
+              className={`filtros-conciliacion__select ${errors.material ? "filtros-conciliacion__select--error" : ""}`}
+              disabled={
+                !filtros.obraSeleccionada || disabled || loadingCatalogos
+              }
+              aria-label="Seleccionar material"
+              aria-invalid={!!errors.material}
+              aria-describedby={errors.material ? "error-material" : undefined}
+            >
+              <option value="">
+                {!filtros.obraSeleccionada
+                  ? "Primero seleccione una obra"
+                  : "Seleccione un material"}
+              </option>
+              {materiales?.map((material) => (
+                <option key={material.id_material} value={material.id_material}>
+                  {material.material} ({material.tipo_de_material})
+                </option>
+              ))}
+            </select>
+            {errors.material && (
+              <span id="error-material" className="filtros-conciliacion__error">
+                {errors.material}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Botón de acción */}
@@ -229,6 +290,7 @@ const FiltrosConciliacion = ({
           disabled={
             !filtros.semanaSeleccionada ||
             !filtros.obraSeleccionada ||
+            (tipoActivo === "material" && !filtros.materialSeleccionado) ||
             disabled ||
             loadingCatalogos
           }

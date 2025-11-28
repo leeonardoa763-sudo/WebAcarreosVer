@@ -216,6 +216,9 @@ export const useConciliacionesMaterialHelpers = () => {
   /**
    * Preparar datos para guardar conciliación de material
    */
+  /**
+   * Preparar datos para guardar conciliación de material
+   */
   const prepararDatosConciliacion = (
     vales,
     totales,
@@ -228,6 +231,10 @@ export const useConciliacionesMaterialHelpers = () => {
     );
 
     const obra = vales[0]?.obras;
+
+    // 👇 NUEVO: Obtener información del material
+    const primerDetalle = vales[0]?.vale_material_detalles?.[0];
+    const material = primerDetalle?.material;
 
     return {
       tipo_conciliacion: "material",
@@ -245,6 +252,8 @@ export const useConciliacionesMaterialHelpers = () => {
       total_horas: 0, // Material no usa horas
       generado_por: idPersona,
       estado: "generada",
+      // 👇 NUEVO: Agregar nota con el material
+      notas: material ? `Material: ${material.material}` : null,
     };
   };
 

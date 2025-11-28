@@ -23,6 +23,7 @@ import { supabase } from "../../config/supabase";
 export const useConciliacionesMaterialQueries = () => {
   /**
    * Obtener vales verificados de material para generar conciliación
+   * NUEVO: Filtra por material específico si está seleccionado
    */
   const fetchValesVerificadosMaterial = useCallback(
     async (filtros, idSindicatoUsuario) => {
@@ -44,58 +45,58 @@ export const useConciliacionesMaterialQueries = () => {
           .from("vales")
           .select(
             `
-          *,
-          obras:id_obra (
-            id_obra,
-            obra,
-            cc,
-            empresas:id_empresa (
-              id_empresa,
-              empresa,
-              sufijo
-            )
-          ),
-          operadores:id_operador (
-            id_operador,
-            nombre_completo,
-            sindicatos:id_sindicato (
-              id_sindicato,
-              sindicato
-            )
-          ),
-          vehiculos:id_vehiculo (
-            id_vehiculo,
-            placas
-          ),
-          persona:id_persona_creador (
-            nombre,
-            primer_apellido,
-            segundo_apellido
-          ),
-          vale_material_detalles (
-            id_detalle_material,
-            capacidad_m3,
-            distancia_km,
-            cantidad_pedida_m3,
-            peso_ton,
-            volumen_real_m3,
-            folio_banco,
-            precio_m3,
-            costo_total,
-            material:id_material (
-              id_material,
-              material,
-              tipo_de_material:id_tipo_de_material (
-                id_tipo_de_material,
-                tipo_de_material
-              )
-            ),
-            bancos:id_banco (
-              id_banco,
-              banco
-            )
+        *,
+        obras:id_obra (
+          id_obra,
+          obra,
+          cc,
+          empresas:id_empresa (
+            id_empresa,
+            empresa,
+            sufijo
           )
-        `
+        ),
+        operadores:id_operador (
+          id_operador,
+          nombre_completo,
+          sindicatos:id_sindicato (
+            id_sindicato,
+            sindicato
+          )
+        ),
+        vehiculos:id_vehiculo (
+          id_vehiculo,
+          placas
+        ),
+        persona:id_persona_creador (
+          nombre,
+          primer_apellido,
+          segundo_apellido
+        ),
+        vale_material_detalles (
+          id_detalle_material,
+          capacidad_m3,
+          distancia_km,
+          cantidad_pedida_m3,
+          peso_ton,
+          volumen_real_m3,
+          folio_banco,
+          precio_m3,
+          costo_total,
+          material:id_material (
+            id_material,
+            material,
+            tipo_de_material:id_tipo_de_material (
+              id_tipo_de_material,
+              tipo_de_material
+            )
+          ),
+          bancos:id_banco (
+            id_banco,
+            banco
+          )
+        )
+      `
           )
           .eq("tipo_vale", "material")
           .eq("verificado_por_sindicato", true)
@@ -140,6 +141,33 @@ export const useConciliacionesMaterialQueries = () => {
           );
         }
 
+        // 👇 NUEVO: Filtrar por material específico si está seleccionado
+        if (filtros.materialSeleccionado) {
+          valesFiltrados = valesFiltrados.filter((vale) => {
+            // Un vale se incluye si ALGUNO de sus detalles tiene el material seleccionado
+            return vale.vale_material_detalles?.some(
+              (detalle) =>
+                detalle.material?.id_material === filtros.materialSeleccionado
+            );
+          });
+
+          // Además, filtrar los detalles del vale para solo incluir el material seleccionado
+          valesFiltrados = valesFiltrados.map((vale) => ({
+            ...vale,
+            vale_material_detalles: vale.vale_material_detalles.filter(
+              (detalle) =>
+                detalle.material?.id_material === filtros.materialSeleccionado
+            ),
+          }));
+
+          console.log(
+            "[useConciliacionesMaterialQueries] Vales después de filtrar por material:",
+            valesFiltrados.length,
+            "- Material ID:",
+            filtros.materialSeleccionado
+          );
+        }
+
         return { success: true, data: valesFiltrados };
       } catch (error) {
         console.error(
@@ -166,7 +194,10 @@ export const useConciliacionesMaterialQueries = () => {
           .from("vales")
           .select(
             `
+          id_vale,
+          folio,
           id_obra,
+          id_operador,
           obras:id_obra (
             id_obra,
             obra,
@@ -177,8 +208,11 @@ export const useConciliacionesMaterialQueries = () => {
             )
           ),
           operadores:id_operador (
+            id_operador,
+            id_sindicato,
             sindicatos:id_sindicato (
-              id_sindicato
+              id_sindicato,
+              sindicato
             )
           )
         `
@@ -190,6 +224,14 @@ export const useConciliacionesMaterialQueries = () => {
           .lte("fecha_creacion", semana.fechaFin);
 
         const { data, error } = await query;
+        console.log(
+          "[useConciliacionesMaterialQueries] Vales ANTES de filtrar por sindicato:",
+          data?.length || 0
+        );
+        console.log(
+          "[useConciliacionesMaterialQueries] idSindicatoUsuario:",
+          idSindicatoUsuario
+        );
 
         if (error) throw error;
 
@@ -199,6 +241,17 @@ export const useConciliacionesMaterialQueries = () => {
         if (idSindicatoUsuario) {
           valesFiltrados = valesFiltrados.filter((vale) => {
             const sindicatoOperador = vale.operadores?.id_sindicato;
+
+            // 👇 AGREGAR ESTE LOG TAMBIÉN:
+            console.log(
+              "[useConciliacionesMaterialQueries] Vale:",
+              vale.folio,
+              "- Sindicato operador:",
+              sindicatoOperador,
+              "- Match:",
+              sindicatoOperador === idSindicatoUsuario
+            );
+
             return sindicatoOperador === idSindicatoUsuario;
           });
         }
@@ -323,10 +376,107 @@ export const useConciliacionesMaterialQueries = () => {
     []
   );
 
+  /**
+   * Obtener materiales que tienen vales verificados en una semana y obra específica
+   */
+  const fetchMaterialesConVales = useCallback(
+    async (semana, idObra, idSindicatoUsuario) => {
+      try {
+        console.log(
+          "[useConciliacionesMaterialQueries] fetchMaterialesConVales - Inicio"
+        );
+
+        let query = supabase
+          .from("vales")
+          .select(
+            `
+        id_vale,
+        folio,
+        id_operador,
+        operadores:id_operador (
+          id_operador,
+          id_sindicato
+        ),
+        vale_material_detalles (
+          id_detalle_material,
+          id_material,
+          material:id_material (
+            id_material,
+            material,
+            tipo_de_material:id_tipo_de_material (
+              id_tipo_de_material,
+              tipo_de_material
+            )
+          )
+        )
+      `
+          )
+          .eq("tipo_vale", "material")
+          .eq("verificado_por_sindicato", true)
+          .neq("estado", "conciliado")
+          .eq("id_obra", idObra)
+          .gte("fecha_creacion", semana.fechaInicio)
+          .lte("fecha_creacion", semana.fechaFin);
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        // Filtrar por sindicato en el cliente
+        let valesFiltrados = data || [];
+
+        if (idSindicatoUsuario) {
+          valesFiltrados = valesFiltrados.filter((vale) => {
+            const sindicatoOperador = vale.operadores?.id_sindicato;
+            return sindicatoOperador === idSindicatoUsuario;
+          });
+        }
+
+        // Extraer materiales únicos
+        const materialesMap = new Map();
+
+        valesFiltrados.forEach((vale) => {
+          vale.vale_material_detalles?.forEach((detalle) => {
+            const material = detalle.material;
+            if (material && !materialesMap.has(material.id_material)) {
+              materialesMap.set(material.id_material, {
+                id_material: material.id_material,
+                material: material.material,
+                tipo_de_material: material.tipo_de_material?.tipo_de_material,
+                id_tipo_de_material:
+                  material.tipo_de_material?.id_tipo_de_material,
+              });
+            }
+          });
+        });
+
+        // Convertir a array y ordenar alfabéticamente
+        const materialesUnicos = Array.from(materialesMap.values()).sort(
+          (a, b) => a.material.localeCompare(b.material)
+        );
+
+        console.log(
+          "[useConciliacionesMaterialQueries] Materiales únicos encontrados:",
+          materialesUnicos.length
+        );
+
+        return { success: true, data: materialesUnicos };
+      } catch (error) {
+        console.error(
+          "[useConciliacionesMaterialQueries] Error en fetchMaterialesConVales:",
+          error
+        );
+        return { success: false, error: error.message, data: [] };
+      }
+    },
+    []
+  );
+
   return {
     fetchValesVerificadosMaterial,
     fetchObrasConValesMaterial,
     fetchSemanasConValesMaterial,
+    fetchMaterialesConVales,
   };
 };
 
