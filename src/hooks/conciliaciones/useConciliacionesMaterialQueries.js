@@ -3,12 +3,15 @@
  *
  * Queries a Supabase específicas para conciliaciones de material
  *
+ * CORRECCIONES APLICADAS:
+ * 1. Eliminado filtro por sindicato de operador (Material no depende de sindicato)
+ * 2. Corregido filtro de fecha para incluir TODO el día final (23:59:59.999)
+ *
  * Funcionalidades:
  * - Obtener vales verificados de material
  * - Obtener obras con vales de material verificados
  * - Obtener semanas con vales de material verificados
- *
- * Usado en: useConciliacionesMaterial.js
+ * - Obtener materiales con vales verificados
  */
 
 // 1. React y hooks
@@ -17,13 +20,10 @@ import { useCallback } from "react";
 // 2. Config
 import { supabase } from "../../config/supabase";
 
-/**
- * Hook para queries de conciliaciones de material
- */
 export const useConciliacionesMaterialQueries = () => {
   /**
    * Obtener vales verificados de material para generar conciliación
-   * NUEVO: Filtra por material específico si está seleccionado
+   * Filtra por: semana (fecha_creacion), obra, material
    */
   const fetchValesVerificadosMaterial = useCallback(
     async (filtros, idSindicatoUsuario) => {
@@ -34,10 +34,6 @@ export const useConciliacionesMaterialQueries = () => {
         console.log(
           "[useConciliacionesMaterialQueries] Filtros recibidos:",
           filtros
-        );
-        console.log(
-          "[useConciliacionesMaterialQueries] Sindicato usuario:",
-          idSindicatoUsuario
         );
 
         // Query base
@@ -100,21 +96,23 @@ export const useConciliacionesMaterialQueries = () => {
           )
           .eq("tipo_vale", "material")
           .eq("verificado_por_sindicato", true)
-          .neq("estado", "conciliado");
+          .neq("estado", "conciliado"); // ← Comentar para ver vales conciliados en PRUEBAS
 
         // Filtrar por obra
         if (filtros.obraSeleccionada) {
           query = query.eq("id_obra", filtros.obraSeleccionada);
         }
 
-        // Filtrar por rango de fechas de la semana
+        // ✅ CORRECCIÓN: Incluir TODO el día final (hasta 23:59:59.999)
         if (filtros.semanaSeleccionada) {
+          const fechaFinCompleta = `${filtros.semanaSeleccionada.fechaFin}T23:59:59.999Z`;
+
           query = query
             .gte("fecha_creacion", filtros.semanaSeleccionada.fechaInicio)
-            .lte("fecha_creacion", filtros.semanaSeleccionada.fechaFin);
+            .lte("fecha_creacion", fechaFinCompleta);
         }
 
-        // Ordenar por placas y fecha
+        // Ordenar por fecha
         query = query.order("fecha_creacion", { ascending: true });
 
         const { data, error } = await query;
@@ -126,32 +124,23 @@ export const useConciliacionesMaterialQueries = () => {
           data?.length || 0
         );
 
-        // Filtrar por sindicato en el cliente
         let valesFiltrados = data || [];
 
-        if (idSindicatoUsuario) {
-          valesFiltrados = valesFiltrados.filter((vale) => {
-            const sindicatoOperador = vale.operadores?.sindicatos?.id_sindicato;
-            return sindicatoOperador === idSindicatoUsuario;
-          });
+        console.log(
+          "[useConciliacionesMaterialQueries] Vales después de query:",
+          valesFiltrados.length
+        );
 
-          console.log(
-            "[useConciliacionesMaterialQueries] Vales después de filtrar por sindicato:",
-            valesFiltrados.length
-          );
-        }
-
-        // 👇 NUEVO: Filtrar por material específico si está seleccionado
+        // Filtrar por material específico si está seleccionado
         if (filtros.materialSeleccionado) {
           valesFiltrados = valesFiltrados.filter((vale) => {
-            // Un vale se incluye si ALGUNO de sus detalles tiene el material seleccionado
             return vale.vale_material_detalles?.some(
               (detalle) =>
                 detalle.material?.id_material === filtros.materialSeleccionado
             );
           });
 
-          // Además, filtrar los detalles del vale para solo incluir el material seleccionado
+          // Filtrar los detalles del vale para solo incluir el material seleccionado
           valesFiltrados = valesFiltrados.map((vale) => ({
             ...vale,
             vale_material_detalles: vale.vale_material_detalles.filter(
@@ -183,21 +172,22 @@ export const useConciliacionesMaterialQueries = () => {
   /**
    * Obtener obras que tienen vales verificados de material en una semana específica
    */
-  const fetchObrasConValesMaterial = useCallback(
-    async (semana, idSindicatoUsuario) => {
-      try {
-        console.log(
-          "[useConciliacionesMaterialQueries] fetchObrasConValesMaterial - Inicio"
-        );
+  const fetchObrasConValesMaterial = useCallback(async (semana) => {
+    try {
+      console.log(
+        "[useConciliacionesMaterialQueries] fetchObrasConValesMaterial - Inicio"
+      );
 
-        let query = supabase
-          .from("vales")
-          .select(
-            `
+      // ✅ CORRECCIÓN: Incluir TODO el día final
+      const fechaFinCompleta = `${semana.fechaFin}T23:59:59.999Z`;
+
+      let query = supabase
+        .from("vales")
+        .select(
+          `
           id_vale,
           folio,
           id_obra,
-          id_operador,
           obras:id_obra (
             id_obra,
             obra,
@@ -206,197 +196,139 @@ export const useConciliacionesMaterialQueries = () => {
               empresa,
               sufijo
             )
-          ),
-          operadores:id_operador (
-            id_operador,
-            id_sindicato,
-            sindicatos:id_sindicato (
-              id_sindicato,
-              sindicato
-            )
           )
         `
-          )
-          .eq("tipo_vale", "material")
-          .eq("verificado_por_sindicato", true)
-          .neq("estado", "conciliado")
-          .gte("fecha_creacion", semana.fechaInicio)
-          .lte("fecha_creacion", semana.fechaFin);
+        )
+        .eq("tipo_vale", "material")
+        .eq("verificado_por_sindicato", true)
+        .neq("estado", "conciliado")
+        .gte("fecha_creacion", semana.fechaInicio)
+        .lte("fecha_creacion", fechaFinCompleta);
 
-        const { data, error } = await query;
-        console.log(
-          "[useConciliacionesMaterialQueries] Vales ANTES de filtrar por sindicato:",
-          data?.length || 0
-        );
-        console.log(
-          "[useConciliacionesMaterialQueries] idSindicatoUsuario:",
-          idSindicatoUsuario
-        );
+      const { data, error } = await query;
 
-        if (error) throw error;
+      if (error) throw error;
 
-        // Filtrar por sindicato en el cliente
-        let valesFiltrados = data || [];
+      console.log(
+        "[useConciliacionesMaterialQueries] Vales encontrados:",
+        data?.length || 0
+      );
 
-        if (idSindicatoUsuario) {
-          valesFiltrados = valesFiltrados.filter((vale) => {
-            const sindicatoOperador = vale.operadores?.id_sindicato;
-
-            // 👇 AGREGAR ESTE LOG TAMBIÉN:
-            console.log(
-              "[useConciliacionesMaterialQueries] Vale:",
-              vale.folio,
-              "- Sindicato operador:",
-              sindicatoOperador,
-              "- Match:",
-              sindicatoOperador === idSindicatoUsuario
-            );
-
-            return sindicatoOperador === idSindicatoUsuario;
+      // Agrupar por obra (eliminar duplicados)
+      const obrasUnicas = (data || []).reduce((acc, vale) => {
+        if (vale.obras && !acc.find((o) => o.id_obra === vale.obras.id_obra)) {
+          acc.push({
+            id_obra: vale.obras.id_obra,
+            obra: vale.obras.obra,
+            cc: vale.obras.cc,
+            empresa: vale.obras.empresas?.empresa,
+            sufijo: vale.obras.empresas?.sufijo,
           });
         }
+        return acc;
+      }, []);
 
-        // Agrupar por obra (eliminar duplicados)
-        const obrasUnicas = valesFiltrados.reduce((acc, vale) => {
-          if (
-            vale.obras &&
-            !acc.find((o) => o.id_obra === vale.obras.id_obra)
-          ) {
-            acc.push({
-              id_obra: vale.obras.id_obra,
-              obra: vale.obras.obra,
-              cc: vale.obras.cc,
-              empresa: vale.obras.empresas?.empresa,
-              sufijo: vale.obras.empresas?.sufijo,
-            });
-          }
-          return acc;
-        }, []);
+      console.log(
+        "[useConciliacionesMaterialQueries] Obras únicas encontradas:",
+        obrasUnicas.length
+      );
 
-        console.log(
-          "[useConciliacionesMaterialQueries] Obras únicas encontradas:",
-          obrasUnicas.length
-        );
-
-        return { success: true, data: obrasUnicas };
-      } catch (error) {
-        console.error(
-          "[useConciliacionesMaterialQueries] Error en fetchObrasConValesMaterial:",
-          error
-        );
-        return { success: false, error: error.message, data: [] };
-      }
-    },
-    []
-  );
+      return { success: true, data: obrasUnicas };
+    } catch (error) {
+      console.error(
+        "[useConciliacionesMaterialQueries] Error en fetchObrasConValesMaterial:",
+        error
+      );
+      return { success: false, error: error.message, data: [] };
+    }
+  }, []);
 
   /**
    * Obtener semanas con vales verificados de material
    */
-  const fetchSemanasConValesMaterial = useCallback(
-    async (idSindicatoUsuario) => {
-      try {
-        console.log(
-          "[useConciliacionesMaterialQueries] fetchSemanasConValesMaterial - Inicio"
-        );
+  const fetchSemanasConValesMaterial = useCallback(async () => {
+    try {
+      console.log(
+        "[useConciliacionesMaterialQueries] fetchSemanasConValesMaterial - Inicio"
+      );
 
-        let query = supabase
-          .from("vales")
-          .select(
-            `
-          fecha_creacion,
-          operadores:id_operador (
-            id_sindicato,
-            sindicatos:id_sindicato (
-              id_sindicato
-            )
-          )
-        `
-          )
-          .eq("tipo_vale", "material")
-          .eq("verificado_por_sindicato", true)
-          .neq("estado", "conciliado")
-          .order("fecha_creacion", { ascending: false });
+      let query = supabase
+        .from("vales")
+        .select("fecha_creacion")
+        .eq("tipo_vale", "material")
+        .eq("verificado_por_sindicato", true)
+        .neq("estado", "conciliado")
+        .order("fecha_creacion", { ascending: false });
 
-        const { data, error } = await query;
+      const { data, error } = await query;
 
-        if (error) throw error;
+      if (error) throw error;
 
-        // Filtrar por sindicato en el cliente
-        let valesFiltrados = data || [];
+      console.log(
+        "[useConciliacionesMaterialQueries] Vales encontrados:",
+        data?.length || 0
+      );
 
-        if (idSindicatoUsuario) {
-          valesFiltrados = valesFiltrados.filter((vale) => {
-            const sindicatoOperador = vale.operadores?.id_sindicato;
-            return sindicatoOperador === idSindicatoUsuario;
-          });
+      // Agrupar por semana
+      const semanas = {};
+
+      (data || []).forEach((vale) => {
+        const fecha = new Date(vale.fecha_creacion);
+        const semanaInfo = calcularSemanaISO(fecha);
+        const key = `${semanaInfo.año}-${semanaInfo.numero}`;
+
+        if (!semanas[key]) {
+          semanas[key] = {
+            numero: semanaInfo.numero,
+            año: semanaInfo.año,
+            fechaInicio: semanaInfo.fechaInicio,
+            fechaFin: semanaInfo.fechaFin,
+            cantidadVales: 0,
+          };
         }
 
-        // Agrupar por semana
-        const semanas = {};
+        semanas[key].cantidadVales++;
+      });
 
-        valesFiltrados.forEach((vale) => {
-          const fecha = new Date(vale.fecha_creacion);
-          const semanaInfo = calcularSemanaISO(fecha);
-          const key = `${semanaInfo.año}-${semanaInfo.numero}`;
+      // Convertir a array y ordenar
+      const semanasArray = Object.values(semanas).sort((a, b) => {
+        if (a.año !== b.año) return b.año - a.año;
+        return b.numero - a.numero;
+      });
 
-          if (!semanas[key]) {
-            semanas[key] = {
-              numero: semanaInfo.numero,
-              año: semanaInfo.año,
-              fechaInicio: semanaInfo.fechaInicio,
-              fechaFin: semanaInfo.fechaFin,
-              cantidadVales: 0,
-            };
-          }
+      console.log(
+        "[useConciliacionesMaterialQueries] Semanas encontradas:",
+        semanasArray.length
+      );
 
-          semanas[key].cantidadVales++;
-        });
-
-        // Convertir a array y ordenar
-        const semanasArray = Object.values(semanas).sort((a, b) => {
-          if (a.año !== b.año) return b.año - a.año;
-          return b.numero - a.numero;
-        });
-
-        console.log(
-          "[useConciliacionesMaterialQueries] Semanas encontradas:",
-          semanasArray.length
-        );
-
-        return { success: true, data: semanasArray };
-      } catch (error) {
-        console.error(
-          "[useConciliacionesMaterialQueries] Error en fetchSemanasConValesMaterial:",
-          error
-        );
-        return { success: false, error: error.message, data: [] };
-      }
-    },
-    []
-  );
+      return { success: true, data: semanasArray };
+    } catch (error) {
+      console.error(
+        "[useConciliacionesMaterialQueries] Error en fetchSemanasConValesMaterial:",
+        error
+      );
+      return { success: false, error: error.message, data: [] };
+    }
+  }, []);
 
   /**
    * Obtener materiales que tienen vales verificados en una semana y obra específica
    */
-  const fetchMaterialesConVales = useCallback(
-    async (semana, idObra, idSindicatoUsuario) => {
-      try {
-        console.log(
-          "[useConciliacionesMaterialQueries] fetchMaterialesConVales - Inicio"
-        );
+  const fetchMaterialesConVales = useCallback(async (semana, idObra) => {
+    try {
+      console.log(
+        "[useConciliacionesMaterialQueries] fetchMaterialesConVales - Inicio"
+      );
 
-        let query = supabase
-          .from("vales")
-          .select(
-            `
+      // ✅ CORRECCIÓN: Incluir TODO el día final
+      const fechaFinCompleta = `${semana.fechaFin}T23:59:59.999Z`;
+
+      let query = supabase
+        .from("vales")
+        .select(
+          `
         id_vale,
         folio,
-        id_operador,
-        operadores:id_operador (
-          id_operador,
-          id_sindicato
-        ),
         vale_material_detalles (
           id_detalle_material,
           id_material,
@@ -410,67 +342,55 @@ export const useConciliacionesMaterialQueries = () => {
           )
         )
       `
-          )
-          .eq("tipo_vale", "material")
-          .eq("verificado_por_sindicato", true)
-          .neq("estado", "conciliado")
-          .eq("id_obra", idObra)
-          .gte("fecha_creacion", semana.fechaInicio)
-          .lte("fecha_creacion", semana.fechaFin);
+        )
+        .eq("tipo_vale", "material")
+        .eq("verificado_por_sindicato", true)
+        .neq("estado", "conciliado")
+        .eq("id_obra", idObra)
+        .gte("fecha_creacion", semana.fechaInicio)
+        .lte("fecha_creacion", fechaFinCompleta);
 
-        const { data, error } = await query;
+      const { data, error } = await query;
 
-        if (error) throw error;
+      if (error) throw error;
 
-        // Filtrar por sindicato en el cliente
-        let valesFiltrados = data || [];
+      // Extraer materiales únicos
+      const materialesMap = new Map();
 
-        if (idSindicatoUsuario) {
-          valesFiltrados = valesFiltrados.filter((vale) => {
-            const sindicatoOperador = vale.operadores?.id_sindicato;
-            return sindicatoOperador === idSindicatoUsuario;
-          });
-        }
-
-        // Extraer materiales únicos
-        const materialesMap = new Map();
-
-        valesFiltrados.forEach((vale) => {
-          vale.vale_material_detalles?.forEach((detalle) => {
-            const material = detalle.material;
-            if (material && !materialesMap.has(material.id_material)) {
-              materialesMap.set(material.id_material, {
-                id_material: material.id_material,
-                material: material.material,
-                tipo_de_material: material.tipo_de_material?.tipo_de_material,
-                id_tipo_de_material:
-                  material.tipo_de_material?.id_tipo_de_material,
-              });
-            }
-          });
+      (data || []).forEach((vale) => {
+        vale.vale_material_detalles?.forEach((detalle) => {
+          const material = detalle.material;
+          if (material && !materialesMap.has(material.id_material)) {
+            materialesMap.set(material.id_material, {
+              id_material: material.id_material,
+              material: material.material,
+              tipo_de_material: material.tipo_de_material?.tipo_de_material,
+              id_tipo_de_material:
+                material.tipo_de_material?.id_tipo_de_material,
+            });
+          }
         });
+      });
 
-        // Convertir a array y ordenar alfabéticamente
-        const materialesUnicos = Array.from(materialesMap.values()).sort(
-          (a, b) => a.material.localeCompare(b.material)
-        );
+      // Convertir a array y ordenar alfabéticamente
+      const materialesUnicos = Array.from(materialesMap.values()).sort((a, b) =>
+        a.material.localeCompare(b.material)
+      );
 
-        console.log(
-          "[useConciliacionesMaterialQueries] Materiales únicos encontrados:",
-          materialesUnicos.length
-        );
+      console.log(
+        "[useConciliacionesMaterialQueries] Materiales únicos encontrados:",
+        materialesUnicos.length
+      );
 
-        return { success: true, data: materialesUnicos };
-      } catch (error) {
-        console.error(
-          "[useConciliacionesMaterialQueries] Error en fetchMaterialesConVales:",
-          error
-        );
-        return { success: false, error: error.message, data: [] };
-      }
-    },
-    []
-  );
+      return { success: true, data: materialesUnicos };
+    } catch (error) {
+      console.error(
+        "[useConciliacionesMaterialQueries] Error en fetchMaterialesConVales:",
+        error
+      );
+      return { success: false, error: error.message, data: [] };
+    }
+  }, []);
 
   return {
     fetchValesVerificadosMaterial,
@@ -486,18 +406,12 @@ export const useConciliacionesMaterialQueries = () => {
  */
 const calcularSemanaISO = (fecha) => {
   const date = new Date(fecha);
-
-  // Ajustar al lunes de la semana
   const dia = date.getDay();
   const diff = dia === 0 ? -6 : 1 - dia;
   const lunes = new Date(date);
   lunes.setDate(date.getDate() + diff);
-
-  // Sábado de la semana
   const sabado = new Date(lunes);
   sabado.setDate(lunes.getDate() + 5);
-
-  // Calcular número de semana
   const primerDiaAno = new Date(lunes.getFullYear(), 0, 1);
   const diasTranscurridos = Math.floor(
     (lunes - primerDiaAno) / (24 * 60 * 60 * 1000)
