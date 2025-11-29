@@ -142,6 +142,7 @@ export const useConciliacionesHelpers = () => {
       fecha_fin: filtros.semanaSeleccionada.fechaFin,
       subtotal: totales.subtotal,
       iva_16_porciento: totales.iva,
+      retencion_4_porciento: 0,
       total_final: totales.total,
       total_dias: totales.totalDias,
       total_horas: totales.totalHoras,

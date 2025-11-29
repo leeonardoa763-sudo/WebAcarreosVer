@@ -89,6 +89,17 @@ const Conciliaciones = () => {
     setDatosParaPDF(null);
 
     setTabActivo(nuevoTab);
+
+    // Forzar recarga de catálogos del nuevo tab
+    setTimeout(() => {
+      if (nuevoTab === "renta") {
+        console.log("  → Recargando catálogos de RENTA");
+        rentaHook.loadSemanas?.();
+      } else {
+        console.log("  → Recargando catálogos de MATERIAL");
+        materialHook.loadSemanas?.();
+      }
+    }, 100);
   };
 
   /**
@@ -304,6 +315,7 @@ const Conciliaciones = () => {
                   conciliacion={conciliacionGenerada}
                   valesAgrupados={datosParaPDF.valesAgrupados}
                   totales={datosParaPDF.totalesGenerales}
+                  tipoConciliacion={tabActivo}
                 />
               )}
             </div>

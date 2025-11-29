@@ -61,6 +61,11 @@ export const useConciliacionesMaterial = () => {
    */
   const loadSemanas = useCallback(async () => {
     if (!idPersona) return;
+    console.log("📞 [useConciliacionesMaterial] loadSemanas LLAMADO", {
+      idPersona,
+      sindicatoSeleccionado: filtros.sindicatoSeleccionado,
+      timestamp: new Date().toISOString(),
+    });
 
     console.log("[useConciliacionesMaterial] loadSemanas - Inicio");
     setLoadingCatalogos(true);
@@ -379,15 +384,21 @@ export const useConciliacionesMaterial = () => {
     }
   }, [filtros.semanaSeleccionada?.numero, filtros.semanaSeleccionada?.año]); // ✅ REMOVIDO: loadObras
 
-  //  CORREGIDO: Cargar semanas cuando cambia idPersona O sindicatoSeleccionado
+  // Cargar semanas cuando cambia idPersona O sindicatoSeleccionado
   useEffect(() => {
+    console.log("🔄 [useConciliacionesMaterial] useEffect SEMANAS ejecutado", {
+      idPersona,
+      sindicatoSeleccionado: filtros.sindicatoSeleccionado,
+      timestamp: new Date().toISOString(),
+    });
+
     if (idPersona) {
       loadSemanas();
     }
   }, [
     idPersona,
     filtros.sindicatoSeleccionado,
-    //  NO incluir loadSemanas aquí
+    // NO incluir loadSemanas aquí
   ]);
 
   // Cargar obras SOLO cuando cambia la semana
@@ -427,6 +438,7 @@ export const useConciliacionesMaterial = () => {
     updateFiltros,
     clearFiltros,
     vistaPrevia,
+    loadSemanas,
     cargarVistaPrevia,
     generarConciliacion,
     loadHistorial,

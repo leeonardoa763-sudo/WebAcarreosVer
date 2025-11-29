@@ -247,13 +247,12 @@ export const useConciliacionesMaterialHelpers = () => {
       fecha_fin: filtros.semanaSeleccionada.fechaFin,
       subtotal: totales.subtotal,
       iva_16_porciento: totales.iva,
+      retencion_4_porciento: totales.retencion,
       total_final: totales.total,
       total_dias: 0, // Material no usa días
       total_horas: 0, // Material no usa horas
       generado_por: idPersona,
       estado: "generada",
-      // 👇 NUEVO: Agregar nota con el material
-      notas: material ? `Material: ${material.material}` : null,
     };
   };
 

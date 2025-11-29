@@ -277,5 +277,6 @@ export const useConciliaciones = () => {
     obtenerConciliacion,
     loadHistorial,
     helpers,
+    loadSemanas,
   };
 };
