@@ -1,11 +1,25 @@
 /**
  * src/components/conciliaciones/BotonGenerarPDF.jsx
+ *
+ * Botón para generar PDFs de conciliaciones
+ *
+ * Funcionalidades:
+ * - Detecta tipo de material automáticamente
+ * - Llama al generador correcto según tipo
+ *
+ * Usado en: Conciliaciones.jsx
  */
 
+// 1. React y hooks
 import { useState } from "react";
+
+// 2. Icons
 import { FileText } from "lucide-react";
+
+// 3. Utils
 import { generarPDFConciliacionRenta } from "../../utils/conciliaciones/generarPDFConciliacionRenta";
-import { generarPDFConciliacionMaterial } from "../../utils/conciliaciones/generarPDFConciliacionMaterial"; // 👈 AGREGAR
+import { generarPDFConciliacionMaterialPetreo } from "../../utils/conciliaciones/generarPDFConciliacionMaterialPetreo";
+import { generarPDFConciliacionMaterialCorte } from "../../utils/conciliaciones/generarPDFConciliacionMaterialCorte";
 
 const BotonGenerarPDF = ({
   conciliacion,
@@ -16,12 +30,47 @@ const BotonGenerarPDF = ({
 }) => {
   const [generando, setGenerando] = useState(false);
 
+  /**
+   * Detectar tipo de material predominante
+   */
+  const detectarTipoMaterial = () => {
+    let conteoTipo1o2 = 0;
+    let conteoTipo3 = 0;
+
+    Object.values(valesAgrupados).forEach((grupo) => {
+      grupo.vales.forEach((vale) => {
+        vale.vale_material_detalles?.forEach((detalle) => {
+          const idTipo =
+            detalle.material?.tipo_de_material?.id_tipo_de_material;
+          if (idTipo === 1 || idTipo === 2) conteoTipo1o2++;
+          if (idTipo === 3) conteoTipo3++;
+        });
+      });
+    });
+
+    return conteoTipo1o2 > conteoTipo3 ? "petreo" : "corte";
+  };
+
   const handleGenerar = () => {
     try {
       setGenerando(true);
 
       if (tipoConciliacion === "material") {
-        generarPDFConciliacionMaterial(conciliacion, valesAgrupados, totales); // 👈 CAMBIAR
+        const tipoMaterial = detectarTipoMaterial();
+
+        if (tipoMaterial === "petreo") {
+          generarPDFConciliacionMaterialPetreo(
+            conciliacion,
+            valesAgrupados,
+            totales
+          );
+        } else {
+          generarPDFConciliacionMaterialCorte(
+            conciliacion,
+            valesAgrupados,
+            totales
+          );
+        }
       } else {
         generarPDFConciliacionRenta(conciliacion, valesAgrupados, totales);
       }

@@ -39,7 +39,10 @@ const Login = () => {
   if (loading) {
     return (
       <div className="login-page">
-        <div className="loading-spinner">Verificando sesión...</div>
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p className="loading-text">Verificando sesión...</p>
+        </div>
       </div>
     );
   }

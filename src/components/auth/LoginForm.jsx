@@ -134,7 +134,14 @@ const LoginForm = () => {
             backgroundColor: loading ? colors.textSecondary : colors.primary,
           }}
         >
-          {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
+          {loading ? (
+            <span className="login-form__button-content">
+              <span className="login-form__spinner"></span>
+              <span>Iniciando sesión...</span>
+            </span>
+          ) : (
+            "Iniciar Sesión"
+          )}
         </button>
       </form>
 
