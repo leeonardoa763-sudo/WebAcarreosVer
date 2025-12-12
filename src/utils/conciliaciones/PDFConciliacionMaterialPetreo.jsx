@@ -53,14 +53,14 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     flexDirection: "row",
-    marginBottom: 5,
+    marginBottom: 2,
   },
   infoLabel: {
-    width: "25%",
+    width: "15%",
     fontWeight: 700,
   },
   infoValue: {
-    width: "75%",
+    width: "85%",
   },
   // TABLA
   table: {
@@ -69,10 +69,11 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: "row",
-    backgroundColor: "#E6E6E6",
+    backgroundColor: "#FF6B35",
     padding: "3.5pt 0",
     fontSize: 7,
     fontWeight: 700,
+    color: "white",
   },
   tableRow: {
     flexDirection: "row",
@@ -131,8 +132,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 2,
   },
-  colVol: { width: 40, fontSize: 7, textAlign: "center", paddingHorizontal: 2 },
-  colTon: { width: 40, fontSize: 7, textAlign: "center", paddingHorizontal: 2 },
+  colVol: {
+    width: 40,
+    fontSize: 7,
+    textAlign: "center",
+    paddingHorizontal: 2,
+  },
+  colTon: {
+    width: 40,
+    fontSize: 7,
+    textAlign: "center",
+    paddingHorizontal: 2,
+  },
   // SUBTOTALES
   subtotalRow: {
     flexDirection: "row",
@@ -162,7 +173,7 @@ const styles = StyleSheet.create({
   totalRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    marginBottom: 4.5,
+    marginBottom: 2,
     fontSize: 7,
   },
   totalLabel: {
@@ -178,11 +189,11 @@ const styles = StyleSheet.create({
   totalFinal: {
     fontSize: 10,
     fontWeight: 700,
-    marginTop: 2,
+    marginTop: 3,
   },
   // FIRMAS
   firmasSection: {
-    marginTop: 40,
+    marginTop: 50,
     flexDirection: "row",
     justifyContent: "space-between",
   },
@@ -357,11 +368,30 @@ const PDFConciliacionMaterialPetreo = ({
                 <View style={styles.subtotalRow}>
                   <Text style={styles.subtotalLabel}>Subtotal {placas}:</Text>
                   <View style={styles.subtotalValues}>
-                    <Text style={styles.subtotalItem}>{viajesGrupo}</Text>
-                    <Text style={styles.subtotalItem}>
+                    <Text
+                      style={[
+                        styles.subtotalViajes,
+                        { paddingRight: 28 }, // ← Solo este
+                      ]}
+                    >
+                      {viajesGrupo}
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.subtotalM3,
+                        { paddingRight: 22 }, // ← Solo este, más espacio
+                      ]}
+                    >
                       {formatearNumero(m3Grupo)}
                     </Text>
-                    <Text style={styles.subtotalItem}>
+
+                    <Text
+                      style={[
+                        styles.subtotalton,
+                        { paddingRight: 10 }, // ← Solo este, más espacio
+                      ]}
+                    >
                       {formatearNumero(toneladasGrupo)}
                     </Text>
                   </View>
