@@ -18,8 +18,8 @@ import { FileText } from "lucide-react";
 
 // 3. Utils
 import { generarPDFConciliacionRenta } from "../../utils/conciliaciones/generarPDFConciliacionRenta";
-import { generarPDFConciliacionMaterialPetreo } from "../../utils/conciliaciones/generarPDFConciliacionMaterialPetreo";
-import { generarPDFConciliacionMaterialCorte } from "../../utils/conciliaciones/generarPDFConciliacionMaterialCorte";
+import { generarPDFConciliacionMaterialPetreo } from "../../utils/conciliaciones/material-petreo/generarPDFConciliacionMaterialPetreo.jsx";
+import { generarPDFConciliacionMaterialCorte } from "../../utils/conciliaciones/material-corte/generarPDFConciliacionMaterialCorte.jsx";
 
 const BotonGenerarPDF = ({
   conciliacion,
@@ -51,7 +51,7 @@ const BotonGenerarPDF = ({
     return conteoTipo1o2 > conteoTipo3 ? "petreo" : "corte";
   };
 
-  const handleGenerar = () => {
+  const handleGenerar = async () => {
     try {
       setGenerando(true);
 
@@ -59,13 +59,13 @@ const BotonGenerarPDF = ({
         const tipoMaterial = detectarTipoMaterial();
 
         if (tipoMaterial === "petreo") {
-          generarPDFConciliacionMaterialPetreo(
+          await generarPDFConciliacionMaterialPetreo(
             conciliacion,
             valesAgrupados,
             totales
           );
         } else {
-          generarPDFConciliacionMaterialCorte(
+          await generarPDFConciliacionMaterialCorte(
             conciliacion,
             valesAgrupados,
             totales
