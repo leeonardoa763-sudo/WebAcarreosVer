@@ -73,7 +73,7 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
             </div>
           </td>
           <td>{detalle.bancos?.banco || "N/A"}</td>
-          <td>{formatearVolumen(detalle.distancia_km)} km</td>
+          <td>{detalle.distancia_km?.toFixed(1) || 0} km</td>
           <td className="tabla-vales__viajes">1</td>
           <td>{formatearVolumen(detalle.volumen_real_m3)}</td>
           <td>{formatearPeso(detalle.peso_ton)}</td>

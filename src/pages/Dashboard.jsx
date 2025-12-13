@@ -4,8 +4,7 @@
  * Vista principal del dashboard administrativo
  *
  * Muestra estadísticas generales de vales emitidos
- * Gráficas de vales por obra y tipo
- * Lista de últimos vales creados
+ * Historial de conciliaciones generadas
  *
  * Acceso: Solo ADMINISTRADOR, FINANZAS, SINDICATO
  */
@@ -25,6 +24,7 @@ import { useAuth } from "../hooks/useAuth";
 
 // 5. Componentes
 import StatsCard from "../components/dashboard/StatsCard";
+import SeccionConciliaciones from "../components/dashboard/SeccionConciliaciones"; // 👈 NUEVO
 
 // 6. Estilos
 import "../styles/dashboard.css";
@@ -159,6 +159,11 @@ const Dashboard = () => {
           Icon={CalendarDays}
           color="#F59E0B"
         />
+      </div>
+
+      {/* 👇 NUEVA SECCIÓN DE CONCILIACIONES */}
+      <div style={{ marginTop: "32px" }}>
+        <SeccionConciliaciones />
       </div>
     </div>
   );

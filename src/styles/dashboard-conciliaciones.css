@@ -1,0 +1,658 @@
+/**
+ * src/styles/dashboard-conciliaciones.css
+ *
+ * Estilos para la sección de conciliaciones en Dashboard
+ *
+ * Incluye:
+ * - Tabs de Renta/Material
+ * - Buscador
+ * - Lista agrupada por semana
+ * - Modal de vista previa (simula PDF)
+ * - Paginación
+ */
+
+/* ========================================
+   SECCIÓN PRINCIPAL
+   ======================================== */
+
+.seccion-conciliaciones {
+  background: var(--color-surface, #ffffff);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.seccion-conciliaciones__header {
+  margin-bottom: 24px;
+}
+
+.seccion-conciliaciones__title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text-primary, #2c3e50);
+  margin: 0 0 8px 0;
+}
+
+.seccion-conciliaciones__subtitle {
+  font-size: 14px;
+  color: var(--color-text-secondary, #7f8c8d);
+  margin: 0;
+}
+
+/* ========================================
+   TABS
+   ======================================== */
+
+.seccion-conciliaciones__tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  transition: all 0.2s ease;
+}
+
+.tab:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.tab--active {
+  color: white !important;
+}
+
+/* ========================================
+   BUSCADOR
+   ======================================== */
+
+.seccion-conciliaciones__search {
+  margin-bottom: 24px;
+}
+
+.search-box {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+}
+
+.search-box__icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #7f8c8d;
+}
+
+.search-box__input {
+  width: 100%;
+  padding: 12px 12px 12px 44px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.search-box__input:focus {
+  outline: none;
+  border-color: #004e89;
+}
+
+.search-box__results {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #7f8c8d;
+}
+
+/* ========================================
+   LOADING Y ERROR
+   ======================================== */
+
+.seccion-conciliaciones__loading,
+.seccion-conciliaciones__error,
+.seccion-conciliaciones__empty {
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.seccion-conciliaciones__loading .spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e0e0e0;
+  border-top-color: #004e89;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.seccion-conciliaciones__error {
+  color: #e74c3c;
+}
+
+.seccion-conciliaciones__empty {
+  color: #7f8c8d;
+}
+
+/* ========================================
+   LISTA AGRUPADA POR SEMANA
+   ======================================== */
+
+.lista-conciliaciones-semana {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.semana-grupo {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.semana-grupo__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 16px 20px;
+  background: #f5f6fa;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.semana-grupo__header:hover {
+  background: #ebedf2;
+}
+
+.semana-grupo__header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.semana-grupo__titulo {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.semana-grupo__header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.semana-grupo__periodo {
+  font-size: 14px;
+  color: #7f8c8d;
+}
+
+.semana-grupo__count {
+  font-size: 13px;
+  font-weight: 600;
+  color: #004e89;
+  background: #e3f2fd;
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+/* ========================================
+   ITEMS DE CONCILIACIÓN
+   ======================================== */
+
+.semana-grupo__content {
+  display: flex;
+  flex-direction: column;
+  background: white;
+}
+
+.conciliacion-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 16px 20px;
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  background: white;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  text-align: left;
+}
+
+.conciliacion-item:hover {
+  background: #f8f9fa;
+}
+
+.conciliacion-item__folio {
+  font-size: 15px;
+  font-weight: 700;
+  color: #004e89;
+}
+
+.conciliacion-item__info {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.conciliacion-item__obra {
+  font-size: 13px;
+  color: #7f8c8d;
+  max-width: 300px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conciliacion-item__total {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a936f;
+}
+
+/* ========================================
+   PAGINACIÓN
+   ======================================== */
+
+.seccion-conciliaciones__pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.pagination__btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: white;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pagination__btn:hover:not(:disabled) {
+  background: #f5f6fa;
+  border-color: #004e89;
+  color: #004e89;
+}
+
+.pagination__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination__info {
+  font-size: 14px;
+  color: #7f8c8d;
+}
+
+/* ========================================
+   MODAL OVERLAY
+   ======================================== */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.modal-preview {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 900px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* ========================================
+   MODAL HEADER
+   ======================================== */
+
+.modal-preview__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.modal-preview__title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.modal-preview__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: background 0.2s ease;
+  color: #7f8c8d;
+}
+
+.modal-preview__close:hover {
+  background: #f5f6fa;
+  color: #2c3e50;
+}
+
+/* ========================================
+   MODAL CONTENT
+   ======================================== */
+
+.modal-preview__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.modal-preview__loading,
+.modal-preview__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+
+.modal-preview__loading .spinner {
+  width: 48px;
+  height: 48px;
+  color: #004e89;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+/* ========================================
+   PREVIEW PDF (SIMULA EL PDF)
+   ======================================== */
+
+.preview-pdf {
+  background: white;
+  padding: 40px;
+  max-width: 850px;
+  margin: 0 auto;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Encabezado */
+.preview-pdf__header {
+  margin-bottom: 32px;
+}
+
+.preview-pdf__title {
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 12px 0;
+  color: #2c3e50;
+}
+
+.preview-pdf__divider {
+  height: 2px;
+  background: #2c3e50;
+  margin-bottom: 16px;
+}
+
+.preview-pdf__info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.info-row {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.info-label {
+  font-weight: 700;
+  color: #2c3e50;
+  min-width: 140px;
+}
+
+.info-value {
+  color: #555;
+}
+
+/* Tabla */
+.preview-pdf__table {
+  margin: 24px 0;
+  overflow-x: auto;
+}
+
+.preview-pdf__table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.preview-pdf__table thead {
+  background: #004e89;
+  color: white;
+}
+
+.preview-pdf__table th {
+  padding: 10px 8px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.preview-pdf__table td {
+  padding: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.preview-pdf__table .text-center {
+  text-align: center;
+}
+
+.preview-pdf__table .text-right {
+  text-align: right;
+}
+
+.preview-pdf__table .subtotal-row {
+  background: #f5f6fa;
+  font-weight: 700;
+}
+
+/* Totales */
+.preview-pdf__totals {
+  margin: 24px 0;
+  padding-top: 16px;
+  border-top: 2px solid #2c3e50;
+}
+
+.total-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 40px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.total-label {
+  font-weight: 600;
+  color: #2c3e50;
+  min-width: 150px;
+  text-align: right;
+}
+
+.total-value {
+  min-width: 120px;
+  text-align: right;
+  font-weight: 700;
+}
+
+.total-row--final {
+  font-size: 16px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 2px solid #2c3e50;
+}
+
+/* Firmas */
+.preview-pdf__firmas {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 60px;
+  gap: 40px;
+}
+
+.firma-box {
+  flex: 1;
+  text-align: center;
+}
+
+.firma-linea {
+  height: 1px;
+  background: #2c3e50;
+  margin-bottom: 12px;
+}
+
+.firma-texto {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  color: #2c3e50;
+}
+
+.firma-nombre {
+  font-size: 11px;
+  margin: 0;
+  color: #555;
+}
+
+/* Footer */
+.preview-pdf__footer {
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+  text-align: center;
+}
+
+.preview-pdf__footer p {
+  font-size: 11px;
+  color: #7f8c8d;
+  margin: 0;
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 768px) {
+  .seccion-conciliaciones {
+    padding: 16px;
+  }
+
+  .search-box {
+    max-width: 100%;
+  }
+
+  .semana-grupo__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .semana-grupo__header-right {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .conciliacion-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .conciliacion-item__info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .preview-pdf {
+    padding: 20px;
+  }
+
+  .preview-pdf__table {
+    font-size: 10px;
+  }
+
+  .preview-pdf__firmas {
+    flex-direction: column;
+    gap: 32px;
+  }
+  /* ========================================
+   ESTILOS ADICIONALES PARA MATERIAL
+   ======================================== */
+
+  .totales-subtitulo {
+    font-size: 14px;
+    font-weight: 700;
+    color: #2c3e50;
+    margin: 16px 0 8px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .total-value--retencion {
+    color: #e74c3c;
+  }
+
+  /* Ajustes de tabla para Material */
+  .preview-pdf__table table th:nth-child(5),
+  .preview-pdf__table table td:nth-child(5) {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
