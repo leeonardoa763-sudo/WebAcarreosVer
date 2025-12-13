@@ -69,29 +69,6 @@ export const sharedStyles = StyleSheet.create({
   },
 
   // ========================================
-  // SUBTOTALES POR GRUPO
-  // ========================================
-  subtotalRow: {
-    flexDirection: "row",
-    padding: "3pt 0",
-    fontSize: 7,
-    fontWeight: 700,
-  },
-  subtotalLabel: {
-    width: "50%",
-    paddingLeft: 2,
-  },
-  subtotalValues: {
-    width: "50%",
-    flexDirection: "row",
-    justifyContent: "flex-end",
-  },
-  subtotalItem: {
-    marginLeft: 10,
-    textAlign: "right",
-  },
-
-  // ========================================
   // TOTALES FINALES
   // ========================================
   totalesSection: {

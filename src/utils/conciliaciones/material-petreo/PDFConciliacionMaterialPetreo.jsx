@@ -67,7 +67,9 @@ const PDFConciliacionMaterialPetreo = ({
     <Document>
       <Page size="LETTER" style={sharedStyles.page}>
         {/* ENCABEZADO */}
-        <Text style={sharedStyles.title}>CONCILIACIÓN DE MATERIAL</Text>
+        <Text style={sharedStyles.title}>
+          CONCILIACIÓN DE MATERIAL - MATERIAL PETREO
+        </Text>
         <View style={sharedStyles.divider} />
 
         <View style={sharedStyles.infoRow}>
@@ -115,9 +117,9 @@ const PDFConciliacionMaterialPetreo = ({
             <Text style={materialPetreoStyles.colFolioBanco}>F.Banco</Text>
             <Text style={materialPetreoStyles.colMaterial}>Material</Text>
             <Text style={materialPetreoStyles.colBanco}>Banco</Text>
-            <Text style={materialPetreoStyles.colDistancia}>Distancia</Text>
+            <Text style={materialPetreoStyles.colDistancia}>Dist (Km)</Text>
             <Text style={materialPetreoStyles.colViajes}>Viajes</Text>
-            <Text style={materialPetreoStyles.colVol}>Volumen</Text>
+            <Text style={materialPetreoStyles.colVol}>Vol (m³)</Text>
             <Text style={materialPetreoStyles.colTon}>Toneladas</Text>
           </View>
 
@@ -181,25 +183,34 @@ const PDFConciliacionMaterialPetreo = ({
                 )}
 
                 {/* Subtotal por placas */}
-                <View style={sharedStyles.subtotalRow}>
-                  <Text style={sharedStyles.subtotalLabel}>
+                <View style={materialPetreoStyles.subtotalRow}>
+                  <Text style={materialPetreoStyles.subtotalLabel}>
                     Subtotal {placas}:
                   </Text>
-                  <View style={sharedStyles.subtotalValues}>
+                  <View style={materialPetreoStyles.subtotalValues}>
                     <Text
-                      style={[sharedStyles.subtotalItem, { paddingRight: 28 }]}
+                      style={[
+                        materialPetreoStyles.subtotalItem,
+                        { paddingRight: 18 },
+                      ]}
                     >
                       {viajesGrupo}
                     </Text>
 
                     <Text
-                      style={[sharedStyles.subtotalItem, { paddingRight: 22 }]}
+                      style={[
+                        materialPetreoStyles.subtotalItem,
+                        { paddingRight: 12 },
+                      ]}
                     >
                       {formatearNumero(m3Grupo)}
                     </Text>
 
                     <Text
-                      style={[sharedStyles.subtotalItem, { paddingRight: 10 }]}
+                      style={[
+                        materialPetreoStyles.subtotalItem,
+                        { paddingRight: 10 },
+                      ]}
                     >
                       {formatearNumero(toneladasGrupo)}
                     </Text>

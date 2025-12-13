@@ -193,23 +193,32 @@ const PDFConciliacionMaterialCorte = ({
                 )}
 
                 {/* Subtotal por placas */}
-                <View style={sharedStyles.subtotalRow}>
-                  <Text style={sharedStyles.subtotalLabel}>
+                <View style={materialCorteStyles.subtotalRow}>
+                  <Text style={materialCorteStyles.subtotalLabel}>
                     Subtotal {placas}:
                   </Text>
-                  <View style={sharedStyles.subtotalValues}>
+                  <View style={materialCorteStyles.subtotalValues}>
                     <Text
-                      style={[sharedStyles.subtotalItem, { paddingRight: 28 }]}
+                      style={[
+                        materialCorteStyles.subtotalItem,
+                        { paddingRight: 64 },
+                      ]}
                     >
                       {viajesGrupo}
                     </Text>
                     <Text
-                      style={[sharedStyles.subtotalItem, { paddingRight: 22 }]}
+                      style={[
+                        materialCorteStyles.subtotalItem,
+                        { paddingRight: 20 },
+                      ]}
                     >
                       {formatearNumero(m3Grupo)}
                     </Text>
                     <Text
-                      style={[sharedStyles.subtotalItem, { paddingRight: 10 }]}
+                      style={[
+                        materialCorteStyles.subtotalItem,
+                        { paddingRight: 4 },
+                      ]}
                     >
                       ${formatearNumero(grupo.subtotal)}
                     </Text>

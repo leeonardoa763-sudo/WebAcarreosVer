@@ -17,9 +17,9 @@ import { useState } from "react";
 import { FileText } from "lucide-react";
 
 // 3. Utils
-import { generarPDFConciliacionRenta } from "../../utils/conciliaciones/generarPDFConciliacionRenta";
-import { generarPDFConciliacionMaterialPetreo } from "../../utils/conciliaciones/material-petreo/generarPDFConciliacionMaterialPetreo.jsx";
-import { generarPDFConciliacionMaterialCorte } from "../../utils/conciliaciones/material-corte/generarPDFConciliacionMaterialCorte.jsx";
+import { generarPDFConciliacionRenta } from "../../utils/conciliaciones/renta/generarPDFConciliacionRenta.jsx";
+import { generarPDFConciliacionMaterialPetreo } from "../../utils/conciliaciones/material-petreo/generarPDFConciliacionMaterialPetreo";
+import { generarPDFConciliacionMaterialCorte } from "../../utils/conciliaciones/material-corte/generarPDFConciliacionMaterialCorte";
 
 const BotonGenerarPDF = ({
   conciliacion,
@@ -72,7 +72,11 @@ const BotonGenerarPDF = ({
           );
         }
       } else {
-        generarPDFConciliacionRenta(conciliacion, valesAgrupados, totales);
+        await generarPDFConciliacionRenta(
+          conciliacion,
+          valesAgrupados,
+          totales
+        );
       }
     } catch (error) {
       console.error("Error al generar PDF:", error);

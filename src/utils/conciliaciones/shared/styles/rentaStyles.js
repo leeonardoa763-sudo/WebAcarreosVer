@@ -1,84 +1,71 @@
 /**
- * src/utils/conciliaciones/shared/styles/materialCorteStyles.js
+ * src/utils/conciliaciones/shared/styles/rentaStyles.js
  *
- * Estilos específicos para PDFs de Material de Corte (Tipo 3)
+ * Estilos específicos para PDFs de Renta de Maquinaria
  *
  * COLUMNAS:
- * - Placas, Fecha, Folio, Material, Banco, Distancia, Viajes, Capacidad, M³ Pedidos, Importe
- * - SIN: Folio Banco, Toneladas
+ * - Placas, Folio, Fecha, Material Movido, Viajes, Días, Horas, Importe
  *
- * Usado en: PDFConciliacionMaterialCorte.jsx
+ * Usado en: PDFConciliacionRenta.jsx
  */
 
 import { StyleSheet } from "@react-pdf/renderer";
 
-export const materialCorteStyles = StyleSheet.create({
+export const rentaStyles = StyleSheet.create({
   // ========================================
-  // COLUMNAS ESPECÍFICAS DE CORTE
+  // COLUMNAS ESPECÍFICAS DE RENTA
   // ========================================
   colPlacas: {
-    width: 50,
-    fontSize: 7,
-    textAlign: "center",
-    paddingHorizontal: 2,
-  },
-  colFecha: {
-    width: 55,
+    width: 60,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
   },
   colFolio: {
+    width: 70,
+    fontSize: 7,
+    textAlign: "center",
+    paddingHorizontal: 2,
+  },
+  colFecha: {
     width: 60,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
   },
   colMaterial: {
-    width: 80,
-    fontSize: 7,
-    textAlign: "center",
-    paddingHorizontal: 2,
-  },
-  colBanco: {
-    width: 55,
-    fontSize: 7,
-    textAlign: "center",
-    paddingHorizontal: 2,
-  },
-  colDistancia: {
-    width: 45,
+    width: 100,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
   },
   colViajes: {
-    width: 35,
+    width: 40,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
   },
-  colCapacidad: {
-    width: 45,
+  colDias: {
+    width: 40,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
   },
-  colM3Pedidos: {
-    width: 45,
+  colHoras: {
+    width: 50,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
   },
   colImporte: {
-    width: 50,
+    width: 60,
     fontSize: 7,
     textAlign: "right",
     paddingHorizontal: 2,
   },
 
   // ========================================
-  // SUBTOTALES ESPECÍFICOS DE CORTE
+  // SUBTOTALES ESPECÍFICOS DE RENTA
   // ========================================
   subtotalRow: {
     flexDirection: "row",
@@ -98,5 +85,17 @@ export const materialCorteStyles = StyleSheet.create({
   subtotalItem: {
     marginLeft: 10,
     textAlign: "right",
+  },
+
+  // ========================================
+  // TABLA - ENCABEZADO ESPECÍFICO DE RENTA
+  // ========================================
+  tableHeaderRenta: {
+    flexDirection: "row",
+    backgroundColor: "#004E89",
+    padding: "3.5pt 0",
+    fontSize: 7,
+    fontWeight: 700,
+    color: "white",
   },
 });
