@@ -24,6 +24,7 @@ import Dashboard from "./pages/Dashboard";
 import Vales from "./pages/Vales";
 import Conciliaciones from "./pages/Conciliaciones";
 import VerificarVales from "./pages/VerificarVales";
+import VisualizarVale from "./pages/VisualizarVale";
 
 // 5. Estilos
 import "./styles/global.css";
@@ -84,11 +85,8 @@ const App = () => {
             }
           />
 
-          {/* Ruta pública - Verificación de vale sin auth */}
-          <Route
-            path="/vale/:folio"
-            element={<div>Verificar Vale - Por implementar</div>}
-          />
+          {/*  RUTA PÚBLICA - Visualización de vale sin autenticación */}
+          <Route path="/vale/:folio" element={<VisualizarVale />} />
 
           {/* Ruta 404 */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

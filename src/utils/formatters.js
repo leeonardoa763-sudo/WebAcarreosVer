@@ -413,3 +413,28 @@ export const esFechaValida = (fecha) => {
     return false;
   }
 };
+
+/**
+ * Formatear hora desde timestamp
+ * @param {string|Date} timestamp - Fecha en formato ISO o Date object
+ * @returns {string} Hora formateada (HH:MM AM/PM)
+ */
+export const formatearHora = (timestamp) => {
+  if (!timestamp) return "N/A";
+
+  try {
+    const date = new Date(timestamp);
+
+    if (isNaN(date.getTime())) return "Hora inválida";
+
+    return date.toLocaleTimeString("es-MX", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "America/Mexico_City",
+    });
+  } catch (error) {
+    console.error("Error en formatearHora:", error);
+    return "Error";
+  }
+};
