@@ -57,6 +57,17 @@ const Login = () => {
 
         {/* Formulario de login */}
         <LoginForm />
+
+        {/* Créditos del creador */}
+        <div className="login-footer">
+          <p className="login-footer__text">
+            Desarrollado por{" "}
+            <span className="login-footer__name">
+              Ing. Leonardo Aguilar Saucedo
+            </span>
+          </p>
+          <p className="login-footer__contact">Tel: 492 145 2396</p>
+        </div>
       </div>
     </div>
   );

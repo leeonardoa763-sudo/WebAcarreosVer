@@ -6,9 +6,8 @@
  * Incluye:
  * - Tabs de Renta/Material
  * - Buscador
- * - Lista agrupada por semana
+ * - Lista agrupada por mes y semana
  * - Modal de vista previa (simula PDF)
- * - Paginación
  */
 
 /* ========================================
@@ -150,19 +149,98 @@
 }
 
 /* ========================================
-   LISTA AGRUPADA POR SEMANA
+   LISTA PRINCIPAL
    ======================================== */
 
-.lista-conciliaciones-semana {
+.lista-conciliaciones-mes {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
+/* ========================================
+   GRUPO DE MESES (PRIMER NIVEL)
+   ======================================== */
+
+.mes-grupo {
+  border: 2px solid;
+  border-radius: 10px;
+  overflow: hidden;
+  background: white;
+}
+
+.mes-grupo__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 18px 24px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mes-grupo__header:hover {
+  filter: brightness(0.9);
+}
+
+.mes-grupo__header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: white;
+}
+
+.mes-grupo__titulo {
+  font-size: 18px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 0.3px;
+}
+
+.mes-grupo__header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Total del mes (en header azul/naranja) */
+.mes-grupo__total {
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.mes-grupo__count {
+  font-size: 14px;
+  font-weight: 600;
+  background: white;
+  padding: 6px 14px;
+  border-radius: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.mes-grupo__content {
+  padding: 12px;
+  background: #f8f9fa;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ========================================
+   GRUPO DE SEMANAS (SEGUNDO NIVEL)
+   ======================================== */
+
 .semana-grupo {
-  border: 1px solid #e0e0e0;
+  border: 1px solid #d0d0d0;
   border-radius: 8px;
   overflow: hidden;
+  background: white;
 }
 
 .semana-grupo__header {
@@ -170,26 +248,27 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  padding: 16px 20px;
-  background: #f5f6fa;
+  padding: 14px 20px;
+  background: #ffffff;
   border: none;
   cursor: pointer;
   transition: background 0.2s ease;
+  border-bottom: 1px solid #e8e8e8;
 }
 
 .semana-grupo__header:hover {
-  background: #ebedf2;
+  background: #f5f6fa;
 }
 
 .semana-grupo__header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .semana-grupo__titulo {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
   color: #2c3e50;
 }
 
@@ -199,52 +278,72 @@
   gap: 16px;
 }
 
-.semana-grupo__periodo {
+/* Total de la semana */
+.semana-grupo__total {
   font-size: 14px;
+  font-weight: 700;
+  color: #1a936f;
+  background: #e8f5e9;
+  padding: 5px 12px;
+  border-radius: 12px;
+  border: 1px solid #a5d6a7;
+}
+
+.semana-grupo__periodo {
+  font-size: 13px;
   color: #7f8c8d;
+  font-weight: 500;
 }
 
 .semana-grupo__count {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #004e89;
   background: #e3f2fd;
-  padding: 4px 12px;
+  padding: 4px 10px;
   border-radius: 12px;
 }
-
-/* ========================================
-   ITEMS DE CONCILIACIÓN
-   ======================================== */
 
 .semana-grupo__content {
   display: flex;
   flex-direction: column;
   background: white;
+  padding: 8px;
 }
+
+/* ========================================
+   ITEMS DE CONCILIACIÓN (TERCER NIVEL)
+   ======================================== */
 
 .conciliacion-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  padding: 16px 20px;
+  padding: 14px 18px;
   border: none;
-  border-top: 1px solid #e0e0e0;
-  background: white;
+  border-radius: 6px;
+  background: #fafbfc;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: all 0.2s ease;
   text-align: left;
+  margin-bottom: 6px;
+}
+
+.conciliacion-item:last-child {
+  margin-bottom: 0;
 }
 
 .conciliacion-item:hover {
-  background: #f8f9fa;
+  background: #e8f4f8;
+  border-left: 3px solid #004e89;
+  padding-left: 15px;
 }
 
 .conciliacion-item__folio {
   font-size: 15px;
   font-weight: 700;
-  color: #004e89;
+  color: #2c3e50;
 }
 
 .conciliacion-item__info {
@@ -266,51 +365,6 @@
   font-size: 15px;
   font-weight: 700;
   color: #1a936f;
-}
-
-/* ========================================
-   PAGINACIÓN
-   ======================================== */
-
-.seccion-conciliaciones__pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 16px;
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid #e0e0e0;
-}
-
-.pagination__btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  background: white;
-  font-size: 14px;
-  font-weight: 600;
-  color: #2c3e50;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.pagination__btn:hover:not(:disabled) {
-  background: #f5f6fa;
-  border-color: #004e89;
-  color: #004e89;
-}
-
-.pagination__btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.pagination__info {
-  font-size: 14px;
-  color: #7f8c8d;
 }
 
 /* ========================================
@@ -535,6 +589,19 @@
   border-top: 2px solid #2c3e50;
 }
 
+.totales-subtitulo {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 16px 0 8px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.total-value--retencion {
+  color: #e74c3c;
+}
+
 /* Firmas */
 .preview-pdf__firmas {
   display: flex;
@@ -594,6 +661,21 @@
     max-width: 100%;
   }
 
+  .mes-grupo__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .mes-grupo__header-right {
+    width: 100%;
+  }
+
+  .mes-grupo__total {
+    font-size: 14px;
+    padding: 5px 10px;
+  }
+
   .semana-grupo__header {
     flex-direction: column;
     align-items: flex-start;
@@ -606,16 +688,31 @@
     gap: 8px;
   }
 
+  .semana-grupo__total {
+    font-size: 13px;
+    padding: 4px 10px;
+  }
+
   .conciliacion-item {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
 
+  .conciliacion-item:hover {
+    border-left: none;
+    padding-left: 18px;
+  }
+
   .conciliacion-item__info {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+    width: 100%;
+  }
+
+  .conciliacion-item__obra {
+    max-width: 100%;
   }
 
   .preview-pdf {
@@ -626,33 +723,28 @@
     font-size: 10px;
   }
 
-  .preview-pdf__firmas {
-    flex-direction: column;
-    gap: 32px;
-  }
-  /* ========================================
-   ESTILOS ADICIONALES PARA MATERIAL
-   ======================================== */
-
-  .totales-subtitulo {
-    font-size: 14px;
-    font-weight: 700;
-    color: #2c3e50;
-    margin: 16px 0 8px 0;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #e0e0e0;
-  }
-
-  .total-value--retencion {
-    color: #e74c3c;
-  }
-
-  /* Ajustes de tabla para Material */
-  .preview-pdf__table table th:nth-child(5),
-  .preview-pdf__table table td:nth-child(5) {
+  .preview-pdf__table th:nth-child(5),
+  .preview-pdf__table td:nth-child(5) {
     max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .preview-pdf__firmas {
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  .total-row {
+    gap: 16px;
+  }
+
+  .total-label {
+    min-width: 120px;
+  }
+
+  .total-value {
+    min-width: 100px;
   }
 }

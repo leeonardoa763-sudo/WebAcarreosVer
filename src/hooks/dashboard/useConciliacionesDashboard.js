@@ -28,8 +28,6 @@ export const useConciliacionesDashboard = () => {
   // Estados locales
   const [tipoActivo, setTipoActivo] = useState("renta");
   const [folioSearch, setFolioSearch] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
 
   // Seleccionar hook activo
   const hookActivo = tipoActivo === "renta" ? rentaHook : materialHook;
@@ -57,55 +55,87 @@ export const useConciliacionesDashboard = () => {
   }, [hookActivo.conciliaciones, folioSearch]);
 
   /**
-   * Aplicar paginación (client-side)
-   */
-  const conciliacionesPaginadas = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return conciliacionesFiltradas.slice(startIndex, endIndex);
-  }, [conciliacionesFiltradas, currentPage]);
-
-  /**
-   * Calcular total de páginas
-   */
-  const totalPages = useMemo(() => {
-    return Math.ceil(conciliacionesFiltradas.length / pageSize);
-  }, [conciliacionesFiltradas.length]);
-
-  /**
-   * Agrupar conciliaciones paginadas por semana
+   * Agrupar conciliaciones por MES y luego por SEMANA
+   * Incluye cálculo de totales por semana y por mes
    */
   const conciliacionesAgrupadas = useMemo(() => {
-    const grupos = {};
+    const meses = {};
 
-    conciliacionesPaginadas.forEach((conc) => {
-      const key = `${conc.año}-${conc.numero_semana}`;
+    const nombresMeses = [
+      "Enero",
+      "Febrero",
+      "Marzo",
+      "Abril",
+      "Mayo",
+      "Junio",
+      "Julio",
+      "Agosto",
+      "Septiembre",
+      "Octubre",
+      "Noviembre",
+      "Diciembre",
+    ];
 
-      if (!grupos[key]) {
-        grupos[key] = {
+    // Iterar sobre TODAS las conciliaciones filtradas
+    conciliacionesFiltradas.forEach((conc) => {
+      const keyMes = `${conc.año}-${String(conc.fecha_inicio).substring(5, 7)}`;
+      const keySemana = `${conc.año}-${conc.numero_semana}`;
+      const mesNumero = parseInt(String(conc.fecha_inicio).substring(5, 7));
+
+      // Crear grupo de mes si no existe
+      if (!meses[keyMes]) {
+        meses[keyMes] = {
+          mes: mesNumero,
+          año: conc.año,
+          mesNombre: nombresMeses[mesNumero - 1],
+          semanas: {},
+          totalMes: 0, // ← NUEVO: Total del mes
+        };
+      }
+
+      // Crear grupo de semana dentro del mes si no existe
+      if (!meses[keyMes].semanas[keySemana]) {
+        meses[keyMes].semanas[keySemana] = {
           año: conc.año,
           numeroSemana: conc.numero_semana,
           fechaInicio: conc.fecha_inicio,
           fechaFin: conc.fecha_fin,
           conciliaciones: [],
+          totalSemana: 0, // ← NUEVO: Total de la semana
         };
       }
 
-      grupos[key].conciliaciones.push(conc);
+      // Agregar conciliación a la semana
+      meses[keyMes].semanas[keySemana].conciliaciones.push(conc);
+
+      // ← NUEVO: Sumar al total de la semana
+      meses[keyMes].semanas[keySemana].totalSemana += conc.total_final || 0;
+
+      // ← NUEVO: Sumar al total del mes
+      meses[keyMes].totalMes += conc.total_final || 0;
     });
 
-    return Object.values(grupos).sort((a, b) => {
-      if (a.año !== b.año) return b.año - a.año;
-      return b.numeroSemana - a.numeroSemana;
-    });
-  }, [conciliacionesPaginadas]);
+    // Convertir a array y ordenar
+    return Object.entries(meses)
+      .map(([keyMes, mes]) => ({
+        keyMes,
+        ...mes,
+        semanas: Object.values(mes.semanas).sort((a, b) => {
+          if (a.año !== b.año) return b.año - a.año;
+          return b.numeroSemana - a.numeroSemana;
+        }),
+      }))
+      .sort((a, b) => {
+        if (a.año !== b.año) return b.año - a.año;
+        return b.mes - a.mes;
+      });
+  }, [conciliacionesFiltradas]);
 
   /**
    * Cambiar tipo de conciliación
    */
   const cambiarTipo = useCallback((nuevoTipo) => {
     setTipoActivo(nuevoTipo);
-    setCurrentPage(1);
     setFolioSearch("");
   }, []);
 
@@ -114,25 +144,11 @@ export const useConciliacionesDashboard = () => {
    */
   const buscarPorFolio = useCallback((folio) => {
     setFolioSearch(folio);
-    setCurrentPage(1);
   }, []);
-
-  /**
-   * Ir a página específica
-   */
-  const irAPagina = useCallback(
-    (pagina) => {
-      if (pagina >= 1 && pagina <= totalPages) {
-        setCurrentPage(pagina);
-      }
-    },
-    [totalPages]
-  );
 
   return {
     // Datos
-    conciliaciones: conciliacionesPaginadas,
-    conciliacionesAgrupadas,
+    conciliacionesAgrupadas, // Ya no se necesita 'conciliaciones'
     loading: hookActivo.loading,
     error: hookActivo.error,
 
@@ -142,11 +158,7 @@ export const useConciliacionesDashboard = () => {
     cambiarTipo,
     buscarPorFolio,
 
-    // Paginación
-    currentPage,
-    totalPages,
+    // Info para UI
     totalCount: conciliacionesFiltradas.length,
-    pageSize,
-    irAPagina,
   };
 };

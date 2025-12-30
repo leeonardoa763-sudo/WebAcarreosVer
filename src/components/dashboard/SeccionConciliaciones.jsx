@@ -16,19 +16,13 @@
 import { useState } from "react";
 
 // 2. Icons
-import {
-  Truck,
-  Package,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { Truck, Package, Search } from "lucide-react";
 
 // 3. Hooks personalizados
 import { useConciliacionesDashboard } from "../../hooks/dashboard/useConciliacionesDashboard";
 
 // 4. Componentes
-import ListaConciliacionesPorSemana from "./ListaConciliacionesPorSemana";
+import ListaConciliacionesPorMes from "./ListaConciliacionesPorMes";
 import ModalVistaPreviewConciliacion from "./ModalVistaPreviewConciliacion";
 
 // 5. Config
@@ -46,10 +40,7 @@ const SeccionConciliaciones = () => {
     folioSearch,
     cambiarTipo,
     buscarPorFolio,
-    currentPage,
-    totalPages,
     totalCount,
-    irAPagina,
   } = useConciliacionesDashboard();
 
   // Estado del modal
@@ -154,37 +145,13 @@ const SeccionConciliaciones = () => {
               <p>No se encontraron conciliaciones</p>
             </div>
           ) : (
-            <ListaConciliacionesPorSemana
-              grupos={conciliacionesAgrupadas}
+            <ListaConciliacionesPorMes
+              meses={conciliacionesAgrupadas}
               onSeleccionar={handleAbrirModal}
+              colorTema={
+                tipoActivo === "renta" ? colors.secondary : colors.primary
+              }
             />
-          )}
-
-          {/* Paginación */}
-          {totalPages > 1 && (
-            <div className="seccion-conciliaciones__pagination">
-              <button
-                onClick={() => irAPagina(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="pagination__btn"
-              >
-                <ChevronLeft size={18} />
-                Anterior
-              </button>
-
-              <span className="pagination__info">
-                Página {currentPage} de {totalPages}
-              </span>
-
-              <button
-                onClick={() => irAPagina(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="pagination__btn"
-              >
-                Siguiente
-                <ChevronRight size={18} />
-              </button>
-            </div>
           )}
         </>
       )}

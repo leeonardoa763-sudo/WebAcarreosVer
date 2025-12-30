@@ -196,6 +196,41 @@
 }
 
 /* ========================================
+   FOOTER CON CRÉDITOS DEL DESARROLLADOR
+======================================== */
+
+.login-footer {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+  text-align: center;
+}
+
+.login-footer__text {
+  color: #7f8c8d;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.login-footer__name {
+  color: #ff6b35;
+  font-weight: 600;
+}
+
+.login-footer__contact {
+  color: #95a5a6;
+  font-size: 13px;
+  margin-top: 4px;
+  text-decoration: none;
+  display: inline-block;
+  transition: color 0.2s ease;
+}
+
+.login-footer__contact:hover {
+  color: #ff6b35;
+}
+
+/* ========================================
    LOADING DE VERIFICACIÓN DE SESIÓN
 ======================================== */
 
@@ -297,5 +332,15 @@
 
   .login-logo__image {
     max-width: 140px;
+  }
+
+  .login-footer {
+    margin-top: 24px;
+    padding-top: 20px;
+  }
+
+  .login-footer__text,
+  .login-footer__contact {
+    font-size: 12px;
   }
 }
