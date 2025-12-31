@@ -4,7 +4,8 @@
  * Página de listado y búsqueda de vales
  *
  * Funcionalidades:
- * - Lista de vales con paginación
+ * - Lista de vales con pestañas Material/Renta
+ * - Agrupación por mes y semana
  * - Filtros avanzados (obra, tipo, estado, fechas)
  * - Búsqueda por folio, operador, placas
  * - Vista de tarjetas con información resumida
@@ -20,7 +21,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // 3. Icons
-import { Search, Filter, X } from "lucide-react";
+import { Search, Filter, X, Package, Truck } from "lucide-react";
 
 // 4. Hooks personalizados
 import { useVales } from "../hooks/useVales";
@@ -32,6 +33,12 @@ import ValeFilters from "../components/vales/ValeFilters";
 // 6. Estilos
 import "../styles/vales.css";
 
+// Constantes de pestañas
+const TABS = [
+  { id: "material", label: "Material", icon: Package },
+  { id: "renta", label: "Renta", icon: Truck },
+];
+
 const Vales = () => {
   const navigate = useNavigate();
   const {
@@ -42,12 +49,13 @@ const Vales = () => {
     updateFilters,
     clearFilters,
     hasFilters,
-    pagination,
-    goToPage,
   } = useVales();
 
   // Estado local para mostrar/ocultar filtros
   const [showFilters, setShowFilters] = useState(false);
+
+  // Estado para pestaña activa
+  const [activeTab, setActiveTab] = useState("material");
 
   /**
    * Manejar búsqueda por término
@@ -79,6 +87,9 @@ const Vales = () => {
     updateFilters({ searchTerm: "" });
   };
 
+  // Filtrar vales por tipo según pestaña activa
+  const valesFiltrados = vales.filter((vale) => vale.tipo_vale === activeTab);
+
   return (
     <div className="vales-page">
       {/* Header */}
@@ -86,13 +97,35 @@ const Vales = () => {
         <div className="vales-page__title-section">
           <h1 className="vales-page__title">Vales</h1>
           <p className="vales-page__subtitle" aria-live="polite">
-            {pagination.totalCount}{" "}
-            {pagination.totalCount === 1
+            {valesFiltrados.length}{" "}
+            {valesFiltrados.length === 1
               ? "vale encontrado"
               : "vales encontrados"}
           </p>
         </div>
       </header>
+
+      {/* Pestañas Material/Renta */}
+      <div className="vales-tabs" role="tablist" aria-label="Tipos de vales">
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              className={`vales-tab ${activeTab === tab.id ? "vales-tab--active" : ""}`}
+              onClick={() => setActiveTab(tab.id)}
+              data-type={tab.id}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`panel-${tab.id}`}
+              type="button"
+            >
+              <Icon size={20} aria-hidden="true" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
 
       {/* Barra de búsqueda y filtros */}
       <div
@@ -186,7 +219,12 @@ const Vales = () => {
       )}
 
       {/* Contenido principal */}
-      <main className="vales-page__content">
+      <main
+        className="vales-page__content"
+        role="tabpanel"
+        id={`panel-${activeTab}`}
+        aria-labelledby={`tab-${activeTab}`}
+      >
         {loading ? (
           <div className="vales-page__loading" role="status" aria-live="polite">
             <div className="loading-spinner" aria-hidden="true"></div>
@@ -203,12 +241,12 @@ const Vales = () => {
               Reintentar
             </button>
           </div>
-        ) : vales.length === 0 ? (
+        ) : valesFiltrados.length === 0 ? (
           <div className="vales-page__empty" role="status" aria-live="polite">
             <p>
               {hasFilters
                 ? "No se encontraron vales con los filtros aplicados"
-                : "No hay vales registrados"}
+                : `No hay vales de ${activeTab} registrados`}
             </p>
             {hasFilters && (
               <button
@@ -221,42 +259,9 @@ const Vales = () => {
             )}
           </div>
         ) : (
-          <ValesList vales={vales} onValeClick={handleValeClick} />
+          <ValesList vales={valesFiltrados} onValeClick={handleValeClick} />
         )}
       </main>
-
-      {/* Paginación */}
-      {!loading && !error && vales.length > 0 && pagination.totalPages > 1 && (
-        <nav
-          className="vales-page__pagination"
-          role="navigation"
-          aria-label="Paginación de vales"
-        >
-          <button
-            onClick={() => goToPage(pagination.currentPage - 1)}
-            disabled={pagination.currentPage === 1}
-            className="vales-page__pagination-button"
-            aria-label="Ir a página anterior"
-            type="button"
-          >
-            Anterior
-          </button>
-
-          <span className="vales-page__pagination-info" aria-current="page">
-            Página {pagination.currentPage} de {pagination.totalPages}
-          </span>
-
-          <button
-            onClick={() => goToPage(pagination.currentPage + 1)}
-            disabled={pagination.currentPage === pagination.totalPages}
-            className="vales-page__pagination-button"
-            aria-label="Ir a página siguiente"
-            type="button"
-          >
-            Siguiente
-          </button>
-        </nav>
-      )}
     </div>
   );
 };
