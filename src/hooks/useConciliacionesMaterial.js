@@ -61,13 +61,7 @@ export const useConciliacionesMaterial = () => {
    */
   const loadSemanas = useCallback(async () => {
     if (!idPersona) return;
-    console.log("📞 [useConciliacionesMaterial] loadSemanas LLAMADO", {
-      idPersona,
-      sindicatoSeleccionado: filtros.sindicatoSeleccionado,
-      timestamp: new Date().toISOString(),
-    });
 
-    console.log("[useConciliacionesMaterial] loadSemanas - Inicio");
     setLoadingCatalogos(true);
 
     const sindicatoFiltro = isAdmin
@@ -79,11 +73,6 @@ export const useConciliacionesMaterial = () => {
 
     setSemanas(resultado.data);
     setLoadingCatalogos(false);
-
-    console.log(
-      "[useConciliacionesMaterial] Semanas cargadas:",
-      resultado.data.length
-    );
   }, [
     idPersona,
     isAdmin,
@@ -99,7 +88,6 @@ export const useConciliacionesMaterial = () => {
     async (semana) => {
       if (!semana || !idPersona) return;
 
-      console.log("[useConciliacionesMaterial] loadObras - Inicio");
       setLoadingCatalogos(true);
 
       const sindicatoFiltro = isAdmin
@@ -113,11 +101,6 @@ export const useConciliacionesMaterial = () => {
 
       setObras(resultado.data);
       setLoadingCatalogos(false);
-
-      console.log(
-        "[useConciliacionesMaterial] Obras cargadas:",
-        resultado.data.length
-      );
     },
     [
       idPersona,
@@ -135,7 +118,6 @@ export const useConciliacionesMaterial = () => {
     async (semana, idObra) => {
       if (!semana || !idObra || !idPersona) return;
 
-      console.log("[useConciliacionesMaterial] loadMateriales - Inicio");
       setLoadingCatalogos(true);
 
       const sindicatoFiltro = isAdmin
@@ -150,11 +132,6 @@ export const useConciliacionesMaterial = () => {
 
       setMateriales(resultado.data);
       setLoadingCatalogos(false);
-
-      console.log(
-        "[useConciliacionesMaterial] Materiales cargados:",
-        resultado.data.length
-      );
     },
     [
       idPersona,
@@ -175,7 +152,6 @@ export const useConciliacionesMaterial = () => {
     }
 
     try {
-      console.log("[useConciliacionesMaterial] cargarVistaPrevia - Inicio");
       setVistaPrevia((prev) => ({ ...prev, loading: true, error: null }));
 
       const sindicatoFiltro = isAdmin
@@ -189,11 +165,6 @@ export const useConciliacionesMaterial = () => {
 
       if (!resultado.success) throw new Error(resultado.error);
 
-      console.log(
-        "[useConciliacionesMaterial] Vales obtenidos:",
-        resultado.data.length
-      );
-
       const validacion = helpers.validarValesDisponibles(resultado.data);
 
       if (!validacion.valid) throw new Error(validacion.error);
@@ -201,12 +172,6 @@ export const useConciliacionesMaterial = () => {
       const gruposPorPlacas = helpers.agruparValesPorPlacas(resultado.data);
 
       const totales = helpers.calcularTotalesGenerales(gruposPorPlacas);
-
-      console.log(
-        "[useConciliacionesMaterial] Grupos creados:",
-        Object.keys(gruposPorPlacas).length
-      );
-      console.log("[useConciliacionesMaterial] Totales:", totales);
 
       setVistaPrevia({
         valesAgrupados: gruposPorPlacas,
@@ -232,11 +197,6 @@ export const useConciliacionesMaterial = () => {
    * Actualizar filtros
    */
   const updateFiltros = useCallback((nuevosFiltros) => {
-    console.log(
-      "[useConciliacionesMaterial] updateFiltros - Nuevos filtros:",
-      nuevosFiltros
-    );
-
     setFiltros((prev) => ({
       ...prev,
       ...nuevosFiltros,
@@ -255,12 +215,11 @@ export const useConciliacionesMaterial = () => {
    * Limpiar filtros
    */
   const clearFiltros = useCallback(() => {
-    console.log("[useConciliacionesMaterial] clearFiltros");
     setFiltros(initialFiltrosState);
     setVistaPrevia(initialVistaPreviaState);
     setObras([]);
     setSemanas([]);
-    setMateriales([]); // 👈 NUEVO
+    setMateriales([]);
   }, []);
 
   /**
@@ -275,8 +234,6 @@ export const useConciliacionesMaterial = () => {
     }
 
     try {
-      console.log("[useConciliacionesMaterial] generarConciliacion - Inicio");
-
       // Preparar datos
       const dataConciliacion = helpers.prepararDatosConciliacion(
         vistaPrevia.valesOriginales,
@@ -289,12 +246,6 @@ export const useConciliacionesMaterial = () => {
       // Extraer IDs de vales
       const idsVales = vistaPrevia.valesOriginales.map((v) => v.id_vale);
 
-      console.log(
-        "[useConciliacionesMaterial] Guardando conciliación con",
-        idsVales.length,
-        "vales"
-      );
-
       // Guardar en BD
       const resultado = await queriesGenerales.guardarConciliacion(
         dataConciliacion,
@@ -304,11 +255,6 @@ export const useConciliacionesMaterial = () => {
       if (!resultado.success) {
         throw new Error(resultado.error);
       }
-
-      console.log(
-        "[useConciliacionesMaterial] Conciliación guardada:",
-        resultado.data.folio
-      );
 
       // Limpiar estados
       clearFiltros();
@@ -347,7 +293,6 @@ export const useConciliacionesMaterial = () => {
     if (!idPersona) return;
 
     try {
-      console.log("[useConciliacionesMaterial] loadHistorial - Inicio");
       setLoading(true);
       setError(null);
 
@@ -361,11 +306,6 @@ export const useConciliacionesMaterial = () => {
       if (!resultado.success) throw new Error(resultado.error);
 
       setConciliaciones(resultado.data);
-
-      console.log(
-        "[useConciliacionesMaterial] Conciliaciones cargadas:",
-        resultado.data.length
-      );
     } catch (error) {
       console.error(
         "[useConciliacionesMaterial] Error en loadHistorial:",
@@ -386,12 +326,6 @@ export const useConciliacionesMaterial = () => {
 
   // Cargar semanas cuando cambia idPersona O sindicatoSeleccionado
   useEffect(() => {
-    console.log("🔄 [useConciliacionesMaterial] useEffect SEMANAS ejecutado", {
-      idPersona,
-      sindicatoSeleccionado: filtros.sindicatoSeleccionado,
-      timestamp: new Date().toISOString(),
-    });
-
     if (idPersona) {
       loadSemanas();
     }

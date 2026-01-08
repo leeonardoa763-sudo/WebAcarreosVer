@@ -82,7 +82,6 @@ export const useConciliacionesHelpers = () => {
    * Validar que hay vales disponibles para conciliación
    */
   const validarValesDisponibles = (vales) => {
-    console.log("DEBUG validarValesDisponibles - Input:", vales);
     console.log("DEBUG - Cantidad de vales:", vales?.length);
 
     if (!vales || vales.length === 0) {

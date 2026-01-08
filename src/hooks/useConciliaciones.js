@@ -239,12 +239,6 @@ export const useConciliaciones = () => {
 
   // ✅ CORREGIDO: Cargar semanas cuando cambia idPersona O sindicatoSeleccionado
   useEffect(() => {
-    console.log("🔄 [useConciliaciones] useEffect SEMANAS ejecutado", {
-      idPersona,
-      sindicatoSeleccionado: filtros.sindicatoSeleccionado,
-      timestamp: new Date().toISOString(),
-    });
-
     if (idPersona) {
       loadSemanas();
     }

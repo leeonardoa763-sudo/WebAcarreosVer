@@ -12,6 +12,7 @@
  */
 
 import * as pdfjsLib from "pdfjs-dist";
+const { getDocument } = pdfjsLib;
 
 // Configurar worker de PDF.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -103,27 +104,42 @@ export const convertPDFToImage = async (file) => {
 };
 
 /**
- * Extraer folio del PDF (intenta OCR primero)
+ * Extraer folio Y texto completo del PDF
+ * Retorna: { success, folio, textoCompleto, error }
  */
 export const extractFolioFromPDF = async (file) => {
   try {
-    // Método 1: Extraer texto y buscar folio
-    const textResult = await extractTextFromPDF(file);
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await getDocument({ data: arrayBuffer }).promise;
+    const page = await pdf.getPage(1);
+    const textContent = await page.getTextContent();
 
-    if (textResult.success) {
-      const folioResult = extractFolioFromText(textResult.text);
-      if (folioResult.success) {
-        return folioResult;
-      }
+    // Extraer TODO el texto
+    const textoCompleto = textContent.items.map((item) => item.str).join(" ");
+
+    // Buscar folio en el texto
+    const folioRegex = /[A-Z]{2,3}-\d{3}-\d{5}/;
+    const match = textoCompleto.match(folioRegex);
+
+    if (match) {
+      return {
+        success: true,
+        folio: match[0],
+        textoCompleto: textoCompleto,
+      };
     }
 
     return {
       success: false,
-      error: "No se pudo extraer el folio del PDF",
-      needsQR: true, // Indica que debe intentar con QR
+      error: "No se encontró folio en el PDF",
+      textoCompleto: textoCompleto,
     };
   } catch (error) {
     console.error("Error en extractFolioFromPDF:", error);
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: error.message,
+      textoCompleto: "",
+    };
   }
 };

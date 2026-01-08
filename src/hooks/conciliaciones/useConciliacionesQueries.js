@@ -263,11 +263,6 @@ export const useConciliacionesQueries = () => {
           return b.numero - a.numero;
         });
 
-        console.log(
-          "[fetchSemanasConValesVerificados] Semanas finales:",
-          semanasArray.length
-        );
-
         return { success: true, data: semanasArray };
       } catch (error) {
         console.error("Error en fetchSemanasConValesVerificados:", error);
@@ -464,18 +459,13 @@ export const useConciliacionesQueries = () => {
 
         if (errorRel) throw errorRel;
 
-        // 3. ⚠️ COMENTAR TEMPORALMENTE - Actualizar estado de vales a 'conciliado'
-        // const { error: errorUpdate } = await supabase
-        //   .from("vales")
-        //   .update({ estado: "conciliado" })
-        //   .in("id_vale", idsVales);
+        //3. ⚠️ COMENTAR TEMPORALMENTE - Actualizar estado de vales a 'conciliado'
+        const { error: errorUpdate } = await supabase
+          .from("vales")
+          .update({ estado: "conciliado" })
+          .in("id_vale", idsVales);
 
-        // if (errorUpdate) throw errorUpdate;
-
-        // ✅ TEMPORAL: Log para ver que se saltó la actualización
-        console.log(
-          "⚠️ MODO PRUEBAS: [useConciliacionesQueries] No se cambió el estado de los vales a 'conciliado'"
-        );
+        if (errorUpdate) throw errorUpdate;
 
         return { success: true, data: conciliacion };
       } catch (error) {

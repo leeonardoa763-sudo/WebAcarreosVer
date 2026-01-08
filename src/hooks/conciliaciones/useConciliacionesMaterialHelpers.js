@@ -22,9 +22,6 @@ export const useConciliacionesMaterialHelpers = () => {
    */
   const agruparValesPorPlacas = (vales) => {
     console.log(
-      "[useConciliacionesMaterialHelpers] agruparValesPorPlacas - Inicio"
-    );
-    console.log(
       "[useConciliacionesMaterialHelpers] Total vales a agrupar:",
       vales.length
     );
@@ -106,10 +103,6 @@ export const useConciliacionesMaterialHelpers = () => {
    * Fórmula: Total = (Subtotal + IVA) - Retención
    */
   const calcularTotalesGenerales = (gruposPorPlacas) => {
-    console.log(
-      "[useConciliacionesMaterialHelpers] calcularTotalesGenerales - Inicio"
-    );
-
     let subtotal = 0;
     let totalViajesTipo1 = 0;
     let totalViajesTipo2 = 0;
@@ -156,11 +149,6 @@ export const useConciliacionesMaterialHelpers = () => {
       totalToneladasTipo2: Number(totalToneladasTipo2.toFixed(2)),
     };
 
-    console.log(
-      "[useConciliacionesMaterialHelpers] Totales calculados:",
-      totales
-    );
-
     return totales;
   };
 
@@ -168,15 +156,6 @@ export const useConciliacionesMaterialHelpers = () => {
    * Validar que hay vales disponibles para conciliación
    */
   const validarValesDisponibles = (vales) => {
-    console.log(
-      "[useConciliacionesMaterialHelpers] validarValesDisponibles - Input:",
-      vales
-    );
-    console.log(
-      "[useConciliacionesMaterialHelpers] Cantidad de vales:",
-      vales?.length
-    );
-
     if (!vales || vales.length === 0) {
       return {
         valid: false,
@@ -232,7 +211,7 @@ export const useConciliacionesMaterialHelpers = () => {
 
     const obra = vales[0]?.obras;
 
-    // 👇 NUEVO: Obtener información del material
+    // Obtener información del material
     const primerDetalle = vales[0]?.vale_material_detalles?.[0];
     const material = primerDetalle?.material;
 
@@ -261,10 +240,6 @@ export const useConciliacionesMaterialHelpers = () => {
    * Organiza por tipo de material para renderizado correcto
    */
   const formatearParaTabla = (gruposPorPlacas) => {
-    console.log(
-      "[useConciliacionesMaterialHelpers] formatearParaTabla - Inicio"
-    );
-
     return Object.values(gruposPorPlacas).map((grupo) => ({
       ...grupo,
       vales: grupo.vales.map((vale) => ({

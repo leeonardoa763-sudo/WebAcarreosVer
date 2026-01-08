@@ -28,14 +28,6 @@ export const useConciliacionesMaterialQueries = () => {
   const fetchValesVerificadosMaterial = useCallback(
     async (filtros, idSindicatoUsuario) => {
       try {
-        console.log(
-          "[useConciliacionesMaterialQueries] fetchValesVerificadosMaterial - Inicio"
-        );
-        console.log(
-          "[useConciliacionesMaterialQueries] Filtros recibidos:",
-          filtros
-        );
-
         // Query base
         let query = supabase
           .from("vales")
@@ -119,17 +111,7 @@ export const useConciliacionesMaterialQueries = () => {
 
         if (error) throw error;
 
-        console.log(
-          "[useConciliacionesMaterialQueries] Vales encontrados:",
-          data?.length || 0
-        );
-
         let valesFiltrados = data || [];
-
-        console.log(
-          "[useConciliacionesMaterialQueries] Vales después de query:",
-          valesFiltrados.length
-        );
 
         // Filtrar por material específico si está seleccionado
         if (filtros.materialSeleccionado) {
@@ -148,13 +130,6 @@ export const useConciliacionesMaterialQueries = () => {
                 detalle.material?.id_material === filtros.materialSeleccionado
             ),
           }));
-
-          console.log(
-            "[useConciliacionesMaterialQueries] Vales después de filtrar por material:",
-            valesFiltrados.length,
-            "- Material ID:",
-            filtros.materialSeleccionado
-          );
         }
 
         return { success: true, data: valesFiltrados };
@@ -174,11 +149,7 @@ export const useConciliacionesMaterialQueries = () => {
    */
   const fetchObrasConValesMaterial = useCallback(async (semana) => {
     try {
-      console.log(
-        "[useConciliacionesMaterialQueries] fetchObrasConValesMaterial - Inicio"
-      );
-
-      // ✅ CORRECCIÓN: Incluir TODO el día final
+      //  Incluir TODO el día final
       const fechaFinCompleta = `${semana.fechaFin}T23:59:59.999Z`;
 
       let query = supabase
@@ -209,11 +180,6 @@ export const useConciliacionesMaterialQueries = () => {
 
       if (error) throw error;
 
-      console.log(
-        "[useConciliacionesMaterialQueries] Vales encontrados:",
-        data?.length || 0
-      );
-
       // Agrupar por obra (eliminar duplicados)
       const obrasUnicas = (data || []).reduce((acc, vale) => {
         if (vale.obras && !acc.find((o) => o.id_obra === vale.obras.id_obra)) {
@@ -227,11 +193,6 @@ export const useConciliacionesMaterialQueries = () => {
         }
         return acc;
       }, []);
-
-      console.log(
-        "[useConciliacionesMaterialQueries] Obras únicas encontradas:",
-        obrasUnicas.length
-      );
 
       return { success: true, data: obrasUnicas };
     } catch (error) {
@@ -248,10 +209,6 @@ export const useConciliacionesMaterialQueries = () => {
    */
   const fetchSemanasConValesMaterial = useCallback(async () => {
     try {
-      console.log(
-        "[useConciliacionesMaterialQueries] fetchSemanasConValesMaterial - Inicio"
-      );
-
       let query = supabase
         .from("vales")
         .select("fecha_creacion")
@@ -263,11 +220,6 @@ export const useConciliacionesMaterialQueries = () => {
       const { data, error } = await query;
 
       if (error) throw error;
-
-      console.log(
-        "[useConciliacionesMaterialQueries] Vales encontrados:",
-        data?.length || 0
-      );
 
       // Agrupar por semana
       const semanas = {};
@@ -296,11 +248,6 @@ export const useConciliacionesMaterialQueries = () => {
         return b.numero - a.numero;
       });
 
-      console.log(
-        "[useConciliacionesMaterialQueries] Semanas encontradas:",
-        semanasArray.length
-      );
-
       return { success: true, data: semanasArray };
     } catch (error) {
       console.error(
@@ -316,11 +263,7 @@ export const useConciliacionesMaterialQueries = () => {
    */
   const fetchMaterialesConVales = useCallback(async (semana, idObra) => {
     try {
-      console.log(
-        "[useConciliacionesMaterialQueries] fetchMaterialesConVales - Inicio"
-      );
-
-      // ✅ CORRECCIÓN: Incluir TODO el día final
+      //  Incluir TODO el día final
       const fechaFinCompleta = `${semana.fechaFin}T23:59:59.999Z`;
 
       let query = supabase
@@ -375,11 +318,6 @@ export const useConciliacionesMaterialQueries = () => {
       // Convertir a array y ordenar alfabéticamente
       const materialesUnicos = Array.from(materialesMap.values()).sort((a, b) =>
         a.material.localeCompare(b.material)
-      );
-
-      console.log(
-        "[useConciliacionesMaterialQueries] Materiales únicos encontrados:",
-        materialesUnicos.length
       );
 
       return { success: true, data: materialesUnicos };

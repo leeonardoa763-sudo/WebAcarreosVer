@@ -68,12 +68,6 @@ const Conciliaciones = () => {
    * Cambiar de tab y limpiar estados
    */
   const handleCambiarTab = (nuevoTab) => {
-    console.log("🔀 [Conciliaciones] handleCambiarTab INICIO", {
-      tabAnterior: tabActivo,
-      nuevoTab,
-      timestamp: new Date().toISOString(),
-    });
-
     // Limpiar estados del tab anterior
     if (tabActivo === "renta") {
       console.log("  → Limpiando filtros de RENTA");
@@ -216,7 +210,7 @@ const Conciliaciones = () => {
           }}
         >
           <Truck size={20} aria-hidden="true" />
-          <span>Renta de Maquinaria</span>
+          <span>Renta</span>
         </button>
 
         <button
