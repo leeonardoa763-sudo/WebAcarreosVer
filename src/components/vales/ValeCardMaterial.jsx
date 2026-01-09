@@ -253,6 +253,16 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                         </span>
                       </div>
 
+                      {/* Sindicato*/}
+                      {vale.operadores?.sindicatos?.sindicato && (
+                        <div className="vale-card__field">
+                          <span className="vale-card__label">Sindicato:</span>
+                          <span className="vale-card__value">
+                            {vale.operadores.sindicatos.sindicato}
+                          </span>
+                        </div>
+                      )}
+
                       <div className="vale-card__detalle-item-small">
                         <span className="vale-card__detalle-label">
                           Capacidad:

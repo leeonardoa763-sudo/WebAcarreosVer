@@ -208,6 +208,15 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
             )}
           </div>
 
+          {vale.vale_renta_detalle?.[0]?.sindicatos?.sindicato && (
+            <div className="vale-card__field">
+              <span className="vale-card__label">Sindicato:</span>
+              <span className="vale-card__value">
+                {vale.vale_renta_detalle[0].sindicatos.sindicato}
+              </span>
+            </div>
+          )}
+
           {/* Detalles de RENTA */}
           <div className="vale-card__detalles-section">
             <h4 className="vale-card__section-title">

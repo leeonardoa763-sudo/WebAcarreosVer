@@ -44,16 +44,6 @@ const Sidebar = () => {
         </NavLink>
 
         <NavLink
-          to="/verificar-vales"
-          className={({ isActive }) =>
-            isActive ? "sidebar__link sidebar__link--active" : "sidebar__link"
-          }
-        >
-          <FileCheck className="sidebar__icon" size={20} />
-          <span className="sidebar__text">Verificar Vales</span>
-        </NavLink>
-
-        <NavLink
           to="/operadores"
           className={({ isActive }) =>
             isActive ? "sidebar__link sidebar__link--active" : "sidebar__link"
@@ -61,6 +51,16 @@ const Sidebar = () => {
         >
           <Truck className="sidebar__icon" size={20} />
           <span className="sidebar__text">Operadores</span>
+        </NavLink>
+
+        <NavLink
+          to="/verificar-vales"
+          className={({ isActive }) =>
+            isActive ? "sidebar__link sidebar__link--active" : "sidebar__link"
+          }
+        >
+          <FileCheck className="sidebar__icon" size={20} />
+          <span className="sidebar__text">Verificar Vales</span>
         </NavLink>
 
         <NavLink

@@ -268,35 +268,6 @@ const OperadorFilters = ({
                 ))}
               </select>
             </div>
-
-            {/* Filtro: Sindicato */}
-            <div className="operador-filters__field">
-              <label htmlFor="sindicato" className="operador-filters__label">
-                Sindicato
-              </label>
-              <select
-                id="sindicato"
-                value={filtros.id_sindicato || ""}
-                onChange={(e) =>
-                  handleFiltroChange(
-                    "id_sindicato",
-                    e.target.value ? Number(e.target.value) : null
-                  )
-                }
-                className="operador-filters__select"
-                disabled={loadingCatalogos}
-              >
-                <option value="">Todos los sindicatos</option>
-                {sindicatos.map((sindicato) => (
-                  <option
-                    key={sindicato.id_sindicato}
-                    value={sindicato.id_sindicato}
-                  >
-                    {sindicato.sindicato}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
         </div>
       )}

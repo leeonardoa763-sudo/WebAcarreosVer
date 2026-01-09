@@ -56,7 +56,11 @@ const construirQueryBase = (tipoVale) => {
         nombre_completo,
         nombre,
         primer_apellido,
-        segundo_apellido
+        segundo_apellido,
+        sindicatos (
+          id_sindicato,
+          sindicato
+        )
       ),
       
       vehiculos!inner (
@@ -343,9 +347,9 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
  * Calcular totales de un estado
  */
 const calcularTotalesEstado = (vales, tipoVale) => {
-  const totalViajes = vales.length;
-
   if (tipoVale === "material") {
+    const totalViajes = vales.length;
+
     const totalM3 = vales.reduce((sum, vale) => {
       const detalles = vale.vale_material_detalles || [];
       const m3Vale = detalles.reduce(
@@ -361,7 +365,17 @@ const calcularTotalesEstado = (vales, tipoVale) => {
       totalM3: Number(totalM3.toFixed(2)),
     };
   } else {
-    // Renta
+    // Renta - Sumar numero_viajes de los detalles
+    const totalViajes = vales.reduce((sum, vale) => {
+      const detalles = vale.vale_renta_detalle || [];
+      const viajesVale = detalles.reduce(
+        (sumDetalle, detalle) =>
+          sumDetalle + (Number(detalle.numero_viajes) || 0),
+        0
+      );
+      return sum + viajesVale;
+    }, 0);
+
     const totalDias = vales.reduce((sum, vale) => {
       const detalles = vale.vale_renta_detalle || [];
       const diasVale = detalles.reduce(

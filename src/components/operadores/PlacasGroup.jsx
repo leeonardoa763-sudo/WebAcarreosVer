@@ -142,7 +142,7 @@ const PlacasGroup = ({
         </div>
       </button>
 
-      {/* Contenido: Estados y vales */}
+      {/* Contenido: Vales directamente (sin agrupación por estado) */}
       {!estaColapsado && (
         <div
           className="placas-group__content"
@@ -150,128 +150,83 @@ const PlacasGroup = ({
           role="region"
           aria-label={`Vales de ${placas}`}
         >
-          {vehiculoData.porEstado.map((estadoGrupo) => {
-            const IconoEstado = obtenerIconoComponente(estadoGrupo.estado);
-            const estadoColapsado = estadosColapsados.has(estadoGrupo.estado);
+          {/* Contenido: Estados y vales */}
+          {!estaColapsado && (
+            <div
+              className="placas-group__content"
+              id={`placas-content-${placas}`}
+              role="region"
+              aria-label={`Vales de ${placas}`}
+            >
+              {vehiculoData.porEstado.map((estadoGrupo) => {
+                const IconoEstado = obtenerIconoComponente(estadoGrupo.estado);
 
-            return (
-              <div key={estadoGrupo.estado} className="estado-group">
-                {/* Header del estado */}
-                <button
-                  type="button"
-                  className="estado-group__header"
-                  onClick={() => toggleEstado(estadoGrupo.estado)}
-                  style={{
-                    borderLeftColor: helpers.obtenerColorEstado(
-                      estadoGrupo.estado
-                    ),
-                  }}
-                  aria-expanded={!estadoColapsado}
-                  aria-controls={`estado-content-${placas}-${estadoGrupo.estado}`}
-                >
-                  <div className="estado-group__header-left">
-                    {estadoColapsado ? (
-                      <ChevronRight size={18} aria-hidden="true" />
-                    ) : (
-                      <ChevronDown size={18} aria-hidden="true" />
-                    )}
-                    <IconoEstado
-                      size={18}
-                      aria-hidden="true"
-                      style={{
-                        color: helpers.obtenerColorEstado(estadoGrupo.estado),
-                      }}
-                    />
-                    <span className="estado-group__nombre">
-                      {helpers.obtenerEtiquetaEstado(estadoGrupo.estado)}
-                    </span>
-                  </div>
-
-                  <div className="estado-group__header-right">
-                    <span className="estado-group__stat">
-                      {estadoGrupo.totalViajes}{" "}
-                      {estadoGrupo.totalViajes === 1 ? "vale" : "vales"}
-                    </span>
-                    {tipoVale === "material" ? (
-                      <span className="estado-group__stat estado-group__stat--primary">
-                        {helpers.formatearNumero(estadoGrupo.totalM3)} m³
+                return (
+                  <div key={estadoGrupo.estado} className="estado-group-simple">
+                    {/* Header simple del estado (no colapsable) */}
+                    <div className="estado-group-simple__header">
+                      <IconoEstado
+                        size={18}
+                        aria-hidden="true"
+                        style={{
+                          color: helpers.obtenerColorEstado(estadoGrupo.estado),
+                        }}
+                      />
+                      <span className="estado-group-simple__nombre">
+                        {helpers.obtenerEtiquetaEstado(estadoGrupo.estado)}
                       </span>
-                    ) : (
-                      <>
-                        <span className="estado-group__stat">
-                          {helpers.formatearNumero(estadoGrupo.totalDias)} días
-                        </span>
-                        <span className="estado-group__stat estado-group__stat--primary">
-                          {helpers.formatearNumero(estadoGrupo.totalHoras)} hrs
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </button>
+                      <span className="estado-group-simple__count">
+                        ({estadoGrupo.totalViajes}{" "}
+                        {estadoGrupo.totalViajes === 1 ? "vale" : "vales"})
+                      </span>
+                    </div>
 
-                {/* Lista de vales del estado */}
-                {!estadoColapsado && (
-                  <div
-                    className="estado-group__vales"
-                    id={`estado-content-${placas}-${estadoGrupo.estado}`}
-                    role="region"
-                    aria-label={`Vales ${helpers.obtenerEtiquetaEstado(estadoGrupo.estado)}`}
-                  >
-                    {estadoGrupo.vales.map((vale) => {
-                      const valeExpandido = valesExpandidos.has(vale.id_vale);
+                    {/* Lista de vales */}
+                    <div className="estado-group-simple__vales">
+                      {estadoGrupo.vales.map((vale) => {
+                        const valeExpandido = valesExpandidos.has(vale.id_vale);
 
-                      return (
-                        <div key={vale.id_vale} className="vale-item">
-                          {/* Header compacto del vale */}
-                          <button
-                            type="button"
-                            className="vale-item__header"
-                            onClick={() => toggleVale(vale.id_vale)}
-                            aria-expanded={valeExpandido}
-                            aria-controls={`vale-content-${vale.id_vale}`}
-                          >
-                            <div className="vale-item__header-left">
-                              {valeExpandido ? (
-                                <ChevronDown size={16} aria-hidden="true" />
-                              ) : (
-                                <ChevronRight size={16} aria-hidden="true" />
-                              )}
-                              <span className="vale-item__folio">
-                                {vale.folio}
-                              </span>
-                              <span className="vale-item__fecha">
-                                {helpers.formatearFechaCorta(
-                                  vale.fecha_creacion
-                                )}
-                              </span>
-                            </div>
-
-                            <div className="vale-item__header-right">
-                              <span className="vale-item__obra">
-                                {vale.obras?.obra || "Sin obra"}
-                              </span>
-                            </div>
-                          </button>
-
-                          {/* Detalle completo del vale (ValeCard) */}
-                          {valeExpandido && (
-                            <div
-                              className="vale-item__content"
-                              id={`vale-content-${vale.id_vale}`}
-                              role="region"
-                              aria-label={`Detalles del vale ${vale.folio}`}
+                        return (
+                          <div key={vale.id_vale} className="vale-item">
+                            <button
+                              type="button"
+                              className="vale-item__header"
+                              onClick={() => toggleVale(vale.id_vale)}
+                              aria-expanded={valeExpandido}
                             >
-                              <ValeCard vale={vale} />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                              <div className="vale-item__header-left">
+                                {valeExpandido ? (
+                                  <ChevronDown size={16} aria-hidden="true" />
+                                ) : (
+                                  <ChevronRight size={16} aria-hidden="true" />
+                                )}
+                                <span className="vale-item__fecha">
+                                  {helpers.formatearFechaCorta(
+                                    vale.fecha_creacion
+                                  )}
+                                </span>
+                              </div>
+                              <div className="vale-item__header-right">
+                                <span className="vale-item__obra">
+                                  {vale.obras?.obra || "Sin obra"}
+                                </span>
+                              </div>
+                            </button>
+
+                            {valeExpandido && (
+                              <div className="vale-item__content">
+                                <ValeCard vale={vale} />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

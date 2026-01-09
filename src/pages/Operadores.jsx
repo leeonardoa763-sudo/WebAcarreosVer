@@ -93,7 +93,6 @@ const Operadores = () => {
       {/* Header */}
       <header className="operadores-header">
         <div className="operadores-header__title">
-          <Truck size={32} aria-hidden="true" />
           <h1>Reporte por Operadores</h1>
         </div>
 

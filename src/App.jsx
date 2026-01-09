@@ -54,22 +54,22 @@ const App = () => {
           />
 
           <Route
-            path="/vales"
+            path="/operadores"
             element={
               <ProtectedRoute>
                 <Layout>
-                  <Vales />
+                  <Operadores />
                 </Layout>
               </ProtectedRoute>
             }
           />
 
           <Route
-            path="/operadores"
+            path="/vales"
             element={
               <ProtectedRoute>
                 <Layout>
-                  <Operadores />
+                  <Vales />
                 </Layout>
               </ProtectedRoute>
             }
