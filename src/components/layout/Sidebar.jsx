@@ -13,6 +13,7 @@ import {
   FileText,
   FileSpreadsheet,
   FileCheck,
+  Truck,
 } from "lucide-react";
 
 // 3. Config
@@ -50,6 +51,16 @@ const Sidebar = () => {
         >
           <FileCheck className="sidebar__icon" size={20} />
           <span className="sidebar__text">Verificar Vales</span>
+        </NavLink>
+
+        <NavLink
+          to="/operadores"
+          className={({ isActive }) =>
+            isActive ? "sidebar__link sidebar__link--active" : "sidebar__link"
+          }
+        >
+          <Truck className="sidebar__icon" size={20} />
+          <span className="sidebar__text">Operadores</span>
         </NavLink>
 
         <NavLink

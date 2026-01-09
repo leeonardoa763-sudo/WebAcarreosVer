@@ -25,6 +25,7 @@ import Vales from "./pages/Vales";
 import Conciliaciones from "./pages/Conciliaciones";
 import VerificarVales from "./pages/VerificarVales";
 import VisualizarVale from "./pages/VisualizarVale";
+import Operadores from "./pages/Operadores";
 
 // 5. Estilos
 import "./styles/global.css";
@@ -64,6 +65,17 @@ const App = () => {
           />
 
           <Route
+            path="/operadores"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Operadores />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/verificar-vales"
             element={
               <ProtectedRoute>
@@ -85,7 +97,7 @@ const App = () => {
             }
           />
 
-          {/*  RUTA PÚBLICA - Visualización de vale sin autenticación */}
+          {/* RUTA PÚBLICA - Visualización de vale sin autenticación */}
           <Route path="/vale/:folio" element={<VisualizarVale />} />
 
           {/* Ruta 404 */}
