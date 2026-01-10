@@ -8,6 +8,7 @@
  * - Maneja estados independientes para cada tipo
  * - Genera conciliaciones según el tipo seleccionado
  * - Muestra vista previa antes de guardar
+ * - Valida si se está generando conciliación de la semana actual
  *
  * Usado en: App.jsx (ruta /conciliaciones)
  */
@@ -60,6 +61,8 @@ const Conciliaciones = () => {
   const [mensaje, setMensaje] = useState({ tipo: null, texto: "" });
   const [conciliacionGenerada, setConciliacionGenerada] = useState(null);
   const [datosParaPDF, setDatosParaPDF] = useState(null);
+  const [mostrarModalSemanaActual, setMostrarModalSemanaActual] =
+    useState(false);
 
   // Seleccionar el hook activo según el tab
   const hookActivo = tabActivo === "renta" ? rentaHook : materialHook;
@@ -97,21 +100,20 @@ const Conciliaciones = () => {
   };
 
   /**
-   * Generar conciliación (aplica al hook activo)
+   * Verificar si la semana seleccionada incluye la fecha actual
    */
-  const handleGenerar = async () => {
-    const vistaPrevia = hookActivo.vistaPrevia;
+  const esSemanaCorriente = (semana) => {
+    const hoy = new Date();
+    const inicio = new Date(semana.fechaInicio); // ← cambio aquí
+    const fin = new Date(semana.fechaFin); // ← cambio aquí
+    return hoy >= inicio && hoy <= fin;
+  };
 
-    if (
-      !vistaPrevia.valesAgrupados ||
-      Object.keys(vistaPrevia.valesAgrupados).length === 0
-    ) {
-      setMensaje({
-        tipo: "error",
-        texto: "No hay vales para generar conciliación",
-      });
-      return;
-    }
+  /**
+   * Ejecutar la generación de conciliación
+   */
+  const ejecutarGeneracion = async () => {
+    const vistaPrevia = hookActivo.vistaPrevia;
 
     try {
       console.log(
@@ -121,7 +123,6 @@ const Conciliaciones = () => {
       setGenerando(true);
       setMensaje({ tipo: null, texto: "" });
 
-      // Guardar los datos ANTES de que se limpien
       const datosGuardados = {
         valesAgrupados: vistaPrevia.valesAgrupados,
         totalesGenerales: vistaPrevia.totalesGenerales,
@@ -135,29 +136,28 @@ const Conciliaciones = () => {
           resultado.data.folio
         );
 
-        // Cargar datos completos con relaciones
         const { data: conciliacionCompleta, error } = await supabase
           .from("conciliaciones")
           .select(
             `
-          *,
-          obras:id_obra (
-            id_obra,
-            obra,
-            cc
-          ),
-          sindicatos:id_sindicato (
-            id_sindicato,
-            sindicato,
-            nombre_completo,
-            nombre_firma_conciliacion
-          ),
-          empresas:id_empresa (
-            id_empresa,
-            empresa,
-            sufijo
-          )
-        `
+        *,
+        obras:id_obra (
+          id_obra,
+          obra,
+          cc
+        ),
+        sindicatos:id_sindicato (
+          id_sindicato,
+          sindicato,
+          nombre_completo,
+          nombre_firma_conciliacion
+        ),
+        empresas:id_empresa (
+          id_empresa,
+          empresa,
+          sufijo
+        )
+      `
           )
           .eq("id_conciliacion", resultado.data.id_conciliacion)
           .single();
@@ -183,6 +183,39 @@ const Conciliaciones = () => {
     } finally {
       setGenerando(false);
     }
+  };
+
+  /**
+   * Generar conciliación (valida semana actual antes de proceder)
+   */
+  const handleGenerar = async () => {
+    const vistaPrevia = hookActivo.vistaPrevia;
+
+    if (
+      !vistaPrevia.valesAgrupados ||
+      Object.keys(vistaPrevia.valesAgrupados).length === 0
+    ) {
+      setMensaje({
+        tipo: "error",
+        texto: "No hay vales para generar conciliación",
+      });
+      return;
+    }
+
+    // Verificar si es la semana actual
+    const semanaSeleccionada = hookActivo.filtros.semanaSeleccionada;
+
+    if (semanaSeleccionada) {
+      const esSemanaActual = esSemanaCorriente(semanaSeleccionada);
+
+      if (esSemanaActual) {
+        setMostrarModalSemanaActual(true);
+        return;
+      }
+    }
+
+    // Continuar con la generación normal
+    await ejecutarGeneracion();
   };
 
   return (
@@ -246,14 +279,14 @@ const Conciliaciones = () => {
         <FiltrosConciliacion
           semanas={hookActivo.semanas}
           obras={hookActivo.obras}
-          materiales={hookActivo.materiales} //  NUEVO
+          materiales={hookActivo.materiales}
           sindicatos={hookActivo.sindicatos}
           filtros={hookActivo.filtros}
           onFiltrosChange={hookActivo.updateFiltros}
           onCargarVistaPrevia={hookActivo.cargarVistaPrevia}
           loadingCatalogos={hookActivo.loadingCatalogos}
           disabled={false}
-          tipoActivo={tabActivo} //  NUEVO: Pasar 'renta' o 'material'
+          tipoActivo={tabActivo}
         />
 
         {/* Error de vista previa */}
@@ -316,6 +349,56 @@ const Conciliaciones = () => {
           </>
         )}
       </div>
+
+      {/* Modal de advertencia semana actual */}
+      {mostrarModalSemanaActual && (
+        <div
+          className="modal-overlay"
+          onClick={() => setMostrarModalSemanaActual(false)}
+        >
+          <div
+            className="modal-content modal-content--warning"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h3>⚠️ Advertencia: Semana en Curso</h3>
+            </div>
+
+            <div className="modal-body">
+              <p>
+                Estás generando una conciliación para la{" "}
+                <strong>semana actual</strong>.
+              </p>
+              <p>
+                Si la semana aún no ha terminado, podrían aparecer más vales que
+                no estarán incluidos en esta conciliación.
+              </p>
+              <p className="modal-question">
+                ¿Deseas continuar de todas formas?
+              </p>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                onClick={() => setMostrarModalSemanaActual(false)}
+                className="btn btn--secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  setMostrarModalSemanaActual(false);
+                  ejecutarGeneracion();
+                }}
+                className="btn btn--primary"
+                style={{ backgroundColor: colors.accent }}
+              >
+                Sí, generar conciliación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -172,7 +172,7 @@ const PlacasGroup = ({
                           color: helpers.obtenerColorEstado(estadoGrupo.estado),
                         }}
                       />
-                      <span className="estado-group-simple__nombre">
+                      <span className="estado-group__nombre">
                         {helpers.obtenerEtiquetaEstado(estadoGrupo.estado)}
                       </span>
                       <span className="estado-group-simple__count">

@@ -115,9 +115,16 @@ const ValesList = ({ vales }) => {
           const groupKey = `${mes}-${semana}-${idObra}`;
           ids.add(groupKey);
 
-          Object.keys(obraData.materiales).forEach((material) => {
-            ids.add(`${groupKey}-${material}`);
-          });
+          // Ordenar materiales: "en_proceso" primero
+          Object.keys(obraData.materiales)
+            .sort((a, b) => {
+              if (a === "en_proceso") return -1;
+              if (b === "en_proceso") return 1;
+              return a.localeCompare(b);
+            })
+            .forEach((material) => {
+              ids.add(`${groupKey}-${material}`);
+            });
         });
       });
     });
@@ -193,8 +200,13 @@ const ValesList = ({ vales }) => {
 
                       {!isObraCollapsed && (
                         <div className="vales-group-obra__content">
-                          {Object.entries(obraData.materiales).map(
-                            ([material, valesMaterial]) => {
+                          {Object.entries(obraData.materiales)
+                            .sort(([a], [b]) => {
+                              if (a === "en_proceso") return -1;
+                              if (b === "en_proceso") return 1;
+                              return a.localeCompare(b);
+                            })
+                            .map(([material, valesMaterial]) => {
                               const materialKey = `${groupKey}-${material}`;
                               const isMaterialCollapsed =
                                 isCollapsed(materialKey);
@@ -215,7 +227,9 @@ const ValesList = ({ vales }) => {
                                     ) : (
                                       <ChevronDown size={16} />
                                     )}
-                                    <span>{material}</span>
+                                    <span className="vales-group-material__title">
+                                      {material}
+                                    </span>
                                     <span className="vales-group-material__count">
                                       {valesMaterial.length}{" "}
                                       {valesMaterial.length === 1
@@ -236,8 +250,7 @@ const ValesList = ({ vales }) => {
                                   )}
                                 </div>
                               );
-                            }
-                          )}
+                            })}
                         </div>
                       )}
                     </div>

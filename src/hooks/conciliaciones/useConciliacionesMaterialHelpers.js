@@ -129,14 +129,15 @@ export const useConciliacionesMaterialHelpers = () => {
       totalToneladasTipo2 += grupo.totalesTipo2.totalToneladas;
     });
 
-    const iva = subtotal * 0.16;
-    const retencion = subtotal * 0.04;
-    const total = subtotal + iva - retencion;
+    const subtotalFinal = Number(subtotal.toFixed(2));
+    const iva = Number((subtotalFinal * 0.16).toFixed(2));
+    const retencion = Number((subtotalFinal * 0.04).toFixed(2));
+    const total = subtotalFinal + iva - retencion;
 
     const totales = {
-      subtotal: Number(subtotal.toFixed(2)),
-      iva: Number(iva.toFixed(2)),
-      retencion: Number(retencion.toFixed(2)),
+      subtotal: subtotalFinal,
+      iva,
+      retencion,
       total: Number(total.toFixed(2)),
       // Totales por tipo
       totalViajesTipo1,
@@ -228,8 +229,6 @@ export const useConciliacionesMaterialHelpers = () => {
       iva_16_porciento: totales.iva,
       retencion_4_porciento: totales.retencion,
       total_final: totales.total,
-      total_dias: 0, // Material no usa días
-      total_horas: 0, // Material no usa horas
       generado_por: idPersona,
       estado: "generada",
     };

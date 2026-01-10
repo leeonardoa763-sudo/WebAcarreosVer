@@ -6,6 +6,7 @@
  * Funcionalidades:
  * - Detecta tipo de material automáticamente
  * - Llama al generador correcto según tipo
+ * - Recarga página después de descargar
  *
  * Usado en: Conciliaciones.jsx
  */
@@ -78,6 +79,11 @@ const BotonGenerarPDF = ({
           totales
         );
       }
+
+      // Recargar página después de generar PDF
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error("Error al generar PDF:", error);
       alert("Error al generar PDF");
