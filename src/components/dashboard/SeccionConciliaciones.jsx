@@ -16,7 +16,8 @@
 import { useState } from "react";
 
 // 2. Icons
-import { Truck, Package, Search } from "lucide-react";
+// 2. Icons
+import { Truck, Package, Search, Download } from "lucide-react";
 
 // 3. Hooks personalizados
 import { useConciliacionesDashboard } from "../../hooks/dashboard/useConciliacionesDashboard";
@@ -30,6 +31,9 @@ import { colors } from "../../config/colors";
 
 // 6. Estilos
 import "../../styles/dashboard-conciliaciones.css";
+
+// 7. Utils
+import { exportarConciliacionesDashboard } from "../../utils/exportConciliacionesDashboard";
 
 const SeccionConciliaciones = () => {
   const {
@@ -64,16 +68,53 @@ const SeccionConciliaciones = () => {
     setConciliacionSeleccionada(null);
   };
 
+  /**
+   * Manejar exportación a Excel
+   */
+  const handleExportarExcel = () => {
+    try {
+      // Obtener todas las conciliaciones filtradas (aplanadas del agrupamiento)
+      const todasLasConciliaciones = [];
+
+      conciliacionesAgrupadas.forEach((mes) => {
+        mes.semanas.forEach((semana) => {
+          todasLasConciliaciones.push(...semana.conciliaciones);
+        });
+      });
+
+      // Exportar
+      exportarConciliacionesDashboard(todasLasConciliaciones, tipoActivo);
+    } catch (error) {
+      console.error("Error al exportar:", error);
+      alert("Error al exportar las conciliaciones");
+    }
+  };
+
   return (
     <div className="seccion-conciliaciones">
       {/* Header */}
       <div className="seccion-conciliaciones__header">
-        <h2 className="seccion-conciliaciones__title">
-          Historial de Conciliaciones
-        </h2>
-        <p className="seccion-conciliaciones__subtitle">
-          Visualiza las conciliaciones generadas agrupadas por semana
-        </p>
+        <div className="seccion-conciliaciones__header-content">
+          <div>
+            <h2 className="seccion-conciliaciones__title">
+              Historial de Conciliaciones
+            </h2>
+            <p className="seccion-conciliaciones__subtitle">
+              Visualiza las conciliaciones generadas agrupadas por semana
+            </p>
+          </div>
+
+          {/* Botón de exportación */}
+          <button
+            className="btn-exportar-excel"
+            onClick={handleExportarExcel}
+            disabled={loading || totalCount === 0}
+            title="Exportar a Excel"
+          >
+            <Download size={18} />
+            <span>Exportar a Excel</span>
+          </button>
+        </div>
       </div>
 
       {/* Tabs Renta / Material */}

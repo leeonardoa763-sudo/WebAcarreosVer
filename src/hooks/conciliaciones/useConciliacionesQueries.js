@@ -273,7 +273,7 @@ export const useConciliacionesQueries = () => {
   );
 
   /**
-   * Obtener historial de conciliaciones generadas
+   * Obtener historial de conciliaciones generadas CON VALES
    */
   const fetchConciliacionesGeneradas = useCallback(
     async (filtros = {}, idSindicatoUsuario) => {
@@ -286,15 +286,16 @@ export const useConciliacionesQueries = () => {
           obras:id_obra (
             id_obra,
             obra,
-            cc
+            cc,
+            empresas:id_empresa (
+              empresa,
+              sufijo
+            )
           ),
           sindicatos:id_sindicato (
             id_sindicato,
-            sindicato
-          ),
-          empresas:id_empresa (
-            empresa,
-            sufijo
+            sindicato,
+            nombre_completo
           ),
           persona:generado_por (
             nombre,
@@ -327,7 +328,96 @@ export const useConciliacionesQueries = () => {
 
         if (error) throw error;
 
-        return { success: true, data: data || [] };
+        // Para cada conciliación, obtener los vales relacionados
+        const conciliacionesConVales = await Promise.all(
+          (data || []).map(async (conc) => {
+            try {
+              // Obtener IDs de vales de la tabla intermedia
+              const { data: valesIds, error: errorValesIds } = await supabase
+                .from("conciliacion_vales")
+                .select("id_vale")
+                .eq("id_conciliacion", conc.id_conciliacion);
+
+              if (errorValesIds) {
+                console.error("Error obteniendo IDs de vales:", errorValesIds);
+                return { ...conc, vales: [] };
+              }
+
+              if (!valesIds || valesIds.length === 0) {
+                return { ...conc, vales: [] };
+              }
+
+              const idsVales = valesIds.map((v) => v.id_vale);
+
+              // Obtener detalles de los vales según el tipo de conciliación
+              if (conc.tipo_conciliacion === "renta") {
+                const { data: vales, error: errorVales } = await supabase
+                  .from("vales")
+                  .select(
+                    `
+                  *,
+                  vale_renta_detalle (
+                    capacidad_m3,
+                    numero_viajes,
+                    total_horas,
+                    total_dias,
+                    costo_total,
+                    material:id_material (
+                      material
+                    )
+                  )
+                `
+                  )
+                  .in("id_vale", idsVales); // ✅ CORRECTO: Supabase maneja el array automáticamente
+
+                if (errorVales) {
+                  console.error("Error obteniendo vales de renta:", errorVales);
+                  return { ...conc, vales: [] };
+                }
+
+                return { ...conc, vales: vales || [] };
+              } else {
+                // Material
+                const { data: vales, error: errorVales } = await supabase
+                  .from("vales")
+                  .select(
+                    `
+                  *,
+                  vale_material_detalles (
+                    cantidad_pedida_m3,
+                    cantidad_real_m3,
+                    distancia_km,
+                    precio_m3,
+                    precio_total,
+                    material:id_material (
+                      material
+                    )
+                  )
+                `
+                  )
+                  .in("id_vale", idsVales); // ✅ CORRECTO: Supabase maneja el array automáticamente
+
+                if (errorVales) {
+                  console.error(
+                    "Error obteniendo vales de material:",
+                    errorVales
+                  );
+                  return { ...conc, vales: [] };
+                }
+
+                return { ...conc, vales: vales || [] };
+              }
+            } catch (innerError) {
+              console.error(
+                `Error procesando conciliación ${conc.id_conciliacion}:`,
+                innerError
+              );
+              return { ...conc, vales: [] };
+            }
+          })
+        );
+
+        return { success: true, data: conciliacionesConVales };
       } catch (error) {
         console.error("Error en fetchConciliacionesGeneradas:", error);
         return { success: false, error: error.message, data: [] };
