@@ -385,10 +385,10 @@ export const useConciliacionesQueries = () => {
                   *,
                   vale_material_detalles (
                     cantidad_pedida_m3,
-                    cantidad_real_m3,
+                    volumen_real_m3,
                     distancia_km,
                     precio_m3,
-                    precio_total,
+                    costo_total,
                     material:id_material (
                       material
                     )
@@ -425,6 +425,166 @@ export const useConciliacionesQueries = () => {
     },
     []
   );
+
+  /**
+   * Obtener conciliaciones SIN vales (más rápido para listados)
+   */
+  const fetchConciliacionesSinVales = useCallback(
+    async (filtros = {}, idSindicatoUsuario) => {
+      try {
+        let query = supabase
+          .from("conciliaciones")
+          .select(
+            `
+          *,
+          obras:id_obra (
+            id_obra,
+            obra,
+            cc,
+            empresas:id_empresa (
+              empresa,
+              sufijo
+            )
+          ),
+          sindicatos:id_sindicato (
+            id_sindicato,
+            sindicato,
+            nombre_completo
+          ),
+          persona:generado_por (
+            nombre,
+            primer_apellido,
+            segundo_apellido
+          )
+        `
+          )
+          .order("fecha_generacion", { ascending: false });
+
+        // Filtrar por sindicato (si no es admin)
+        if (idSindicatoUsuario && !filtros.ignorarSindicato) {
+          query = query.eq("id_sindicato", idSindicatoUsuario);
+        }
+
+        // Filtros opcionales
+        if (filtros.tipo_conciliacion) {
+          query = query.eq("tipo_conciliacion", filtros.tipo_conciliacion);
+        }
+
+        if (filtros.id_obra) {
+          query = query.eq("id_obra", filtros.id_obra);
+        }
+
+        if (filtros.estado) {
+          query = query.eq("estado", filtros.estado);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        return { success: true, data: data || [] };
+      } catch (error) {
+        console.error("Error en fetchConciliacionesSinVales:", error);
+        return { success: false, error: error.message, data: [] };
+      }
+    },
+    []
+  );
+
+  /**
+   * Cargar vales para múltiples conciliaciones (para exportar)
+   */
+  const fetchValesParaConciliaciones = useCallback(async (conciliaciones) => {
+    try {
+      const conciliacionesConVales = await Promise.all(
+        conciliaciones.map(async (conc) => {
+          try {
+            // Obtener IDs de vales de la tabla intermedia
+            const { data: valesIds, error: errorValesIds } = await supabase
+              .from("conciliacion_vales")
+              .select("id_vale")
+              .eq("id_conciliacion", conc.id_conciliacion);
+
+            if (errorValesIds || !valesIds || valesIds.length === 0) {
+              return { ...conc, vales: [] };
+            }
+
+            const idsVales = valesIds.map((v) => v.id_vale);
+
+            // Obtener detalles de los vales según el tipo de conciliación
+            if (conc.tipo_conciliacion === "renta") {
+              const { data: vales, error: errorVales } = await supabase
+                .from("vales")
+                .select(
+                  `
+                *,
+                vale_renta_detalle (
+                  capacidad_m3,
+                  numero_viajes,
+                  total_horas,
+                  total_dias,
+                  costo_total,
+                  material:id_material (
+                    material
+                  )
+                )
+              `
+                )
+                .in("id_vale", idsVales);
+
+              if (errorVales) {
+                console.error("Error obteniendo vales de renta:", errorVales);
+                return { ...conc, vales: [] };
+              }
+
+              return { ...conc, vales: vales || [] };
+            } else {
+              // Material
+              const { data: vales, error: errorVales } = await supabase
+                .from("vales")
+                .select(
+                  `
+                *,
+                vale_material_detalles (
+                  cantidad_pedida_m3,
+                  volumen_real_m3,
+                  distancia_km,
+                  precio_m3,
+                  costo_total,
+                  material:id_material (
+                    material
+                  )
+                )
+              `
+                )
+                .in("id_vale", idsVales);
+
+              if (errorVales) {
+                console.error(
+                  "Error obteniendo vales de material:",
+                  errorVales
+                );
+                return { ...conc, vales: [] };
+              }
+
+              return { ...conc, vales: vales || [] };
+            }
+          } catch (innerError) {
+            console.error(
+              `Error procesando conciliación ${conc.id_conciliacion}:`,
+              innerError
+            );
+            return { ...conc, vales: [] };
+          }
+        })
+      );
+
+      return { success: true, data: conciliacionesConVales };
+    } catch (error) {
+      console.error("Error en fetchValesParaConciliaciones:", error);
+      return { success: false, error: error.message, data: [] };
+    }
+  }, []);
 
   /**
    * Obtener detalle de una conciliación con sus vales
@@ -571,6 +731,8 @@ export const useConciliacionesQueries = () => {
     fetchObrasConValesVerificados,
     fetchSemanasConValesVerificados,
     fetchConciliacionesGeneradas,
+    fetchConciliacionesSinVales,
+    fetchValesParaConciliaciones,
     fetchConciliacionConVales,
     guardarConciliacion,
   };

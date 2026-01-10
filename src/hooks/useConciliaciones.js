@@ -191,7 +191,7 @@ export const useConciliaciones = () => {
   }, [vistaPrevia, filtros, generar, clearFiltros, loadSemanas]);
 
   /**
-   * Cargar historial
+   * Cargar historial de conciliaciones de renta SIN vales
    */
   const loadHistorial = useCallback(async () => {
     if (!idPersona) return;
@@ -202,7 +202,7 @@ export const useConciliaciones = () => {
 
       const sindicatoFiltro = isAdmin ? null : idSindicato;
 
-      const resultado = await queries.fetchConciliacionesGeneradas(
+      const resultado = await queries.fetchConciliacionesSinVales(
         { tipo_conciliacion: "renta" },
         sindicatoFiltro
       );

@@ -287,7 +287,7 @@ export const useConciliacionesMaterial = () => {
   ]);
 
   /**
-   * Cargar historial de conciliaciones de material
+   * Cargar historial de conciliaciones de material SIN vales
    */
   const loadHistorial = useCallback(async () => {
     if (!idPersona) return;
@@ -298,7 +298,8 @@ export const useConciliacionesMaterial = () => {
 
       const sindicatoFiltro = isAdmin ? null : idSindicato;
 
-      const resultado = await queriesGenerales.fetchConciliacionesGeneradas(
+      // ← CAMBIO: Usar fetchConciliacionesSinVales en vez de fetchConciliacionesGeneradas
+      const resultado = await queriesGenerales.fetchConciliacionesSinVales(
         { tipo_conciliacion: "material" },
         sindicatoFiltro
       );

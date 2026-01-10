@@ -16,7 +16,7 @@
 import { useState } from "react";
 
 // 2. Icons
-// 2. Icons
+
 import { Truck, Package, Search, Download } from "lucide-react";
 
 // 3. Hooks personalizados
@@ -71,7 +71,7 @@ const SeccionConciliaciones = () => {
   /**
    * Manejar exportación a Excel
    */
-  const handleExportarExcel = () => {
+  const handleExportarExcel = async () => {
     try {
       // Obtener todas las conciliaciones filtradas (aplanadas del agrupamiento)
       const todasLasConciliaciones = [];
@@ -82,11 +82,48 @@ const SeccionConciliaciones = () => {
         });
       });
 
-      // Exportar
-      exportarConciliacionesDashboard(todasLasConciliaciones, tipoActivo);
+      if (todasLasConciliaciones.length === 0) {
+        alert("No hay conciliaciones para exportar");
+        return;
+      }
+
+      // Mostrar loading
+      const btnExportar = document.querySelector(".btn-exportar-excel");
+      const contenidoOriginal = btnExportar ? btnExportar.innerHTML : null;
+
+      if (btnExportar) {
+        btnExportar.disabled = true;
+        btnExportar.innerHTML = "<span>Preparando datos...</span>";
+      }
+
+      // Cargar vales para estas conciliaciones
+      const { exportarConVales } = await import(
+        "../../utils/exportConciliacionesDashboard"
+      );
+      await exportarConVales(todasLasConciliaciones, tipoActivo);
+
+      // Restaurar botón
+      if (btnExportar && contenidoOriginal) {
+        btnExportar.disabled = false;
+        btnExportar.innerHTML = contenidoOriginal;
+      }
     } catch (error) {
       console.error("Error al exportar:", error);
       alert("Error al exportar las conciliaciones");
+
+      // Restaurar botón en caso de error
+      const btnExportar = document.querySelector(".btn-exportar-excel");
+      if (btnExportar) {
+        btnExportar.disabled = false;
+        btnExportar.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>Exportar a Excel</span>
+      `;
+      }
     }
   };
 

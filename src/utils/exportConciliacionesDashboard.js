@@ -7,13 +7,17 @@
  * - Prepara datos de conciliaciones con todas las columnas requeridas
  * - Formatea fechas, números y montos
  * - Maneja tanto conciliaciones de renta como de material
+ * - Carga vales bajo demanda para optimizar rendimiento
  *
- * Dependencias: formatters.js, exportToExcel.js
+ * Dependencias: formatters.js, exportToExcel.js, supabase
  * Usado en: Dashboard (SeccionConciliaciones)
  */
 
 // Importar utilidad de exportación base
 import { exportToExcel } from "./exportToExcel";
+
+// Importar queries
+import { supabase } from "../config/supabase";
 
 // Importar formateadores
 import { formatearFechaCorta } from "./formatters";
@@ -121,7 +125,7 @@ const obtenerTotalM3Numero = (conc) => {
     let totalM3 = 0;
     conc.vales.forEach((vale) => {
       vale.vale_material_detalles?.forEach((detalle) => {
-        totalM3 += parseFloat(detalle.cantidad_real_m3 || 0);
+        totalM3 += parseFloat(detalle.volumen_real_m3 || 0);
       });
     });
 
@@ -188,25 +192,37 @@ const obtenerTotalDiasNumero = (conc) => {
 
 /**
  * Obtener número total de viajes
- * Aplica para conciliaciones de renta
+ * Para renta: suma de numero_viajes de los detalles
+ * Para material: cuenta cada detalle como 1 viaje
  *
  * @param {Object} conc - Objeto de conciliación
  * @returns {string|number} - Total de viajes o vacío
  */
 const obtenerNumeroViajes = (conc) => {
   try {
-    const tipoConc = conc.tipo || conc.tipo_conciliacion;
-    if (tipoConc !== "renta") return "";
     if (!conc.vales || conc.vales.length === 0) return "";
 
-    let totalViajes = 0;
-    conc.vales.forEach((vale) => {
-      vale.vale_renta_detalle?.forEach((detalle) => {
-        totalViajes += parseInt(detalle.numero_viajes || 0);
-      });
-    });
+    const tipoConc = conc.tipo || conc.tipo_conciliacion;
 
-    return totalViajes > 0 ? totalViajes : "";
+    if (tipoConc === "renta") {
+      // Para renta: sumar campo numero_viajes
+      let totalViajes = 0;
+      conc.vales.forEach((vale) => {
+        vale.vale_renta_detalle?.forEach((detalle) => {
+          totalViajes += parseInt(detalle.numero_viajes || 0);
+        });
+      });
+      return totalViajes > 0 ? totalViajes : "";
+    } else {
+      // Para material: contar cada detalle como 1 viaje
+      let totalViajes = 0;
+      conc.vales.forEach((vale) => {
+        vale.vale_material_detalles?.forEach(() => {
+          totalViajes += 1;
+        });
+      });
+      return totalViajes > 0 ? totalViajes : "";
+    }
   } catch (error) {
     console.error("Error al calcular total viajes:", error);
     return "";
@@ -285,6 +301,105 @@ export const exportarConciliacionesDashboard = (conciliaciones, tipoActivo) => {
 
     // Preparar datos
     const datosFormateados = prepararDatosParaExcel(conciliaciones);
+
+    // Generar nombre de archivo
+    const fecha = new Date().toISOString().split("T")[0];
+    const tipo = tipoActivo === "renta" ? "Renta" : "Material";
+    const fileName = `Conciliaciones_${tipo}_${fecha}`;
+
+    // Exportar a Excel
+    exportToExcel(datosFormateados, fileName, "Conciliaciones");
+
+    console.log(`✅ ${conciliaciones.length} conciliaciones exportadas`);
+  } catch (error) {
+    console.error("Error al exportar conciliaciones:", error);
+    throw error;
+  }
+};
+
+/**
+ * Exportar conciliaciones cargando vales bajo demanda
+ * Optimizado para no cargar vales innecesariamente
+ *
+ * @param {Array} conciliaciones - Array de conciliaciones sin vales
+ * @param {string} tipoActivo - Tipo de conciliación activo ("renta" o "material")
+ */
+export const exportarConVales = async (conciliaciones, tipoActivo) => {
+  try {
+    // Validar que hay datos
+    if (!conciliaciones || conciliaciones.length === 0) {
+      throw new Error("No hay conciliaciones para exportar");
+    }
+
+    // Cargar vales para estas conciliaciones
+    const conciliacionesConVales = await Promise.all(
+      conciliaciones.map(async (conc) => {
+        try {
+          // Obtener IDs de vales
+          const { data: valesIds } = await supabase
+            .from("conciliacion_vales")
+            .select("id_vale")
+            .eq("id_conciliacion", conc.id_conciliacion);
+
+          if (!valesIds || valesIds.length === 0) {
+            return { ...conc, vales: [] };
+          }
+
+          const idsVales = valesIds.map((v) => v.id_vale);
+
+          // Cargar vales según tipo
+          if (conc.tipo_conciliacion === "renta") {
+            const { data: vales } = await supabase
+              .from("vales")
+              .select(
+                `
+                *,
+                vale_renta_detalle (
+                  capacidad_m3,
+                  numero_viajes,
+                  total_horas,
+                  total_dias,
+                  costo_total,
+                  material:id_material (
+                    material
+                  )
+                )
+              `
+              )
+              .in("id_vale", idsVales);
+
+            return { ...conc, vales: vales || [] };
+          } else {
+            const { data: vales } = await supabase
+              .from("vales")
+              .select(
+                `
+                *,
+                vale_material_detalles (
+                  cantidad_pedida_m3,
+                  volumen_real_m3,
+                  distancia_km,
+                  precio_m3,
+                  costo_total,
+                  material:id_material (
+                    material
+                  )
+                )
+              `
+              )
+              .in("id_vale", idsVales);
+
+            return { ...conc, vales: vales || [] };
+          }
+        } catch (error) {
+          console.error(`Error cargando vales para ${conc.folio}:`, error);
+          return { ...conc, vales: [] };
+        }
+      })
+    );
+
+    // Preparar datos
+    const datosFormateados = prepararDatosParaExcel(conciliacionesConVales);
 
     // Generar nombre de archivo
     const fecha = new Date().toISOString().split("T")[0];

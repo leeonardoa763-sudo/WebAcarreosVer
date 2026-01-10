@@ -40,7 +40,9 @@ const VistaPreviewRenta = ({ conciliacion, valesAgrupados }) => {
           </div>
           <div className="info-row">
             <span className="info-label">Empresa:</span>
-            <span className="info-value">{conciliacion.empresas.empresa}</span>
+            <span className="info-value">
+              {conciliacion.obras?.empresas?.empresa || "N/A"}
+            </span>
           </div>
           <div className="info-row">
             <span className="info-label">Sindicato:</span>
