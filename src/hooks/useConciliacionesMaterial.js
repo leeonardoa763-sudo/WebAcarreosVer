@@ -86,7 +86,11 @@ export const useConciliacionesMaterial = () => {
    */
   const loadObras = useCallback(
     async (semana) => {
-      if (!semana || !idPersona) return;
+      if (!semana || !idPersona) {
+        console.log("⚠️ NO SE EJECUTA: Falta semana o idPersona");
+        console.log("════════════════════════════════════════════\n");
+        return;
+      }
 
       setLoadingCatalogos(true);
 
@@ -94,10 +98,16 @@ export const useConciliacionesMaterial = () => {
         ? filtros.sindicatoSeleccionado
         : idSindicato;
 
-      const resultado = await queriesMaterial.fetchObrasConValesMaterial(
-        semana,
-        sindicatoFiltro
-      );
+      const resultado =
+        await queriesMaterial.fetchObrasConValesMaterial(semana);
+
+      if (!resultado.success) {
+        console.log("❌ ERROR:", resultado.error);
+      }
+
+      if (resultado.data?.length === 0) {
+        console.log("⚠️⚠️⚠️ NO SE ENCONTRARON OBRAS ⚠️⚠️⚠️");
+      }
 
       setObras(resultado.data);
       setLoadingCatalogos(false);

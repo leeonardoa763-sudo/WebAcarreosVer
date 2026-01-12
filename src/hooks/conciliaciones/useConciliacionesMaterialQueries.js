@@ -2,7 +2,7 @@
  * src/hooks/conciliaciones/useConciliacionesMaterialQueries.js
  *
  * Queries a Supabase específicas para conciliaciones de material
- *
+ *const { data, error } = await query;
  * CORRECCIONES APLICADAS:
  * 1. Eliminado filtro por sindicato de operador (Material no depende de sindicato)
  * 2. Corregido filtro de fecha para incluir TODO el día final (23:59:59.999)
@@ -19,6 +19,9 @@ import { useCallback } from "react";
 
 // 2. Config
 import { supabase } from "../../config/supabase";
+
+// 3. Utils
+import { calcularSemanaISO } from "../../utils/dateUtils";
 
 export const useConciliacionesMaterialQueries = () => {
   /**
@@ -95,7 +98,7 @@ export const useConciliacionesMaterialQueries = () => {
           query = query.eq("id_obra", filtros.obraSeleccionada);
         }
 
-        // ✅ CORRECCIÓN: Incluir TODO el día final (hasta 23:59:59.999)
+        //  CORRECCIÓN: Incluir TODO el día final (hasta 23:59:59.999)
         if (filtros.semanaSeleccionada) {
           const fechaFinCompleta = `${filtros.semanaSeleccionada.fechaFin}T23:59:59.999Z`;
 
@@ -180,6 +183,13 @@ export const useConciliacionesMaterialQueries = () => {
 
       if (error) throw error;
 
+      (data || []).forEach((vale, index) => {
+        if (vale.obras) {
+        } else {
+          console.log("    ❌ NO TIENE DATOS DE OBRA");
+        }
+      });
+
       // Agrupar por obra (eliminar duplicados)
       const obrasUnicas = (data || []).reduce((acc, vale) => {
         if (vale.obras && !acc.find((o) => o.id_obra === vale.obras.id_obra)) {
@@ -221,12 +231,18 @@ export const useConciliacionesMaterialQueries = () => {
 
       if (error) throw error;
 
+      // Ver las fechas de los vales
+      data?.forEach((vale, idx) => {
+        const fecha = new Date(vale.fecha_creacion);
+      });
+
       // Agrupar por semana
       const semanas = {};
 
-      (data || []).forEach((vale) => {
+      data.forEach((vale) => {
         const fecha = new Date(vale.fecha_creacion);
         const semanaInfo = calcularSemanaISO(fecha);
+
         const key = `${semanaInfo.año}-${semanaInfo.numero}`;
 
         if (!semanas[key]) {
@@ -242,18 +258,16 @@ export const useConciliacionesMaterialQueries = () => {
         semanas[key].cantidadVales++;
       });
 
-      // Convertir a array y ordenar
       const semanasArray = Object.values(semanas).sort((a, b) => {
         if (a.año !== b.año) return b.año - a.año;
         return b.numero - a.numero;
       });
 
+      semanasArray.forEach((sem, idx) => {});
+
       return { success: true, data: semanasArray };
     } catch (error) {
-      console.error(
-        "[useConciliacionesMaterialQueries] Error en fetchSemanasConValesMaterial:",
-        error
-      );
+      console.error("Error en fetchSemanasConValesMaterial:", error);
       return { success: false, error: error.message, data: [] };
     }
   }, []);
@@ -335,33 +349,5 @@ export const useConciliacionesMaterialQueries = () => {
     fetchObrasConValesMaterial,
     fetchSemanasConValesMaterial,
     fetchMaterialesConVales,
-  };
-};
-
-/**
- * Calcular semana ISO 8601 a partir de una fecha
- * Lunes a Sábado (ajustado para México)
- */
-const calcularSemanaISO = (fecha) => {
-  const date = new Date(fecha);
-  const dia = date.getDay();
-  const diff = dia === 0 ? -6 : 1 - dia;
-  const lunes = new Date(date);
-  lunes.setDate(date.getDate() + diff);
-  const sabado = new Date(lunes);
-  sabado.setDate(lunes.getDate() + 5);
-  const primerDiaAno = new Date(lunes.getFullYear(), 0, 1);
-  const diasTranscurridos = Math.floor(
-    (lunes - primerDiaAno) / (24 * 60 * 60 * 1000)
-  );
-  const numeroSemana = Math.ceil(
-    (diasTranscurridos + primerDiaAno.getDay() + 1) / 7
-  );
-
-  return {
-    numero: numeroSemana,
-    año: lunes.getFullYear(),
-    fechaInicio: lunes.toISOString().split("T")[0],
-    fechaFin: sabado.toISOString().split("T")[0],
   };
 };

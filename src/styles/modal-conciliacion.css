@@ -1,0 +1,217 @@
+/**
+ * src/styles/modal-conciliacion.css
+ * 
+ * Estilos para el modal de conciliación generada
+ */
+
+/* Overlay del modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Contenedor del modal */
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease-out;
+  position: relative;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Header del modal */
+.modal-header {
+  padding: 24px 24px 16px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.modal-header__title-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.3;
+}
+
+.modal-close-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.modal-close-button:hover {
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
+/* Body del modal */
+.modal-body {
+  padding: 24px;
+}
+
+/* Información de la conciliación */
+.conciliacion-generada-info {
+  background-color: #f9fafb;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.conciliacion-generada-info__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.conciliacion-generada-info__item:last-child {
+  border-bottom: none;
+}
+
+.conciliacion-generada-info__item--total {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 2px solid #d1d5db;
+  border-bottom: none;
+}
+
+.conciliacion-generada-info__label {
+  font-weight: 500;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.conciliacion-generada-info__value {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 14px;
+  text-align: right;
+}
+
+.conciliacion-generada-info__value--total {
+  font-size: 18px;
+  color: var(--color-success, #10b981);
+}
+
+/* Mensaje informativo */
+.modal-info-message {
+  background-color: #eff6ff;
+  border-left: 4px solid #3b82f6;
+  padding: 16px;
+  border-radius: 6px;
+  margin-bottom: 0;
+}
+
+.modal-info-message p {
+  margin: 0;
+  color: #1e40af;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Footer del modal */
+.modal-footer {
+  padding: 16px 24px 24px 24px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Botón de descargar PDF personalizado */
+.btn--download-pdf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal-content {
+    max-width: 100%;
+    border-radius: 12px 12px 0 0;
+    max-height: 95vh;
+  }
+
+  .modal-header h3 {
+    font-size: 18px;
+  }
+
+  .conciliacion-generada-info__item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .conciliacion-generada-info__value {
+    text-align: left;
+  }
+
+  .modal-footer {
+    flex-direction: column-reverse;
+  }
+
+  .modal-footer button {
+    width: 100%;
+  }
+}

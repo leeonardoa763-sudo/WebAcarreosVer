@@ -19,6 +19,9 @@ import { useCallback } from "react";
 // 2. Config
 import { supabase } from "../../config/supabase";
 
+// 3. Utils
+import { calcularSemanaISO } from "../../utils/dateUtils";
+
 /**
  * Hook para queries de conciliaciones
  */
@@ -735,39 +738,5 @@ export const useConciliacionesQueries = () => {
     fetchValesParaConciliaciones,
     fetchConciliacionConVales,
     guardarConciliacion,
-  };
-};
-
-/**
- * Calcular semana ISO 8601 a partir de una fecha
- * Lunes a Sábado (ajustado para México)
- */
-const calcularSemanaISO = (fecha) => {
-  const date = new Date(fecha);
-
-  // Ajustar al lunes de la semana
-  const dia = date.getDay();
-  const diff = dia === 0 ? -6 : 1 - dia; // Si es domingo, restar 6, sino al lunes
-  const lunes = new Date(date);
-  lunes.setDate(date.getDate() + diff);
-
-  // Sábado de la semana
-  const sabado = new Date(lunes);
-  sabado.setDate(lunes.getDate() + 5);
-
-  // Calcular número de semana
-  const primerDiaAno = new Date(lunes.getFullYear(), 0, 1);
-  const diasTranscurridos = Math.floor(
-    (lunes - primerDiaAno) / (24 * 60 * 60 * 1000)
-  );
-  const numeroSemana = Math.ceil(
-    (diasTranscurridos + primerDiaAno.getDay() + 1) / 7
-  );
-
-  return {
-    numero: numeroSemana,
-    año: lunes.getFullYear(),
-    fechaInicio: lunes.toISOString().split("T")[0],
-    fechaFin: sabado.toISOString().split("T")[0],
   };
 };

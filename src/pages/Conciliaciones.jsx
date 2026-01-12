@@ -25,6 +25,8 @@ import { supabase } from "../config/supabase";
 
 // 4. Componentes compartidos
 import FiltrosConciliacion from "../components/conciliaciones/FiltrosConciliacion";
+import ModalConciliacionGenerada from "../components/conciliaciones/ModalConciliacionGenerada";
+import "../styles/modal-conciliacion.css";
 
 // 5. Componentes de Renta
 import TablaConciliacionRenta from "../components/conciliaciones/TablaConciliacionRenta";
@@ -36,7 +38,7 @@ import ResumenTotalesMaterial from "../components/conciliaciones/ResumenTotalesM
 
 // 7. Componentes comunes
 import BotonGenerarPDF from "../components/conciliaciones/BotonGenerarPDF";
-
+import { esSemanaCorriente } from "../utils/dateUtils";
 // 8. Icons
 import { Truck, Package } from "lucide-react";
 
@@ -62,6 +64,8 @@ const Conciliaciones = () => {
   const [conciliacionGenerada, setConciliacionGenerada] = useState(null);
   const [datosParaPDF, setDatosParaPDF] = useState(null);
   const [mostrarModalSemanaActual, setMostrarModalSemanaActual] =
+    useState(false);
+  const [mostrarModalConciliacion, setMostrarModalConciliacion] =
     useState(false);
 
   // Seleccionar el hook activo según el tab
@@ -97,16 +101,6 @@ const Conciliaciones = () => {
         materialHook.loadSemanas?.();
       }
     }, 100);
-  };
-
-  /**
-   * Verificar si la semana seleccionada incluye la fecha actual
-   */
-  const esSemanaCorriente = (semana) => {
-    const hoy = new Date();
-    const inicio = new Date(semana.fechaInicio); // ← cambio aquí
-    const fin = new Date(semana.fechaFin); // ← cambio aquí
-    return hoy >= inicio && hoy <= fin;
   };
 
   /**
@@ -167,10 +161,11 @@ const Conciliaciones = () => {
         setConciliacionGenerada(conciliacionCompleta);
         setDatosParaPDF(datosGuardados);
 
-        setMensaje({
-          tipo: "success",
-          texto: `Conciliación generada exitosamente: ${resultado.data.folio}`,
-        });
+        // Abrir modal en lugar de mostrar mensaje
+        setMostrarModalConciliacion(true);
+
+        // Limpiar mensaje
+        setMensaje({ tipo: "", texto: "" });
       } else {
         throw new Error(resultado.error);
       }
@@ -323,11 +318,11 @@ const Conciliaciones = () => {
               />
             )}
 
-            {/* Botones de acción */}
+            {/* Botón de generar */}
             <div className="conciliaciones-actions">
-              {!conciliacionGenerada ? (
-                Object.keys(hookActivo.vistaPrevia.valesAgrupados || {})
-                  .length > 0 && (
+              {Object.keys(hookActivo.vistaPrevia.valesAgrupados || {}).length >
+                0 &&
+                !conciliacionGenerada && (
                   <button
                     onClick={handleGenerar}
                     disabled={generando}
@@ -336,15 +331,7 @@ const Conciliaciones = () => {
                   >
                     {generando ? "Generando..." : "Generar Conciliación"}
                   </button>
-                )
-              ) : (
-                <BotonGenerarPDF
-                  conciliacion={conciliacionGenerada}
-                  valesAgrupados={datosParaPDF.valesAgrupados}
-                  totales={datosParaPDF.totalesGenerales}
-                  tipoConciliacion={tabActivo}
-                />
-              )}
+                )}
             </div>
           </>
         )}
@@ -398,6 +385,22 @@ const Conciliaciones = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de conciliación generada */}
+      {mostrarModalConciliacion && conciliacionGenerada && (
+        <ModalConciliacionGenerada
+          isOpen={mostrarModalConciliacion}
+          onClose={() => {
+            setMostrarModalConciliacion(false);
+            setConciliacionGenerada(null);
+            setDatosParaPDF({ valesAgrupados: null, totalesGenerales: null });
+          }}
+          conciliacion={conciliacionGenerada}
+          valesAgrupados={datosParaPDF.valesAgrupados}
+          totales={datosParaPDF.totalesGenerales}
+          tipoConciliacion={tabActivo}
+        />
       )}
     </div>
   );
