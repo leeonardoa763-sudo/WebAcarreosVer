@@ -214,4 +214,29 @@
   .modal-footer button {
     width: 100%;
   }
+  /* Botón cerrar deshabilitado */
+  .btn--secondary:disabled {
+    background-color: #e5e7eb;
+    color: #9ca3af;
+    cursor: not-allowed;
+    border: 1px solid #d1d5db;
+  }
+
+  .btn--secondary:disabled:hover {
+    background-color: #e5e7eb;
+    transform: none;
+  }
+
+  /* Mensaje en botón cerrar cuando está deshabilitado */
+  .btn--secondary {
+    white-space: nowrap;
+    transition: all 0.3s ease;
+  }
+
+  @media (max-width: 640px) {
+    .btn--secondary {
+      white-space: normal;
+      text-align: center;
+    }
+  }
 }

@@ -33,10 +33,10 @@ import ValeFilters from "../components/vales/ValeFilters";
 // 6. Estilos
 import "../styles/vales.css";
 
-// Constantes de pestañas
+// Constantes de pestañas (Renta primero)
 const TABS = [
-  { id: "material", label: "Material", icon: Package },
   { id: "renta", label: "Renta", icon: Truck },
+  { id: "material", label: "Material", icon: Package },
 ];
 
 const Vales = () => {
@@ -54,8 +54,8 @@ const Vales = () => {
   // Estado local para mostrar/ocultar filtros
   const [showFilters, setShowFilters] = useState(false);
 
-  // Estado para pestaña activa
-  const [activeTab, setActiveTab] = useState("material");
+  // Estado para pestaña activa (Renta por defecto)
+  const [activeTab, setActiveTab] = useState("renta");
 
   /**
    * Manejar búsqueda por término

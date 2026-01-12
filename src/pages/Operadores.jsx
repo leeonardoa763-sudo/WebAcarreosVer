@@ -105,17 +105,6 @@ const Operadores = () => {
           <button
             type="button"
             role="tab"
-            aria-selected={pestañaActiva === "material"}
-            aria-controls="panel-material"
-            className={`operadores-tabs__tab ${pestañaActiva === "material" ? "operadores-tabs__tab--active" : ""}`}
-            onClick={() => cambiarPestaña("material")}
-          >
-            <Package size={20} aria-hidden="true" />
-            <span>Material</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
             aria-selected={pestañaActiva === "renta"}
             aria-controls="panel-renta"
             className={`operadores-tabs__tab ${pestañaActiva === "renta" ? "operadores-tabs__tab--active" : ""}`}
@@ -123,6 +112,17 @@ const Operadores = () => {
           >
             <Truck size={20} aria-hidden="true" />
             <span>Renta</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={pestañaActiva === "material"}
+            aria-controls="panel-material"
+            className={`operadores-tabs__tab ${pestañaActiva === "material" ? "operadores-tabs__tab--active" : ""}`}
+            onClick={() => cambiarPestaña("material")}
+          >
+            <Package size={20} aria-hidden="true" />
+            <span>Material</span>
           </button>
         </div>
       </header>

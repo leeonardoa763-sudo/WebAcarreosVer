@@ -8,7 +8,7 @@
  */
 
 // 1. React y hooks
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 // 2. Icons
 import { CheckCircle, Download, X } from "lucide-react";
@@ -27,15 +27,17 @@ const ModalConciliacionGenerada = ({
   totales,
   tipoConciliacion,
 }) => {
-  // Cerrar con tecla ESC
+  const [pdfDescargado, setPdfDescargado] = useState(false);
   useEffect(() => {
     const handleEsc = (e) => {
-      if (e.key === "Escape") onClose();
+      // Solo permitir cerrar con ESC si ya se descargó el PDF
+      if (e.key === "Escape" && pdfDescargado) {
+        onClose();
+      }
     };
 
     if (isOpen) {
       document.addEventListener("keydown", handleEsc);
-      // Prevenir scroll del body cuando el modal está abierto
       document.body.style.overflow = "hidden";
     }
 
@@ -43,12 +45,12 @@ const ModalConciliacionGenerada = ({
       document.removeEventListener("keydown", handleEsc);
       document.body.style.overflow = "unset";
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, pdfDescargado]);
 
   if (!isOpen || !conciliacion) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={(e) => e.stopPropagation()}>
       <div
         className="modal-content modal-content--success"
         onClick={(e) => e.stopPropagation()}
@@ -63,14 +65,6 @@ const ModalConciliacionGenerada = ({
             />
             <h3>¡Conciliación Generada Exitosamente!</h3>
           </div>
-          <button
-            onClick={onClose}
-            className="modal-close-button"
-            aria-label="Cerrar modal"
-            type="button"
-          >
-            <X size={24} />
-          </button>
         </div>
 
         {/* Body del modal */}
@@ -146,8 +140,13 @@ const ModalConciliacionGenerada = ({
             onClick={onClose}
             className="btn btn--secondary"
             type="button"
+            disabled={!pdfDescargado}
+            style={{
+              opacity: pdfDescargado ? 1 : 0.5,
+              cursor: pdfDescargado ? "pointer" : "not-allowed",
+            }}
           >
-            Cerrar
+            {pdfDescargado ? "Cerrar" : "Descarga el PDF para continuar"}
           </button>
 
           <BotonGenerarPDF
@@ -158,6 +157,7 @@ const ModalConciliacionGenerada = ({
             customIcon={<Download size={20} />}
             customText="Descargar PDF"
             customClassName="btn btn--primary btn--download-pdf"
+            onPdfGenerado={() => setPdfDescargado(true)}
           />
         </div>
       </div>

@@ -26,8 +26,11 @@ const BotonGenerarPDF = ({
   conciliacion,
   valesAgrupados,
   totales,
-  disabled,
   tipoConciliacion,
+  customIcon,
+  customText,
+  customClassName,
+  onPdfGenerado,
 }) => {
   const [generando, setGenerando] = useState(false);
 
@@ -80,10 +83,17 @@ const BotonGenerarPDF = ({
         );
       }
 
-      // Recargar página después de generar PDF
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      // Llamar callback si existe
+      if (onPdfGenerado) {
+        onPdfGenerado();
+      }
+
+      // Recargar página después de generar PDF (solo si NO hay callback)
+      if (!onPdfGenerado) {
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      }
     } catch (error) {
       console.error("Error al generar PDF:", error);
       alert("Error al generar PDF");
@@ -95,11 +105,16 @@ const BotonGenerarPDF = ({
   return (
     <button
       onClick={handleGenerar}
-      disabled={disabled || generando}
-      className="btn btn--secondary"
+      disabled={generando}
+      className={customClassName || "btn btn--secondary"}
+      style={
+        customClassName
+          ? undefined
+          : { display: "flex", alignItems: "center", gap: "8px" }
+      }
     >
-      <FileText size={18} />
-      {generando ? "Generando PDF..." : "Descargar PDF"}
+      {customIcon || <FileText size={18} />}
+      {generando ? "Generando PDF..." : customText || "Descargar PDF"}
     </button>
   );
 };

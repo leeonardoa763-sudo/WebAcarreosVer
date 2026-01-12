@@ -56,7 +56,8 @@ const VerificarVales = () => {
   const [step, setStep] = useState("upload"); // upload, extracting, preview, verifying, success
   const [successMessage, setSuccessMessage] = useState(null);
   const [batchResults, setBatchResults] = useState(null);
-  const [showBatchUpload, setShowBatchUpload] = useState(false);
+  // Inicializado en true para mostrar solo opción masiva
+  const [showBatchUpload, setShowBatchUpload] = useState(true);
 
   const handleFileSelect = async (file) => {
     setStep("extracting");
@@ -159,23 +160,23 @@ const VerificarVales = () => {
 
   return (
     <div className="verificar-vales__main">
-      {/* Botón para alternar entre individual y masivo */}
-      {step === "upload" && (
-        <div className="verificar-vales__mode-toggle">
-          <button
-            onClick={() => setShowBatchUpload(false)}
-            className={`verificar-vales__mode-btn ${!showBatchUpload ? "verificar-vales__mode-btn--active" : ""}`}
-          >
-            Individual
-          </button>
-          <button
-            onClick={() => setShowBatchUpload(true)}
-            className={`verificar-vales__mode-btn ${showBatchUpload ? "verificar-vales__mode-btn--active" : ""}`}
-          >
-            Masivo
-          </button>
-        </div>
-      )}
+      {/* TOGGLE COMENTADO - Solo mostrar masivo por ahora */}
+      {/* {step === "upload" && (
+  <div className="verificar-vales__mode-toggle">
+    <button
+      onClick={() => setShowBatchUpload(false)}
+      className={`verificar-vales__mode-btn ${!showBatchUpload ? "verificar-vales__mode-btn--active" : ""}`}
+    >
+      Individual
+    </button>
+    <button
+      onClick={() => setShowBatchUpload(true)}
+      className={`verificar-vales__mode-btn ${showBatchUpload ? "verificar-vales__mode-btn--active" : ""}`}
+    >
+      Masivo
+    </button>
+  </div>
+)} */}
 
       {step === "upload" && !showBatchUpload && (
         <UploadZone onFileSelect={handleFileSelect} disabled={processing} />

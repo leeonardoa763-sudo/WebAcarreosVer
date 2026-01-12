@@ -17,8 +17,8 @@
 import { useState } from "react";
 
 export const useOperadoresState = () => {
-  // Estado de pestaña activa
-  const [pestañaActiva, setPestañaActiva] = useState("material");
+  // Estado de pestaña activa (Renta por defecto)
+  const [pestañaActiva, setPestañaActiva] = useState("renta");
 
   // Datos agrupados
   const [datosAgrupados, setDatosAgrupados] = useState({
