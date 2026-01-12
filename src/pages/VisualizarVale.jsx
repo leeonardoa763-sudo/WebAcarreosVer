@@ -62,11 +62,31 @@ const VisualizarVale = () => {
   /**
    * Cargar datos del vale desde BD
    */
+  /**
+   * Cargar datos del vale desde BD
+   * CON: Timeout, retry automático, y mejor manejo de errores para móviles
+   */
   useEffect(() => {
+    let isMounted = true;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+    const TIMEOUT_MS = 10000; // 10 segundos
+
     const fetchVale = async () => {
       try {
         setLoading(true);
         setError(null);
+
+        console.log(
+          `[VisualizarVale] Intentando cargar vale: ${folio} (intento ${retryCount + 1}/${MAX_RETRIES + 1})`
+        );
+
+        // Crear controlador de timeout para móviles
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          console.log("[VisualizarVale] ⏱️ Timeout alcanzado, abortando...");
+          controller.abort();
+        }, TIMEOUT_MS);
 
         const { data, error: fetchError } = await supabase
           .from("vales")
@@ -74,15 +94,15 @@ const VisualizarVale = () => {
             `
             *,
             total_descargas_web,
-                obras:id_obra (
-                id_obra,
-                obra,
-                cc,
-                empresas:id_empresa (
-                    empresa,
-                    sufijo,
-                    logo
-                )
+            obras:id_obra (
+              id_obra,
+              obra,
+              cc,
+              empresas:id_empresa (
+                empresa,
+                sufijo,
+                logo
+              )
             ),
             operadores:id_operador (
               id_operador,
@@ -146,9 +166,36 @@ const VisualizarVale = () => {
           `
           )
           .eq("folio", folio)
+          .abortSignal(controller.signal)
           .single();
 
+        // Limpiar timeout si la petición terminó antes
+        clearTimeout(timeoutId);
+
         if (fetchError) {
+          // Detectar si fue timeout
+          const isTimeout =
+            fetchError.message?.includes("aborted") ||
+            fetchError.message?.includes("timeout") ||
+            fetchError.name === "AbortError";
+
+          // Si fue timeout y aún hay reintentos disponibles
+          if (isTimeout && retryCount < MAX_RETRIES) {
+            retryCount++;
+            console.log(
+              `⚠️ Timeout detectado, reintentando en ${retryCount} segundos...`
+            );
+
+            // Esperar más tiempo en cada reintento (1s, 2s, 3s)
+            setTimeout(() => {
+              if (isMounted) {
+                fetchVale();
+              }
+            }, 1000 * retryCount);
+            return;
+          }
+
+          // Si no hay más reintentos o es otro tipo de error
           console.error("[VisualizarVale] Error en query:", fetchError);
           throw fetchError;
         }
@@ -159,22 +206,49 @@ const VisualizarVale = () => {
           return;
         }
 
-        console.log("[VisualizarVale] Vale encontrado:", data.folio);
-        setVale(data);
+        console.log("[VisualizarVale] ✅ Vale encontrado:", data.folio);
 
-        // Registrar acceso (sin esperar respuesta)
-        registrarAcceso(data.id_vale);
+        // Solo actualizar estado si el componente sigue montado
+        if (isMounted) {
+          setVale(data);
+          // Registrar acceso (sin esperar respuesta)
+          registrarAcceso(data.id_vale);
+        }
       } catch (error) {
         console.error("[VisualizarVale] Error al cargar vale:", error);
-        setError("Error al cargar el vale. Intente nuevamente.");
+
+        // Solo actualizar estado si el componente sigue montado
+        if (isMounted) {
+          // Mensajes de error más específicos
+          if (
+            error.name === "AbortError" ||
+            error.message?.includes("aborted")
+          ) {
+            setError(
+              "La conexión está tardando demasiado. Por favor, verifica tu conexión a internet y vuelve a escanear el código QR."
+            );
+          } else if (error.code === "PGRST116") {
+            setError("Vale no encontrado en el sistema.");
+          } else {
+            setError("Error al cargar el vale. Por favor, intenta nuevamente.");
+          }
+        }
       } finally {
-        setLoading(false);
+        // Solo actualizar loading si el componente sigue montado
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     if (folio) {
       fetchVale();
     }
+
+    // Cleanup: prevenir actualizaciones de estado en componente desmontado
+    return () => {
+      isMounted = false;
+    };
   }, [folio]);
 
   /**

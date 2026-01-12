@@ -8,6 +8,48 @@
  */
 
 /* ========================================
+   FIX CRÍTICO PARA MÓVILES
+   ======================================== */
+
+/* Prevenir zoom automático en iOS cuando se enfoca un input */
+input,
+select,
+textarea,
+button {
+  font-size: 16px !important;
+}
+
+/* Mejorar scroll suave en móviles (especialmente iOS) */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Fix para altura real del viewport en móviles */
+html,
+body {
+  height: 100%;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+}
+
+/* Fix específico para Safari iOS */
+@supports (-webkit-touch-callout: none) {
+  html,
+  body {
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Prevenir comportamientos extraños del touch en móviles */
+button,
+a,
+.btn-volver,
+.btn-descargar {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  touch-action: manipulation;
+}
+
+/* ========================================
    PÁGINA PRINCIPAL
    ======================================== */
 
@@ -33,6 +75,14 @@
   overflow: hidden;
   position: relative;
   animation: slideIn 0.3s ease-out;
+  /* Fix para móviles pequeños */
+  margin: 0 auto;
+
+  /* Ajuste responsive para pantallas muy pequeñas */
+  @media (max-width: 380px) {
+    max-width: 95%;
+    border-radius: 8px;
+  }
 }
 
 @keyframes slideIn {
