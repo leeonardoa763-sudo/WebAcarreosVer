@@ -18,6 +18,9 @@ import { useState, useEffect, useCallback } from "react";
 // 2. Hooks personalizados
 import { useAuth } from "./useAuth";
 
+// 2.5. Config
+import { supabase } from "../config/supabase";
+
 // 3. Módulos de vales
 import {
   initialValesState,
@@ -41,6 +44,12 @@ export const useVales = () => {
 
   // Estados de catálogos
   const [obras, setObras] = useState(initialCatalogosState.obras);
+  const [materiales, setMateriales] = useState(
+    initialCatalogosState.materiales
+  );
+  const [sindicatos, setSindicatos] = useState(
+    initialCatalogosState.sindicatos
+  );
   const [loadingCatalogos, setLoadingCatalogos] = useState(
     initialCatalogosState.loadingCatalogos
   );
@@ -60,6 +69,42 @@ export const useVales = () => {
     setObras(result.data);
     setLoadingCatalogos(false);
   }, [fetchObras]);
+
+  /**
+   * Cargar catálogo de materiales
+   */
+  const loadMateriales = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("material")
+        .select("id_material, material, id_tipo_de_material")
+        .order("material");
+
+      if (error) throw error;
+      setMateriales(data || []);
+    } catch (error) {
+      console.error("Error al cargar materiales:", error);
+      setMateriales([]);
+    }
+  }, []);
+
+  /**
+   * Cargar catálogo de sindicatos
+   */
+  const loadSindicatos = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("sindicatos")
+        .select("id_sindicato, sindicato")
+        .order("sindicato");
+
+      if (error) throw error;
+      setSindicatos(data || []);
+    } catch (error) {
+      console.error("Error al cargar sindicatos:", error);
+      setSindicatos([]);
+    }
+  }, []);
 
   /**
    * Obtener vales con filtros (sin paginación)
@@ -95,7 +140,8 @@ export const useVales = () => {
     applyFilters,
     filters.searchTerm,
     filters.id_obra,
-    filters.tipo_vale,
+    filters.id_material,
+    filters.id_sindicato,
     filters.estado,
     filters.fecha_inicio,
     filters.fecha_fin,
@@ -123,7 +169,9 @@ export const useVales = () => {
    */
   useEffect(() => {
     loadObras();
-  }, [loadObras]);
+    loadMateriales();
+    loadSindicatos(); // ← AGREGAR
+  }, [loadObras, loadMateriales, loadSindicatos]); // ← AGREGAR loadSindicatos
 
   /**
    * Efecto para cargar vales cuando cambian filtros
@@ -136,7 +184,8 @@ export const useVales = () => {
   }, [
     filters.searchTerm,
     filters.id_obra,
-    filters.tipo_vale,
+    filters.id_material,
+    filters.id_sindicato,
     filters.estado,
     filters.fecha_inicio,
     filters.fecha_fin,
@@ -147,6 +196,8 @@ export const useVales = () => {
     // Datos
     vales,
     obras,
+    materiales,
+    sindicatos,
     loading,
     loadingCatalogos,
     error,

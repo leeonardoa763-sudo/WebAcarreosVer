@@ -127,6 +127,7 @@ const VisualizarVale = () => {
               peso_ton,
               volumen_real_m3,
               folio_banco,
+              requisicion,
               precio_m3,
               costo_total,
               tarifa_primer_km,
@@ -581,6 +582,11 @@ const DetallesMaterial = ({ detalle }) => {
         <span className="info-value">
           {formatearVolumen(detalle.cantidad_pedida_m3)}
         </span>
+      </div>
+
+      <div className="info-row">
+        <span className="info-label">Requisición:</span>
+        <span className="info-value">{detalle.requisicion || "N/A"}</span>
       </div>
 
       {detalle.folio_banco && (

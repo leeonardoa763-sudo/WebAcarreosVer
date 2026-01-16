@@ -45,6 +45,7 @@ export const useValesQueries = () => {
           id_operador,
           nombre_completo,
           sindicatos:id_sindicato (
+            id_sindicato,
             sindicato
           )
         ),
@@ -67,6 +68,7 @@ export const useValesQueries = () => {
           precio_m3,
           costo_total,
           folio_banco,
+          requisicion,
           notas_adicionales,
           material:id_material (
             id_material,
@@ -159,6 +161,7 @@ export const useValesQueries = () => {
             id_operador,
             nombre_completo,
             sindicatos:id_sindicato (
+              id_sindicato,
               sindicato
             )
           ),

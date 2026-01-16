@@ -7,7 +7,7 @@
  * - Estados principales (vales, loading, error)
  * - Estados de filtros
  * - Estados de paginación
- * - Catálogos (obras)
+ * - Catálogos (obras, materiales)
  *
  * Usado en: useVales.js
  */
@@ -27,7 +27,8 @@ export const initialValesState = {
 export const initialFiltersState = {
   searchTerm: "", // Búsqueda por folio, operador o placas
   id_obra: null,
-  tipo_vale: null, // 'material' o 'renta'
+  id_material: null, // ID del material a filtrar
+  id_sindicato: null,
   estado: null, // 'borrador', 'emitido', 'verificado', 'pagado'
   fecha_inicio: null,
   fecha_fin: null,
@@ -48,6 +49,8 @@ export const initialPaginationState = {
  */
 export const initialCatalogosState = {
   obras: [],
+  materiales: [],
+  sindicatos: [],
   loadingCatalogos: true,
 };
 

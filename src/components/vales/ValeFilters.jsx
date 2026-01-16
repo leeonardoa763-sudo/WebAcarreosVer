@@ -5,7 +5,8 @@
  *
  * Funcionalidades:
  * - Filtro por obra
- * - Filtro por tipo de vale (material/renta)
+ * - Filtro por material
+ * - Filtro por sindicato (solo ADMINISTRADOR)
  * - Filtro por estado
  * - Filtro por rango de fechas
  * - Aplicar y limpiar filtros
@@ -18,9 +19,10 @@
 import { useState, useEffect } from "react";
 
 // 2. Icons
-import { Building2, FileType, AlertCircle, Calendar } from "lucide-react";
+import { Building2, AlertCircle, Calendar, Package, Users } from "lucide-react";
 
 // 3. Hooks personalizados
+import { useAuth } from "../../hooks/useAuth";
 import { useVales } from "../../hooks/useVales";
 
 // 4. Utils
@@ -30,12 +32,14 @@ import { formatearFechaInput } from "../../utils/formatters";
 import { colors } from "../../config/colors";
 
 const ValeFilters = ({ filters, updateFilters, onClose }) => {
-  const { obras, loadingCatalogos } = useVales();
+  const { userProfile } = useAuth();
+  const { obras, materiales, sindicatos, loadingCatalogos } = useVales();
 
   // Estados locales para formulario
   const [localFilters, setLocalFilters] = useState({
     id_obra: filters.id_obra || "",
-    tipo_vale: filters.tipo_vale || "",
+    id_material: filters.id_material || "",
+    id_sindicato: filters.id_sindicato || "",
     estado: filters.estado || "",
     fecha_inicio: filters.fecha_inicio
       ? formatearFechaInput(filters.fecha_inicio)
@@ -50,12 +54,6 @@ const ValeFilters = ({ filters, updateFilters, onClose }) => {
     { value: "emitido", label: "Emitido" },
     { value: "verificado", label: "Verificado" },
     { value: "pagado", label: "Pagado" },
-  ];
-
-  // Tipos de vale
-  const tipos = [
-    { value: "material", label: "Material" },
-    { value: "renta", label: "Renta" },
   ];
 
   /**
@@ -86,7 +84,12 @@ const ValeFilters = ({ filters, updateFilters, onClose }) => {
     // Convertir valores vacíos a null
     const filtersToApply = {
       id_obra: localFilters.id_obra ? parseInt(localFilters.id_obra) : null,
-      tipo_vale: localFilters.tipo_vale || null,
+      id_material: localFilters.id_material
+        ? parseInt(localFilters.id_material)
+        : null,
+      id_sindicato: localFilters.id_sindicato
+        ? parseInt(localFilters.id_sindicato)
+        : null,
       estado: localFilters.estado || null,
       fecha_inicio: localFilters.fecha_inicio || null,
       fecha_fin: localFilters.fecha_fin || null,
@@ -102,7 +105,8 @@ const ValeFilters = ({ filters, updateFilters, onClose }) => {
   const handleClearLocal = () => {
     setLocalFilters({
       id_obra: "",
-      tipo_vale: "",
+      id_material: "",
+      id_sindicato: "",
       estado: "",
       fecha_inicio: "",
       fecha_fin: "",
@@ -115,7 +119,8 @@ const ValeFilters = ({ filters, updateFilters, onClose }) => {
   useEffect(() => {
     setLocalFilters({
       id_obra: filters.id_obra || "",
-      tipo_vale: filters.tipo_vale || "",
+      id_material: filters.id_material || "",
+      id_sindicato: filters.id_sindicato || "",
       estado: filters.estado || "",
       fecha_inicio: filters.fecha_inicio
         ? formatearFechaInput(filters.fecha_inicio)
@@ -126,7 +131,8 @@ const ValeFilters = ({ filters, updateFilters, onClose }) => {
     });
   }, [
     filters.id_obra,
-    filters.tipo_vale,
+    filters.id_material,
+    filters.id_sindicato,
     filters.estado,
     filters.fecha_inicio,
     filters.fecha_fin,
@@ -162,27 +168,58 @@ const ValeFilters = ({ filters, updateFilters, onClose }) => {
           </select>
         </div>
 
-        {/* Filtro por Tipo de Vale */}
+        {/* Filtro por Material */}
         <div className="vale-filters__field">
-          <label htmlFor="filter-tipo-vale" className="vale-filters__label">
-            <FileType size={16} aria-hidden="true" />
-            <span>Tipo de Vale</span>
+          <label htmlFor="filter-material" className="vale-filters__label">
+            <Package size={16} aria-hidden="true" />
+            <span>Material</span>
           </label>
           <select
-            id="filter-tipo-vale"
-            value={localFilters.tipo_vale}
-            onChange={(e) => handleInputChange("tipo_vale", e.target.value)}
+            id="filter-material"
+            value={localFilters.id_material}
+            onChange={(e) => handleInputChange("id_material", e.target.value)}
             className="vale-filters__select"
-            aria-label="Seleccionar tipo de vale para filtrar"
+            disabled={loadingCatalogos}
+            aria-label="Seleccionar material para filtrar"
           >
-            <option value="">Todos los tipos</option>
-            {tipos.map((tipo) => (
-              <option key={tipo.value} value={tipo.value}>
-                {tipo.label}
+            <option value="">Todos los materiales</option>
+            {materiales.map((material) => (
+              <option key={material.id_material} value={material.id_material}>
+                {material.material}
               </option>
             ))}
           </select>
         </div>
+
+        {/* Filtro por Sindicato - Solo para ADMINISTRADOR */}
+        {userProfile?.roles?.role === "Administrador" && (
+          <div className="vale-filters__field">
+            <label htmlFor="filter-sindicato" className="vale-filters__label">
+              <Users size={16} aria-hidden="true" />
+              <span>Sindicato</span>
+            </label>
+            <select
+              id="filter-sindicato"
+              value={localFilters.id_sindicato}
+              onChange={(e) =>
+                handleInputChange("id_sindicato", e.target.value)
+              }
+              className="vale-filters__select"
+              disabled={loadingCatalogos}
+              aria-label="Seleccionar sindicato para filtrar"
+            >
+              <option value="">Todos los sindicatos</option>
+              {sindicatos.map((sindicato) => (
+                <option
+                  key={sindicato.id_sindicato}
+                  value={sindicato.id_sindicato}
+                >
+                  {sindicato.sindicato}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Filtro por Estado */}
         <div className="vale-filters__field">

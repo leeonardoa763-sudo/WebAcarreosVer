@@ -153,6 +153,12 @@ export const generarPDFMaterialPublico = (valeData) => {
   doc.text(`${detalle.cantidad_pedida_m3 || "N/A"} m³`, marginLeft + 30, yPos);
   yPos += 4;
 
+  doc.setFont("helvetica", "bold");
+  doc.text("Requisición:", marginLeft, yPos);
+  doc.setFont("helvetica", "normal");
+  doc.text(detalle.requisicion || "N/A", marginLeft + 30, yPos);
+  yPos += 4;
+
   if (detalle.folio_banco) {
     doc.setFont("helvetica", "bold");
     doc.text("Folio Banco:", marginLeft, yPos);

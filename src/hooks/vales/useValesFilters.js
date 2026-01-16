@@ -5,7 +5,7 @@
  *
  * Funcionalidades:
  * - Aplicar filtros en el cliente
- * - Filtro por obra, tipo, estado, fechas
+ * - Filtro por obra, material, estado, fechas
  * - Búsqueda por folio, operador, placas, materiales
  * - Validación de filtros
  *
@@ -30,11 +30,33 @@ export const useValesFilters = () => {
       );
     }
 
-    // 2. Filtro por tipo de vale
-    if (filters.tipo_vale) {
-      filteredData = filteredData.filter(
-        (vale) => vale.tipo_vale === filters.tipo_vale
-      );
+    // 2. Filtro por material
+    if (filters.id_material) {
+      filteredData = filteredData.filter((vale) => {
+        // Para vales de material, buscar en vale_material_detalles
+        if (vale.tipo_vale === "material" && vale.vale_material_detalles) {
+          return vale.vale_material_detalles.some(
+            (detalle) => detalle.material?.id_material === filters.id_material
+          );
+        }
+        // Para vales de renta, buscar en vale_renta_detalle
+        if (vale.tipo_vale === "renta" && vale.vale_renta_detalle) {
+          return vale.vale_renta_detalle.some(
+            (detalle) => detalle.material?.id_material === filters.id_material
+          );
+        }
+        return false;
+      });
+    }
+
+    // 3. Filtro por sindicato (solo para vales de renta)
+    if (filters.id_sindicato) {
+      filteredData = filteredData.filter((vale) => {
+        const resultado =
+          vale.operadores?.sindicatos?.id_sindicato === filters.id_sindicato;
+
+        return resultado;
+      });
     }
 
     // 3. Filtro por estado
@@ -119,7 +141,8 @@ export const useValesFilters = () => {
     return (
       filters.searchTerm ||
       filters.id_obra ||
-      filters.tipo_vale ||
+      filters.id_material ||
+      filters.id_sindicato || // ← AGREGAR
       filters.estado ||
       filters.fecha_inicio ||
       filters.fecha_fin

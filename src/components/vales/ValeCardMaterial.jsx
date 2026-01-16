@@ -293,6 +293,16 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                         </span>
                       </div>
 
+                      {/* Requisición */}
+                      <div className="vale-card__detalle-item-small">
+                        <span className="vale-card__detalle-label">
+                          Requisición:
+                        </span>
+                        <span className="vale-card__detalle-value">
+                          {detalle.requisicion || "N/A"}
+                        </span>
+                      </div>
+
                       {/* Precio por M³ */}
                       <div className="vale-card__detalle-item-small">
                         <span className="vale-card__detalle-label">
