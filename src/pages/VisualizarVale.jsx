@@ -60,12 +60,25 @@ const VisualizarVale = () => {
   const [downloadingPDF, setDownloadingPDF] = useState(false);
 
   /**
-   * Cargar datos del vale desde BD
+   * Obtener clase de fondo según estado del vale
+   * Aplica colores distintivos para identificación rápida:
+   * - en_proceso: rojo
+   * - emitido: azul
+   * - verificado: amarillo
    */
+  const getBackgroundClass = (estado) => {
+    const backgroundClasses = {
+      en_proceso: "bg-estado-proceso",
+      emitido: "bg-estado-emitido",
+      verificado: "bg-estado-verificado",
+    };
+    return backgroundClasses[estado] || "";
+  };
+
   /**
    * Cargar datos del vale desde BD
-   * CON: Timeout, retry automático, y mejor manejo de errores para móviles
    */
+
   useEffect(() => {
     let isMounted = true;
     let retryCount = 0;
@@ -353,7 +366,7 @@ const VisualizarVale = () => {
   const badgeTipo = getBadgeTipo(vale.tipo_vale);
 
   return (
-    <div className="visualizar-vale-page">
+    <div className={`visualizar-vale-page ${getBackgroundClass(vale.estado)}`}>
       <div className="visualizar-vale-container">
         {/* MARCA DE AGUA */}
         <div className="marca-agua">

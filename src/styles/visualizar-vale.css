@@ -364,6 +364,33 @@ a,
 }
 
 /* ========================================
+   FONDOS POR ESTADO DEL VALE
+   ======================================== */
+
+/*
+ * Clases para cambiar el fondo de toda la página según el estado del vale
+ * - en_proceso: Fondo rojo (vale en proceso de elaboración)
+ * - emitido: Fondo azul (vale emitido y listo para verificación)
+ * - verificado: Fondo amarillo/dorado (vale verificado por sindicato)
+ */
+
+.visualizar-vale-page.bg-estado-proceso {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+}
+
+.visualizar-vale-page.bg-estado-emitido {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+}
+
+.visualizar-vale-page.bg-estado-verificado {
+  background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%);
+}
+
+/* 
+ * Nota: Los estados borrador y pagado mantienen el gradiente púrpura por defecto
+ */
+
+/* ========================================
    RESPONSIVE
    ======================================== */
 
