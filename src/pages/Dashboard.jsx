@@ -1,120 +1,81 @@
 /**
  * src/pages/Dashboard.jsx
  *
- * Vista principal del dashboard administrativo
+ * Vista principal del dashboard administrativo (MEJORADA)
  *
- * Muestra estadísticas generales de vales emitidos
- * Historial de conciliaciones generadas
+ * Muestra:
+ * - Métricas principales en cards (Total vales, M³, Horas, Valor total)
+ * - Gráfica de tendencia mensual con indicador de incremento/decremento
+ * - Distribución por obras (top 5)
+ * - Distribución por tipo (Material vs Renta)
+ * - Top 5 materiales más solicitados
+ * - Sección de conciliaciones recientes
  *
  * Acceso: Solo ADMINISTRADOR, FINANZAS, SINDICATO
  */
 
 // 1. React y hooks
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // 2. Icons
-import { FileText, Calendar, TrendingUp, CalendarDays } from "lucide-react";
+import { FileText, Truck, Clock, DollarSign, RefreshCw } from "lucide-react";
 
 // 3. Config
-import { supabase } from "../config/supabase";
+import { colors } from "../config/colors";
 
 // 4. Hooks personalizados
 import { useAuth } from "../hooks/useAuth";
+import { useDashboardAnalytics } from "../hooks/useDashboardAnalytics";
 
 // 5. Componentes
-import StatsCard from "../components/dashboard/StatsCard";
-import SeccionConciliaciones from "../components/dashboard/SeccionConciliaciones"; // 👈 NUEVO
+import MetricCard from "../components/dashboard/MetricCard";
+import GraficaTendenciaMensual from "../components/dashboard/GraficaTendenciaMensual";
+import GraficaDistribucionObras from "../components/dashboard/GraficaDistribucionObras";
+import GraficaTipoVales from "../components/dashboard/GraficaTipoVales";
+import GraficaTopMateriales from "../components/dashboard/GraficaTopMateriales";
+import SeccionConciliaciones from "../components/dashboard/SeccionConciliaciones";
 
 // 6. Estilos
 import "../styles/dashboard.css";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { userProfile, canViewAllVales } = useAuth();
-  const [stats, setStats] = useState({
-    totalVales: 0,
-    valesHoy: 0,
-    valesSemana: 0,
-    valesMes: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { userProfile } = useAuth();
+
+  // Hook de analytics
+  const {
+    metricas,
+    tendenciaMensual,
+    distribucionObras,
+    distribucionTipo,
+    topMateriales,
+    periodoTendencia,
+    obrasDisponibles,
+    obraSeleccionadaMateriales,
+    loading,
+    error,
+    refresh,
+    cambiarPeriodo,
+    cambiarObraMateriales,
+  } = useDashboardAnalytics();
+
+  const [refreshing, setRefreshing] = useState(false);
 
   /**
-   * Obtener estadísticas de vales
+   * Refrescar datos del dashboard
    */
-  const fetchStats = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Fechas para filtros
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
-
-      const inicioSemana = new Date();
-      inicioSemana.setDate(hoy.getDate() - 7);
-
-      const inicioMes = new Date();
-      inicioMes.setDate(1);
-
-      // Query base
-      let query = supabase
-        .from("vales")
-        .select("id_vale, fecha_creacion", { count: "exact" });
-
-      // Filtrar por obra si no puede ver todos
-      if (!canViewAllVales() && userProfile?.id_current_obra) {
-        query = query.eq("id_obra", userProfile.id_current_obra);
-      }
-
-      // Total de vales
-      const { count: totalVales } = await query;
-
-      // Vales de hoy
-      const { count: valesHoy } = await query.gte(
-        "fecha_creacion",
-        hoy.toISOString()
-      );
-
-      // Vales de la semana
-      const { count: valesSemana } = await query.gte(
-        "fecha_creacion",
-        inicioSemana.toISOString()
-      );
-
-      // Vales del mes
-      const { count: valesMes } = await query.gte(
-        "fecha_creacion",
-        inicioMes.toISOString()
-      );
-
-      setStats({
-        totalVales: totalVales || 0,
-        valesHoy: valesHoy || 0,
-        valesSemana: valesSemana || 0,
-        valesMes: valesMes || 0,
-      });
-    } catch (error) {
-      console.error("Error en fetchStats:", error);
-      setError("No se pudieron cargar las estadísticas");
-    } finally {
-      setLoading(false);
-    }
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refresh();
+    setTimeout(() => setRefreshing(false), 500);
   };
-
-  useEffect(() => {
-    if (userProfile) {
-      fetchStats();
-    }
-  }, [userProfile?.id_persona, canViewAllVales()]);
 
   if (loading) {
     return (
       <div className="dashboard-loading">
         <div className="loading-spinner"></div>
-        <p>Cargando estadísticas...</p>
+        <p>Cargando dashboard...</p>
       </div>
     );
   }
@@ -123,45 +84,146 @@ const Dashboard = () => {
     return (
       <div className="dashboard-error">
         <p>{error}</p>
+        <button
+          onClick={handleRefresh}
+          style={{
+            marginTop: "16px",
+            padding: "12px 24px",
+            background: colors.primary,
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontSize: "14px",
+            fontWeight: 600,
+          }}
+        >
+          Reintentar
+        </button>
       </div>
     );
   }
 
   return (
     <div className="dashboard">
+      {/* Header con botón de refresh */}
       <div className="dashboard__header">
-        <h1 className="dashboard__title">Dashboard</h1>
-        <p className="dashboard__subtitle">Bienvenido, {userProfile?.nombre}</p>
+        <div>
+          <h1 className="dashboard__title">Dashboard</h1>
+          <p className="dashboard__subtitle">
+            Bienvenido, {userProfile?.nombre}
+          </p>
+        </div>
+
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          style={{
+            padding: "10px 20px",
+            background: refreshing ? "#e0e0e0" : "white",
+            border: `2px solid ${colors.primary}`,
+            borderRadius: "8px",
+            cursor: refreshing ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            color: colors.primary,
+            fontWeight: 600,
+            fontSize: "14px",
+            transition: "all 0.2s ease",
+          }}
+        >
+          <RefreshCw
+            size={18}
+            style={{
+              animation: refreshing ? "spin 1s linear infinite" : "none",
+            }}
+          />
+          Actualizar
+        </button>
       </div>
 
-      <div className="dashboard__stats">
-        <StatsCard
+      {/* ========================================
+          SECCIÓN 1: MÉTRICAS PRINCIPALES
+      ======================================== */}
+      <div className="dashboard__metrics-grid">
+        <MetricCard
           title="Total Vales"
-          value={stats.totalVales}
+          value={metricas.totalVales}
+          subtitle="Todos los tiempos"
           Icon={FileText}
-          color="#FF6B35"
+          color={colors.primary}
         />
-        <StatsCard
-          title="Hoy"
-          value={stats.valesHoy}
-          Icon={Calendar}
-          color="#004E89"
+
+        <MetricCard
+          title="M³ Totales"
+          value={metricas.totalM3}
+          subtitle="Material transportado"
+          Icon={Truck}
+          color={colors.secondary}
         />
-        <StatsCard
-          title="Esta Semana"
-          value={stats.valesSemana}
-          Icon={TrendingUp}
+
+        <MetricCard
+          title="Horas Renta"
+          value={metricas.totalHoras}
+          subtitle="Total de horas trabajadas"
+          Icon={Clock}
           color="#1A936F"
         />
-        <StatsCard
-          title="Este Mes"
-          value={stats.valesMes}
-          Icon={CalendarDays}
+
+        <MetricCard
+          title="Valor Total"
+          value={`$${(metricas.valorTotal / 1000).toFixed(1)}K`}
+          subtitle="MXN en vales emitidos"
+          Icon={DollarSign}
           color="#F59E0B"
         />
       </div>
 
-      {/* 👇 NUEVA SECCIÓN DE CONCILIACIONES */}
+      {/* ========================================
+          SECCIÓN 2: GRÁFICA DE TENDENCIA
+      ======================================== */}
+      <div style={{ marginTop: "32px" }}>
+        <GraficaTendenciaMensual
+          data={tendenciaMensual}
+          periodo={periodoTendencia}
+          onCambioPeriodo={cambiarPeriodo}
+        />
+      </div>
+
+      {/* ========================================
+          SECCIÓN 3: DISTRIBUCIONES
+      ======================================== */}
+      <div
+        style={{
+          marginTop: "32px",
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))",
+          gap: "24px",
+        }}
+      >
+        {/* Distribución por obras */}
+        <GraficaDistribucionObras data={distribucionObras} />
+
+        {/* Distribución por tipo */}
+        <GraficaTipoVales data={distribucionTipo} />
+      </div>
+
+      {/* ========================================
+          SECCIÓN 4: TOP MATERIALES
+      ======================================== */}
+      <div style={{ marginTop: "32px" }}>
+        <GraficaTopMateriales
+          data={topMateriales}
+          obras={obrasDisponibles}
+          obraSeleccionada={obraSeleccionadaMateriales}
+          onCambioObra={cambiarObraMateriales}
+        />
+      </div>
+
+      {/* ========================================
+          SECCIÓN 5: CONCILIACIONES RECIENTES
+      ======================================== */}
       <div style={{ marginTop: "32px" }}>
         <SeccionConciliaciones />
       </div>
