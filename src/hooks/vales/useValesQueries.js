@@ -104,7 +104,7 @@ export const useValesQueries = () => {
           )
         )
       `,
-      { count: "exact" }
+      { count: "exact" },
     );
   }, []);
 
@@ -124,7 +124,7 @@ export const useValesQueries = () => {
             empresa,
             sufijo
           )
-        `
+        `,
         )
         .order("obra", { ascending: true });
 
@@ -218,7 +218,7 @@ export const useValesQueries = () => {
               costo_dia
             )
           )
-        `
+        `,
         )
         .eq("id_vale", id_vale)
         .single();
@@ -297,7 +297,7 @@ export const useValesQueries = () => {
               costo_dia
             )
           )
-        `
+        `,
         )
         .eq("folio", folio)
         .single();

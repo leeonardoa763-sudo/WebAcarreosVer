@@ -1,0 +1,338 @@
+/**
+ * src/styles/notifications.css
+ * 
+ * Estilos para el sistema de notificaciones
+ * 
+ * Componentes estilizados:
+ * - Campanita con badge (notification-bell)
+ * - Dropdown de notificaciones (notification-dropdown)
+ * - Items individuales (notification-item)
+ * - Estados: loading, empty, unread
+ * 
+ * Siguiendo: BEM naming convention, variables de colores, responsive design
+ */
+
+/* ========================================
+   CAMPANITA DE NOTIFICACIONES
+======================================== */
+
+.notification-bell {
+  position: relative;
+}
+
+.notification-bell__button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #6b7280;
+}
+
+.notification-bell__button:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.notification-bell__badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 10px;
+  border: 2px solid #ffffff;
+}
+
+/* ========================================
+   DROPDOWN DE NOTIFICACIONES
+======================================== */
+
+.notification-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 380px;
+  max-height: 500px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header del dropdown */
+.notification-dropdown__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.notification-dropdown__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.notification-dropdown__count {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 12px;
+}
+
+.notification-dropdown__mark-all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.2s ease;
+}
+
+.notification-dropdown__mark-all:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+/* Lista de notificaciones */
+.notification-dropdown__list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+/* Estados especiales de la lista */
+.notification-dropdown__loading,
+.notification-dropdown__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.notification-dropdown__empty p {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* Footer del dropdown */
+.notification-dropdown__footer {
+  padding: 12px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.notification-dropdown__view-all {
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.notification-dropdown__view-all:hover {
+  background: #eff6ff;
+}
+
+/* ========================================
+   ITEM DE NOTIFICACIÓN
+======================================== */
+
+.notification-item {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.notification-item:hover {
+  background: #f9fafb;
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+/* Item no leído */
+.notification-item--unread {
+  background: #eff6ff;
+}
+
+.notification-item--unread:hover {
+  background: #dbeafe;
+}
+
+/* Icono del item */
+.notification-item__icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  color: #ffffff;
+}
+
+/* Contenido del item */
+.notification-item__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.notification-item__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.notification-item__folio {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.notification-item__tipo {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.notification-item__obra {
+  font-size: 13px;
+  color: #4b5563;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notification-item__time {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* Indicador de no leída */
+.notification-item__dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  background: #3b82f6;
+  border-radius: 50%;
+  margin-left: 8px;
+  align-self: center;
+}
+
+/* ========================================
+   SCROLLBAR PERSONALIZADA
+======================================== */
+
+.notification-dropdown__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.notification-dropdown__list::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+.notification-dropdown__list::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.notification-dropdown__list::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* ========================================
+   RESPONSIVE
+======================================== */
+
+@media (max-width: 640px) {
+  .notification-dropdown {
+    width: 320px;
+    max-height: 400px;
+  }
+
+  .notification-item {
+    padding: 12px;
+  }
+
+  .notification-item__icon {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* ========================================
+   ANIMACIÓN DE ENTRADA
+======================================== */
+
+.notification-dropdown {
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
