@@ -2,6 +2,7 @@
  * src/styles/vales.css
  * 
  * Estilos para página de vales con pestañas, agrupación por mes/semana y tarjetas compactas
+ * VERSIÓN PREMIUM con degradados y efectos modernos
  */
 
 /* ========================================
@@ -12,10 +13,29 @@
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .vales-page__header {
   margin-bottom: 24px;
+  padding: 28px;
+
+  /* Fondo con degradado elegante */
+  background: linear-gradient(135deg, #ffffff 0%, #f7fafc 100%);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .vales-page__title-section {
@@ -27,14 +47,20 @@
 .vales-page__title {
   font-size: 32px;
   font-weight: 700;
-  color: #2c3e50;
   margin: 0;
+
+  /* Texto con degradado de colores */
+  background: linear-gradient(135deg, #ff6b35 0%, #e74c3c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .vales-page__subtitle {
   font-size: 16px;
   color: #7f8c8d;
   margin: 0;
+  font-weight: 500;
 }
 
 /* ========================================
@@ -60,21 +86,42 @@
   font-size: 1rem;
   font-weight: 500;
   color: #6b7280;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.vales-tab::before {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  transition: all 0.3s ease;
 }
 
 .vales-tab:hover {
   color: #374151;
+  background: rgba(0, 0, 0, 0.02);
 }
 
 .vales-tab--active[data-type="material"] {
   color: #ff6b35;
-  border-bottom-color: #ff6b35;
+  font-weight: 600;
+}
+
+.vales-tab--active[data-type="material"]::before {
+  background: linear-gradient(90deg, #ff6b35 0%, #ff8a5b 100%);
 }
 
 .vales-tab--active[data-type="renta"] {
   color: #8b5cf6;
-  border-bottom-color: #8b5cf6;
+  font-weight: 600;
+}
+
+.vales-tab--active[data-type="renta"]::before {
+  background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%);
 }
 
 /* ========================================
@@ -108,15 +155,17 @@
   padding: 12px 48px 12px 48px;
   font-size: 15px;
   border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  transition: all 0.2s ease;
+  border-radius: 10px;
+  transition: all 0.3s ease;
   font-family: inherit;
+  background: #ffffff;
 }
 
 .vales-page__search-input:focus {
   outline: none;
   border-color: #ff6b35;
   box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+  transform: translateY(-1px);
 }
 
 .vales-page__search-clear {
@@ -148,24 +197,27 @@
   padding: 12px 20px;
   background: #ffffff;
   border: 2px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: 10px;
   color: #2c3e50;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   position: relative;
 }
 
 .vales-page__filter-button:hover {
   border-color: #ff6b35;
   color: #ff6b35;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
 }
 
 .vales-page__filter-button.active {
-  background: #ff6b35;
+  background: linear-gradient(135deg, #ff6b35 0%, #e74c3c 100%);
   border-color: #ff6b35;
   color: #ffffff;
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
 }
 
 .vales-page__filter-badge {
@@ -188,18 +240,19 @@
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
-  background: #fee2e2;
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
   border: 2px solid #fca5a5;
-  border-radius: 8px;
+  border-radius: 10px;
   color: #dc2626;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
 }
 
 .vales-page__clear-button:hover {
-  background: #fecaca;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(220, 38, 38, 0.15);
 }
 
 /* ========================================
@@ -227,10 +280,12 @@
 ======================================== */
 
 .vale-filters {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
   border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.7);
 }
 
 .vale-filters__header {
@@ -271,9 +326,10 @@
   padding: 10px 12px;
   font-size: 14px;
   border: 2px solid #e5e7eb;
-  border-radius: 6px;
+  border-radius: 8px;
   transition: all 0.2s ease;
   font-family: inherit;
+  background: #ffffff;
 }
 
 .vale-filters__select:focus,
@@ -302,7 +358,7 @@
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
 }
 
 .vale-filters__button--secondary {
@@ -312,15 +368,18 @@
 
 .vale-filters__button--secondary:hover {
   background: #e5e7eb;
+  transform: translateY(-1px);
 }
 
 .vale-filters__button--primary {
   color: #ffffff;
+  background: linear-gradient(135deg, #ff6b35 0%, #e74c3c 100%);
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.25);
 }
 
 .vale-filters__button--primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.35);
 }
 
 /* ========================================
@@ -340,6 +399,13 @@
   justify-content: center;
   min-height: 400px;
   gap: 16px;
+
+  /* Fondo elegante */
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .vales-page__loading p,
@@ -348,10 +414,12 @@
   font-size: 16px;
   color: #7f8c8d;
   margin: 0;
+  font-weight: 500;
 }
 
 .vales-page__error p {
   color: #dc2626;
+  font-weight: 600;
 }
 
 /* ========================================
@@ -369,10 +437,12 @@
 ======================================== */
 
 .vales-group-mes {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.7);
 }
 
 .vales-group-mes__title {
@@ -383,6 +453,7 @@
   color: #ffffff;
   background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
   text-transform: capitalize;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* ========================================
@@ -432,11 +503,13 @@
   align-items: center;
   gap: 12px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
 }
 
 .vales-group-obra__header:hover {
   background: #fafbfc;
+  border-left-color: #ff6b35;
+  transform: translateX(2px);
 }
 
 .vales-group-obra__info {
@@ -476,6 +549,11 @@
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+.vales-group-material:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .vales-group-material__header {
@@ -525,13 +603,15 @@
 .vale-card-compact {
   background: #ffffff;
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
   overflow: hidden;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 .vale-card-compact:hover {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
 }
 
 .vale-card-compact__header {
@@ -606,7 +686,7 @@
 .vale-card-compact__body {
   padding: 16px;
   border-top: 1px solid #e5e7eb;
-  background: #fafbfc;
+  background: linear-gradient(180deg, #fafbfc 0%, #ffffff 100%);
   animation: expandDown 0.2s ease;
 }
 
@@ -719,7 +799,7 @@
   font-size: 11px;
   font-weight: 700;
   color: #ffffff;
-  background: #7f8c8d;
+  background: linear-gradient(135deg, #7f8c8d 0%, #95a5a6 100%);
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -803,9 +883,10 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #f5f6fa;
+  background: linear-gradient(135deg, #f5f6fa 0%, #ffffff 100%);
   padding: 8px 12px;
   border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .vale-card__total-label {
@@ -829,6 +910,10 @@
 ======================================== */
 
 @media (max-width: 768px) {
+  .vales-page__header {
+    padding: 20px;
+  }
+
   .vales-page__title {
     font-size: 24px;
   }
@@ -840,6 +925,10 @@
 
   .vales-page__search {
     max-width: none;
+  }
+
+  .vale-filters {
+    padding: 16px;
   }
 
   .vale-filters__body {
@@ -858,7 +947,7 @@
     font-size: 14px;
   }
 
-  .vales-group-obra__nombre {
+  .vales-group-obra__nome {
     font-size: 14px;
   }
 }

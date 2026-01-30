@@ -1,7 +1,7 @@
 /**
  * src/styles/layout.css
  * 
- * Estilos para Navbar, Sidebar y Layout
+ * Estilos para Navbar, Sidebar y Layout - Versión Moderna con Degradados
  */
 
 /* ========================================
@@ -24,46 +24,72 @@
   flex: 1;
   padding: 24px;
   overflow-y: auto;
-  background: #F5F6FA;
+  background: #f5f6fa;
 }
 
 /* ========================================
-   NAVBAR
+   NAVBAR - DISEÑO MODERNO CON DEGRADADO
 ======================================== */
 
 .navbar {
   height: 64px;
-  background: #FFFFFF;
-  border-bottom: 1px solid #E5E7EB;
+  /* Degradado azul profesional */
+  background: linear-gradient(135deg, #004e89 0%, #002b4d 100%);
+  border-bottom: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  /* Sombra más pronunciada */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  position: relative;
+  z-index: 100;
+}
+
+/* Efecto de glassmorphism sutil */
+.navbar::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  pointer-events: none;
 }
 
 .navbar__left {
   display: flex;
   align-items: center;
   gap: 16px;
+  position: relative;
+  z-index: 1;
 }
 
 .navbar__logo {
   height: 40px;
   width: auto;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
 .navbar__title {
   font-size: 20px;
   font-weight: 700;
-  color: #2C3E50;
+  color: #ffffff;
   margin: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .navbar__right {
   display: flex;
   align-items: center;
   gap: 20px;
+  position: relative;
+  z-index: 1;
 }
 
 .navbar__user {
@@ -75,47 +101,57 @@
 .navbar__user-name {
   font-size: 14px;
   font-weight: 600;
-  color: #2C3E50;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .navbar__user-role {
   font-size: 12px;
-  color: #7F8C8D;
+  color: rgba(255, 255, 255, 0.8);
   text-transform: uppercase;
   font-weight: 500;
 }
 
 .navbar__logout {
-  padding: 8px 16px;
+  padding: 10px 20px;
   font-size: 14px;
   font-weight: 600;
-  color: #FFFFFF;
+  color: #ffffff;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
+  /* Degradado naranja a rojo */
+  background: linear-gradient(135deg, #ff6b35 0%, #e74c3c 100%);
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
 }
 
 .navbar__logout:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.5);
+}
+
+.navbar__logout:active {
+  transform: translateY(0);
 }
 
 /* ========================================
-   SIDEBAR
+   SIDEBAR - DISEÑO MODERNO CON DEGRADADO
 ======================================== */
 
 .sidebar {
   width: 240px;
-  background: #FFFFFF;
-  border-right: 1px solid #E5E7EB;
+  /* Degradado vertical suave */
+  background: linear-gradient(180deg, #ffffff 0%, #f8f9fa 50%, #f1f3f5 100%);
+  border-right: 1px solid #e5e7eb;
   padding: 20px 0;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
 }
 
 .sidebar__nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   padding: 0 12px;
 }
 
@@ -123,24 +159,55 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  color: #7F8C8D;
+  padding: 14px 16px;
+  color: #7f8c8d;
   text-decoration: none;
-  border-radius: 8px;
-  transition: all 0.2s ease;
+  border-radius: 10px;
+  transition: all 0.3s ease;
   font-size: 15px;
   font-weight: 500;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Efecto hover con degradado sutil */
+.sidebar__link::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #f5f6fa 0%, #e8eaf0 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.sidebar__link:hover::before {
+  opacity: 1;
 }
 
 .sidebar__link:hover {
-  background: #F5F6FA;
-  color: #2C3E50;
+  color: #2c3e50;
+  transform: translateX(4px);
 }
 
+/* Link activo con degradado naranja-rojizo */
 .sidebar__link--active {
-  background: #FEF3EF;
-  color: #FF6B35;
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8a5b 100%);
+  color: #ffffff;
   font-weight: 600;
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+}
+
+.sidebar__link--active::before {
+  display: none;
+}
+
+.sidebar__link--active:hover {
+  transform: translateX(2px);
+  box-shadow: 0 6px 16px rgba(255, 107, 53, 0.4);
 }
 
 .sidebar__icon {
@@ -149,6 +216,22 @@
 
 .sidebar__text {
   flex: 1;
+}
+
+/* ========================================
+   CAMPANITA DE NOTIFICACIONES (ESTILO NAVBAR)
+======================================== */
+
+.notification-bell__button {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.notification-bell__button:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
 }
 
 /* ========================================
@@ -180,5 +263,91 @@
 
   .navbar__user-name {
     display: none;
+  }
+
+  .navbar__logout {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar {
+    padding: 0 16px;
+  }
+
+  .navbar__title {
+    font-size: 16px;
+  }
+
+  .navbar__logo {
+    height: 32px;
+  }
+  /* ========================================
+   CONTENIDO PRINCIPAL CON ESTILO PREMIUM
+======================================== */
+
+  .layout__content {
+    flex: 1;
+    padding: 32px;
+    overflow-y: auto;
+
+    /* Fondo con patrón sutil de puntos */
+    background:
+      radial-gradient(
+        circle at 20% 20%,
+        rgba(255, 107, 53, 0.03) 1px,
+        transparent 1px
+      ),
+      radial-gradient(
+        circle at 80% 80%,
+        rgba(0, 78, 137, 0.03) 1px,
+        transparent 1px
+      ),
+      linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+    background-size:
+      40px 40px,
+      40px 40px,
+      100% 100%;
+    background-position:
+      0 0,
+      20px 20px,
+      0 0;
+
+    /* Animación sutil al cargar */
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  /* Container para páginas */
+  .page-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    animation: slideInFromLeft 0.5s ease-out;
+  }
+
+  /* Cards premium con glassmorphism */
+  .card-premium {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    box-shadow: var(--shadow-md);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    transition: all 0.3s ease;
+  }
+
+  .card-premium:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  @media (max-width: 768px) {
+    .layout__content {
+      padding: 20px;
+      background-size:
+        30px 30px,
+        30px 30px,
+        100% 100%;
+    }
   }
 }
