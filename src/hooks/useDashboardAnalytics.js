@@ -110,9 +110,10 @@ export const useDashboardAnalytics = () => {
 
         if (detallesRenta) {
           totalHoras = detallesRenta.reduce((sum, d) => {
-            // Si es renta por día, convertir días a horas (8 horas por día)
-            if (d.es_renta_por_dia && d.total_dias) {
-              return sum + parseFloat(d.total_dias) * 8;
+            // MODIFICADO: Si total_dias > 0, convertir días a horas (8 horas por día)
+            const totalDias = parseFloat(d.total_dias || 0);
+            if (totalDias > 0) {
+              return sum + totalDias * 8;
             }
             return sum + (parseFloat(d.total_horas) || 0);
           }, 0);

@@ -58,7 +58,9 @@ const ValePreview = ({ vale }) => {
     let tieneRentaPorHora = false;
 
     vale.vale_renta_detalle.forEach((detalle) => {
-      const esRentaPorDia = detalle.es_renta_por_dia === true;
+      // MODIFICADO: Detectar renta por día si total_dias > 0
+      const totalDias = Number(detalle.total_dias || 0);
+      const esRentaPorDia = totalDias > 0;
 
       if (esRentaPorDia) {
         // Sumar solo días de detalles que son por día
@@ -101,7 +103,7 @@ const ValePreview = ({ vale }) => {
     // Usar el costo_total que viene de la BD, convertir a número
     const costoTotal = vale.vale_material_detalles.reduce(
       (sum, d) => sum + Number(d.costo_total || 0),
-      0
+      0,
     );
 
     return { totalM3Tipo3, totalM3Otros, costoTotal };

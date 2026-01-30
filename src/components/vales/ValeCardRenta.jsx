@@ -51,7 +51,7 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
   const calcularCostoTotal = () => {
     return vale.vale_renta_detalle.reduce(
       (sum, detalle) => sum + Number(detalle.costo_total || 0),
-      0
+      0,
     );
   };
 
@@ -236,7 +236,7 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                 const costoDia = Number(detalle.precios_renta?.costo_dia || 0);
 
                 // Determinar si es renta por día
-                const esRentaPorDia = detalle.es_renta_por_dia === true;
+                const esRentaPorDia = totalDias > 0;
 
                 return (
                   <div
@@ -285,7 +285,7 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                         </div>
                       )}
 
-                      {/* Hora Fin - SIEMPRE SE MUESTRA si existe */}
+                      {/* Hora Fin */}
                       {detalle.hora_fin ? (
                         <div className="vale-card__detalle-item-small">
                           <span className="vale-card__detalle-label">
@@ -301,7 +301,8 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                             Hora Fin:
                           </span>
                           <span className="vale-card__detalle-value">
-                            Día completo
+                            {totalDias === 0.5 ? "Medio día" : "Día completo"}{" "}
+                            {/* <--- MODIFICADO */}
                           </span>
                         </div>
                       ) : null}

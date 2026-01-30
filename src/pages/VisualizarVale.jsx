@@ -91,7 +91,7 @@ const VisualizarVale = () => {
         setError(null);
 
         console.log(
-          `[VisualizarVale] Intentando cargar vale: ${folio} (intento ${retryCount + 1}/${MAX_RETRIES + 1})`
+          `[VisualizarVale] Intentando cargar vale: ${folio} (intento ${retryCount + 1}/${MAX_RETRIES + 1})`,
         );
 
         // Crear controlador de timeout para móviles
@@ -177,7 +177,7 @@ const VisualizarVale = () => {
                 costo_dia
               )
             )
-          `
+          `,
           )
           .eq("folio", folio)
           .abortSignal(controller.signal)
@@ -197,7 +197,7 @@ const VisualizarVale = () => {
           if (isTimeout && retryCount < MAX_RETRIES) {
             retryCount++;
             console.log(
-              `⚠️ Timeout detectado, reintentando en ${retryCount} segundos...`
+              `⚠️ Timeout detectado, reintentando en ${retryCount} segundos...`,
             );
 
             // Esperar más tiempo en cada reintento (1s, 2s, 3s)
@@ -239,7 +239,7 @@ const VisualizarVale = () => {
             error.message?.includes("aborted")
           ) {
             setError(
-              "La conexión está tardando demasiado. Por favor, verifica tu conexión a internet y vuelve a escanear el código QR."
+              "La conexión está tardando demasiado. Por favor, verifica tu conexión a internet y vuelve a escanear el código QR.",
             );
           } else if (error.code === "PGRST116") {
             setError("Vale no encontrado en el sistema.");
@@ -298,7 +298,7 @@ const VisualizarVale = () => {
         {
           p_folio: folio,
           p_user_agent: navigator.userAgent,
-        }
+        },
       );
 
       if (error) {
@@ -314,7 +314,7 @@ const VisualizarVale = () => {
       }
 
       console.log(
-        `✅ Descarga registrada. Total: ${data?.total_descargas || "?"}`
+        `✅ Descarga registrada. Total: ${data?.total_descargas || "?"}`,
       );
     } catch (error) {
       console.error("[VisualizarVale] Error al descargar:", error);
@@ -674,7 +674,9 @@ const DetallesMaterial = ({ detalle }) => {
 // ========================================
 
 const DetallesRenta = ({ detalle }) => {
-  const esRentaPorDia = detalle.es_renta_por_dia === true;
+  // MODIFICADO: Detectar renta por día si total_dias > 0
+  const totalDias = Number(detalle.total_dias || 0);
+  const esRentaPorDia = totalDias > 0;
 
   return (
     <div className="vale-section">
@@ -728,7 +730,13 @@ const DetallesRenta = ({ detalle }) => {
 
       <div className="info-row">
         <span className="info-label">Total Días:</span>
-        <span className="info-value">{esRentaPorDia ? "1 día" : "N/A"}</span>
+        <span className="info-value">
+          {esRentaPorDia
+            ? totalDias === 0.5
+              ? "0.5 días (medio día)"
+              : `${totalDias} ${totalDias === 1 ? "día" : "días"}`
+            : "N/A"}
+        </span>
       </div>
 
       <div className="divider-thin"></div>

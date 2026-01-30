@@ -43,7 +43,7 @@ const BatchResults = ({
       // Usar el costo_total que viene de la BD, convertir a número
       const costoTotal = vale.vale_material_detalles.reduce(
         (sum, d) => sum + Number(d.costo_total || 0),
-        0
+        0,
       );
 
       // Calcular volumen según tipo, convertir a número
@@ -75,7 +75,7 @@ const BatchResults = ({
       // Sumar número de viajes
       const totalViajes = vale.vale_renta_detalle.reduce(
         (sum, detalle) => sum + (detalle.numero_viajes || 0),
-        0
+        0,
       );
 
       // Calcular totales basados en es_renta_por_dia
@@ -85,7 +85,9 @@ const BatchResults = ({
       let tieneRentaPorHora = false;
 
       vale.vale_renta_detalle.forEach((detalle) => {
-        const esRentaPorDia = detalle.es_renta_por_dia === true;
+        // MODIFICADO: Detectar renta por día si total_dias > 0
+        const totalDias = Number(detalle.total_dias || 0);
+        const esRentaPorDia = totalDias > 0;
 
         if (esRentaPorDia) {
           totalDiasPorDia += Number(detalle.total_dias || 0);
@@ -100,7 +102,12 @@ const BatchResults = ({
       let cantidad = "Pendiente";
 
       if (tieneRentaPorDia && totalDiasPorDia > 0) {
-        cantidad = `${totalDiasPorDia} ${totalDiasPorDia === 1 ? "día" : "días"}`;
+        // Mostrar correctamente medio día
+        if (totalDiasPorDia === 0.5) {
+          cantidad = "0.5 días (medio día)";
+        } else {
+          cantidad = `${totalDiasPorDia} ${totalDiasPorDia === 1 ? "día" : "días"}`;
+        }
 
         // Si también tiene horas, agregar
         if (tieneRentaPorHora && totalHorasPorHora > 0) {
@@ -113,7 +120,7 @@ const BatchResults = ({
       // Usar el costo_total que viene de la BD, convertir a número
       const costoTotal = vale.vale_renta_detalle.reduce(
         (sum, d) => sum + Number(d.costo_total || 0),
-        0
+        0,
       );
 
       return {

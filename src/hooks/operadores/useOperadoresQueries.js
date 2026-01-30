@@ -69,6 +69,12 @@ const construirQueryBase = (tipoVale) => {
         activo
       ),
       
+      persona:id_persona_creador (
+            nombre,
+            primer_apellido,
+            segundo_apellido
+          ),
+      
       ${
         tipoVale === "material"
           ? `vale_material_detalles (
@@ -113,10 +119,15 @@ const construirQueryBase = (tipoVale) => {
             sindicatos (
               id_sindicato,
               sindicato
+            ),
+            precios_renta:id_precios_renta (    
+              id_precios_renta,
+              costo_hr,
+              costo_dia
             )
           )`
       }
-    `
+    `,
     )
     .eq("tipo_vale", tipoVale)
     .eq("archivado", false);
@@ -174,7 +185,7 @@ export const obtenerValesMaterialAgrupados = async (filtros, userProfile) => {
     const agrupado = agruparValesPorEmpresaPlacasEstado(
       vales,
       "material",
-      filtros
+      filtros,
     );
 
     return agrupado;
@@ -213,7 +224,7 @@ export const obtenerValesRentaAgrupados = async (filtros, userProfile) => {
     const agrupado = agruparValesPorEmpresaPlacasEstado(
       vales,
       "renta",
-      filtros
+      filtros,
     );
 
     return agrupado;
@@ -232,7 +243,7 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
   if (filtros.searchTerm) {
     const termino = filtros.searchTerm.toLowerCase();
     valesFiltrados = vales.filter((vale) =>
-      vale.vehiculos?.placas?.toLowerCase().includes(termino)
+      vale.vehiculos?.placas?.toLowerCase().includes(termino),
     );
   }
 
@@ -284,7 +295,7 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
         (estadoGrupo) => {
           // Ordenar vales por fecha (más reciente primero)
           const valesOrdenados = estadoGrupo.vales.sort(
-            (a, b) => new Date(b.fecha_creacion) - new Date(a.fecha_creacion)
+            (a, b) => new Date(b.fecha_creacion) - new Date(a.fecha_creacion),
           );
 
           // Calcular totales del estado
@@ -295,7 +306,7 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
             vales: valesOrdenados,
             ...totalesEstado,
           };
-        }
+        },
       );
 
       // Ordenar estados (verificado, en_proceso, emitido, etc.)
@@ -304,7 +315,7 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
       // Calcular totales del vehículo
       const totalesVehiculo = calcularTotalesVehiculo(
         estadosOrdenados,
-        tipoVale
+        tipoVale,
       );
 
       return {
@@ -316,7 +327,7 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
 
     // Ordenar vehículos por placas
     const vehiculosOrdenados = vehiculosArray.sort((a, b) =>
-      a.placas.localeCompare(b.placas)
+      a.placas.localeCompare(b.placas),
     );
 
     // Calcular totales de la empresa
@@ -331,7 +342,7 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
 
   // Ordenar empresas alfabéticamente
   const empresasOrdenadas = empresasArray.sort((a, b) =>
-    a.nombre_empresa.localeCompare(b.nombre_empresa)
+    a.nombre_empresa.localeCompare(b.nombre_empresa),
   );
 
   // Calcular resumen general
@@ -355,7 +366,7 @@ const calcularTotalesEstado = (vales, tipoVale) => {
       const m3Vale = detalles.reduce(
         (sumDetalle, detalle) =>
           sumDetalle + (Number(detalle.volumen_real_m3) || 0),
-        0
+        0,
       );
       return sum + m3Vale;
     }, 0);
@@ -371,7 +382,7 @@ const calcularTotalesEstado = (vales, tipoVale) => {
       const viajesVale = detalles.reduce(
         (sumDetalle, detalle) =>
           sumDetalle + (Number(detalle.numero_viajes) || 0),
-        0
+        0,
       );
       return sum + viajesVale;
     }, 0);
@@ -380,7 +391,7 @@ const calcularTotalesEstado = (vales, tipoVale) => {
       const detalles = vale.vale_renta_detalle || [];
       const diasVale = detalles.reduce(
         (sumDetalle, detalle) => sumDetalle + (Number(detalle.total_dias) || 0),
-        0
+        0,
       );
       return sum + diasVale;
     }, 0);
@@ -390,7 +401,7 @@ const calcularTotalesEstado = (vales, tipoVale) => {
       const horasVale = detalles.reduce(
         (sumDetalle, detalle) =>
           sumDetalle + (Number(detalle.total_horas) || 0),
-        0
+        0,
       );
       return sum + horasVale;
     }, 0);
@@ -409,7 +420,7 @@ const calcularTotalesEstado = (vales, tipoVale) => {
 const calcularTotalesVehiculo = (estados, tipoVale) => {
   const totalViajes = estados.reduce(
     (sum, estado) => sum + estado.totalViajes,
-    0
+    0,
   );
 
   if (tipoVale === "material") {
@@ -421,11 +432,11 @@ const calcularTotalesVehiculo = (estados, tipoVale) => {
   } else {
     const totalDias = estados.reduce(
       (sum, estado) => sum + estado.totalDias,
-      0
+      0,
     );
     const totalHoras = estados.reduce(
       (sum, estado) => sum + estado.totalHoras,
-      0
+      0,
     );
     return {
       totalViajes,
@@ -442,13 +453,13 @@ const calcularTotalesEmpresa = (vehiculos, tipoVale) => {
   const totalVehiculos = vehiculos.length;
   const totalViajes = vehiculos.reduce(
     (sum, vehiculo) => sum + vehiculo.totalViajes,
-    0
+    0,
   );
 
   if (tipoVale === "material") {
     const totalM3 = vehiculos.reduce(
       (sum, vehiculo) => sum + vehiculo.totalM3,
-      0
+      0,
     );
     return {
       totalVehiculos,
@@ -458,11 +469,11 @@ const calcularTotalesEmpresa = (vehiculos, tipoVale) => {
   } else {
     const totalDias = vehiculos.reduce(
       (sum, vehiculo) => sum + vehiculo.totalDias,
-      0
+      0,
     );
     const totalHoras = vehiculos.reduce(
       (sum, vehiculo) => sum + vehiculo.totalHoras,
-      0
+      0,
     );
     return {
       totalVehiculos,
@@ -480,11 +491,11 @@ const calcularResumenGeneral = (empresas, tipoVale) => {
   const totalEmpresas = empresas.length;
   const totalVehiculos = empresas.reduce(
     (sum, empresa) => sum + empresa.totalVehiculos,
-    0
+    0,
   );
   const totalViajes = empresas.reduce(
     (sum, empresa) => sum + empresa.totalViajes,
-    0
+    0,
   );
 
   if (tipoVale === "material") {
@@ -498,11 +509,11 @@ const calcularResumenGeneral = (empresas, tipoVale) => {
   } else {
     const totalDias = empresas.reduce(
       (sum, empresa) => sum + empresa.totalDias,
-      0
+      0,
     );
     const totalHoras = empresas.reduce(
       (sum, empresa) => sum + empresa.totalHoras,
-      0
+      0,
     );
     return {
       totalEmpresas,
