@@ -87,6 +87,7 @@ const construirQueryBase = (tipoVale) => {
             costo_total,
             distancia_km,
             folio_banco,
+            requisicion,
             notas_adicionales,
             material (
               id_material,

@@ -902,3 +902,65 @@
     grid-template-columns: 1fr;
   }
 }
+/* ========================================
+   GRUPO POR FECHA (dentro de estado)
+   ======================================== */
+
+.fecha-group {
+  border-left: 2px solid var(--color-border, #e0e0e0);
+  margin-left: 8px;
+  margin-bottom: 4px;
+}
+
+.fecha-group__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.fecha-group__header:hover {
+  background: #f0f0f0;
+}
+
+.fecha-group__header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fecha-group__fecha {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #444;
+}
+
+.fecha-group__header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fecha-group__obra {
+  font-size: 0.8rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.fecha-group__vales {
+  padding-left: 8px;
+}
+
+/* Folio dentro del vale-item (ajuste) */
+.vale-item__folio {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #333;
+}

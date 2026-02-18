@@ -1,12 +1,12 @@
 /**
  * src/components/operadores/PlacasGroup.jsx
  *
- * Componente para mostrar un grupo de placas con sus vales agrupados por estado
+ * Componente para mostrar un grupo de placas con sus vales agrupados por estado y fecha
  *
  * Estructura:
  * - Header con placas y totales
  * - Grupos de estados (verificado, en_proceso, emitido, etc.)
- * - Lista de vales por estado (ordenados por fecha)
+ * - Dentro de cada estado, vales agrupados por fecha (colapsable)
  * - Al hacer click en un vale, se expande para mostrar detalles completos
  *
  * Dependencias: ValeCard (para mostrar detalle completo del vale)
@@ -44,29 +44,29 @@ const PlacasGroup = ({
   onToggle,
   helpers,
 }) => {
-  // Estado para controlar qué estados están colapsados
-  const [estadosColapsados, setEstadosColapsados] = useState(new Set());
-
   // Estado para controlar qué vales están expandidos
   const [valesExpandidos, setValesExpandidos] = useState(new Set());
 
+  // Estado para controlar qué grupos de fecha están colapsados
+  const [fechasColapsadas, setFechasColapsadas] = useState(new Set());
+
   /**
-   * Toggle colapsar estado
+   * Toggle expandir/colapsar grupo de fecha
    */
-  const toggleEstado = (estado) => {
-    setEstadosColapsados((prev) => {
+  const toggleFecha = (claveUnica) => {
+    setFechasColapsadas((prev) => {
       const nuevoSet = new Set(prev);
-      if (nuevoSet.has(estado)) {
-        nuevoSet.delete(estado);
+      if (nuevoSet.has(claveUnica)) {
+        nuevoSet.delete(claveUnica);
       } else {
-        nuevoSet.add(estado);
+        nuevoSet.add(claveUnica);
       }
       return nuevoSet;
     });
   };
 
   /**
-   * Toggle expandir vale
+   * Toggle expandir detalle de vale
    */
   const toggleVale = (idVale) => {
     setValesExpandidos((prev) => {
@@ -78,6 +78,29 @@ const PlacasGroup = ({
       }
       return nuevoSet;
     });
+  };
+
+  /**
+   * Agrupar vales por fecha (yyyy-MM-dd) dentro de un estado
+   * Devuelve array ordenado por fecha descendente
+   */
+  const agruparValesPorFecha = (vales) => {
+    const grupos = {};
+
+    vales.forEach((vale) => {
+      const fechaClave = vale.fecha_creacion
+        ? vale.fecha_creacion.split("T")[0]
+        : "sin-fecha";
+
+      if (!grupos[fechaClave]) {
+        grupos[fechaClave] = [];
+      }
+      grupos[fechaClave].push(vale);
+    });
+
+    return Object.entries(grupos)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([fecha, valesDelDia]) => ({ fecha, valesDelDia }));
   };
 
   /**
@@ -95,8 +118,7 @@ const PlacasGroup = ({
       sin_estado: HelpCircle,
     };
 
-    const IconoComponente = iconos[estado] || File;
-    return IconoComponente;
+    return iconos[estado] || File;
   };
 
   return (
@@ -142,7 +164,7 @@ const PlacasGroup = ({
         </div>
       </button>
 
-      {/* Contenido: Vales directamente (sin agrupación por estado) */}
+      {/* Contenido: Estados → Fechas → Vales */}
       {!estaColapsado && (
         <div
           className="placas-group__content"
@@ -150,83 +172,119 @@ const PlacasGroup = ({
           role="region"
           aria-label={`Vales de ${placas}`}
         >
-          {/* Contenido: Estados y vales */}
-          {!estaColapsado && (
-            <div
-              className="placas-group__content"
-              id={`placas-content-${placas}`}
-              role="region"
-              aria-label={`Vales de ${placas}`}
-            >
-              {vehiculoData.porEstado.map((estadoGrupo) => {
-                const IconoEstado = obtenerIconoComponente(estadoGrupo.estado);
+          {vehiculoData.porEstado.map((estadoGrupo) => {
+            const IconoEstado = obtenerIconoComponente(estadoGrupo.estado);
 
-                return (
-                  <div key={estadoGrupo.estado} className="estado-group-simple">
-                    {/* Header simple del estado (no colapsable) */}
-                    <div className="estado-group-simple__header">
-                      <IconoEstado
-                        size={18}
-                        aria-hidden="true"
-                        style={{
-                          color: helpers.obtenerColorEstado(estadoGrupo.estado),
-                        }}
-                      />
-                      <span className="estado-group__nombre">
-                        {helpers.obtenerEtiquetaEstado(estadoGrupo.estado)}
-                      </span>
-                      <span className="estado-group-simple__count">
-                        ({estadoGrupo.totalViajes}{" "}
-                        {estadoGrupo.totalViajes === 1 ? "vale" : "vales"})
-                      </span>
-                    </div>
+            return (
+              <div key={estadoGrupo.estado} className="estado-group-simple">
+                {/* Header del estado */}
+                <div className="estado-group-simple__header">
+                  <IconoEstado
+                    size={18}
+                    aria-hidden="true"
+                    style={{
+                      color: helpers.obtenerColorEstado(estadoGrupo.estado),
+                    }}
+                  />
+                  <span className="estado-group__nombre">
+                    {helpers.obtenerEtiquetaEstado(estadoGrupo.estado)}
+                  </span>
+                  <span className="estado-group-simple__count">
+                    ({estadoGrupo.totalViajes}{" "}
+                    {estadoGrupo.totalViajes === 1 ? "vale" : "vales"})
+                  </span>
+                </div>
 
-                    {/* Lista de vales */}
-                    <div className="estado-group-simple__vales">
-                      {estadoGrupo.vales.map((vale) => {
-                        const valeExpandido = valesExpandidos.has(vale.id_vale);
+                {/* Vales agrupados por fecha */}
+                <div className="estado-group-simple__vales">
+                  {agruparValesPorFecha(estadoGrupo.vales).map(
+                    ({ fecha, valesDelDia }) => {
+                      const claveFecha = `${estadoGrupo.estado}-${placas}-${fecha}`;
+                      const fechaColapsada = fechasColapsadas.has(claveFecha);
+                      const nombreObra =
+                        valesDelDia[0]?.obras?.obra || "Sin obra";
 
-                        return (
-                          <div key={vale.id_vale} className="vale-item">
-                            <button
-                              type="button"
-                              className="vale-item__header"
-                              onClick={() => toggleVale(vale.id_vale)}
-                              aria-expanded={valeExpandido}
-                            >
-                              <div className="vale-item__header-left">
-                                {valeExpandido ? (
-                                  <ChevronDown size={16} aria-hidden="true" />
-                                ) : (
-                                  <ChevronRight size={16} aria-hidden="true" />
+                      return (
+                        <div key={claveFecha} className="fecha-group">
+                          {/* Header colapsable por fecha */}
+                          <button
+                            type="button"
+                            className="fecha-group__header"
+                            onClick={() => toggleFecha(claveFecha)}
+                            aria-expanded={!fechaColapsada}
+                          >
+                            <div className="fecha-group__header-left">
+                              {fechaColapsada ? (
+                                <ChevronRight size={16} aria-hidden="true" />
+                              ) : (
+                                <ChevronDown size={16} aria-hidden="true" />
+                              )}
+                              <span className="fecha-group__fecha">
+                                {helpers.formatearFechaCorta(
+                                  fecha + "T00:00:00",
                                 )}
-                                <span className="vale-item__fecha">
-                                  {helpers.formatearFechaCorta(
-                                    vale.fecha_creacion
-                                  )}
-                                </span>
-                              </div>
-                              <div className="vale-item__header-right">
-                                <span className="vale-item__obra">
-                                  {vale.obras?.obra || "Sin obra"}
-                                </span>
-                              </div>
-                            </button>
+                              </span>
+                            </div>
+                            <div className="fecha-group__header-right">
+                              <span className="fecha-group__obra">
+                                {nombreObra}
+                              </span>
+                            </div>
+                          </button>
 
-                            {valeExpandido && (
-                              <div className="vale-item__content">
-                                <ValeCard vale={vale} />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                          {/* Lista de vales de esa fecha */}
+                          {!fechaColapsada && (
+                            <div className="fecha-group__vales">
+                              {valesDelDia.map((vale) => {
+                                const valeExpandido = valesExpandidos.has(
+                                  vale.id_vale,
+                                );
+
+                                return (
+                                  <div key={vale.id_vale} className="vale-item">
+                                    <button
+                                      type="button"
+                                      className="vale-item__header"
+                                      onClick={() => toggleVale(vale.id_vale)}
+                                      aria-expanded={valeExpandido}
+                                    >
+                                      <div className="vale-item__header-left">
+                                        {valeExpandido ? (
+                                          <ChevronDown
+                                            size={16}
+                                            aria-hidden="true"
+                                          />
+                                        ) : (
+                                          <ChevronRight
+                                            size={16}
+                                            aria-hidden="true"
+                                          />
+                                        )}
+                                        <File size={14} aria-hidden="true" />
+                                        <span className="vale-item__folio">
+                                          {vale.folio}
+                                        </span>
+                                      </div>
+                                    </button>
+
+                                    {valeExpandido && (
+                                      <div className="vale-item__content">
+                                        <ValeCard vale={vale} />
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    },
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

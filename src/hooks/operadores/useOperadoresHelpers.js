@@ -158,106 +158,66 @@ export const validarFiltrosActivos = (filtros) => {
 };
 
 /**
- * Preparar datos para exportar a Excel (Material)
+ * Preparar datos de MATERIAL para exportar a Excel en formato tabla plana
+ * Una fila por vale (repitiendo empresa, placas, obra en cada renglón)
  */
-export const prepararDatosExcelMaterial = (datosAgrupados) => {
+export const prepararDatosExcelMaterial = (datos) => {
   const filas = [];
 
-  datosAgrupados.forEach((empresa) => {
-    // Fila de empresa
-    filas.push({
-      Empresa: empresa.nombre_empresa,
-      Placas: "",
-      Estado: "",
-      Folio: "",
-      Fecha: "",
-      Obra: "",
-      Material: "",
-      "M³ Real": "",
-      Operador: "",
-      "Total Vehículos": empresa.totalVehiculos,
-      "Total Viajes": empresa.totalViajes,
-      "Total M³": formatearNumero(empresa.totalM3),
-    });
+  datos.forEach((empresa) => {
+    const nombreEmpresa = empresa.nombre_empresa || "";
 
     empresa.vehiculos.forEach((vehiculo) => {
-      // Fila de vehículo
-      filas.push({
-        Empresa: "",
-        Placas: vehiculo.placas,
-        Estado: "",
-        Folio: "",
-        Fecha: "",
-        Obra: "",
-        Material: "",
-        "M³ Real": "",
-        Operador: "",
-        "Total Vehículos": "",
-        "Total Viajes": vehiculo.totalViajes,
-        "Total M³": formatearNumero(vehiculo.totalM3),
-      });
+      const placas = vehiculo.placas || "";
 
       vehiculo.porEstado.forEach((estadoGrupo) => {
-        // Fila de estado
-        filas.push({
-          Empresa: "",
-          Placas: "",
-          Estado: obtenerEtiquetaEstado(estadoGrupo.estado),
-          Folio: "",
-          Fecha: "",
-          Obra: "",
-          Material: "",
-          "M³ Real": "",
-          Operador: "",
-          "Total Vehículos": "",
-          "Total Viajes": estadoGrupo.totalViajes,
-          "Total M³": formatearNumero(estadoGrupo.totalM3),
-        });
+        // Capitalizar primera letra del estado
+        const estado =
+          estadoGrupo.estado.charAt(0).toUpperCase() +
+          estadoGrupo.estado.slice(1).replace("_", " ");
 
         estadoGrupo.vales.forEach((vale) => {
+          // Formatear fecha dd/mm/yyyy
+          const fechaRaw = vale.fecha_creacion || "";
+          const fecha = fechaRaw
+            ? fechaRaw.split("T")[0].split("-").reverse().join("/")
+            : "";
+
           const detalles = vale.vale_material_detalles || [];
-          const totalM3Vale = detalles.reduce(
-            (sum, d) => sum + (Number(d.volumen_real_m3) || 0),
-            0
-          );
 
-          const materiales = detalles
-            .map((d) => d.material?.material || "Sin material")
-            .join(", ");
-
-          // Fila de vale
-          filas.push({
-            Empresa: "",
-            Placas: "",
-            Estado: "",
-            Folio: vale.folio,
-            Fecha: formatearFechaCorta(vale.fecha_creacion),
-            Obra: vale.obras?.obra || "Sin obra",
-            Material: materiales,
-            "M³ Real": formatearNumero(totalM3Vale),
-            Operador: vale.operadores?.nombre_completo || "Sin operador",
-            "Total Vehículos": "",
-            "Total Viajes": "",
-            "Total M³": "",
-          });
+          if (detalles.length === 0) {
+            // Vale sin detalles: una fila vacía
+            filas.push({
+              Empresa: nombreEmpresa,
+              Placas: placas,
+              Estado: estado,
+              Folio: vale.folio || "",
+              Fecha: fecha,
+              Obra: vale.obras?.obra || "",
+              Material: "",
+              "M³ Real": "",
+              Operador: vale.operadores?.nombre_completo || "",
+            });
+          } else {
+            detalles.forEach((detalle) => {
+              filas.push({
+                Empresa: nombreEmpresa,
+                Placas: placas,
+                Estado: estado,
+                Folio: vale.folio || "",
+                Fecha: fecha,
+                Obra: vale.obras?.obra || "",
+                Material: detalle.material?.material || "",
+                "M³ Real":
+                  detalle.volumen_real_m3 != null
+                    ? Number(detalle.volumen_real_m3)
+                    : "",
+                Operador: vale.operadores?.nombre_completo || "",
+              });
+            });
+          }
         });
       });
-    });
-
-    // Fila vacía entre empresas
-    filas.push({
-      Empresa: "",
-      Placas: "",
-      Estado: "",
-      Folio: "",
-      Fecha: "",
-      Obra: "",
-      Material: "",
-      "M³ Real": "",
-      Operador: "",
-      "Total Vehículos": "",
-      "Total Viajes": "",
-      "Total M³": "",
     });
   });
 
@@ -265,120 +225,71 @@ export const prepararDatosExcelMaterial = (datosAgrupados) => {
 };
 
 /**
- * Preparar datos para exportar a Excel (Renta)
+ * Preparar datos de RENTA para exportar a Excel en formato tabla plana
+ * Una fila por vale (repitiendo empresa, placas, obra en cada renglón)
  */
-export const prepararDatosExcelRenta = (datosAgrupados) => {
+export const prepararDatosExcelRenta = (datos) => {
   const filas = [];
 
-  datosAgrupados.forEach((empresa) => {
-    // Fila de empresa
-    filas.push({
-      Empresa: empresa.nombre_empresa,
-      Placas: "",
-      Estado: "",
-      Folio: "",
-      Fecha: "",
-      Obra: "",
-      Material: "",
-      Días: "",
-      Horas: "",
-      Operador: "",
-      "Total Vehículos": empresa.totalVehiculos,
-      "Total Viajes": empresa.totalViajes,
-      "Total Días": formatearNumero(empresa.totalDias),
-      "Total Horas": formatearNumero(empresa.totalHoras),
-    });
+  datos.forEach((empresa) => {
+    const nombreEmpresa = empresa.nombre_empresa || "";
 
     empresa.vehiculos.forEach((vehiculo) => {
-      // Fila de vehículo
-      filas.push({
-        Empresa: "",
-        Placas: vehiculo.placas,
-        Estado: "",
-        Folio: "",
-        Fecha: "",
-        Obra: "",
-        Material: "",
-        Días: "",
-        Horas: "",
-        Operador: "",
-        "Total Vehículos": "",
-        "Total Viajes": vehiculo.totalViajes,
-        "Total Días": formatearNumero(vehiculo.totalDias),
-        "Total Horas": formatearNumero(vehiculo.totalHoras),
-      });
+      const placas = vehiculo.placas || "";
 
       vehiculo.porEstado.forEach((estadoGrupo) => {
-        // Fila de estado
-        filas.push({
-          Empresa: "",
-          Placas: "",
-          Estado: obtenerEtiquetaEstado(estadoGrupo.estado),
-          Folio: "",
-          Fecha: "",
-          Obra: "",
-          Material: "",
-          Días: "",
-          Horas: "",
-          Operador: "",
-          "Total Vehículos": "",
-          "Total Viajes": estadoGrupo.totalViajes,
-          "Total Días": formatearNumero(estadoGrupo.totalDias),
-          "Total Horas": formatearNumero(estadoGrupo.totalHoras),
-        });
+        const estado =
+          estadoGrupo.estado.charAt(0).toUpperCase() +
+          estadoGrupo.estado.slice(1).replace("_", " ");
 
         estadoGrupo.vales.forEach((vale) => {
+          const fechaRaw = vale.fecha_creacion || "";
+          const fecha = fechaRaw
+            ? fechaRaw.split("T")[0].split("-").reverse().join("/")
+            : "";
+
           const detalles = vale.vale_renta_detalle || [];
-          const totalDiasVale = detalles.reduce(
-            (sum, d) => sum + (Number(d.total_dias) || 0),
-            0
-          );
-          const totalHorasVale = detalles.reduce(
-            (sum, d) => sum + (Number(d.total_horas) || 0),
-            0
-          );
 
-          const materiales = detalles
-            .map((d) => d.material?.material || "Sin material")
-            .join(", ");
-
-          // Fila de vale
-          filas.push({
-            Empresa: "",
-            Placas: "",
-            Estado: "",
-            Folio: vale.folio,
-            Fecha: formatearFechaCorta(vale.fecha_creacion),
-            Obra: vale.obras?.obra || "Sin obra",
-            Material: materiales,
-            Días: formatearNumero(totalDiasVale),
-            Horas: formatearNumero(totalHorasVale),
-            Operador: vale.operadores?.nombre_completo || "Sin operador",
-            "Total Vehículos": "",
-            "Total Viajes": "",
-            "Total Días": "",
-            "Total Horas": "",
-          });
+          if (detalles.length === 0) {
+            filas.push({
+              Empresa: nombreEmpresa,
+              Placas: placas,
+              Estado: estado,
+              Folio: vale.folio || "",
+              Fecha: fecha,
+              Obra: vale.obras?.obra || "",
+              Material: "",
+              "Num. Viajes": "",
+              "Total Días": "",
+              "Total Horas": "",
+              Operador: vale.operadores?.nombre_completo || "",
+            });
+          } else {
+            detalles.forEach((detalle) => {
+              filas.push({
+                Empresa: nombreEmpresa,
+                Placas: placas,
+                Estado: estado,
+                Folio: vale.folio || "",
+                Fecha: fecha,
+                Obra: vale.obras?.obra || "",
+                Material: detalle.material?.material || "",
+                "Num. Viajes":
+                  detalle.numero_viajes != null
+                    ? Number(detalle.numero_viajes)
+                    : "",
+                "Total Días":
+                  detalle.total_dias != null ? Number(detalle.total_dias) : "",
+                "Total Horas":
+                  detalle.total_horas != null
+                    ? Number(detalle.total_horas)
+                    : "",
+                Operador: vale.operadores?.nombre_completo || "",
+              });
+            });
+          }
         });
       });
-    });
-
-    // Fila vacía entre empresas
-    filas.push({
-      Empresa: "",
-      Placas: "",
-      Estado: "",
-      Folio: "",
-      Fecha: "",
-      Obra: "",
-      Material: "",
-      Días: "",
-      Horas: "",
-      Operador: "",
-      "Total Vehículos": "",
-      "Total Viajes": "",
-      "Total Días": "",
-      "Total Horas": "",
     });
   });
 
