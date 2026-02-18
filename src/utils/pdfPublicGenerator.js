@@ -95,7 +95,7 @@ export const generarPDFMaterialPublico = (valeData) => {
   doc.setFont("helvetica", "normal");
   const obraText = doc.splitTextToSize(
     valeData.obras?.obra || "N/A",
-    pageWidth - marginLeft * 2
+    pageWidth - marginLeft * 2,
   );
   doc.text(obraText, marginLeft, yPos);
   yPos += obraText.length * 3 + 2;
@@ -127,7 +127,7 @@ export const generarPDFMaterialPublico = (valeData) => {
   doc.setFont("helvetica", "normal");
   const materialText = doc.splitTextToSize(
     detalle.material?.material || "N/A",
-    pageWidth - marginLeft * 2
+    pageWidth - marginLeft * 2,
   );
   doc.text(materialText, marginLeft, yPos);
   yPos += materialText.length * 3 + 2;
@@ -183,56 +183,56 @@ export const generarPDFMaterialPublico = (valeData) => {
     yPos += 4;
   }
 
-  // ========================================
-  // PRECIOS (si existen)
-  // ========================================
-  if (detalle.costo_total) {
-    yPos += 1;
-    doc.line(marginLeft, yPos, pageWidth - marginLeft, yPos);
-    yPos += 4;
+  // // ========================================
+  // // PRECIOS (si existen)
+  // // ========================================
+  // if (detalle.costo_total) {
+  //   yPos += 1;
+  //   doc.line(marginLeft, yPos, pageWidth - marginLeft, yPos);
+  //   yPos += 4;
 
-    if (detalle.tarifa_primer_km) {
-      doc.setFont("helvetica", "bold");
-      doc.text("Tarifa 1er Km:", marginLeft, yPos);
-      doc.setFont("helvetica", "normal");
-      doc.text(
-        formatearMoneda(detalle.tarifa_primer_km),
-        marginLeft + 30,
-        yPos
-      );
-      yPos += 4;
-    }
+  //   if (detalle.tarifa_primer_km) {
+  //     doc.setFont("helvetica", "bold");
+  //     doc.text("Tarifa 1er Km:", marginLeft, yPos);
+  //     doc.setFont("helvetica", "normal");
+  //     doc.text(
+  //       formatearMoneda(detalle.tarifa_primer_km),
+  //       marginLeft + 30,
+  //       yPos
+  //     );
+  //     yPos += 4;
+  //   }
 
-    if (detalle.tarifa_subsecuente) {
-      doc.setFont("helvetica", "bold");
-      doc.text("Tarifa Sub.:", marginLeft, yPos);
-      doc.setFont("helvetica", "normal");
-      doc.text(
-        `${formatearMoneda(detalle.tarifa_subsecuente)}/km`,
-        marginLeft + 30,
-        yPos
-      );
-      yPos += 4;
-    }
+  //   if (detalle.tarifa_subsecuente) {
+  //     doc.setFont("helvetica", "bold");
+  //     doc.text("Tarifa Sub.:", marginLeft, yPos);
+  //     doc.setFont("helvetica", "normal");
+  //     doc.text(
+  //       `${formatearMoneda(detalle.tarifa_subsecuente)}/km`,
+  //       marginLeft + 30,
+  //       yPos
+  //     );
+  //     yPos += 4;
+  //   }
 
-    if (detalle.precio_m3) {
-      doc.setFont("helvetica", "bold");
-      doc.text("Precio/m³:", marginLeft, yPos);
-      doc.setFont("helvetica", "normal");
-      doc.text(formatearMoneda(detalle.precio_m3), marginLeft + 30, yPos);
-      yPos += 4;
-    }
+  //   if (detalle.precio_m3) {
+  //     doc.setFont("helvetica", "bold");
+  //     doc.text("Precio/m³:", marginLeft, yPos);
+  //     doc.setFont("helvetica", "normal");
+  //     doc.text(formatearMoneda(detalle.precio_m3), marginLeft + 30, yPos);
+  //     yPos += 4;
+  //   }
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.text("Costo Total:", marginLeft, yPos);
-    doc.text(
-      formatearMoneda(detalle.costo_total) + " MXN",
-      marginLeft + 30,
-      yPos
-    );
-    yPos += 5;
-  }
+  //   doc.setFont("helvetica", "bold");
+  //   doc.setFontSize(9);
+  //   doc.text("Costo Total:", marginLeft, yPos);
+  //   doc.text(
+  //     formatearMoneda(detalle.costo_total) + " MXN",
+  //     marginLeft + 30,
+  //     yPos
+  //   );
+  //   yPos += 5;
+  // }
 
   // ========================================
   // DATOS GENERALES
@@ -248,7 +248,7 @@ export const generarPDFMaterialPublico = (valeData) => {
   doc.setFont("helvetica", "normal");
   const operadorText = doc.splitTextToSize(
     valeData.operadores?.nombre_completo || "N/A",
-    pageWidth - marginLeft * 2
+    pageWidth - marginLeft * 2,
   );
   doc.text(operadorText, marginLeft, yPos);
   yPos += operadorText.length * 3 + 2;
@@ -265,7 +265,7 @@ export const generarPDFMaterialPublico = (valeData) => {
   doc.setFont("helvetica", "normal");
   const sindicatoText = doc.splitTextToSize(
     valeData.vehiculos?.sindicatos?.sindicato || "N/A",
-    pageWidth - marginLeft * 2
+    pageWidth - marginLeft * 2,
   );
   doc.text(sindicatoText, marginLeft, yPos);
   yPos += sindicatoText.length * 3 + 5;
@@ -283,7 +283,7 @@ export const generarPDFMaterialPublico = (valeData) => {
     doc.setFont("helvetica", "normal");
     const notasText = doc.splitTextToSize(
       detalle.notas_adicionales,
-      pageWidth - marginLeft * 2
+      pageWidth - marginLeft * 2,
     );
     doc.text(notasText, marginLeft, yPos);
     yPos += notasText.length * 3 + 5;
@@ -299,7 +299,7 @@ export const generarPDFMaterialPublico = (valeData) => {
     `Emitida: ${formatearFechaCorta(valeData.fecha_creacion)} ${formatearHora(valeData.fecha_creacion)}`,
     centerX,
     yPos,
-    { align: "center" }
+    { align: "center" },
   );
 
   // Descargar
@@ -378,7 +378,7 @@ export const generarPDFRentaPublico = (valeData) => {
   doc.setFont("helvetica", "normal");
   const obraText = doc.splitTextToSize(
     valeData.obras?.obra || "N/A",
-    pageWidth - marginLeft * 2
+    pageWidth - marginLeft * 2,
   );
   doc.text(obraText, marginLeft, yPos);
   yPos += obraText.length * 3 + 2;
@@ -391,7 +391,7 @@ export const generarPDFRentaPublico = (valeData) => {
   doc.setFont("helvetica", "normal");
   const sindicatoText = doc.splitTextToSize(
     detalle.sindicatos?.sindicato || "N/A",
-    pageWidth - marginLeft * 2
+    pageWidth - marginLeft * 2,
   );
   doc.text(sindicatoText, marginLeft, yPos);
   yPos += sindicatoText.length * 3 + 2;
@@ -413,7 +413,7 @@ export const generarPDFRentaPublico = (valeData) => {
   doc.setFont("helvetica", "normal");
   const materialText = doc.splitTextToSize(
     detalle.material?.material || "N/A",
-    pageWidth - marginLeft * 2
+    pageWidth - marginLeft * 2,
   );
   doc.text(materialText, marginLeft, yPos);
   yPos += materialText.length * 3 + 2;
@@ -441,7 +441,7 @@ export const generarPDFRentaPublico = (valeData) => {
   doc.text(
     detalle.hora_inicio ? formatearHora(detalle.hora_inicio) : "N/A",
     marginLeft + 25,
-    yPos
+    yPos,
   );
   yPos += 4;
 
@@ -455,7 +455,7 @@ export const generarPDFRentaPublico = (valeData) => {
         ? formatearHora(detalle.hora_fin)
         : "Pendiente",
     marginLeft + 25,
-    yPos
+    yPos,
   );
   yPos += 4;
 
@@ -465,7 +465,7 @@ export const generarPDFRentaPublico = (valeData) => {
   doc.text(
     esRentaPorDia ? "N/A" : `${detalle.total_horas || 0} hrs`,
     marginLeft + 25,
-    yPos
+    yPos,
   );
   yPos += 4;
 
@@ -478,35 +478,35 @@ export const generarPDFRentaPublico = (valeData) => {
   doc.line(marginLeft, yPos, pageWidth - marginLeft, yPos);
   yPos += 4;
 
-  const precioRenta = detalle.precios_renta || {};
+  // const precioRenta = detalle.precios_renta || {};
 
-  if (precioRenta.costo_hr) {
-    doc.setFont("helvetica", "bold");
-    doc.text("Tarifa/Hora:", marginLeft, yPos);
-    doc.setFont("helvetica", "normal");
-    doc.text(formatearMoneda(precioRenta.costo_hr), marginLeft + 25, yPos);
-    yPos += 4;
-  }
+  // if (precioRenta.costo_hr) {
+  //   doc.setFont("helvetica", "bold");
+  //   doc.text("Tarifa/Hora:", marginLeft, yPos);
+  //   doc.setFont("helvetica", "normal");
+  //   doc.text(formatearMoneda(precioRenta.costo_hr), marginLeft + 25, yPos);
+  //   yPos += 4;
+  // }
 
-  if (precioRenta.costo_dia) {
-    doc.setFont("helvetica", "bold");
-    doc.text("Tarifa/Día:", marginLeft, yPos);
-    doc.setFont("helvetica", "normal");
-    doc.text(formatearMoneda(precioRenta.costo_dia), marginLeft + 25, yPos);
-    yPos += 4;
-  }
+  // if (precioRenta.costo_dia) {
+  //   doc.setFont("helvetica", "bold");
+  //   doc.text("Tarifa/Día:", marginLeft, yPos);
+  //   doc.setFont("helvetica", "normal");
+  //   doc.text(formatearMoneda(precioRenta.costo_dia), marginLeft + 25, yPos);
+  //   yPos += 4;
+  // }
 
-  if (detalle.costo_total) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.text("Costo Total:", marginLeft, yPos);
-    doc.text(
-      formatearMoneda(detalle.costo_total) + " MXN",
-      marginLeft + 25,
-      yPos
-    );
-    yPos += 5;
-  }
+  // if (detalle.costo_total) {
+  //   doc.setFont("helvetica", "bold");
+  //   doc.setFontSize(9);
+  //   doc.text("Costo Total:", marginLeft, yPos);
+  //   doc.text(
+  //     formatearMoneda(detalle.costo_total) + " MXN",
+  //     marginLeft + 25,
+  //     yPos,
+  //   );
+  //   yPos += 5;
+  // }
 
   // ========================================
   // DATOS GENERALES
@@ -522,7 +522,7 @@ export const generarPDFRentaPublico = (valeData) => {
   doc.setFont("helvetica", "normal");
   const operadorText = doc.splitTextToSize(
     valeData.operadores?.nombre_completo || "N/A",
-    pageWidth - marginLeft * 2
+    pageWidth - marginLeft * 2,
   );
   doc.text(operadorText, marginLeft, yPos);
   yPos += operadorText.length * 3 + 2;
@@ -555,7 +555,7 @@ export const generarPDFRentaPublico = (valeData) => {
     }`;
     const residenteText = doc.splitTextToSize(
       residenteNombre,
-      pageWidth - marginLeft * 2
+      pageWidth - marginLeft * 2,
     );
     doc.text(residenteText, marginLeft, yPos);
     yPos += residenteText.length * 3 + 5;
@@ -574,7 +574,7 @@ export const generarPDFRentaPublico = (valeData) => {
     doc.setFont("helvetica", "normal");
     const notasText = doc.splitTextToSize(
       detalle.notas_adicionales,
-      pageWidth - marginLeft * 2
+      pageWidth - marginLeft * 2,
     );
     doc.text(notasText, marginLeft, yPos);
     yPos += notasText.length * 3 + 5;
@@ -590,7 +590,7 @@ export const generarPDFRentaPublico = (valeData) => {
     `Emitida: ${formatearFechaCorta(valeData.fecha_creacion)} ${formatearHora(valeData.fecha_creacion)}`,
     centerX,
     yPos,
-    { align: "center" }
+    { align: "center" },
   );
 
   doc.save(`Vale_${valeData.folio}_Web.pdf`);

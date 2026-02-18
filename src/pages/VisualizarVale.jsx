@@ -24,7 +24,14 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
+  LogIn,
+  Eye,
+  EyeOff,
+  Lock,
 } from "lucide-react";
+
+// 3. Hooks personalizados
+import { useAuth } from "../hooks/useAuth";
 
 // 3. Config
 import { supabase } from "../config/supabase";
@@ -52,12 +59,21 @@ import "../styles/visualizar-vale.css";
 const VisualizarVale = () => {
   const { folio } = useParams();
   const navigate = useNavigate();
+  const { user, userProfile, signIn } = useAuth();
 
   // Estados
   const [vale, setVale] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
+
+  // Login estados
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState(null);
 
   /**
    * Obtener clase de fondo según estado del vale
@@ -74,6 +90,58 @@ const VisualizarVale = () => {
     };
     return backgroundClasses[estado] || "";
   };
+
+  /**
+   * Verificar si el usuario puede ver precios
+   * Lógica:
+   * - Sin sesión: NO ver precios
+   * - Administrador: SÍ ver precios de todos los vales
+   * - Sindicato: SÍ ver precios SOLO de vales de su sindicato
+   */
+  const puedeVerPrecios = () => {
+    console.log("=== DEBUG puedeVerPrecios ===");
+    console.log("1. user:", user);
+    console.log("2. userProfile:", userProfile);
+    console.log("3. vale completo:", vale);
+
+    // Sin autenticación, no puede ver precios
+    if (!user || !userProfile) {
+      console.log("❌ NO hay user o userProfile");
+      return false;
+    }
+
+    console.log("4. Role del usuario:", userProfile.roles?.role);
+
+    // Administrador ve todos los precios
+    if (userProfile.roles?.role === "Administrador") {
+      console.log("✅ Es ADMINISTRADOR - puede ver precios");
+      return true;
+    }
+
+    // Sindicato solo ve precios de vales de su sindicato
+    if (userProfile.roles?.role === "Sindicato") {
+      const sindicatoUsuario = userProfile.id_sindicato;
+      const sindicatoOperador = vale?.operadores?.id_sindicato;
+
+      console.log("5. Es SINDICATO");
+      console.log("6. sindicatoUsuario:", sindicatoUsuario);
+      console.log("7. sindicatoOperador:", sindicatoOperador);
+      console.log("8. vale.operadores completo:", vale?.operadores);
+
+      const tienePermiso =
+        sindicatoUsuario && sindicatoUsuario === sindicatoOperador;
+      console.log("9. ¿Tiene permiso?", tienePermiso);
+
+      return tienePermiso;
+    }
+
+    console.log("❌ Rol no reconocido:", userProfile.roles?.role);
+    // Otros roles no ven precios
+    return false;
+  };
+
+  const mostrarPrecios = puedeVerPrecios();
+  console.log("10. RESULTADO FINAL mostrarPrecios:", mostrarPrecios);
 
   /**
    * Cargar datos del vale desde BD
@@ -119,7 +187,8 @@ const VisualizarVale = () => {
             ),
             operadores:id_operador (
               id_operador,
-              nombre_completo
+              nombre_completo,
+              id_sindicato
             ),
             vehiculos:id_vehiculo (
               id_vehiculo,
@@ -283,6 +352,49 @@ const VisualizarVale = () => {
       // No bloqueamos si falla el registro
       console.error("[VisualizarVale] Error al registrar acceso:", error);
     }
+  };
+
+  /**
+   * Manejar login desde el modal
+   */
+  const handleLogin = async (e) => {
+    e.preventDefault();
+
+    try {
+      setLoginLoading(true);
+      setLoginError(null);
+
+      // Intentar iniciar sesión
+      const { error } = await signIn(loginEmail, loginPassword);
+
+      if (error) {
+        setLoginError(error.message || "Credenciales inválidas");
+        return;
+      }
+
+      // Si login exitoso, cerrar modal
+      setShowLoginModal(false);
+      setLoginEmail("");
+      setLoginPassword("");
+
+      // Recargar datos del vale para verificar permisos
+      // (el useEffect se ejecutará automáticamente al cambiar user)
+    } catch (error) {
+      console.error("[VisualizarVale] Error en login:", error);
+      setLoginError("Error al iniciar sesión. Intenta nuevamente.");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  /**
+   * Cerrar modal de login
+   */
+  const handleCloseModal = () => {
+    setShowLoginModal(false);
+    setLoginEmail("");
+    setLoginPassword("");
+    setLoginError(null);
   };
 
   /**
@@ -459,11 +571,17 @@ const VisualizarVale = () => {
 
         {/* DATOS ESPECÍFICOS POR TIPO */}
         {vale.tipo_vale === "material" && detalleMaterial && (
-          <DetallesMaterial detalle={detalleMaterial} />
+          <DetallesMaterial
+            detalle={detalleMaterial}
+            mostrarPrecios={mostrarPrecios}
+          />
         )}
 
         {vale.tipo_vale === "renta" && detalleRenta && (
-          <DetallesRenta detalle={detalleRenta} />
+          <DetallesRenta
+            detalle={detalleRenta}
+            mostrarPrecios={mostrarPrecios}
+          />
         )}
 
         <div className="divider"></div>
@@ -550,12 +668,115 @@ const VisualizarVale = () => {
             )}
           </button>
 
+          {/* Botón para iniciar sesión si no está autenticado */}
+          {!user && (
+            <button
+              onClick={() => setShowLoginModal(true)}
+              className="btn-login"
+              style={{ backgroundColor: colors.success }}
+            >
+              <LogIn size={20} />
+              <span>Iniciar Sesión para Ver Precios</span>
+            </button>
+          )}
+
+          {/* Mensaje si está autenticado pero no tiene permisos */}
+          {user && !mostrarPrecios && (
+            <div className="info-message">
+              <Lock size={20} />
+              <p>No tienes permisos para ver los precios de este vale</p>
+            </div>
+          )}
+
           <p className="footer-text">
             <CheckCircle size={16} />
             Vale emitido el {formatearFecha(vale.fecha_creacion)}
           </p>
         </div>
       </div>
+
+      {/* Modal de login */}
+      {showLoginModal && (
+        <div className="modal-overlay" onClick={handleCloseModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Iniciar Sesión</h3>
+              <button
+                className="modal-close"
+                onClick={handleCloseModal}
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleLogin} className="login-form">
+              {loginError && (
+                <div className="login-error">
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label htmlFor="email">Correo Electrónico</label>
+                <input
+                  id="email"
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="tu@correo.com"
+                  required
+                  autoComplete="email"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="password">Contraseña</label>
+                <div className="password-input">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    className="toggle-password"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={
+                      showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+                    }
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="submit-button"
+                disabled={loginLoading}
+                style={{ backgroundColor: colors.primary }}
+              >
+                {loginLoading ? (
+                  <>
+                    <Loader2 size={20} className="spinner" />
+                    Iniciando...
+                  </>
+                ) : (
+                  <>
+                    <LogIn size={20} />
+                    Iniciar Sesión
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -564,7 +785,7 @@ const VisualizarVale = () => {
 // COMPONENTE: DETALLES DE MATERIAL
 // ========================================
 
-const DetallesMaterial = ({ detalle }) => {
+const DetallesMaterial = ({ detalle, mostrarPrecios }) => {
   return (
     <div className="vale-section">
       <h3 className="section-title">DATOS DE VALE</h3>
@@ -625,8 +846,8 @@ const DetallesMaterial = ({ detalle }) => {
         </div>
       )}
 
-      {/* PRECIOS (si existen) */}
-      {detalle.costo_total && (
+      {/* PRECIOS (solo si tiene permiso) */}
+      {mostrarPrecios && detalle.costo_total && (
         <>
           <div className="divider-thin"></div>
 
@@ -673,7 +894,7 @@ const DetallesMaterial = ({ detalle }) => {
 // COMPONENTE: DETALLES DE RENTA
 // ========================================
 
-const DetallesRenta = ({ detalle }) => {
+const DetallesRenta = ({ detalle, mostrarPrecios }) => {
   // MODIFICADO: Detectar renta por día si total_dias > 0
   const totalDias = Number(detalle.total_dias || 0);
   const esRentaPorDia = totalDias > 0;
@@ -741,31 +962,38 @@ const DetallesRenta = ({ detalle }) => {
 
       <div className="divider-thin"></div>
 
-      {detalle.precios_renta?.costo_hr && (
-        <div className="info-row">
-          <span className="info-label">Tarifa/Hora:</span>
-          <span className="info-value">
-            {formatearMoneda(detalle.precios_renta.costo_hr)}
-          </span>
-        </div>
-      )}
+      {/* PRECIOS (solo si tiene permiso) */}
+      {mostrarPrecios && (
+        <>
+          <div className="divider-thin"></div>
 
-      {detalle.precios_renta?.costo_dia && (
-        <div className="info-row">
-          <span className="info-label">Tarifa/Día:</span>
-          <span className="info-value">
-            {formatearMoneda(detalle.precios_renta.costo_dia)}
-          </span>
-        </div>
-      )}
+          {detalle.precios_renta?.costo_hr && (
+            <div className="info-row">
+              <span className="info-label">Tarifa/Hora:</span>
+              <span className="info-value">
+                {formatearMoneda(detalle.precios_renta.costo_hr)}
+              </span>
+            </div>
+          )}
 
-      {detalle.costo_total && (
-        <div className="info-row info-row-total">
-          <span className="info-label">Costo Total:</span>
-          <span className="info-value">
-            {formatearMoneda(detalle.costo_total)} MXN
-          </span>
-        </div>
+          {detalle.precios_renta?.costo_dia && (
+            <div className="info-row">
+              <span className="info-label">Tarifa/Día:</span>
+              <span className="info-value">
+                {formatearMoneda(detalle.precios_renta.costo_dia)}
+              </span>
+            </div>
+          )}
+
+          {detalle.costo_total && (
+            <div className="info-row info-row-total">
+              <span className="info-label">Costo Total:</span>
+              <span className="info-value">
+                {formatearMoneda(detalle.costo_total)} MXN
+              </span>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
