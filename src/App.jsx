@@ -8,7 +8,7 @@
  * Rutas protegidas con ProtectedRoute
  */
 
-// 1. React y hooks
+// 1. React Router
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 // 2. Config y Context
@@ -26,6 +26,7 @@ import Conciliaciones from "./pages/Conciliaciones";
 import VerificarVales from "./pages/VerificarVales";
 import VisualizarVale from "./pages/VisualizarVale";
 import Operadores from "./pages/Operadores";
+import HistorialConciliaciones from "./pages/HistorialConciliaciones";
 
 // 5. Estilos
 import "./styles/global.css";
@@ -38,14 +39,14 @@ const App = () => {
           {/* Ruta pública - Login */}
           <Route path="/login" element={<Login />} />
 
-          {/* Ruta raíz - Redireccionar a dashboard */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          {/* Ruta raíz - Redirige a vales (accesible por todos los roles) */}
+          <Route path="/" element={<Navigate to="/vales" replace />} />
 
-          {/* Rutas protegidas - Requieren autenticación */}
+          {/* Dashboard - solo Administrador */}
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredRole="Administrador">
                 <Layout>
                   <Dashboard />
                 </Layout>
@@ -53,10 +54,11 @@ const App = () => {
             }
           />
 
+          {/* Operadores - solo Administrador */}
           <Route
             path="/operadores"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredRole="Administrador">
                 <Layout>
                   <Operadores />
                 </Layout>
@@ -64,6 +66,7 @@ const App = () => {
             }
           />
 
+          {/* Vales - todos los roles autenticados */}
           <Route
             path="/vales"
             element={
@@ -75,6 +78,7 @@ const App = () => {
             }
           />
 
+          {/* Verificar Vales - todos los roles autenticados */}
           <Route
             path="/verificar-vales"
             element={
@@ -86,6 +90,7 @@ const App = () => {
             }
           />
 
+          {/* Conciliaciones - todos los roles autenticados */}
           <Route
             path="/conciliaciones"
             element={
@@ -97,11 +102,23 @@ const App = () => {
             }
           />
 
+          {/* Historial de Conciliaciones - todos los roles autenticados */}
+          <Route
+            path="/historial-conciliaciones"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <HistorialConciliaciones />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
           {/* RUTA PÚBLICA - Visualización de vale sin autenticación */}
           <Route path="/vale/:folio" element={<VisualizarVale />} />
 
-          {/* Ruta 404 */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          {/* Ruta 404 - Redirige a vales */}
+          <Route path="*" element={<Navigate to="/vales" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

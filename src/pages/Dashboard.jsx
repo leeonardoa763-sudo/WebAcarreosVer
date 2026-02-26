@@ -34,7 +34,6 @@ import GraficaTendenciaMensual from "../components/dashboard/GraficaTendenciaMen
 import GraficaDistribucionObras from "../components/dashboard/GraficaDistribucionObras";
 import GraficaTipoVales from "../components/dashboard/GraficaTipoVales";
 import GraficaTopMateriales from "../components/dashboard/GraficaTopMateriales";
-import SeccionConciliaciones from "../components/dashboard/SeccionConciliaciones";
 
 // 6. Estilos
 import "../styles/dashboard.css";
@@ -219,13 +218,6 @@ const Dashboard = () => {
           obraSeleccionada={obraSeleccionadaMateriales}
           onCambioObra={cambiarObraMateriales}
         />
-      </div>
-
-      {/* ========================================
-          SECCIÓN 5: CONCILIACIONES RECIENTES
-      ======================================== */}
-      <div style={{ marginTop: "32px" }}>
-        <SeccionConciliaciones />
       </div>
     </div>
   );
