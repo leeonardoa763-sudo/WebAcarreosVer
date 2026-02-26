@@ -25,15 +25,21 @@ import LoginForm from "../components/auth/LoginForm";
 import "../styles/auth.css";
 
 const Login = () => {
-  const { isAuthenticated, loading, user } = useAuth();
+  const { isAuthenticated, loading, userProfile } = useAuth();
   const navigate = useNavigate();
 
-  // Redireccionar si ya está autenticado SOLO después de que termine el loading inicial
+  // Redireccionar según rol una vez autenticado y con perfil cargado
   useEffect(() => {
-    if (!loading && isAuthenticated) {
-      navigate("/dashboard", { replace: true });
+    if (!loading && isAuthenticated && userProfile?.roles?.role) {
+      const rol = userProfile.roles.role;
+
+      if (rol === "Administrador") {
+        navigate("/dashboard", { replace: true });
+      } else {
+        navigate("/vales", { replace: true });
+      }
     }
-  }, [isAuthenticated, loading, navigate]);
+  }, [isAuthenticated, loading, userProfile, navigate]);
 
   // Mostrar loading mientras verifica sesión inicial
   if (loading) {
