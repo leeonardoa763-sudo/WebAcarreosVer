@@ -54,11 +54,11 @@ const App = () => {
             }
           />
 
-          {/* Operadores - solo Administrador */}
+          {/* Operadores - Administrador y Sindicato */}
           <Route
             path="/operadores"
             element={
-              <ProtectedRoute requiredRole="Administrador">
+              <ProtectedRoute requiredRole={["Administrador", "Sindicato"]}>
                 <Layout>
                   <Operadores />
                 </Layout>

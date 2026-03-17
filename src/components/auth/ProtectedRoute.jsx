@@ -161,7 +161,10 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   }
 
   // Si se requiere un rol específico, validar
-  if (requiredRole && userProfile.roles?.role !== requiredRole) {
+  const rolesPermitidos = Array.isArray(requiredRole)
+    ? requiredRole
+    : [requiredRole];
+  if (requiredRole && !rolesPermitidos.includes(userProfile.roles?.role)) {
     return (
       <div className="protected-route-error">
         <h2>Acceso Denegado</h2>

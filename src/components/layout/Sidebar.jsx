@@ -59,7 +59,7 @@ const Sidebar = () => {
         </NavLink>
 
         {/* Operadores - solo Administrador */}
-        {esAdministrador && (
+        {(esAdministrador || esSindicato) && (
           <NavLink
             to="/operadores"
             className={({ isActive }) =>
