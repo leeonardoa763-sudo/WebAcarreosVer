@@ -8,6 +8,8 @@
  * - Muestra detalles de cada vale
  * - Subtotales por grupo de placas
  *
+ * Nota: Muestra fecha_programada si existe, si no fecha_creacion
+ *
  * Usado en: Conciliaciones.jsx
  */
 
@@ -30,6 +32,17 @@ import {
   formatearVolumen,
   formatearDuracion,
 } from "../../utils/formatters";
+
+/**
+ * Obtener la fecha efectiva de un vale para mostrar en tabla.
+ * Usa fecha_programada si existe, si no usa fecha_creacion.
+ *
+ * @param {Object} vale - Objeto vale
+ * @returns {string} - Fecha efectiva para mostrar
+ */
+const obtenerFechaEfectiva = (vale) => {
+  return vale.fecha_programada || vale.fecha_creacion;
+};
 
 const TablaConciliacionRenta = ({ valesAgrupados }) => {
   const [collapsed, setCollapsed] = useState({});
@@ -126,7 +139,10 @@ const TablaConciliacionRenta = ({ valesAgrupados }) => {
                       {grupo.vales.map((vale) =>
                         vale.vale_renta_detalle.map((detalle, idx) => (
                           <tr key={`${vale.id_vale}-${idx}`}>
-                            <td>{formatearFechaCorta(vale.fecha_creacion)}</td>
+                            {/* Mostrar fecha efectiva: programada si existe, si no creacion */}
+                            <td>
+                              {formatearFechaCorta(obtenerFechaEfectiva(vale))}
+                            </td>
                             <td className="tabla-vales__folio">{vale.folio}</td>
                             <td>
                               <div className="tabla-vales__material">
@@ -152,7 +168,7 @@ const TablaConciliacionRenta = ({ valesAgrupados }) => {
                               {formatearMoneda(detalle.costo_total || 0)}
                             </td>
                           </tr>
-                        ))
+                        )),
                       )}
                     </tbody>
                   </table>

@@ -10,12 +10,29 @@
  * - Incluir todas las relaciones necesarias
  * - Calcular totales por grupo
  *
+ * Nota: Los filtros de fecha y ordenamiento usan fecha_programada si existe,
+ * con fallback a fecha_creacion.
+ *
  * Dependencias: supabase
  * Usado en: useOperadores.js
  */
 
 // 1. Config
 import { supabase } from "../../config/supabase";
+
+/**
+ * Obtener la fecha efectiva de un vale.
+ * Usa fecha_programada si existe, si no usa fecha_creacion.
+ *
+ * @param {Object} vale - Objeto vale
+ * @returns {Date} - Fecha efectiva del vale
+ */
+const obtenerFechaEfectiva = (vale) => {
+  if (vale.fecha_programada) {
+    return new Date(vale.fecha_programada);
+  }
+  return new Date(vale.fecha_creacion);
+};
 
 /**
  * Construir query base con todas las relaciones
@@ -30,6 +47,7 @@ const construirQueryBase = (tipoVale) => {
       tipo_vale,
       estado,
       fecha_creacion,
+      fecha_programada,
       id_obra,
       id_empresa,
       id_operador,
@@ -37,7 +55,7 @@ const construirQueryBase = (tipoVale) => {
       verificado_por_sindicato,
       fecha_verificacion,
       archivado,
-      
+
       obras!inner (
         id_obra,
         obra,
@@ -50,7 +68,7 @@ const construirQueryBase = (tipoVale) => {
           logo
         )
       ),
-      
+
       operadores (
         id_operador,
         nombre_completo,
@@ -62,19 +80,19 @@ const construirQueryBase = (tipoVale) => {
           sindicato
         )
       ),
-      
+
       vehiculos!inner (
         id_vehiculo,
         placas,
         activo
       ),
-      
+
       persona:id_persona_creador (
-            nombre,
-            primer_apellido,
-            segundo_apellido
-          ),
-      
+        nombre,
+        primer_apellido,
+        segundo_apellido
+      ),
+
       ${
         tipoVale === "material"
           ? `vale_material_detalles (
@@ -121,7 +139,7 @@ const construirQueryBase = (tipoVale) => {
               id_sindicato,
               sindicato
             ),
-            precios_renta:id_precios_renta (    
+            precios_renta:id_precios_renta (
               id_precios_renta,
               costo_hr,
               costo_dia
@@ -136,12 +154,15 @@ const construirQueryBase = (tipoVale) => {
 
 /**
  * Aplicar filtros a la query
+ * Usa fecha_programada si existe, si no fecha_creacion
  */
 const aplicarFiltros = (query, filtros) => {
   if (filtros.fecha_inicio && filtros.fecha_fin) {
-    query = query
-      .gte("fecha_creacion", filtros.fecha_inicio)
-      .lte("fecha_creacion", filtros.fecha_fin);
+    // Buscar vales cuya fecha efectiva esté en el rango
+    query = query.or(
+      `and(fecha_programada.gte.${filtros.fecha_inicio},fecha_programada.lte.${filtros.fecha_fin}),` +
+        `and(fecha_programada.is.null,fecha_creacion.gte.${filtros.fecha_inicio},fecha_creacion.lte.${filtros.fecha_fin})`,
+    );
   }
 
   if (filtros.id_empresa) {
@@ -152,8 +173,7 @@ const aplicarFiltros = (query, filtros) => {
     query = query.eq("id_obra", filtros.id_obra);
   }
 
-  // Para sindicato, necesitamos filtrar por el sindicato del vehículo
-  // Lo haremos en el cliente después de obtener los datos
+  // Sindicato se filtra en el cliente después de obtener los datos
 
   return query;
 };
@@ -182,7 +202,6 @@ export const obtenerValesMaterialAgrupados = async (filtros, userProfile) => {
       };
     }
 
-    // Agrupar datos
     const agrupado = agruparValesPorEmpresaPlacasEstado(
       vales,
       "material",
@@ -221,7 +240,6 @@ export const obtenerValesRentaAgrupados = async (filtros, userProfile) => {
       };
     }
 
-    // Agrupar datos
     const agrupado = agruparValesPorEmpresaPlacasEstado(
       vales,
       "renta",
@@ -257,7 +275,6 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
     const placas = vale.vehiculos?.placas || "Sin placas";
     const estado = vale.estado || "sin_estado";
 
-    // Inicializar empresa si no existe
     if (!porEmpresa[idEmpresa]) {
       porEmpresa[idEmpresa] = {
         id_empresa: idEmpresa,
@@ -268,7 +285,6 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
       };
     }
 
-    // Inicializar vehículo (placas) si no existe
     if (!porEmpresa[idEmpresa].vehiculos[placas]) {
       porEmpresa[idEmpresa].vehiculos[placas] = {
         placas: placas,
@@ -277,7 +293,6 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
       };
     }
 
-    // Inicializar estado si no existe
     if (!porEmpresa[idEmpresa].vehiculos[placas].porEstado[estado]) {
       porEmpresa[idEmpresa].vehiculos[placas].porEstado[estado] = {
         estado: estado,
@@ -285,7 +300,6 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
       };
     }
 
-    // Agregar vale al estado
     porEmpresa[idEmpresa].vehiculos[placas].porEstado[estado].vales.push(vale);
   });
 
@@ -294,12 +308,11 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
     const vehiculosArray = Object.values(empresa.vehiculos).map((vehiculo) => {
       const estadosArray = Object.values(vehiculo.porEstado).map(
         (estadoGrupo) => {
-          // Ordenar vales por fecha (más reciente primero)
+          // Ordenar vales por fecha efectiva (más reciente primero)
           const valesOrdenados = estadoGrupo.vales.sort(
-            (a, b) => new Date(b.fecha_creacion) - new Date(a.fecha_creacion),
+            (a, b) => obtenerFechaEfectiva(b) - obtenerFechaEfectiva(a),
           );
 
-          // Calcular totales del estado
           const totalesEstado = calcularTotalesEstado(valesOrdenados, tipoVale);
 
           return {
@@ -310,10 +323,7 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
         },
       );
 
-      // Ordenar estados (verificado, en_proceso, emitido, etc.)
       const estadosOrdenados = ordenarEstados(estadosArray);
-
-      // Calcular totales del vehículo
       const totalesVehiculo = calcularTotalesVehiculo(
         estadosOrdenados,
         tipoVale,
@@ -326,12 +336,10 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
       };
     });
 
-    // Ordenar vehículos por placas
     const vehiculosOrdenados = vehiculosArray.sort((a, b) =>
       a.placas.localeCompare(b.placas),
     );
 
-    // Calcular totales de la empresa
     const totalesEmpresa = calcularTotalesEmpresa(vehiculosOrdenados, tipoVale);
 
     return {
@@ -341,12 +349,10 @@ const agruparValesPorEmpresaPlacasEstado = (vales, tipoVale, filtros) => {
     };
   });
 
-  // Ordenar empresas alfabéticamente
   const empresasOrdenadas = empresasArray.sort((a, b) =>
     a.nombre_empresa.localeCompare(b.nombre_empresa),
   );
 
-  // Calcular resumen general
   const resumen = calcularResumenGeneral(empresasOrdenadas, tipoVale);
 
   return {
@@ -377,7 +383,6 @@ const calcularTotalesEstado = (vales, tipoVale) => {
       totalM3: Number(totalM3.toFixed(2)),
     };
   } else {
-    // Renta - Sumar numero_viajes de los detalles
     const totalViajes = vales.reduce((sum, vale) => {
       const detalles = vale.vale_renta_detalle || [];
       const viajesVale = detalles.reduce(

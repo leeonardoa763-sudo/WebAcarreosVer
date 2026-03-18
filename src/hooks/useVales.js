@@ -45,13 +45,13 @@ export const useVales = () => {
   // Estados de catálogos
   const [obras, setObras] = useState(initialCatalogosState.obras);
   const [materiales, setMateriales] = useState(
-    initialCatalogosState.materiales
+    initialCatalogosState.materiales,
   );
   const [sindicatos, setSindicatos] = useState(
-    initialCatalogosState.sindicatos
+    initialCatalogosState.sindicatos,
   );
   const [loadingCatalogos, setLoadingCatalogos] = useState(
-    initialCatalogosState.loadingCatalogos
+    initialCatalogosState.loadingCatalogos,
   );
 
   // Hooks de módulos

@@ -10,12 +10,29 @@
  * - Exportar a Excel
  * - Validaciones
  *
+ * Nota: El export a Excel usa fecha_programada si existe,
+ * con fallback a fecha_creacion.
+ *
  * Dependencias: colors.js
  * Usado en: useOperadores.js
  */
 
 // 1. Config
 import { colors } from "../../config/colors";
+
+/**
+ * Obtener la fecha efectiva de un vale para mostrar.
+ * Usa fecha_programada si existe, si no usa fecha_creacion.
+ * Devuelve string en formato DD/MM/YYYY.
+ *
+ * @param {Object} vale - Objeto vale
+ * @returns {string} - Fecha formateada DD/MM/YYYY
+ */
+const obtenerFechaEfectivaFormateada = (vale) => {
+  const fechaRaw = vale.fecha_programada || vale.fecha_creacion || "";
+  if (!fechaRaw) return "";
+  return fechaRaw.split("T")[0].split("-").reverse().join("/");
+};
 
 /**
  * Obtener color según empresa
@@ -55,14 +72,14 @@ export const obtenerEtiquetaEstado = (estado) => {
  */
 export const obtenerColorEstado = (estado) => {
   const colores = {
-    borrador: "#94A3B8", // Gris
-    en_proceso: "#3B82F6", // Azul
-    emitido: "#8B5CF6", // Púrpura
-    verificado: "#10B981", // Verde
-    pagado: "#059669", // Verde oscuro
-    conciliado: "#0891B2", // Cyan
-    archivado: "#6B7280", // Gris oscuro
-    sin_estado: "#9CA3AF", // Gris claro
+    borrador: "#94A3B8",
+    en_proceso: "#3B82F6",
+    emitido: "#8B5CF6",
+    verificado: "#10B981",
+    pagado: "#059669",
+    conciliado: "#0891B2",
+    archivado: "#6B7280",
+    sin_estado: "#9CA3AF",
   };
 
   return colores[estado] || "#9CA3AF";
@@ -70,18 +87,17 @@ export const obtenerColorEstado = (estado) => {
 
 /**
  * Obtener componente de ícono del estado (lucide-react)
- * Retorna el nombre del ícono para usar con lucide-react
  */
 export const obtenerIconoEstado = (estado) => {
   const iconos = {
-    borrador: "FileEdit", // Archivo editándose
-    en_proceso: "Clock", // Reloj
-    emitido: "FileText", // Documento
-    verificado: "CheckCircle", // Check verde
-    pagado: "DollarSign", // Signo de dólar
-    conciliado: "FileCheck", // Archivo con check
-    archivado: "Archive", // Caja de archivo
-    sin_estado: "HelpCircle", // Interrogación
+    borrador: "FileEdit",
+    en_proceso: "Clock",
+    emitido: "FileText",
+    verificado: "CheckCircle",
+    pagado: "DollarSign",
+    conciliado: "FileCheck",
+    archivado: "Archive",
+    sin_estado: "HelpCircle",
   };
 
   return iconos[estado] || "File";
@@ -159,7 +175,7 @@ export const validarFiltrosActivos = (filtros) => {
 
 /**
  * Preparar datos de MATERIAL para exportar a Excel en formato tabla plana
- * Una fila por vale (repitiendo empresa, placas, obra en cada renglón)
+ * Una fila por vale. Usa fecha_programada si existe, si no fecha_creacion.
  */
 export const prepararDatosExcelMaterial = (datos) => {
   const filas = [];
@@ -171,22 +187,16 @@ export const prepararDatosExcelMaterial = (datos) => {
       const placas = vehiculo.placas || "";
 
       vehiculo.porEstado.forEach((estadoGrupo) => {
-        // Capitalizar primera letra del estado
         const estado =
           estadoGrupo.estado.charAt(0).toUpperCase() +
           estadoGrupo.estado.slice(1).replace("_", " ");
 
         estadoGrupo.vales.forEach((vale) => {
-          // Formatear fecha dd/mm/yyyy
-          const fechaRaw = vale.fecha_creacion || "";
-          const fecha = fechaRaw
-            ? fechaRaw.split("T")[0].split("-").reverse().join("/")
-            : "";
-
+          // Usar fecha efectiva: programada si existe, si no creacion
+          const fecha = obtenerFechaEfectivaFormateada(vale);
           const detalles = vale.vale_material_detalles || [];
 
           if (detalles.length === 0) {
-            // Vale sin detalles: una fila vacía
             filas.push({
               Empresa: nombreEmpresa,
               Placas: placas,
@@ -226,7 +236,7 @@ export const prepararDatosExcelMaterial = (datos) => {
 
 /**
  * Preparar datos de RENTA para exportar a Excel en formato tabla plana
- * Una fila por vale (repitiendo empresa, placas, obra en cada renglón)
+ * Una fila por vale. Usa fecha_programada si existe, si no fecha_creacion.
  */
 export const prepararDatosExcelRenta = (datos) => {
   const filas = [];
@@ -243,11 +253,8 @@ export const prepararDatosExcelRenta = (datos) => {
           estadoGrupo.estado.slice(1).replace("_", " ");
 
         estadoGrupo.vales.forEach((vale) => {
-          const fechaRaw = vale.fecha_creacion || "";
-          const fecha = fechaRaw
-            ? fechaRaw.split("T")[0].split("-").reverse().join("/")
-            : "";
-
+          // Usar fecha efectiva: programada si existe, si no creacion
+          const fecha = obtenerFechaEfectivaFormateada(vale);
           const detalles = vale.vale_renta_detalle || [];
 
           if (detalles.length === 0) {

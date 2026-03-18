@@ -9,8 +9,25 @@
  * - Búsqueda por folio, operador, placas, materiales
  * - Validación de filtros
  *
+ * Nota: Los filtros de fecha usan fecha_programada si existe,
+ * con fallback a fecha_creacion para vales sin fecha programada.
+ *
  * Usado en: useVales.js
  */
+
+/**
+ * Obtener la fecha efectiva de un vale.
+ * Usa fecha_programada si existe, si no usa fecha_creacion.
+ *
+ * @param {Object} vale - Objeto vale
+ * @returns {Date} - Fecha efectiva del vale
+ */
+const obtenerFechaEfectiva = (vale) => {
+  if (vale.fecha_programada) {
+    return new Date(vale.fecha_programada);
+  }
+  return new Date(vale.fecha_creacion);
+};
 
 /**
  * Hook para lógica de filtros
@@ -26,7 +43,7 @@ export const useValesFilters = () => {
     // 1. Filtro por obra
     if (filters.id_obra) {
       filteredData = filteredData.filter(
-        (vale) => vale.id_obra === filters.id_obra
+        (vale) => vale.id_obra === filters.id_obra,
       );
     }
 
@@ -36,13 +53,13 @@ export const useValesFilters = () => {
         // Para vales de material, buscar en vale_material_detalles
         if (vale.tipo_vale === "material" && vale.vale_material_detalles) {
           return vale.vale_material_detalles.some(
-            (detalle) => detalle.material?.id_material === filters.id_material
+            (detalle) => detalle.material?.id_material === filters.id_material,
           );
         }
         // Para vales de renta, buscar en vale_renta_detalle
         if (vale.tipo_vale === "renta" && vale.vale_renta_detalle) {
           return vale.vale_renta_detalle.some(
-            (detalle) => detalle.material?.id_material === filters.id_material
+            (detalle) => detalle.material?.id_material === filters.id_material,
           );
         }
         return false;
@@ -52,40 +69,41 @@ export const useValesFilters = () => {
     // 3. Filtro por sindicato (solo para vales de renta)
     if (filters.id_sindicato) {
       filteredData = filteredData.filter((vale) => {
-        const resultado =
-          vale.operadores?.sindicatos?.id_sindicato === filters.id_sindicato;
-
-        return resultado;
+        return (
+          vale.operadores?.sindicatos?.id_sindicato === filters.id_sindicato
+        );
       });
     }
 
-    // 3. Filtro por estado
+    // 4. Filtro por estado
     if (filters.estado) {
       filteredData = filteredData.filter(
-        (vale) => vale.estado === filters.estado
+        (vale) => vale.estado === filters.estado,
       );
     }
 
-    // 4. Filtro por fecha inicio
+    // 5. Filtro por fecha inicio
+    // Usa fecha_programada si existe, si no fecha_creacion
     if (filters.fecha_inicio) {
       const fechaInicio = new Date(filters.fecha_inicio);
       filteredData = filteredData.filter((vale) => {
-        const fechaVale = new Date(vale.fecha_creacion);
+        const fechaVale = obtenerFechaEfectiva(vale);
         return fechaVale >= fechaInicio;
       });
     }
 
-    // 5. Filtro por fecha fin
+    // 6. Filtro por fecha fin
+    // Usa fecha_programada si existe, si no fecha_creacion
     if (filters.fecha_fin) {
       const fechaFin = new Date(filters.fecha_fin);
       fechaFin.setDate(fechaFin.getDate() + 1); // Incluir todo el día
       filteredData = filteredData.filter((vale) => {
-        const fechaVale = new Date(vale.fecha_creacion);
+        const fechaVale = obtenerFechaEfectiva(vale);
         return fechaVale < fechaFin;
       });
     }
 
-    // 6. Filtro por búsqueda (folio, operador, placas, materiales)
+    // 7. Filtro por búsqueda (folio, operador, placas, materiales)
     if (filters.searchTerm) {
       filteredData = applySearchFilter(filteredData, filters.searchTerm);
     }
@@ -112,7 +130,7 @@ export const useValesFilters = () => {
         enMateriales = vale.vale_material_detalles.some(
           (detalle) =>
             detalle.material?.material?.toLowerCase().includes(searchLower) ||
-            detalle.bancos?.banco?.toLowerCase().includes(searchLower)
+            detalle.bancos?.banco?.toLowerCase().includes(searchLower),
         );
       }
 
@@ -120,7 +138,7 @@ export const useValesFilters = () => {
       let enRenta = false;
       if (vale.tipo_vale === "renta" && vale.vale_renta_detalle) {
         enRenta = vale.vale_renta_detalle.some((detalle) =>
-          detalle.material?.material?.toLowerCase().includes(searchLower)
+          detalle.material?.material?.toLowerCase().includes(searchLower),
         );
       }
 
@@ -142,7 +160,7 @@ export const useValesFilters = () => {
       filters.searchTerm ||
       filters.id_obra ||
       filters.id_material ||
-      filters.id_sindicato || // ← AGREGAR
+      filters.id_sindicato ||
       filters.estado ||
       filters.fecha_inicio ||
       filters.fecha_fin

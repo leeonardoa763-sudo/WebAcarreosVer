@@ -10,8 +10,29 @@
  * - Formateo de folios
  * - Helpers para estados y tipos
  *
+ * NOTA ZONA HORARIA:
+ * Los timestamps de Supabase vienen en UTC (ej: 2026-03-16T05:25:21+00:00).
+ * Para mostrar fechas de DÍAS (no horas), siempre extraemos solo YYYY-MM-DD
+ * antes de crear el objeto Date, evitando conversiones de zona horaria
+ * que podrían cambiar el día mostrado.
+ * Para mostrar HORAS, usamos timeZone: "America/Mexico_City".
+ *
  * Usado en: Todos los componentes que muestran datos
  */
+
+/**
+ * Extraer solo la parte de fecha (YYYY-MM-DD) de un timestamp ISO.
+ * Evita problemas de zona horaria al parsear solo la fecha sin hora.
+ *
+ * @param {string|Date} fecha - Fecha en formato ISO o Date object
+ * @returns {string} Fecha en formato YYYY-MM-DD
+ */
+const extraerFechaISO = (fecha) => {
+  if (!fecha) return null;
+  const str = typeof fecha === "string" ? fecha : fecha.toISOString();
+  // Tomar solo los primeros 10 caracteres: YYYY-MM-DD
+  return str.substring(0, 10);
+};
 
 /**
  * Formatear fecha a formato legible en español
@@ -23,22 +44,31 @@ export const formatearFecha = (fecha, incluirHora = false) => {
   if (!fecha) return "N/A";
 
   try {
-    const date = new Date(fecha);
+    // Extraer solo YYYY-MM-DD para evitar conversión de zona horaria
+    const soloFecha = extraerFechaISO(fecha);
+    // Parsear con T00:00:00 para que no haya conversión de zona
+    const date = new Date(`${soloFecha}T00:00:00`);
 
-    // Validar fecha válida
     if (isNaN(date.getTime())) return "Fecha inválida";
 
     const opciones = {
       year: "numeric",
       month: "long",
       day: "numeric",
-      timeZone: "America/Mexico_City",
     };
 
     if (incluirHora) {
-      opciones.hour = "2-digit";
-      opciones.minute = "2-digit";
-      opciones.hour12 = true;
+      // Para hora, usar el timestamp original con zona horaria correcta
+      const dateConHora = new Date(fecha);
+      return dateConHora.toLocaleString("es-MX", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+        timeZone: "America/Mexico_City",
+      });
     }
 
     return date.toLocaleDateString("es-MX", opciones);
@@ -50,21 +80,19 @@ export const formatearFecha = (fecha, incluirHora = false) => {
 
 /**
  * Formatear fecha a formato corto (DD/MM/YYYY)
+ * Siempre extrae solo la parte de fecha para evitar problemas de zona horaria
  * @param {string|Date} fecha - Fecha en formato ISO o Date object
- * @returns {string} Fecha formateada
+ * @returns {string} Fecha formateada DD/MM/YYYY
  */
 export const formatearFechaCorta = (fecha) => {
   if (!fecha) return "N/A";
 
   try {
-    const date = new Date(fecha);
+    // Extraer YYYY-MM-DD y parsear sin conversión de zona horaria
+    const soloFecha = extraerFechaISO(fecha);
+    if (!soloFecha) return "N/A";
 
-    if (isNaN(date.getTime())) return "Fecha inválida";
-
-    const dia = String(date.getDate()).padStart(2, "0");
-    const mes = String(date.getMonth() + 1).padStart(2, "0");
-    const anio = date.getFullYear();
-
+    const [anio, mes, dia] = soloFecha.split("-");
     return `${dia}/${mes}/${anio}`;
   } catch (error) {
     console.error("Error en formatearFechaCorta:", error);
@@ -74,6 +102,8 @@ export const formatearFechaCorta = (fecha) => {
 
 /**
  * Formatear fecha y hora de forma separada
+ * - Fecha: extrae YYYY-MM-DD sin conversión de zona horaria
+ * - Hora: convierte a hora México
  * @param {string|Date} fecha - Fecha en formato ISO o Date object
  * @returns {object} Objeto con fecha y hora separadas
  */
@@ -81,13 +111,15 @@ export const formatearFechaHora = (fecha) => {
   if (!fecha) return { fecha: "N/A", hora: "N/A" };
 
   try {
-    const date = new Date(fecha);
+    // Fecha: sin conversión de zona horaria
+    const fechaFormateada = formatearFechaCorta(fecha);
 
+    // Hora: con zona horaria México
+    const date = new Date(fecha);
     if (isNaN(date.getTime())) {
       return { fecha: "Fecha inválida", hora: "" };
     }
 
-    const fechaFormateada = formatearFechaCorta(fecha);
     const hora = date.toLocaleTimeString("es-MX", {
       hour: "2-digit",
       minute: "2-digit",
@@ -377,6 +409,7 @@ export const truncarTexto = (texto, maxLength = 50) => {
 
 /**
  * Formatear fecha para input type="date"
+ * Extrae solo YYYY-MM-DD sin conversión de zona horaria
  * @param {string|Date} fecha - Fecha a formatear
  * @returns {string} Fecha en formato YYYY-MM-DD
  */
@@ -384,14 +417,7 @@ export const formatearFechaInput = (fecha) => {
   if (!fecha) return "";
 
   try {
-    const date = new Date(fecha);
-    if (isNaN(date.getTime())) return "";
-
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
+    return extraerFechaISO(fecha) || "";
   } catch (error) {
     console.error("Error en formatearFechaInput:", error);
     return "";
@@ -416,6 +442,7 @@ export const esFechaValida = (fecha) => {
 
 /**
  * Formatear hora desde timestamp
+ * Siempre convierte a hora México (America/Mexico_City)
  * @param {string|Date} timestamp - Fecha en formato ISO o Date object
  * @returns {string} Hora formateada (HH:MM AM/PM)
  */

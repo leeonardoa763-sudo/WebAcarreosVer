@@ -8,6 +8,8 @@
  * - Columnas: Placas, Folio, Fecha, Material Movido, Viajes, Días, Horas, Importe
  * - SIN: Retención (solo Subtotal + IVA)
  *
+ * Nota: Usa fecha_programada si existe, si no fecha_creacion
+ *
  * Usado en: generarPDFConciliacionRenta.jsx
  */
 
@@ -53,6 +55,19 @@ const formatearNumero = (numero) => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+};
+
+/**
+ * Obtener la fecha efectiva de un vale para mostrar en PDF.
+ * Usa fecha_programada si existe, si no usa fecha_creacion.
+ * Devuelve solo la parte de fecha (YYYY-MM-DD) para formatearFecha.
+ *
+ * @param {Object} vale - Objeto vale
+ * @returns {string} - Fecha en formato YYYY-MM-DD
+ */
+const obtenerFechaEfectiva = (vale) => {
+  const fechaRaw = vale.fecha_programada || vale.fecha_creacion;
+  return fechaRaw.split("T")[0];
 };
 
 // ========================================
@@ -141,13 +156,14 @@ const PDFConciliacionRenta = ({ conciliacion, valesAgrupados, totales }) => {
                       >
                         <Text style={rentaStyles.colPlacas}>{placas}</Text>
                         <Text style={rentaStyles.colFolio}>{vale.folio}</Text>
+                        {/* Mostrar fecha efectiva: programada si existe, si no creacion */}
                         <Text style={rentaStyles.colFecha}>
-                          {formatearFecha(vale.fecha_creacion.split("T")[0])}
+                          {formatearFecha(obtenerFechaEfectiva(vale))}
                         </Text>
                         <Text style={rentaStyles.colMaterial}>
                           {(detalle.material?.material || "N/A").substring(
                             0,
-                            20
+                            20,
                           )}
                         </Text>
                         <Text style={rentaStyles.colViajes}>
@@ -166,7 +182,7 @@ const PDFConciliacionRenta = ({ conciliacion, valesAgrupados, totales }) => {
                         </Text>
                       </View>
                     );
-                  })
+                  }),
                 )}
 
                 {/* Subtotal por placas */}
@@ -203,11 +219,11 @@ const PDFConciliacionRenta = ({ conciliacion, valesAgrupados, totales }) => {
         </View>
 
         {/* ========================================
-    TOTALES
-    ======================================== */}
+            TOTALES
+            ======================================== */}
         <View style={sharedStyles.totalesSection}>
           {(() => {
-            // 👇 OBTENER TARIFAS DESDE LOS DATOS (no calcular)
+            // Obtener tarifas desde los datos (no calcular)
             let tarifaPorDia = 0;
             let tarifaPorHora = 0;
 
@@ -218,11 +234,11 @@ const PDFConciliacionRenta = ({ conciliacion, valesAgrupados, totales }) => {
                   if (detalle.precios_renta) {
                     tarifaPorDia = detalle.precios_renta.costo_dia || 0;
                     tarifaPorHora = detalle.precios_renta.costo_hr || 0;
-                    return true; // Detener búsqueda
+                    return true;
                   }
                   return false;
-                })
-              )
+                }),
+              ),
             );
 
             return (
@@ -245,7 +261,6 @@ const PDFConciliacionRenta = ({ conciliacion, valesAgrupados, totales }) => {
                   </View>
                 )}
 
-                {/* 👇 TARIFAS DESDE BD */}
                 {tarifaPorDia > 0 && (
                   <View style={sharedStyles.totalRow}>
                     <Text style={sharedStyles.totalLabel}>Tarifa/Día:</Text>

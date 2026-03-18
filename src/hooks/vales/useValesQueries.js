@@ -8,7 +8,8 @@
  * - Obtener catálogo de obras
  * - Obtener vale por ID
  * - Obtener vale por folio
- * - IMPORTANTE: Incluye es_renta_por_dia en queries de renta
+ * - Incluye es_renta_por_dia en queries de renta
+ * - Incluye vale_renta_viajes para desglose de viajes individuales
  *
  * Usado en: useVales.js
  */
@@ -25,7 +26,7 @@ import { supabase } from "../../config/supabase";
 export const useValesQueries = () => {
   /**
    * Query base con todas las relaciones
-   * IMPORTANTE: Incluye es_renta_por_dia para lógica condicional
+   * Incluye vale_renta_viajes para mostrar desglose de viajes en el card
    */
   const buildBaseQuery = useCallback(() => {
     return supabase.from("vales").select(
@@ -101,6 +102,11 @@ export const useValesQueries = () => {
           precios_renta:id_precios_renta (
             costo_hr,
             costo_dia
+          ),
+          vale_renta_viajes (
+            id_viaje,
+            numero_viaje,
+            hora_registro
           )
         )
       `,
@@ -138,7 +144,7 @@ export const useValesQueries = () => {
 
   /**
    * Obtener un vale específico por ID
-   * IMPORTANTE: Incluye es_renta_por_dia
+   * Incluye vale_renta_viajes para desglose completo
    */
   const fetchValeById = useCallback(async (id_vale) => {
     try {
@@ -216,6 +222,11 @@ export const useValesQueries = () => {
             precios_renta:id_precios_renta (
               costo_hr,
               costo_dia
+            ),
+            vale_renta_viajes (
+              id_viaje,
+              numero_viaje,
+              hora_registro
             )
           )
         `,
@@ -233,7 +244,7 @@ export const useValesQueries = () => {
 
   /**
    * Obtener vale por folio (para verificación pública)
-   * IMPORTANTE: Incluye es_renta_por_dia
+   * Incluye vale_renta_viajes para desglose completo
    */
   const fetchValeByFolio = useCallback(async (folio) => {
     try {
@@ -295,6 +306,11 @@ export const useValesQueries = () => {
             precios_renta:id_precios_renta (
               costo_hr,
               costo_dia
+            ),
+            vale_renta_viajes (
+              id_viaje,
+              numero_viaje,
+              hora_registro
             )
           )
         `,

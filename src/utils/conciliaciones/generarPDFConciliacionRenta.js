@@ -3,6 +3,8 @@
  *
  * Generación de PDF para conciliaciones de renta
  *
+ * Nota: Usa fecha_programada si existe, si no fecha_creacion
+ *
  * Dependencias: jspdf
  * Usado en: BotonGenerarPDF.jsx
  */
@@ -10,10 +12,23 @@
 // 1. Imports
 import { jsPDF } from "jspdf";
 
+/**
+ * Obtener la fecha efectiva de un vale para mostrar en PDF.
+ * Usa fecha_programada si existe, si no usa fecha_creacion.
+ * Devuelve solo la parte de fecha (YYYY-MM-DD) para formatearFecha.
+ *
+ * @param {Object} vale - Objeto vale
+ * @returns {string} - Fecha en formato YYYY-MM-DD
+ */
+const obtenerFechaEfectiva = (vale) => {
+  const fechaRaw = vale.fecha_programada || vale.fecha_creacion;
+  return fechaRaw.split("T")[0];
+};
+
 export const generarPDFConciliacionRenta = (
   conciliacion,
   valesAgrupados,
-  totales
+  totales,
 ) => {
   try {
     const doc = new jsPDF({
@@ -45,7 +60,7 @@ export const generarPDFConciliacionRenta = (
       return `${dia}/${mes}/${año}`;
     };
 
-    // Función mejorada para verificar salto de página
+    // Función para verificar salto de página
     const checkPageBreak = (neededSpace = 15) => {
       if (yPos + neededSpace > pageHeight - marginBottom) {
         doc.addPage();
@@ -111,7 +126,7 @@ export const generarPDFConciliacionRenta = (
     doc.text(
       `${conciliacion.numero_semana} (${formatearFecha(conciliacion.fecha_inicio)} al ${formatearFecha(conciliacion.fecha_fin)})`,
       valueX,
-      yPos
+      yPos,
     );
     yPos += 9;
 
@@ -160,7 +175,8 @@ export const generarPDFConciliacionRenta = (
         vale.vale_renta_detalle.forEach((detalle) => {
           checkPageBreak(6);
 
-          const fecha = formatearFecha(vale.fecha_creacion.split("T")[0]);
+          // Usar fecha efectiva: programada si existe, si no creacion
+          const fecha = formatearFecha(obtenerFechaEfectiva(vale));
           const material = detalle.material?.material || "N/A";
           const costo = formatearMoneda(detalle.costo_total);
 
@@ -209,7 +225,6 @@ export const generarPDFConciliacionRenta = (
 
     doc.setFontSize(8);
 
-    // Días y Horas
     if (totales.totalDias > 0) {
       doc.setFont("helvetica", "normal");
       doc.text("Total Días:", labelResumenX, yPos, { align: "right" });
@@ -263,7 +278,6 @@ export const generarPDFConciliacionRenta = (
 
     const firmaY = yPos;
 
-    // Líneas de firma
     doc.setLineWidth(0.3);
     doc.line(marginLeft + 10, firmaY, marginLeft + 80, firmaY);
     doc.line(marginRight - 80, firmaY, marginRight - 10, firmaY);
@@ -271,7 +285,6 @@ export const generarPDFConciliacionRenta = (
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
 
-    // Textos de firma
     doc.text("FIRMA DEL SINDICATO", marginLeft + 45, firmaY + 5, {
       align: "center",
     });
@@ -293,9 +306,7 @@ export const generarPDFConciliacionRenta = (
       "Ing. Bruno Leonardo Aguilar Saucedo",
       marginRight - 45,
       firmaY + 10,
-      {
-        align: "center",
-      }
+      { align: "center" },
     );
 
     // ========================================
@@ -310,7 +321,7 @@ export const generarPDFConciliacionRenta = (
         `Página ${i} de ${pageCount} - Generado: ${new Date().toLocaleString("es-MX")}`,
         108,
         272,
-        { align: "center" }
+        { align: "center" },
       );
     }
 

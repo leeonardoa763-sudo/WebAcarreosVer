@@ -4,11 +4,11 @@
  * Tarjeta compacta de vale de RENTA con desplegable
  *
  * Funcionalidades:
- * - Vista compacta: folio, fecha, estado
+ * - Vista compacta: folio, fecha efectiva, estado
  * - Desplegable: información completa del vale de renta
+ * - Muestra fecha de creación Y fecha de emisión (programada) si son distintas
+ * - Desglose de viajes individuales desde vale_renta_viajes
  * - Lógica condicional basada en es_renta_por_dia
- * - Si es_renta_por_dia = true: muestra días y tarifa/día
- * - Si es_renta_por_dia = false: muestra horas y tarifa/hora
  *
  * Usado en: ValeCard.jsx
  */
@@ -27,6 +27,7 @@ import {
   Truck,
   Clock,
   UserCheck,
+  MapPin,
 } from "lucide-react";
 
 // 3. Utils
@@ -40,10 +41,57 @@ import {
   getNombreCompleto,
 } from "../../utils/formatters";
 
+/**
+ * Formatear una fecha ISO a dd/mm/yyyy
+ */
+const formatearFechaCorta = (fechaISO) => {
+  if (!fechaISO) return "N/A";
+  const date = new Date(fechaISO + (fechaISO.includes("T") ? "" : "T00:00:00"));
+  return date.toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+};
+
+/**
+ * Formatear hora de forma legible (HH:MM am/pm)
+ */
+const formatearHora = (horaISO) => {
+  if (!horaISO) return null;
+  return new Date(horaISO).toLocaleTimeString("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
+/**
+ * Obtener la fecha efectiva de un vale para mostrar en header.
+ * Usa fecha_programada si existe, si no usa fecha_creacion.
+ */
+const obtenerFechaEfectiva = (vale) => {
+  const fechaRaw = vale.fecha_programada || vale.fecha_creacion;
+  const { fecha } = formatearFechaHora(fechaRaw);
+  return fecha;
+};
+
 const ValeCardRenta = ({ vale, empresaColor }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const badgeEstado = getBadgeEstado(vale.estado);
-  const { fecha, hora } = formatearFechaHora(vale.fecha_creacion);
+
+  // Fecha de creación (cuando se registró en el sistema)
+  const { fecha: fechaCreacion, hora: horaCreacion } = formatearFechaHora(
+    vale.fecha_creacion,
+  );
+
+  // Fecha efectiva para el header (programada si existe, si no creacion)
+  const fechaHeader = obtenerFechaEfectiva(vale);
+
+  // Saber si tiene fecha programada diferente a creacion
+  const tieneFechaProgramada =
+    vale.fecha_programada &&
+    vale.fecha_programada !== vale.fecha_creacion?.split("T")[0];
 
   /**
    * Calcular costo total del vale
@@ -53,18 +101,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
       (sum, detalle) => sum + Number(detalle.costo_total || 0),
       0,
     );
-  };
-
-  /**
-   * Formatear hora de forma legible
-   */
-  const formatearHora = (horaISO) => {
-    if (!horaISO) return null;
-    return new Date(horaISO).toLocaleTimeString("es-MX", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
   };
 
   return (
@@ -82,7 +118,8 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
           </div>
 
           <div className="vale-card-compact__info">
-            <span className="vale-card-compact__fecha">{fecha}</span>
+            {/* Mostrar fecha efectiva en el header */}
+            <span className="vale-card-compact__fecha">{fechaHeader}</span>
             <span
               className="vale-card-compact__estado"
               style={{
@@ -142,6 +179,7 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
               </div>
             </div>
 
+            {/* Fecha de creación (siempre visible) */}
             <div className="vale-card__info-row-expanded">
               <Calendar
                 size={16}
@@ -151,10 +189,39 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
               <div>
                 <span className="vale-card__label">Fecha de Creación:</span>
                 <span className="vale-card__value">
-                  {fecha} a las {hora}
+                  {fechaCreacion} a las {horaCreacion}
                 </span>
               </div>
             </div>
+
+            {/* Fecha de emisión — solo si es diferente a la de creación */}
+            {tieneFechaProgramada && (
+              <div className="vale-card__info-row-expanded">
+                <Calendar
+                  size={16}
+                  className="vale-card__icon"
+                  style={{ color: "#8B5CF6" }}
+                  aria-hidden="true"
+                />
+                <div>
+                  <span
+                    className="vale-card__label"
+                    style={{ color: "#8B5CF6", fontWeight: 700 }}
+                  >
+                    Fecha de Emisión:
+                  </span>
+                  <span
+                    className="vale-card__value"
+                    style={{ color: "#8B5CF6", fontWeight: 600 }}
+                  >
+                    {formatearFechaCorta(vale.fecha_programada)}
+                  </span>
+                  <span className="vale-card__sub-value">
+                    Vale planeado con anticipación
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div className="vale-card__info-row-expanded">
               <UserCheck
@@ -228,15 +295,18 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
               <p className="vale-card__no-data">Sin detalles de renta</p>
             ) : (
               vale.vale_renta_detalle.map((detalle, index) => {
-                // Convertir valores a número
                 const costoTotal = Number(detalle.costo_total || 0);
                 const totalHoras = Number(detalle.total_horas || 0);
                 const totalDias = Number(detalle.total_dias || 0);
                 const costoHr = Number(detalle.precios_renta?.costo_hr || 0);
                 const costoDia = Number(detalle.precios_renta?.costo_dia || 0);
-
-                // Determinar si es renta por día
                 const esRentaPorDia = totalDias > 0;
+
+                // Viajes individuales registrados en vale_renta_viajes
+                const viajesRegistrados = detalle.vale_renta_viajes || [];
+                const viajesOrdenados = [...viajesRegistrados].sort(
+                  (a, b) => a.numero_viaje - b.numero_viaje,
+                );
 
                 return (
                   <div
@@ -253,7 +323,7 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                     </div>
 
                     <div className="vale-card__detalle-grid">
-                      {/* Capacidad - SIEMPRE SE MUESTRA */}
+                      {/* Capacidad */}
                       <div className="vale-card__detalle-item-small">
                         <span className="vale-card__detalle-label">
                           Capacidad:
@@ -263,7 +333,7 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                         </span>
                       </div>
 
-                      {/* Núm. Viajes - SIEMPRE SE MUESTRA */}
+                      {/* Núm. Viajes */}
                       <div className="vale-card__detalle-item-small">
                         <span className="vale-card__detalle-label">
                           Núm. Viajes:
@@ -273,7 +343,7 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                         </span>
                       </div>
 
-                      {/* Hora Inicio - SIEMPRE SE MUESTRA si existe */}
+                      {/* Hora Inicio */}
                       {detalle.hora_inicio && (
                         <div className="vale-card__detalle-item-small">
                           <span className="vale-card__detalle-label">
@@ -301,16 +371,14 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                             Hora Fin:
                           </span>
                           <span className="vale-card__detalle-value">
-                            {totalDias === 0.5 ? "Medio día" : "Día completo"}{" "}
-                            {/* <--- MODIFICADO */}
+                            {totalDias === 0.5 ? "Medio día" : "Día completo"}
                           </span>
                         </div>
                       ) : null}
 
-                      {/* CONDICIONAL: Si es renta por DÍA */}
+                      {/* CONDICIONAL: renta por DÍA o por HORA */}
                       {esRentaPorDia ? (
                         <>
-                          {/* Total Días */}
                           <div className="vale-card__detalle-item-small">
                             <span className="vale-card__detalle-label">
                               Total Días:
@@ -322,7 +390,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                             </span>
                           </div>
 
-                          {/* Tarifa por Día */}
                           <div className="vale-card__detalle-item-small">
                             <span className="vale-card__detalle-label">
                               Tarifa/Día:
@@ -333,9 +400,7 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                           </div>
                         </>
                       ) : (
-                        /* CONDICIONAL: Si es renta por HORAS */
                         <>
-                          {/* Total Horas */}
                           <div className="vale-card__detalle-item-small">
                             <span className="vale-card__detalle-label">
                               Total Horas:
@@ -347,7 +412,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                             </span>
                           </div>
 
-                          {/* Tarifa por Hora */}
                           <div className="vale-card__detalle-item-small">
                             <span className="vale-card__detalle-label">
                               Tarifa/Hora:
@@ -359,7 +423,7 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                         </>
                       )}
 
-                      {/* Costo Total - SIEMPRE SE MUESTRA */}
+                      {/* Costo Total */}
                       <div className="vale-card__detalle-item-small full-width">
                         <span className="vale-card__detalle-label">
                           Costo Total:
@@ -371,6 +435,33 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                         </span>
                       </div>
                     </div>
+
+                    {/* ==========================================
+                        DESGLOSE DE VIAJES (vale_renta_viajes)
+                        ========================================== */}
+                    {viajesOrdenados.length > 0 && (
+                      <div className="vale-card__viajes-desglose">
+                        <h5 className="vale-card__viajes-title">
+                          <MapPin size={13} aria-hidden="true" />
+                          Registro de Viajes
+                        </h5>
+                        <div className="vale-card__viajes-lista">
+                          {viajesOrdenados.map((viaje) => (
+                            <div
+                              key={viaje.id_viaje}
+                              className="vale-card__viaje-item"
+                            >
+                              <span className="vale-card__viaje-numero">
+                                Viaje {viaje.numero_viaje}
+                              </span>
+                              <span className="vale-card__viaje-hora">
+                                {formatearHora(viaje.hora_registro)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Notas adicionales */}
                     {detalle.notas_adicionales && (

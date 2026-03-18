@@ -10,6 +10,9 @@
  * - Obtener conciliaciones generadas
  * - Guardar nueva conciliación
  *
+ * Nota: Se usa fecha_programada cuando existe (vales planeados con anticipación),
+ * con fallback a fecha_creacion para vales sin fecha programada.
+ *
  * Usado en: useConciliaciones.js
  */
 
@@ -23,6 +26,20 @@ import { supabase } from "../../config/supabase";
 import { calcularSemanaISO } from "../../utils/dateUtils";
 
 /**
+ * Obtener la fecha efectiva de un vale para conciliación.
+ * Usa fecha_programada si existe, si no usa fecha_creacion.
+ *
+ * @param {Object} vale - Objeto vale de la BD
+ * @returns {Date} - Fecha efectiva del vale
+ */
+const obtenerFechaEfectiva = (vale) => {
+  if (vale.fecha_programada) {
+    return new Date(vale.fecha_programada);
+  }
+  return new Date(vale.fecha_creacion);
+};
+
+/**
  * Hook para queries de conciliaciones
  */
 export const useConciliacionesQueries = () => {
@@ -32,64 +49,64 @@ export const useConciliacionesQueries = () => {
   const fetchValesVerificadosRenta = useCallback(
     async (filtros, idSindicatoUsuario) => {
       try {
-        // Query base
+        // Query base — el * incluye fecha_programada automáticamente
         let query = supabase
           .from("vales")
           .select(
             `
-          *,
-          obras:id_obra (
-            id_obra,
-            obra,
-            cc,
-            empresas:id_empresa (
-              id_empresa,
-              empresa,
-              sufijo
-            )
-          ),
-          operadores:id_operador (
-            id_operador,
-            nombre_completo,
-            sindicatos:id_sindicato (
-              id_sindicato,
-              sindicato
-            )
-          ),
-          vehiculos:id_vehiculo (
-            id_vehiculo,
-            placas
-          ),
-          persona:id_persona_creador (
-            nombre,
-            primer_apellido,
-            segundo_apellido
-          ),
-          vale_renta_detalle (
-            id_vale_renta_detalle,
-            capacidad_m3,
-            hora_inicio,
-            hora_fin,
-            total_horas,
-            total_dias,
-            costo_total,
-            numero_viajes,
-            notas_adicionales,
-            es_renta_por_dia,
-            material:id_material (
-              id_material,
-              material
+            *,
+            obras:id_obra (
+              id_obra,
+              obra,
+              cc,
+              empresas:id_empresa (
+                id_empresa,
+                empresa,
+                sufijo
+              )
             ),
-            precios_renta:id_precios_renta (
-              costo_hr,
-              costo_dia
+            operadores:id_operador (
+              id_operador,
+              nombre_completo,
+              sindicatos:id_sindicato (
+                id_sindicato,
+                sindicato
+              )
+            ),
+            vehiculos:id_vehiculo (
+              id_vehiculo,
+              placas
+            ),
+            persona:id_persona_creador (
+              nombre,
+              primer_apellido,
+              segundo_apellido
+            ),
+            vale_renta_detalle (
+              id_vale_renta_detalle,
+              capacidad_m3,
+              hora_inicio,
+              hora_fin,
+              total_horas,
+              total_dias,
+              costo_total,
+              numero_viajes,
+              notas_adicionales,
+              es_renta_por_dia,
+              material:id_material (
+                id_material,
+                material
+              ),
+              precios_renta:id_precios_renta (
+                costo_hr,
+                costo_dia
+              )
             )
-          )
-        `
+          `,
           )
           .eq("tipo_vale", "renta")
           .eq("verificado_por_sindicato", true)
-          .neq("estado", "conciliado"); // No incluir vales ya conciliados
+          .neq("estado", "conciliado");
 
         // Filtrar por obra
         if (filtros.obraSeleccionada) {
@@ -102,18 +119,23 @@ export const useConciliacionesQueries = () => {
         if (sindicatoFiltro) {
           query = query.eq(
             "operadores.sindicatos.id_sindicato",
-            sindicatoFiltro
+            sindicatoFiltro,
           );
         }
 
         // Filtrar por rango de fechas de la semana
+        // Usa fecha_programada si existe, si no fecha_creacion
         if (filtros.semanaSeleccionada) {
-          query = query
-            .gte("fecha_creacion", filtros.semanaSeleccionada.fechaInicio)
-            .lte("fecha_creacion", filtros.semanaSeleccionada.fechaFin);
+          const fechaInicio = filtros.semanaSeleccionada.fechaInicio;
+          const fechaFin = `${filtros.semanaSeleccionada.fechaFin}T23:59:59.999Z`;
+
+          query = query.or(
+            `and(fecha_programada.gte.${fechaInicio},fecha_programada.lte.${fechaFin}),` +
+              `and(fecha_programada.is.null,fecha_creacion.gte.${fechaInicio},fecha_creacion.lte.${fechaFin})`,
+          );
         }
 
-        // Ordenar por placas y fecha
+        // Ordenar por fecha efectiva ascendente
         query = query.order("fecha_creacion", { ascending: true });
 
         const { data, error } = await query;
@@ -126,7 +148,7 @@ export const useConciliacionesQueries = () => {
         return { success: false, error: error.message, data: [] };
       }
     },
-    []
+    [],
   );
 
   /**
@@ -135,38 +157,46 @@ export const useConciliacionesQueries = () => {
   const fetchObrasConValesVerificados = useCallback(
     async (semana, idSindicatoUsuario) => {
       try {
+        const fechaInicio = semana.fechaInicio;
+        const fechaFin = `${semana.fechaFin}T23:59:59.999Z`;
+
         let query = supabase
           .from("vales")
           .select(
             `
-          id_obra,
-          obras:id_obra (
             id_obra,
-            obra,
-            cc,
-            empresas:id_empresa (
-              empresa,
-              sufijo
+            fecha_creacion,
+            fecha_programada,
+            obras:id_obra (
+              id_obra,
+              obra,
+              cc,
+              empresas:id_empresa (
+                empresa,
+                sufijo
+              )
+            ),
+            operadores:id_operador (
+              sindicatos:id_sindicato (
+                id_sindicato
+              )
             )
-          ),
-          operadores:id_operador (
-            sindicatos:id_sindicato (
-              id_sindicato
-            )
-          )
-        `
+          `,
           )
           .eq("tipo_vale", "renta")
           .eq("verificado_por_sindicato", true)
           .neq("estado", "conciliado")
-          .gte("fecha_creacion", semana.fechaInicio)
-          .lte("fecha_creacion", semana.fechaFin);
+          // Usar fecha_programada si existe, si no fecha_creacion
+          .or(
+            `and(fecha_programada.gte.${fechaInicio},fecha_programada.lte.${fechaFin}),` +
+              `and(fecha_programada.is.null,fecha_creacion.gte.${fechaInicio},fecha_creacion.lte.${fechaFin})`,
+          );
 
         // Filtrar por sindicato
         if (idSindicatoUsuario) {
           query = query.eq(
             "operadores.sindicatos.id_sindicato",
-            idSindicatoUsuario
+            idSindicatoUsuario,
           );
         }
 
@@ -197,12 +227,13 @@ export const useConciliacionesQueries = () => {
         return { success: false, error: error.message, data: [] };
       }
     },
-    []
+    [],
   );
 
   /**
-   * Obtener semanas con vales verificados
+   * Obtener semanas con vales verificados de renta
    * Devuelve array de objetos: { numero, año, fechaInicio, fechaFin, cantidadVales }
+   * Usa fecha_programada cuando existe para clasificar el vale en la semana correcta
    */
   const fetchSemanasConValesVerificados = useCallback(
     async (idSindicatoUsuario) => {
@@ -211,14 +242,15 @@ export const useConciliacionesQueries = () => {
           .from("vales")
           .select(
             `
-          fecha_creacion,
-          operadores:id_operador (
-            id_sindicato,
-            sindicatos:id_sindicato (
-              id_sindicato
+            fecha_creacion,
+            fecha_programada,
+            operadores:id_operador (
+              id_sindicato,
+              sindicatos:id_sindicato (
+                id_sindicato
+              )
             )
-          )
-        `
+          `,
           )
           .eq("tipo_vale", "renta")
           .eq("verificado_por_sindicato", true)
@@ -229,7 +261,7 @@ export const useConciliacionesQueries = () => {
 
         if (error) throw error;
 
-        // ✅ CORRECCIÓN: Filtrar en el cliente por sindicato
+        // Filtrar en el cliente por sindicato
         let valesFiltrados = data;
 
         if (idSindicatoUsuario) {
@@ -239,12 +271,13 @@ export const useConciliacionesQueries = () => {
           });
         }
 
-        // Agrupar por semana (calcular en cliente)
+        // Agrupar por semana usando fecha efectiva (programada o creacion)
         const semanas = {};
 
         valesFiltrados.forEach((vale) => {
-          const fecha = new Date(vale.fecha_creacion);
-          const semanaInfo = calcularSemanaISO(fecha);
+          // Usar fecha_programada si existe, si no fecha_creacion
+          const fechaEfectiva = obtenerFechaEfectiva(vale);
+          const semanaInfo = calcularSemanaISO(fechaEfectiva);
           const key = `${semanaInfo.año}-${semanaInfo.numero}`;
 
           if (!semanas[key]) {
@@ -260,7 +293,7 @@ export const useConciliacionesQueries = () => {
           semanas[key].cantidadVales++;
         });
 
-        // Convertir a array y ordenar
+        // Convertir a array y ordenar descendente
         const semanasArray = Object.values(semanas).sort((a, b) => {
           if (a.año !== b.año) return b.año - a.año;
           return b.numero - a.numero;
@@ -272,7 +305,7 @@ export const useConciliacionesQueries = () => {
         return { success: false, error: error.message, data: [] };
       }
     },
-    []
+    [],
   );
 
   /**
@@ -285,27 +318,27 @@ export const useConciliacionesQueries = () => {
           .from("conciliaciones")
           .select(
             `
-          *,
-          obras:id_obra (
-            id_obra,
-            obra,
-            cc,
-            empresas:id_empresa (
-              empresa,
-              sufijo
+            *,
+            obras:id_obra (
+              id_obra,
+              obra,
+              cc,
+              empresas:id_empresa (
+                empresa,
+                sufijo
+              )
+            ),
+            sindicatos:id_sindicato (
+              id_sindicato,
+              sindicato,
+              nombre_completo
+            ),
+            persona:generado_por (
+              nombre,
+              primer_apellido,
+              segundo_apellido
             )
-          ),
-          sindicatos:id_sindicato (
-            id_sindicato,
-            sindicato,
-            nombre_completo
-          ),
-          persona:generado_por (
-            nombre,
-            primer_apellido,
-            segundo_apellido
-          )
-        `
+          `,
           )
           .order("fecha_generacion", { ascending: false });
 
@@ -335,7 +368,6 @@ export const useConciliacionesQueries = () => {
         const conciliacionesConVales = await Promise.all(
           (data || []).map(async (conc) => {
             try {
-              // Obtener IDs de vales de la tabla intermedia
               const { data: valesIds, error: errorValesIds } = await supabase
                 .from("conciliacion_vales")
                 .select("id_vale")
@@ -352,26 +384,25 @@ export const useConciliacionesQueries = () => {
 
               const idsVales = valesIds.map((v) => v.id_vale);
 
-              // Obtener detalles de los vales según el tipo de conciliación
               if (conc.tipo_conciliacion === "renta") {
                 const { data: vales, error: errorVales } = await supabase
                   .from("vales")
                   .select(
                     `
-                  *,
-                  vale_renta_detalle (
-                    capacidad_m3,
-                    numero_viajes,
-                    total_horas,
-                    total_dias,
-                    costo_total,
-                    material:id_material (
-                      material
+                    *,
+                    vale_renta_detalle (
+                      capacidad_m3,
+                      numero_viajes,
+                      total_horas,
+                      total_dias,
+                      costo_total,
+                      material:id_material (
+                        material
+                      )
                     )
+                  `,
                   )
-                `
-                  )
-                  .in("id_vale", idsVales); // ✅ CORRECTO: Supabase maneja el array automáticamente
+                  .in("id_vale", idsVales);
 
                 if (errorVales) {
                   console.error("Error obteniendo vales de renta:", errorVales);
@@ -380,30 +411,29 @@ export const useConciliacionesQueries = () => {
 
                 return { ...conc, vales: vales || [] };
               } else {
-                // Material
                 const { data: vales, error: errorVales } = await supabase
                   .from("vales")
                   .select(
                     `
-                  *,
-                  vale_material_detalles (
-                    cantidad_pedida_m3,
-                    volumen_real_m3,
-                    distancia_km,
-                    precio_m3,
-                    costo_total,
-                    material:id_material (
-                      material
+                    *,
+                    vale_material_detalles (
+                      cantidad_pedida_m3,
+                      volumen_real_m3,
+                      distancia_km,
+                      precio_m3,
+                      costo_total,
+                      material:id_material (
+                        material
+                      )
                     )
+                  `,
                   )
-                `
-                  )
-                  .in("id_vale", idsVales); // ✅ CORRECTO: Supabase maneja el array automáticamente
+                  .in("id_vale", idsVales);
 
                 if (errorVales) {
                   console.error(
                     "Error obteniendo vales de material:",
-                    errorVales
+                    errorVales,
                   );
                   return { ...conc, vales: [] };
                 }
@@ -413,11 +443,11 @@ export const useConciliacionesQueries = () => {
             } catch (innerError) {
               console.error(
                 `Error procesando conciliación ${conc.id_conciliacion}:`,
-                innerError
+                innerError,
               );
               return { ...conc, vales: [] };
             }
-          })
+          }),
         );
 
         return { success: true, data: conciliacionesConVales };
@@ -426,7 +456,7 @@ export const useConciliacionesQueries = () => {
         return { success: false, error: error.message, data: [] };
       }
     },
-    []
+    [],
   );
 
   /**
@@ -439,27 +469,27 @@ export const useConciliacionesQueries = () => {
           .from("conciliaciones")
           .select(
             `
-          *,
-          obras:id_obra (
-            id_obra,
-            obra,
-            cc,
-            empresas:id_empresa (
-              empresa,
-              sufijo
+            *,
+            obras:id_obra (
+              id_obra,
+              obra,
+              cc,
+              empresas:id_empresa (
+                empresa,
+                sufijo
+              )
+            ),
+            sindicatos:id_sindicato (
+              id_sindicato,
+              sindicato,
+              nombre_completo
+            ),
+            persona:generado_por (
+              nombre,
+              primer_apellido,
+              segundo_apellido
             )
-          ),
-          sindicatos:id_sindicato (
-            id_sindicato,
-            sindicato,
-            nombre_completo
-          ),
-          persona:generado_por (
-            nombre,
-            primer_apellido,
-            segundo_apellido
-          )
-        `
+          `,
           )
           .order("fecha_generacion", { ascending: false });
 
@@ -491,7 +521,7 @@ export const useConciliacionesQueries = () => {
         return { success: false, error: error.message, data: [] };
       }
     },
-    []
+    [],
   );
 
   /**
@@ -502,7 +532,6 @@ export const useConciliacionesQueries = () => {
       const conciliacionesConVales = await Promise.all(
         conciliaciones.map(async (conc) => {
           try {
-            // Obtener IDs de vales de la tabla intermedia
             const { data: valesIds, error: errorValesIds } = await supabase
               .from("conciliacion_vales")
               .select("id_vale")
@@ -514,24 +543,23 @@ export const useConciliacionesQueries = () => {
 
             const idsVales = valesIds.map((v) => v.id_vale);
 
-            // Obtener detalles de los vales según el tipo de conciliación
             if (conc.tipo_conciliacion === "renta") {
               const { data: vales, error: errorVales } = await supabase
                 .from("vales")
                 .select(
                   `
-                *,
-                vale_renta_detalle (
-                  capacidad_m3,
-                  numero_viajes,
-                  total_horas,
-                  total_dias,
-                  costo_total,
-                  material:id_material (
-                    material
+                  *,
+                  vale_renta_detalle (
+                    capacidad_m3,
+                    numero_viajes,
+                    total_horas,
+                    total_dias,
+                    costo_total,
+                    material:id_material (
+                      material
+                    )
                   )
-                )
-              `
+                `,
                 )
                 .in("id_vale", idsVales);
 
@@ -542,30 +570,29 @@ export const useConciliacionesQueries = () => {
 
               return { ...conc, vales: vales || [] };
             } else {
-              // Material
               const { data: vales, error: errorVales } = await supabase
                 .from("vales")
                 .select(
                   `
-                *,
-                vale_material_detalles (
-                  cantidad_pedida_m3,
-                  volumen_real_m3,
-                  distancia_km,
-                  precio_m3,
-                  costo_total,
-                  material:id_material (
-                    material
+                  *,
+                  vale_material_detalles (
+                    cantidad_pedida_m3,
+                    volumen_real_m3,
+                    distancia_km,
+                    precio_m3,
+                    costo_total,
+                    material:id_material (
+                      material
+                    )
                   )
-                )
-              `
+                `,
                 )
                 .in("id_vale", idsVales);
 
               if (errorVales) {
                 console.error(
                   "Error obteniendo vales de material:",
-                  errorVales
+                  errorVales,
                 );
                 return { ...conc, vales: [] };
               }
@@ -575,11 +602,11 @@ export const useConciliacionesQueries = () => {
           } catch (innerError) {
             console.error(
               `Error procesando conciliación ${conc.id_conciliacion}:`,
-              innerError
+              innerError,
             );
             return { ...conc, vales: [] };
           }
-        })
+        }),
       );
 
       return { success: true, data: conciliacionesConVales };
@@ -615,14 +642,14 @@ export const useConciliacionesQueries = () => {
             empresa,
             sufijo
           )
-        `
+        `,
         )
         .eq("id_conciliacion", idConciliacion)
         .single();
 
       if (errorConc) throw errorConc;
 
-      // 2. Obtener vales de la conciliación
+      // 2. Obtener IDs de vales de la conciliación
       const { data: valesIds, error: errorVales } = await supabase
         .from("conciliacion_vales")
         .select("id_vale")
@@ -665,9 +692,11 @@ export const useConciliacionesQueries = () => {
               material
             )
           )
-        `
+        `,
         )
         .in("id_vale", idsVales)
+        // Ordenar por fecha efectiva (programada o creacion)
+        .order("fecha_programada", { ascending: true, nullsFirst: false })
         .order("fecha_creacion", { ascending: true });
 
       if (errorDetalles) throw errorDetalles;
@@ -712,7 +741,7 @@ export const useConciliacionesQueries = () => {
 
         if (errorRel) throw errorRel;
 
-        //3. ⚠️ COMENTAR TEMPORALMENTE - Actualizar estado de vales a 'conciliado'
+        // 3. Actualizar estado de vales a 'conciliado'
         const { error: errorUpdate } = await supabase
           .from("vales")
           .update({ estado: "conciliado" })
@@ -726,7 +755,7 @@ export const useConciliacionesQueries = () => {
         return { success: false, error: error.message };
       }
     },
-    []
+    [],
   );
 
   return {
