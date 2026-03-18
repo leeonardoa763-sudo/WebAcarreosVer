@@ -1003,3 +1003,137 @@
   color: #6b7280;
   font-weight: 500;
 }
+/* ========================================
+   DESGLOSE DE VIAJES - vale_material_viajes
+   ======================================== */
+
+.vale-card__viajes-desglose--material {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #f0fdf4;
+  border-radius: 6px;
+  border: 1px solid #bbf7d0;
+}
+
+.vale-card__viajes-desglose--material .vale-card__viajes-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #16a34a;
+  margin: 0 0 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.vale-card__viajes-tabla-header {
+  display: grid;
+  grid-template-columns: 40px 1fr 80px 70px 90px;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #dcfce7;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.vale-card__viajes-tabla-header span {
+  font-size: 10px;
+  font-weight: 700;
+  color: #15803d;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.vale-card__viaje-item--material {
+  display: grid;
+  grid-template-columns: 40px 1fr 80px 70px 90px;
+  gap: 6px;
+  padding: 5px 8px;
+  background: #ffffff;
+  border-radius: 4px;
+  border: 1px solid #bbf7d0;
+  margin-bottom: 3px;
+  align-items: center;
+}
+
+.vale-card__viaje-numero {
+  font-size: 11px;
+  font-weight: 700;
+  color: #16a34a;
+}
+
+.vale-card__viaje-folio {
+  font-size: 11px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.vale-card__viaje-ton {
+  font-size: 11px;
+  font-weight: 600;
+  color: #2c3e50;
+  text-align: right;
+}
+
+.vale-card__viaje-m3 {
+  font-size: 11px;
+  color: #6b7280;
+  text-align: right;
+}
+
+.vale-card__viaje-costo {
+  font-size: 11px;
+  font-weight: 600;
+  color: #10b981;
+  text-align: right;
+}
+
+.vale-card__viajes-totales {
+  display: grid;
+  grid-template-columns: 1fr 80px 80px 90px;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #dcfce7;
+  border-radius: 4px;
+  margin-top: 6px;
+  align-items: center;
+}
+
+.vale-card__viajes-totales-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #15803d;
+  text-transform: uppercase;
+}
+
+.vale-card__viajes-totales-ton {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2c3e50;
+  text-align: right;
+}
+
+.vale-card__viajes-totales-costo {
+  font-size: 12px;
+  font-weight: 700;
+  color: #10b981;
+  text-align: right;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .vale-card__viajes-tabla-header,
+  .vale-card__viaje-item--material {
+    grid-template-columns: 40px 60px 1fr 80px 70px 90px;
+  }
+
+  .vale-card__viajes-tabla-header {
+    grid-template-columns: 40px 60px 1fr 80px 70px 90px;
+  }
+  .vale-card__viaje-hora {
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 500;
+  }
+}

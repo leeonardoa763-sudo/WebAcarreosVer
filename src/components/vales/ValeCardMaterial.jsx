@@ -26,6 +26,7 @@ import {
   Truck,
   Package,
   UserCheck,
+  Receipt,
 } from "lucide-react";
 
 // 3. Utils
@@ -38,6 +39,7 @@ import {
   formatearFolio,
   formatearMoneda,
   getNombreCompleto,
+  formatearHora,
 } from "../../utils/formatters";
 
 const ValeCardMaterial = ({ vale, empresaColor }) => {
@@ -51,7 +53,7 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
   const calcularCostoTotal = () => {
     return vale.vale_material_detalles.reduce(
       (sum, detalle) => sum + Number(detalle.costo_total || 0),
-      0
+      0,
     );
   };
 
@@ -347,6 +349,86 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                         <p className="vale-card__notas-text">
                           {detalle.notas_adicionales}
                         </p>
+                      </div>
+                    )}
+
+                    {/* ==========================================
+                        DESGLOSE DE VIAJES (vale_material_viajes)
+                        ========================================== */}
+                    {detalle.vale_material_viajes?.length > 0 && (
+                      <div className="vale-card__viajes-desglose vale-card__viajes-desglose--material">
+                        <h5 className="vale-card__viajes-title">
+                          <Receipt size={13} aria-hidden="true" />
+                          Registro de Viajes (
+                          {detalle.vale_material_viajes.length})
+                        </h5>
+
+                        <div className="vale-card__viajes-tabla-header">
+                          <span>Viaje</span>
+                          <span>Hora</span>
+                          <span>Folio Físico</span>
+                          <span>Toneladas</span>
+                          <span>M³</span>
+                          <span>Costo</span>
+                        </div>
+
+                        <div className="vale-card__viajes-lista">
+                          {[...detalle.vale_material_viajes]
+                            .sort((a, b) => a.numero_viaje - b.numero_viaje)
+                            .map((viaje) => (
+                              <div
+                                key={viaje.id_viaje}
+                                className="vale-card__viaje-item vale-card__viaje-item--material"
+                              >
+                                <span className="vale-card__viaje-numero">
+                                  #{viaje.numero_viaje}
+                                </span>
+                                <span className="vale-card__viaje-hora">
+                                  {viaje.hora_registro
+                                    ? formatearHora(viaje.hora_registro)
+                                    : "—"}
+                                </span>
+                                <span className="vale-card__viaje-folio">
+                                  {viaje.folio_vale_fisico || "—"}
+                                </span>
+                                <span className="vale-card__viaje-ton">
+                                  {viaje.peso_ton
+                                    ? `${Number(viaje.peso_ton).toFixed(2)} ton`
+                                    : "—"}
+                                </span>
+                                <span className="vale-card__viaje-m3">
+                                  {viaje.volumen_m3
+                                    ? formatearVolumen(Number(viaje.volumen_m3))
+                                    : "—"}
+                                </span>
+                                <span className="vale-card__viaje-costo">
+                                  {viaje.costo_viaje
+                                    ? formatearMoneda(Number(viaje.costo_viaje))
+                                    : "—"}
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+
+                        <div className="vale-card__viajes-totales">
+                          <span className="vale-card__viajes-totales-label">
+                            Subtotal viajes:
+                          </span>
+                          <span className="vale-card__viajes-totales-ton">
+                            {detalle.vale_material_viajes
+                              .reduce((s, v) => s + Number(v.peso_ton || 0), 0)
+                              .toFixed(2)}{" "}
+                            ton
+                          </span>
+                          <span className="vale-card__viajes-totales-costo">
+                            {formatearMoneda(
+                              detalle.vale_material_viajes.reduce(
+                                (s, v) => s + Number(v.costo_viaje || 0),
+                                0,
+                              ),
+                            )}
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>

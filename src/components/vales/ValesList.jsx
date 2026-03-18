@@ -23,6 +23,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 // 3. Utils
 import { format, getWeek } from "date-fns";
 import { es } from "date-fns/locale";
+import { calcularSemanaISO } from "../../utils/dateUtils";
 
 // 4. Componentes
 import ValeCard from "./ValeCard";
@@ -48,15 +49,26 @@ const ValesList = ({ vales }) => {
     const grupos = {};
 
     vales.forEach((vale) => {
-      const fecha = new Date(vale.fecha_creacion);
+      // DESPUÉS - Extraer la fecha de la parte UTC directamente
+      const obtenerFechaUTC = (fechaISO) => {
+        // Tomar solo la parte de fecha del string UTC (YYYY-MM-DD)
+        // y construir la fecha sin conversión de zona horaria
+        const soloFecha = fechaISO.substring(0, 10); // "2026-03-16"
+        return new Date(soloFecha + "T12:00:00");
+      };
 
-      // Mes
-      const mes = format(fecha, "MMMM yyyy", { locale: es });
+      const fechaEfectiva = vale.fecha_programada
+        ? new Date(vale.fecha_programada + "T12:00:00")
+        : obtenerFechaUTC(vale.fecha_creacion);
+
+      // Mes basado en la fecha efectiva
+      const mes = format(fechaEfectiva, "MMMM yyyy", { locale: es });
       if (!grupos[mes]) grupos[mes] = {};
 
-      // Semana (calculada con getWeek)
-      const numeroSemana = getWeek(fecha, { weekStartsOn: 1 });
-      const semana = `Semana ${numeroSemana}`;
+      // Semana usando la misma función que el resto del sistema
+      const semanaInfo = calcularSemanaISO(fechaEfectiva);
+
+      const semana = `Semana ${semanaInfo.numero}`;
       if (!grupos[mes][semana]) grupos[mes][semana] = {};
 
       // Obra dentro de semana
