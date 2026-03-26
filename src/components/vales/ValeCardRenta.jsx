@@ -28,6 +28,7 @@ import {
   Clock,
   UserCheck,
   MapPin,
+  XCircle,
 } from "lucide-react";
 
 // 3. Utils
@@ -118,7 +119,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
           </div>
 
           <div className="vale-card-compact__info">
-            {/* Mostrar fecha efectiva en el header */}
             <span className="vale-card-compact__fecha">{fechaHeader}</span>
             <span
               className="vale-card-compact__estado"
@@ -161,6 +161,7 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
         >
           {/* Información general */}
           <div className="vale-card__info-general">
+            {/* Obra */}
             <div className="vale-card__info-row-expanded">
               <Building2
                 size={16}
@@ -223,6 +224,7 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
               </div>
             )}
 
+            {/* Residente */}
             <div className="vale-card__info-row-expanded">
               <UserCheck
                 size={16}
@@ -237,6 +239,7 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
               </div>
             </div>
 
+            {/* Operador */}
             {vale.operadores && (
               <div className="vale-card__info-row-expanded">
                 <User
@@ -258,6 +261,7 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
               </div>
             )}
 
+            {/* Placas */}
             {vale.vehiculos && (
               <div className="vale-card__info-row-expanded">
                 <Truck
@@ -273,6 +277,87 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                 </div>
               </div>
             )}
+
+            {/* Fecha de verificación */}
+            {vale.fecha_verificacion && (
+              <div className="vale-card__info-row-expanded">
+                <Calendar
+                  size={16}
+                  className="vale-card__icon"
+                  style={{ color: "#004E89" }}
+                  aria-hidden="true"
+                />
+                <div>
+                  <span
+                    className="vale-card__label"
+                    style={{ color: "#004E89" }}
+                  >
+                    Fecha de Verificación:
+                  </span>
+                  <span
+                    className="vale-card__value"
+                    style={{ color: "#004E89" }}
+                  >
+                    {formatearFechaHora(vale.fecha_verificacion).fecha} a las{" "}
+                    {formatearFechaHora(vale.fecha_verificacion).hora}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Fecha de completado */}
+            {vale.fecha_completado && (
+              <div className="vale-card__info-row-expanded">
+                <Calendar
+                  size={16}
+                  className="vale-card__icon"
+                  style={{ color: "#10B981" }}
+                  aria-hidden="true"
+                />
+                <div>
+                  <span
+                    className="vale-card__label"
+                    style={{ color: "#10B981" }}
+                  >
+                    Fecha de Completado:
+                  </span>
+                  <span
+                    className="vale-card__value"
+                    style={{ color: "#10B981" }}
+                  >
+                    {formatearFechaHora(vale.fecha_completado).fecha} a las{" "}
+                    {formatearFechaHora(vale.fecha_completado).hora}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Fecha de cancelación */}
+            {vale.fecha_cancelacion && (
+              <div className="vale-card__info-row-expanded">
+                <XCircle
+                  size={16}
+                  className="vale-card__icon"
+                  style={{ color: "#DC2626" }}
+                  aria-hidden="true"
+                />
+                <div>
+                  <span
+                    className="vale-card__label"
+                    style={{ color: "#DC2626" }}
+                  >
+                    Fecha de Cancelación:
+                  </span>
+                  <span
+                    className="vale-card__value"
+                    style={{ color: "#DC2626" }}
+                  >
+                    {formatearFechaHora(vale.fecha_cancelacion).fecha} a las{" "}
+                    {formatearFechaHora(vale.fecha_cancelacion).hora}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {vale.vale_renta_detalle?.[0]?.sindicatos?.sindicato && (
@@ -281,6 +366,18 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
               <span className="vale-card__value">
                 {vale.vale_renta_detalle[0].sindicatos.sindicato}
               </span>
+            </div>
+          )}
+
+          {/* Motivo de cancelación */}
+          {vale.estado === "cancelado" && vale.motivo_cancelacion && (
+            <div className="vale-card__cancelacion-motivo">
+              <span className="vale-card__cancelacion-label">
+                Motivo de cancelación:
+              </span>
+              <p className="vale-card__cancelacion-texto">
+                {vale.motivo_cancelacion}
+              </p>
             </div>
           )}
 
@@ -302,7 +399,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                 const costoDia = Number(detalle.precios_renta?.costo_dia || 0);
                 const esRentaPorDia = totalDias > 0;
 
-                // Viajes individuales registrados en vale_renta_viajes
                 const viajesRegistrados = detalle.vale_renta_viajes || [];
                 const viajesOrdenados = [...viajesRegistrados].sort(
                   (a, b) => a.numero_viaje - b.numero_viaje,
@@ -323,7 +419,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                     </div>
 
                     <div className="vale-card__detalle-grid">
-                      {/* Capacidad */}
                       <div className="vale-card__detalle-item-small">
                         <span className="vale-card__detalle-label">
                           Capacidad:
@@ -333,7 +428,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                         </span>
                       </div>
 
-                      {/* Núm. Viajes */}
                       <div className="vale-card__detalle-item-small">
                         <span className="vale-card__detalle-label">
                           Núm. Viajes:
@@ -343,7 +437,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                         </span>
                       </div>
 
-                      {/* Hora Inicio */}
                       {detalle.hora_inicio && (
                         <div className="vale-card__detalle-item-small">
                           <span className="vale-card__detalle-label">
@@ -355,7 +448,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                         </div>
                       )}
 
-                      {/* Hora Fin */}
                       {detalle.hora_fin ? (
                         <div className="vale-card__detalle-item-small">
                           <span className="vale-card__detalle-label">
@@ -376,7 +468,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                         </div>
                       ) : null}
 
-                      {/* CONDICIONAL: renta por DÍA o por HORA */}
                       {esRentaPorDia ? (
                         <>
                           <div className="vale-card__detalle-item-small">
@@ -389,7 +480,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                                 : "Pendiente"}
                             </span>
                           </div>
-
                           <div className="vale-card__detalle-item-small">
                             <span className="vale-card__detalle-label">
                               Tarifa/Día:
@@ -411,7 +501,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                                 : "Pendiente"}
                             </span>
                           </div>
-
                           <div className="vale-card__detalle-item-small">
                             <span className="vale-card__detalle-label">
                               Tarifa/Hora:
@@ -423,7 +512,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                         </>
                       )}
 
-                      {/* Costo Total */}
                       <div className="vale-card__detalle-item-small full-width">
                         <span className="vale-card__detalle-label">
                           Costo Total:
@@ -436,9 +524,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                       </div>
                     </div>
 
-                    {/* ==========================================
-                        DESGLOSE DE VIAJES (vale_renta_viajes)
-                        ========================================== */}
                     {viajesOrdenados.length > 0 && (
                       <div className="vale-card__viajes-desglose">
                         <h5 className="vale-card__viajes-title">
@@ -463,7 +548,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                       </div>
                     )}
 
-                    {/* Notas adicionales */}
                     {detalle.notas_adicionales && (
                       <div className="vale-card__notas">
                         <span className="vale-card__detalle-label">Notas:</span>
@@ -477,7 +561,6 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
               })
             )}
 
-            {/* Total General del Vale */}
             {vale.vale_renta_detalle?.length > 0 && (
               <div className="vale-card__total">
                 <span className="vale-card__total-label">

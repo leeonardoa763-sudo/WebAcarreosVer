@@ -1137,3 +1137,31 @@
     font-weight: 500;
   }
 }
+/* ========================================
+   MOTIVO DE CANCELACION
+======================================== */
+
+.vale-card__cancelacion-motivo {
+  margin: 12px 0;
+  padding: 10px 14px;
+  background: #fef2f2;
+  border-left: 3px solid #e74c3c;
+  border-radius: 4px;
+}
+
+.vale-card__cancelacion-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #e74c3c;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+.vale-card__cancelacion-texto {
+  font-size: 13px;
+  color: #2c3e50;
+  margin: 0;
+  line-height: 1.5;
+}

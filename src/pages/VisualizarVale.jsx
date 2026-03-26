@@ -6,6 +6,7 @@
  * Funcionalidades:
  * - Acceso SIN autenticación
  * - Muestra vale completo (Material o Renta)
+ * - Lista de viajes con foto de evidencia y distancia a la obra
  * - Permite descargar PDF con marca de agua
  * - Registra acceso para auditoría
  *
@@ -28,6 +29,11 @@ import {
   Eye,
   EyeOff,
   Lock,
+  MapPin,
+  Clock,
+  Expand,
+  ImageOff,
+  X,
 } from "lucide-react";
 
 // 3. Hooks personalizados
@@ -146,7 +152,6 @@ const VisualizarVale = () => {
   /**
    * Cargar datos del vale desde BD
    */
-
   useEffect(() => {
     let isMounted = true;
     let retryCount = 0;
@@ -215,6 +220,10 @@ const VisualizarVale = () => {
               tarifa_primer_km,
               tarifa_subsecuente,
               notas_adicionales,
+              foto_evidencia_url,
+              latitud_completado,
+              longitud_completado,
+              distancia_obra_metros,
               material:id_material (
                 material,
                 tipo_de_material:id_tipo_de_material (
@@ -223,6 +232,9 @@ const VisualizarVale = () => {
               ),
               bancos:id_banco (
                 banco
+              ),
+              sindicatos:id_sindicato (
+                sindicato
               )
             ),
             vale_renta_detalle (
@@ -238,12 +250,18 @@ const VisualizarVale = () => {
               material:id_material (
                 material
               ),
-              sindicatos:id_sindicato (
-                sindicato
-              ),
               precios_renta:id_precios_renta (
                 costo_hr,
                 costo_dia
+              ),
+              vale_renta_viajes (
+                id_viaje,
+                numero_viaje,
+                hora_registro,
+                persona_registro:id_persona_registro (
+                  nombre,
+                  primer_apellido
+                )
               )
             )
           `,
@@ -584,6 +602,15 @@ const VisualizarVale = () => {
           />
         )}
 
+        {/* LISTA DE VIAJES - MATERIAL */}
+        {vale.tipo_vale === "material" &&
+          vale.vale_material_detalles?.length > 0 && (
+            <ListaViajesMaterial
+              detalles={vale.vale_material_detalles}
+              mostrarPrecios={mostrarPrecios}
+            />
+          )}
+
         <div className="divider"></div>
 
         {/* DATOS GENERALES */}
@@ -891,6 +918,293 @@ const DetallesMaterial = ({ detalle, mostrarPrecios }) => {
 };
 
 // ========================================
+// COMPONENTE: LISTA DE VIAJES - MATERIAL
+// Muestra cada detalle de material como un viaje individual
+// con foto de evidencia, distancia a la obra y datos del viaje
+// ========================================
+
+const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
+  // Estado para el modal de foto ampliada
+  const [fotoModal, setFotoModal] = useState(null); // { url, indice }
+
+  // Calcular badge de proximidad a la obra según distancia en metros
+  const getDistanciaBadge = (metros) => {
+    if (metros === null || metros === undefined) return null;
+    if (metros <= 500)
+      return {
+        label: `${metros} m de la obra`,
+        clase: "distancia-badge--cerca",
+      };
+    if (metros <= 2000)
+      return {
+        label: `${(metros / 1000).toFixed(1)} km de la obra`,
+        clase: "distancia-badge--media",
+      };
+    return {
+      label: `${(metros / 1000).toFixed(1)} km de la obra`,
+      clase: "distancia-badge--lejos",
+    };
+  };
+
+  return (
+    <>
+      <div className="divider"></div>
+
+      <div className="vale-section">
+        <h3 className="section-title">
+          VIAJES REGISTRADOS
+          <span className="viajes-count-badge">{detalles.length}</span>
+        </h3>
+
+        <div className="viajes-lista">
+          {detalles.map((detalle, idx) => {
+            const distanciaBadge = getDistanciaBadge(
+              detalle.distancia_obra_metros,
+            );
+            const tieneGeo =
+              detalle.latitud_completado && detalle.longitud_completado;
+            const tieneFoto = Boolean(detalle.foto_evidencia_url);
+
+            return (
+              <div key={idx} className="viaje-item">
+                {/* Cabecera del viaje */}
+                <div className="viaje-item__header">
+                  <div className="viaje-item__numero">
+                    <span className="viaje-item__numero-label">Viaje</span>
+                    <span className="viaje-item__numero-valor">{idx + 1}</span>
+                    {detalles.length > 1 && (
+                      <span className="viaje-item__numero-total">
+                        / {detalles.length}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="viaje-item__header-badges">
+                    {/* Badge de distancia a la obra */}
+                    {distanciaBadge && (
+                      <span
+                        className={`distancia-badge ${distanciaBadge.clase}`}
+                      >
+                        <MapPin size={11} />
+                        {distanciaBadge.label}
+                      </span>
+                    )}
+                    {/* Tipo de material */}
+                    {detalle.material?.tipo_de_material?.tipo_de_material && (
+                      <span className="tipo-material-badge">
+                        {detalle.material.tipo_de_material.tipo_de_material}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Cuerpo: foto + datos */}
+                <div className="viaje-item__body">
+                  {/* Columna izquierda: foto de evidencia */}
+                  <div className="viaje-item__foto-col">
+                    {tieneFoto ? (
+                      <div className="viaje-item__foto-wrapper">
+                        <img
+                          src={detalle.foto_evidencia_url}
+                          alt={`Evidencia viaje ${idx + 1}`}
+                          className="viaje-item__foto"
+                          onClick={() =>
+                            setFotoModal({
+                              url: detalle.foto_evidencia_url,
+                              indice: idx,
+                              distanciaBadge,
+                            })
+                          }
+                        />
+                        <button
+                          className="viaje-item__foto-btn"
+                          onClick={() =>
+                            setFotoModal({
+                              url: detalle.foto_evidencia_url,
+                              indice: idx,
+                              distanciaBadge,
+                            })
+                          }
+                          aria-label="Ver foto completa"
+                        >
+                          <Expand size={13} />
+                          Ampliar
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="viaje-item__foto-placeholder">
+                        <ImageOff size={24} />
+                        <span>Sin foto</span>
+                      </div>
+                    )}
+
+                    {/* Link a mapa si tiene coordenadas */}
+                    {tieneGeo && (
+                      <a
+                        href={`https://www.google.com/maps?q=${detalle.latitud_completado},${detalle.longitud_completado}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="viaje-item__mapa-link"
+                      >
+                        <MapPin size={12} />
+                        Ver en mapa
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Columna derecha: datos del viaje */}
+                  <div className="viaje-item__datos">
+                    <div className="viaje-item__dato">
+                      <span className="viaje-item__dato-label">Material</span>
+                      <span className="viaje-item__dato-valor">
+                        {detalle.material?.material || "N/A"}
+                      </span>
+                    </div>
+
+                    {detalle.bancos?.banco && (
+                      <div className="viaje-item__dato">
+                        <span className="viaje-item__dato-label">Banco</span>
+                        <span className="viaje-item__dato-valor">
+                          {detalle.bancos.banco}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="viaje-item__dato">
+                      <span className="viaje-item__dato-label">Capacidad</span>
+                      <span className="viaje-item__dato-valor">
+                        {formatearVolumen(detalle.capacidad_m3)}
+                      </span>
+                    </div>
+
+                    <div className="viaje-item__dato">
+                      <span className="viaje-item__dato-label">
+                        Dist. trayecto
+                      </span>
+                      <span className="viaje-item__dato-valor">
+                        {detalle.distancia_km || 0} km
+                      </span>
+                    </div>
+
+                    <div className="viaje-item__separador" />
+
+                    <div className="viaje-item__dato">
+                      <span className="viaje-item__dato-label">M³ Pedidos</span>
+                      <span className="viaje-item__dato-valor">
+                        {formatearVolumen(detalle.cantidad_pedida_m3)}
+                      </span>
+                    </div>
+
+                    {detalle.volumen_real_m3 && (
+                      <div className="viaje-item__dato">
+                        <span className="viaje-item__dato-label">
+                          Vol. Real
+                        </span>
+                        <span className="viaje-item__dato-valor viaje-item__dato-valor--highlight">
+                          {formatearVolumen(detalle.volumen_real_m3)}
+                        </span>
+                      </div>
+                    )}
+
+                    {detalle.peso_ton && (
+                      <div className="viaje-item__dato">
+                        <span className="viaje-item__dato-label">Peso</span>
+                        <span className="viaje-item__dato-valor">
+                          {formatearPeso(detalle.peso_ton)}
+                        </span>
+                      </div>
+                    )}
+
+                    {detalle.folio_banco && (
+                      <div className="viaje-item__dato">
+                        <span className="viaje-item__dato-label">
+                          Folio banco
+                        </span>
+                        <span className="viaje-item__dato-valor">
+                          {detalle.folio_banco}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Importe - solo si tiene permiso */}
+                    {mostrarPrecios && detalle.costo_total && (
+                      <>
+                        <div className="viaje-item__separador" />
+                        <div className="viaje-item__dato viaje-item__dato--costo">
+                          <span className="viaje-item__dato-label">
+                            Importe
+                          </span>
+                          <span className="viaje-item__dato-valor viaje-item__dato-valor--costo">
+                            {formatearMoneda(detalle.costo_total)}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Notas del viaje */}
+                {detalle.notas_adicionales && (
+                  <div className="viaje-item__notas">
+                    <span className="viaje-item__notas-label">Notas:</span>
+                    <span className="viaje-item__notas-texto">
+                      {detalle.notas_adicionales}
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Modal foto ampliada */}
+      {fotoModal && (
+        <div
+          className="foto-modal-overlay"
+          onClick={() => setFotoModal(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Foto de evidencia ampliada"
+        >
+          <div
+            className="foto-modal-contenido"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="foto-modal-cerrar"
+              onClick={() => setFotoModal(null)}
+              aria-label="Cerrar foto"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="foto-modal-titulo">
+              Evidencia — Viaje {fotoModal.indice + 1}
+            </div>
+
+            <img
+              src={fotoModal.url}
+              alt={`Evidencia viaje ${fotoModal.indice + 1}`}
+              className="foto-modal-imagen"
+            />
+
+            {fotoModal.distanciaBadge && (
+              <div
+                className={`foto-modal-distancia ${fotoModal.distanciaBadge.clase}`}
+              >
+                <MapPin size={14} />
+                {fotoModal.distanciaBadge.label}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+// ========================================
 // COMPONENTE: DETALLES DE RENTA
 // ========================================
 
@@ -898,6 +1212,12 @@ const DetallesRenta = ({ detalle, mostrarPrecios }) => {
   // MODIFICADO: Detectar renta por día si total_dias > 0
   const totalDias = Number(detalle.total_dias || 0);
   const esRentaPorDia = totalDias > 0;
+
+  // Viajes registrados en vale_renta_viajes, ordenados por numero_viaje
+  const viajesRegistrados = detalle.vale_renta_viajes || [];
+  const viajesOrdenados = [...viajesRegistrados].sort(
+    (a, b) => a.numero_viaje - b.numero_viaje,
+  );
 
   return (
     <div className="vale-section">
@@ -960,8 +1280,6 @@ const DetallesRenta = ({ detalle, mostrarPrecios }) => {
         </span>
       </div>
 
-      <div className="divider-thin"></div>
-
       {/* PRECIOS (solo si tiene permiso) */}
       {mostrarPrecios && (
         <>
@@ -994,6 +1312,57 @@ const DetallesRenta = ({ detalle, mostrarPrecios }) => {
             </div>
           )}
         </>
+      )}
+
+      {detalle.notas_adicionales && (
+        <div className="info-full" style={{ marginTop: "8px" }}>
+          <span className="info-label">Notas:</span>
+          <span className="info-value">{detalle.notas_adicionales}</span>
+        </div>
+      )}
+
+      {/* Registro de viajes individuales (vale_renta_viajes) */}
+      {viajesOrdenados.length > 0 && (
+        <div className="viajes-renta">
+          <div className="viajes-renta__header">
+            <Clock size={14} />
+            <span>Registro de viajes</span>
+            <span className="viajes-renta__count">
+              {viajesOrdenados.length}
+            </span>
+          </div>
+
+          <div className="viajes-renta__tabla">
+            {/* Encabezados */}
+            <div className="viajes-renta__fila viajes-renta__fila--header">
+              <span>#</span>
+              <span>Hora de registro</span>
+              <span>Registrado por</span>
+            </div>
+
+            {/* Filas de viajes */}
+            {viajesOrdenados.map((viaje) => {
+              const registrador = viaje.persona_registro;
+              const nombreRegistrador = registrador
+                ? `${registrador.nombre} ${registrador.primer_apellido}`
+                : "N/A";
+
+              return (
+                <div key={viaje.id_viaje} className="viajes-renta__fila">
+                  <span className="viajes-renta__num">
+                    {viaje.numero_viaje}
+                  </span>
+                  <span className="viajes-renta__hora">
+                    {formatearHora(viaje.hora_registro)}
+                  </span>
+                  <span className="viajes-renta__persona">
+                    {nombreRegistrador}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );

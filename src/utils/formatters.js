@@ -269,6 +269,16 @@ export const getBadgeEstado = (estado) => {
       color: "#10B981",
       background: "#D1FAE5",
     },
+    cancelado: {
+      label: "Cancelado",
+      color: "#DC2626",
+      background: "#FEE2E2",
+    },
+    conciliado: {
+      label: "Conciliado",
+      color: "#0891B2",
+      background: "#E0F2FE",
+    },
   };
 
   return (
