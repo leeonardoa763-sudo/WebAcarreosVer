@@ -8,6 +8,7 @@
  * - Gestiona estados globales
  * - Expone API unificada
  * - Maneja carga de datos
+ * - Filtra automáticamente por sindicato cuando el rol es Sindicato
  *
  * Usado en: Vales.jsx, Conciliaciones.jsx
  */
@@ -60,6 +61,10 @@ export const useVales = () => {
   const { applyFilters, hasActiveFilters } = useValesFilters();
   const { calcularPrecioTotal } = useValesHelpers();
 
+  // Detectar rol sindicato
+  const esSindicato = userProfile?.roles?.role === "Sindicato";
+  const idSindicatoUsuario = userProfile?.id_sindicato;
+
   /**
    * Cargar catálogo de obras
    */
@@ -107,7 +112,10 @@ export const useVales = () => {
   }, []);
 
   /**
-   * Obtener vales con filtros (sin paginación)
+   * Obtener vales con filtros
+   * Para rol Sindicato: filtra automáticamente por su id_sindicato
+   * comparando contra operadores.sindicatos.id_sindicato en el cliente,
+   * ya que PostgREST no soporta filtrar por relaciones anidadas
    */
   const fetchVales = useCallback(async () => {
     try {
@@ -125,8 +133,20 @@ export const useVales = () => {
 
       if (error) throw error;
 
-      // Aplicar filtros en el cliente
-      const filteredData = applyFilters(data || [], filters);
+      let datos = data || [];
+
+      // Filtro automático por sindicato para rol Sindicato
+      // Se aplica antes de los filtros de usuario para que sea transparente
+      if (esSindicato && idSindicatoUsuario) {
+        datos = datos.filter(
+          (vale) =>
+            Number(vale.operadores?.id_sindicato) ===
+            Number(idSindicatoUsuario),
+        );
+      }
+
+      // Aplicar filtros del usuario encima del filtro de sindicato
+      const filteredData = applyFilters(datos, filters);
 
       setVales(filteredData);
     } catch (error) {
@@ -138,6 +158,8 @@ export const useVales = () => {
   }, [
     buildBaseQuery,
     applyFilters,
+    esSindicato,
+    idSindicatoUsuario,
     filters.searchTerm,
     filters.id_obra,
     filters.id_material,
@@ -170,11 +192,11 @@ export const useVales = () => {
   useEffect(() => {
     loadObras();
     loadMateriales();
-    loadSindicatos(); // ← AGREGAR
-  }, [loadObras, loadMateriales, loadSindicatos]); // ← AGREGAR loadSindicatos
+    loadSindicatos();
+  }, [loadObras, loadMateriales, loadSindicatos]);
 
   /**
-   * Efecto para cargar vales cuando cambian filtros
+   * Efecto para cargar vales cuando cambian filtros o perfil
    */
   useEffect(() => {
     if (userProfile?.id_persona) {

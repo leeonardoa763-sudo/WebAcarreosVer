@@ -10,6 +10,7 @@
  * - Obtener vale por folio
  * - Incluye es_renta_por_dia en queries de renta
  * - Incluye vale_renta_viajes para desglose de viajes individuales
+ * - Incluye tickets_material para desglose de viajes en vales tipo 3
  *
  * Usado en: useVales.js
  */
@@ -27,6 +28,7 @@ export const useValesQueries = () => {
   /**
    * Query base con todas las relaciones
    * Incluye vale_renta_viajes para mostrar desglose de viajes en el card
+   * Incluye tickets_material para desglose de viajes en vales tipo 3 (Producto de Corte)
    */
   const buildBaseQuery = useCallback(() => {
     return supabase.from("vales").select(
@@ -44,6 +46,7 @@ export const useValesQueries = () => {
         ),
         operadores:id_operador (
           id_operador,
+          id_sindicato,
           nombre_completo,
           sindicatos:id_sindicato (
             id_sindicato,
@@ -58,6 +61,12 @@ export const useValesQueries = () => {
           nombre,
           primer_apellido,
           segundo_apellido
+        ),
+        tickets_material (
+          id_ticket,
+          numero_ticket,
+          folio_ticket,
+          fecha_impresion
         ),
         vale_material_detalles (
           id_detalle_material,
@@ -83,7 +92,7 @@ export const useValesQueries = () => {
             id_banco,
             banco
           ),
-            vale_material_viajes (
+          vale_material_viajes (
             id_viaje,
             numero_viaje,
             hora_registro,
@@ -93,7 +102,6 @@ export const useValesQueries = () => {
             folio_vale_fisico
           )
         ),
-        
         vale_renta_detalle (
           id_vale_renta_detalle,
           capacidad_m3,
@@ -155,6 +163,7 @@ export const useValesQueries = () => {
   /**
    * Obtener un vale específico por ID
    * Incluye vale_renta_viajes para desglose completo
+   * Incluye tickets_material para desglose de viajes tipo 3
    */
   const fetchValeById = useCallback(async (id_vale) => {
     try {
@@ -190,6 +199,12 @@ export const useValesQueries = () => {
             primer_apellido,
             segundo_apellido
           ),
+          tickets_material (
+            id_ticket,
+            numero_ticket,
+            folio_ticket,
+            fecha_impresion
+          ),
           vale_material_detalles (
             id_detalle_material,
             capacidad_m3,
@@ -214,14 +229,14 @@ export const useValesQueries = () => {
               banco
             ),
             vale_material_viajes (
-            id_viaje,
-            numero_viaje,
-            hora_registro,
-            peso_ton,
-            volumen_m3,
-            costo_viaje,
-            folio_vale_fisico
-          )
+              id_viaje,
+              numero_viaje,
+              hora_registro,
+              peso_ton,
+              volumen_m3,
+              costo_viaje,
+              folio_vale_fisico
+            )
           ),
           vale_renta_detalle (
             id_vale_renta_detalle,
@@ -264,6 +279,7 @@ export const useValesQueries = () => {
   /**
    * Obtener vale por folio (para verificación pública)
    * Incluye vale_renta_viajes para desglose completo
+   * Incluye tickets_material para desglose de viajes tipo 3
    */
   const fetchValeByFolio = useCallback(async (folio) => {
     try {
@@ -290,6 +306,12 @@ export const useValesQueries = () => {
             id_vehiculo,
             placas
           ),
+          tickets_material (
+            id_ticket,
+            numero_ticket,
+            folio_ticket,
+            fecha_impresion
+          ),
           vale_material_detalles (
             capacidad_m3,
             distancia_km,
@@ -310,14 +332,14 @@ export const useValesQueries = () => {
               banco
             ),
             vale_material_viajes (
-            id_viaje,
-            numero_viaje,
-            hora_registro,
-            peso_ton,
-            volumen_m3,
-            costo_viaje,
-            folio_vale_fisico
-          )
+              id_viaje,
+              numero_viaje,
+              hora_registro,
+              peso_ton,
+              volumen_m3,
+              costo_viaje,
+              folio_vale_fisico
+            )
           ),
           vale_renta_detalle (
             capacidad_m3,

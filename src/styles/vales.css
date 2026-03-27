@@ -1165,3 +1165,28 @@
   margin: 0;
   line-height: 1.5;
 }
+/* ========================================
+   DESGLOSE DE TICKETS - tipo 3 (Producto de Corte)
+======================================== */
+
+.vale-card__viajes-tabla-header--tickets {
+  display: grid;
+  grid-template-columns: 40px 1fr 80px;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #dcfce7;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.vale-card__viaje-item--ticket {
+  display: grid;
+  grid-template-columns: 40px 1fr 80px;
+  gap: 6px;
+  padding: 5px 8px;
+  background: #ffffff;
+  border-radius: 4px;
+  border: 1px solid #bbf7d0;
+  margin-bottom: 3px;
+  align-items: center;
+}

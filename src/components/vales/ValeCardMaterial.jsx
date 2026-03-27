@@ -6,8 +6,8 @@
  * Funcionalidades:
  * - Vista compacta: folio, fecha, estado
  * - Desplegable: información completa del vale de material
- * - Muestra volumen según tipo de material (Tipo 3 = Pedidos, Otros = Reales)
- * - Detalles de banco, distancia, precios
+ * - Tipo 1 y 2 (Pétreo / Base Asfáltica): volumen_real_m3, peso, banco, requisición, viajes físicos
+ * - Tipo 3 (Producto de Corte): volumen_real_m3, capacidad, viajes calculados, sin banco ni peso
  *
  * Usado en: ValeCard.jsx
  */
@@ -49,13 +49,24 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
   const { fecha, hora } = formatearFechaHora(vale.fecha_creacion);
 
   /**
-   * Calcular costo total del vale
+   * Calcular costo total del vale sumando todos los detalles
    */
   const calcularCostoTotal = () => {
     return vale.vale_material_detalles.reduce(
       (sum, detalle) => sum + Number(detalle.costo_total || 0),
       0,
     );
+  };
+
+  /**
+   * Calcular número de viajes para tipo 3
+   * Se infiere dividiendo volumen_real_m3 / capacidad_m3
+   */
+  const calcularViajesTipo3 = (detalle) => {
+    const volumen = Number(detalle.volumen_real_m3 || 0);
+    const capacidad = Number(detalle.capacidad_m3 || 0);
+    if (capacidad <= 0 || volumen <= 0) return null;
+    return Math.round(volumen / capacidad);
   };
 
   return (
@@ -308,18 +319,23 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
               <p className="vale-card__no-data">Sin detalles de material</p>
             ) : (
               vale.vale_material_detalles.map((detalle, index) => {
-                const esTipo3 =
-                  detalle.material?.tipo_de_material?.id_tipo_de_material === 3;
+                const idTipo =
+                  detalle.material?.tipo_de_material?.id_tipo_de_material;
+                const esTipo3 = idTipo === 3;
 
-                const volumen = esTipo3
-                  ? Number(detalle.cantidad_pedida_m3)
-                  : Number(detalle.volumen_real_m3);
+                // Tipo 3: usa volumen_real_m3 (cantidad_pedida_m3 siempre es null)
+                // Tipo 1 y 2: usa volumen_real_m3 también
+                const volumen = Number(detalle.volumen_real_m3 || 0);
+                const precioM3 = Number(detalle.precio_m3 || 0);
+                const costoTotal = Number(detalle.costo_total || 0);
 
-                const labelVolumen = esTipo3 ? "M³ Pedidos" : "M³ Reales";
+                // Solo tipo 1 y 2 muestran peso
+                const pesoTon = esTipo3 ? 0 : Number(detalle.peso_ton || 0);
 
-                const precioM3 = Number(detalle.precio_m3);
-                const costoTotal = Number(detalle.costo_total);
-                const pesoTon = Number(detalle.peso_ton);
+                // Viajes calculados solo para tipo 3
+                const viajesTipo3 = esTipo3
+                  ? calcularViajesTipo3(detalle)
+                  : null;
 
                 return (
                   <div
@@ -336,6 +352,7 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                     </div>
 
                     <div className="vale-card__detalle-grid">
+                      {/* Tipo de material - siempre visible */}
                       <div className="vale-card__detalle-item-small">
                         <span className="vale-card__detalle-label">Tipo:</span>
                         <span className="vale-card__detalle-value">
@@ -344,22 +361,19 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                         </span>
                       </div>
 
-                      <div className="vale-card__detalle-item-small">
-                        <span className="vale-card__detalle-label">Banco:</span>
-                        <span className="vale-card__detalle-value">
-                          {detalle.bancos?.banco || "N/A"}
-                        </span>
-                      </div>
-
-                      {vale.operadores?.sindicatos?.sindicato && (
-                        <div className="vale-card__field">
-                          <span className="vale-card__label">Sindicato:</span>
-                          <span className="vale-card__value">
-                            {vale.operadores.sindicatos.sindicato}
+                      {/* Banco: solo tipo 1 y 2 */}
+                      {!esTipo3 && (
+                        <div className="vale-card__detalle-item-small">
+                          <span className="vale-card__detalle-label">
+                            Banco:
+                          </span>
+                          <span className="vale-card__detalle-value">
+                            {detalle.bancos?.banco || "N/A"}
                           </span>
                         </div>
                       )}
 
+                      {/* Capacidad: siempre visible */}
                       <div className="vale-card__detalle-item-small">
                         <span className="vale-card__detalle-label">
                           Capacidad:
@@ -369,6 +383,7 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                         </span>
                       </div>
 
+                      {/* Distancia: siempre visible */}
                       <div className="vale-card__detalle-item-small">
                         <span className="vale-card__detalle-label">
                           Distancia:
@@ -378,38 +393,56 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                         </span>
                       </div>
 
+                      {/* Viajes calculados: solo tipo 3 */}
+                      {esTipo3 && viajesTipo3 !== null && (
+                        <div className="vale-card__detalle-item-small">
+                          <span className="vale-card__detalle-label">
+                            Viajes:
+                          </span>
+                          <span className="vale-card__detalle-value">
+                            {viajesTipo3}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* M³ Reales: siempre visible */}
                       <div className="vale-card__detalle-item-small">
                         <span className="vale-card__detalle-label">
-                          {labelVolumen}:
+                          M³ Reales:
                         </span>
                         <span className="vale-card__detalle-value highlight">
-                          {!isNaN(volumen) && volumen > 0
+                          {volumen > 0
                             ? formatearVolumen(volumen)
                             : "Pendiente"}
                         </span>
                       </div>
 
-                      <div className="vale-card__detalle-item-small">
-                        <span className="vale-card__detalle-label">
-                          Requisición:
-                        </span>
-                        <span className="vale-card__detalle-value">
-                          {detalle.requisicion || "N/A"}
-                        </span>
-                      </div>
+                      {/* Requisición: solo tipo 1 y 2 */}
+                      {!esTipo3 && (
+                        <div className="vale-card__detalle-item-small">
+                          <span className="vale-card__detalle-label">
+                            Requisición:
+                          </span>
+                          <span className="vale-card__detalle-value">
+                            {detalle.requisicion || "N/A"}
+                          </span>
+                        </div>
+                      )}
 
+                      {/* Precio/M³: siempre visible */}
                       <div className="vale-card__detalle-item-small">
                         <span className="vale-card__detalle-label">
                           Precio/M³:
                         </span>
                         <span className="vale-card__detalle-value">
-                          {!isNaN(precioM3) && precioM3 > 0
+                          {precioM3 > 0
                             ? formatearMoneda(precioM3)
                             : "Pendiente"}
                         </span>
                       </div>
 
-                      {!isNaN(pesoTon) && pesoTon > 0 && (
+                      {/* Peso: solo tipo 1 y 2, y solo si tiene valor */}
+                      {!esTipo3 && pesoTon > 0 && (
                         <div className="vale-card__detalle-item-small">
                           <span className="vale-card__detalle-label">
                             Peso:
@@ -420,12 +453,13 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                         </div>
                       )}
 
+                      {/* Importe: siempre visible, ocupa ancho completo */}
                       <div className="vale-card__detalle-item-small full-width">
                         <span className="vale-card__detalle-label">
                           Importe:
                         </span>
                         <span className="vale-card__detalle-value cost">
-                          {!isNaN(costoTotal) && costoTotal > 0
+                          {costoTotal > 0
                             ? formatearMoneda(costoTotal)
                             : "Pendiente"}
                         </span>
@@ -440,9 +474,47 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                         </p>
                       </div>
                     )}
+                    {/* Desglose de tickets: solo tipo 3 */}
+                    {esTipo3 && vale.tickets_material?.length > 0 && (
+                      <div className="vale-card__viajes-desglose vale-card__viajes-desglose--material">
+                        <h5 className="vale-card__viajes-title">
+                          <Receipt size={13} aria-hidden="true" />
+                          Registro de Viajes ({vale.tickets_material.length})
+                        </h5>
 
-                    {/* Desglose de viajes */}
-                    {detalle.vale_material_viajes?.length > 0 && (
+                        <div className="vale-card__viajes-tabla-header vale-card__viajes-tabla-header--tickets">
+                          <span>Viaje</span>
+                          <span>Folio Ticket</span>
+                          <span>Hora</span>
+                        </div>
+
+                        <div className="vale-card__viajes-lista">
+                          {[...vale.tickets_material]
+                            .sort((a, b) => a.numero_ticket - b.numero_ticket)
+                            .map((ticket) => (
+                              <div
+                                key={ticket.id_ticket}
+                                className="vale-card__viaje-item vale-card__viaje-item--ticket"
+                              >
+                                <span className="vale-card__viaje-numero">
+                                  #{ticket.numero_ticket}
+                                </span>
+                                <span className="vale-card__viaje-folio">
+                                  {ticket.folio_ticket}
+                                </span>
+                                <span className="vale-card__viaje-hora">
+                                  {ticket.fecha_impresion
+                                    ? formatearHora(ticket.fecha_impresion)
+                                    : "—"}
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Desglose de viajes: solo tipo 1 y 2 con viajes registrados */}
+                    {!esTipo3 && detalle.vale_material_viajes?.length > 0 && (
                       <div className="vale-card__viajes-desglose vale-card__viajes-desglose--material">
                         <h5 className="vale-card__viajes-title">
                           <Receipt size={13} aria-hidden="true" />
