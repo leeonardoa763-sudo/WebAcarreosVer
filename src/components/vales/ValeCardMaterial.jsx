@@ -8,6 +8,7 @@
  * - Desplegable: información completa del vale de material
  * - Tipo 1 y 2 (Pétreo / Base Asfáltica): volumen_real_m3, peso, banco, requisición, viajes físicos
  * - Tipo 3 (Producto de Corte): volumen_real_m3, capacidad, viajes calculados, sin banco ni peso
+ * - Botón de editar viajes (solo Administrador, solo vales no conciliados ni verificados)
  *
  * Usado en: ValeCard.jsx
  */
@@ -28,6 +29,7 @@ import {
   UserCheck,
   Receipt,
   XCircle,
+  Pencil,
 } from "lucide-react";
 
 // 3. Utils
@@ -43,10 +45,41 @@ import {
   formatearHora,
 } from "../../utils/formatters";
 
+// 4. Hooks personalizados
+import { useAuth } from "../../hooks/useAuth";
+
+// 5. Componentes
+import ModalEditarVale from "./editar/ModalEditarVale";
+
 const ValeCardMaterial = ({ vale, empresaColor }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const badgeEstado = getBadgeEstado(vale.estado);
   const { fecha, hora } = formatearFechaHora(vale.fecha_creacion);
+
+  // Auth y permisos
+  const { userProfile } = useAuth();
+  const esAdministrador = userProfile?.roles?.role === "Administrador";
+
+  // Estado del modal de edición
+  const [modalEditar, setModalEditar] = useState({
+    abierto: false,
+    idDetalle: null,
+  });
+
+  // El vale es editable si es admin y no está conciliado ni verificado
+  const valeEditable =
+    esAdministrador &&
+    vale.estado !== "conciliado" &&
+    vale.estado !== "verificado";
+
+  const abrirModalEditar = (e, idDetalle) => {
+    e.stopPropagation();
+    setModalEditar({ abierto: true, idDetalle });
+  };
+
+  const cerrarModalEditar = () => {
+    setModalEditar({ abierto: false, idDetalle: null });
+  };
 
   /**
    * Calcular costo total del vale sumando todos los detalles
@@ -337,6 +370,8 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                   ? calcularViajesTipo3(detalle)
                   : null;
 
+                const esTipo1 = idTipo === 1;
+
                 return (
                   <div
                     key={detalle.id_detalle_material}
@@ -349,6 +384,21 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                       <span className="vale-card__detalle-material-name">
                         {detalle.material?.material || "N/A"}
                       </span>
+
+                      {/* Botón editar viajes — solo tipo 1, solo Administrador */}
+                      {valeEditable && esTipo1 && (
+                        <button
+                          type="button"
+                          className="vale-card__btn-editar vale-card__btn-editar--detalle"
+                          onClick={(e) =>
+                            abrirModalEditar(e, detalle.id_detalle_material)
+                          }
+                          title="Editar viajes de este detalle"
+                        >
+                          <Pencil size={11} />
+                          Editar viajes
+                        </button>
+                      )}
                     </div>
 
                     <div className="vale-card__detalle-grid">
@@ -474,6 +524,7 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                         </p>
                       </div>
                     )}
+
                     {/* Desglose de tickets: solo tipo 3 */}
                     {esTipo3 && vale.tickets_material?.length > 0 && (
                       <div className="vale-card__viajes-desglose vale-card__viajes-desglose--material">
@@ -606,6 +657,16 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
             )}
           </div>
         </div>
+      )}
+
+      {/* Modal de edición de viajes */}
+      {modalEditar.abierto && modalEditar.idDetalle && (
+        <ModalEditarVale
+          idDetalleM={modalEditar.idDetalle}
+          folioVale={vale.folio}
+          onCerrar={cerrarModalEditar}
+          onGuardadoExitoso={cerrarModalEditar}
+        />
       )}
     </div>
   );

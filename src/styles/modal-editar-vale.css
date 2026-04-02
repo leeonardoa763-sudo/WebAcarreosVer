@@ -1,0 +1,802 @@
+/**
+ * src/styles/modal-editar-vale.css
+ *
+ * Estilos para el modal de edición de vales y la tabla de viajes editable.
+ * Prefijos: mev__ (modal) y tev__ (tabla editar viajes)
+ */
+
+/* ========================================
+   MODAL OVERLAY Y PANEL
+======================================== */
+
+.mev__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: mev-fade-in 0.18s ease;
+}
+
+@keyframes mev-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.mev__panel {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.2),
+    0 8px 24px rgba(0, 0, 0, 0.12);
+  width: 100%;
+  max-width: 900px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: mev-slide-up 0.2s ease;
+}
+
+@keyframes mev-slide-up {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ========================================
+   HEADER
+======================================== */
+
+.mev__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 18px;
+  border-bottom: 2px solid #f0f1f4;
+  background: #fafbfc;
+  flex-shrink: 0;
+}
+
+.mev__header-izq {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mev__header-icono {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ff6b35, #e85d2a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.mev__titulo {
+  font-size: 17px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.mev__subtitulo {
+  font-size: 12px;
+  color: #7f8c8d;
+  margin: 3px 0 0;
+  font-weight: 500;
+}
+
+.mev__btn-cerrar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.mev__btn-cerrar:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #ef4444;
+}
+
+/* ========================================
+   ALERTAS
+======================================== */
+
+.mev__alerta {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.mev__alerta--error {
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.mev__alerta--exito {
+  background: #f0fdf4;
+  border-bottom: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+.mev__alerta--pendiente {
+  background: #fffbeb;
+  border-bottom: 1px solid #fde68a;
+  color: #92400e;
+}
+
+.mev__error-detalle {
+  font-family: "Courier New", monospace;
+  font-size: 11px;
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ========================================
+   CUERPO (scrollable)
+======================================== */
+
+.mev__cuerpo {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+/* ========================================
+   FOOTER
+======================================== */
+
+.mev__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-top: 2px solid #f0f1f4;
+  background: #fafbfc;
+  gap: 12px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.mev__footer-der {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Botones del footer */
+.mev__btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+}
+
+.mev__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mev__btn--secundario {
+  background: white;
+  border: 1.5px solid #e5e7eb;
+  color: #6b7280;
+}
+
+.mev__btn--secundario:not(:disabled):hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+  color: #374151;
+}
+
+.mev__btn--cancelar {
+  background: white;
+  border: 1.5px solid #e5e7eb;
+  color: #374151;
+}
+
+.mev__btn--cancelar:not(:disabled):hover {
+  background: #f3f4f6;
+}
+
+.mev__btn--guardar {
+  background: linear-gradient(135deg, #ff6b35, #e85d2a);
+  color: white;
+  border: none;
+  padding: 9px 22px;
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.35);
+}
+
+.mev__btn--guardar:not(:disabled):hover {
+  background: linear-gradient(135deg, #e85d2a, #d44e20);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.45);
+  transform: translateY(-1px);
+}
+
+.mev__spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ========================================
+   TABLA EDITAR VIAJES (tev__)
+======================================== */
+
+.tev__contenedor {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Cabecera del detalle ── */
+
+.tev__cabecera-detalle {
+  padding: 18px 24px 14px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tev__info-detalle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px 32px;
+  margin-bottom: 10px;
+}
+
+.tev__info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tev__info-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+}
+
+.tev__info-valor {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.tev__info-valor--editable {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  padding: 3px 7px;
+  border-radius: 6px;
+  border: 1.5px dashed #d1d5db;
+  background: white;
+  transition: all 0.15s ease;
+  font-size: 13px;
+}
+
+.tev__info-valor--editable:hover {
+  border-color: #ff6b35;
+  background: #fff7f4;
+  color: #ff6b35;
+}
+
+.tev__info-valor--precio {
+  color: #004e89;
+  font-size: 15px;
+}
+
+.tev__distancia-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tev__input--distancia {
+  width: 80px;
+}
+
+.tev__input-suffix {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.tev__aviso-distancia {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #6b7280;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+/* ── Tabla ── */
+
+.tev__tabla-wrapper {
+  overflow-x: auto;
+  padding: 16px 24px 0;
+}
+
+.tev__tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.tev__thead-fila {
+  background: #f1f5f9;
+}
+
+.tev__th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+  position: relative;
+}
+
+.tev__th-sub {
+  display: block;
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: none;
+  color: #94a3b8;
+  letter-spacing: 0;
+  margin-top: 1px;
+}
+
+.tev__th--angosto {
+  width: 80px;
+}
+.tev__th--calculado {
+  background: #f8fafc;
+}
+.tev__th--costo {
+  text-align: right;
+}
+.tev__th--acciones {
+  width: 120px;
+  text-align: center;
+}
+
+/* ── Filas ── */
+
+.tev__fila {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.12s ease;
+}
+
+.tev__fila:hover {
+  background: #fafbfc;
+}
+
+.tev__fila--editando {
+  background: #fffbf5;
+  border-left: 3px solid #ff6b35;
+}
+
+.tev__fila--nueva {
+  background: #f0fdf4;
+  border-left: 3px solid #10b981;
+}
+
+.tev__fila--eliminar {
+  background: #fef2f2;
+  opacity: 0.7;
+  border-left: 3px solid #ef4444;
+}
+
+.tev__fila--eliminar td {
+  text-decoration: line-through;
+  color: #9ca3af;
+}
+
+.tev__fila--eliminar .tev__badge,
+.tev__fila--eliminar .tev__btn--restaurar {
+  text-decoration: none;
+}
+
+.tev__td {
+  padding: 10px 12px;
+  vertical-align: middle;
+}
+
+.tev__td--centro {
+  text-align: center;
+}
+.tev__td--calculado {
+  background: #fafcff;
+}
+.tev__td--costo {
+  text-align: right;
+}
+.tev__td--acciones {
+  text-align: center;
+}
+
+/* ── Elementos dentro de celdas ── */
+
+.tev__numero-viaje {
+  font-weight: 700;
+  font-size: 13px;
+  color: #2c3e50;
+  display: block;
+}
+
+.tev__badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 3px;
+}
+
+.tev__badge--nuevo {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.tev__badge--eliminar {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.tev__valor {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.tev__valor--editable {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1.5px dashed #d1d5db;
+  transition: all 0.15s ease;
+}
+
+.tev__valor--editable:hover {
+  border-color: #ff6b35;
+  background: #fff7f4;
+  color: #ff6b35;
+}
+
+.tev__valor--calculado {
+  color: #004e89;
+  font-weight: 600;
+}
+
+.tev__icono-editar {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.tev__sub {
+  display: block;
+  font-size: 10px;
+  color: #9ca3af;
+  margin-top: 1px;
+}
+
+.tev__costo {
+  font-weight: 700;
+  font-size: 14px;
+  color: #10b981;
+}
+
+/* ── Inputs ── */
+
+.tev__input {
+  padding: 6px 10px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #2c3e50;
+  background: white;
+  transition: border-color 0.15s ease;
+  width: 100%;
+  outline: none;
+}
+
+.tev__input:focus {
+  border-color: #ff6b35;
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.12);
+}
+
+.tev__input:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.tev__input--folio {
+  max-width: 130px;
+}
+
+.tev__input--numero {
+  max-width: 110px;
+  text-align: right;
+}
+
+.tev__input--destacado {
+  border-color: #ff6b35;
+  background: #fffbf5;
+  font-weight: 600;
+}
+
+/* ── Acciones en fila ── */
+
+.tev__acciones {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.tev__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  transition: all 0.15s ease;
+}
+
+.tev__btn--editar {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.tev__btn--editar:hover {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.tev__btn--listo {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.tev__btn--listo:hover {
+  background: #bbf7d0;
+}
+
+.tev__btn--eliminar {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.tev__btn--eliminar:hover {
+  background: #fecaca;
+}
+
+.tev__btn--restaurar {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.tev__btn--restaurar:hover {
+  background: #fde68a;
+}
+
+.tev__btn--cancelar-sm {
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* ── Totales ── */
+
+.tev__totales-fila {
+  background: #f0f9ff;
+  border-top: 2px solid #bae6fd;
+}
+
+.tev__totales-label {
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0369a1;
+  text-transform: uppercase;
+}
+
+.tev__totales-valor {
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0369a1;
+}
+
+.tev__totales-costo {
+  padding: 10px 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #10b981;
+  text-align: right;
+}
+
+/* ── Footer de la tabla ── */
+
+.tev__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tev__btn-agregar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  background: white;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tev__btn-agregar:hover {
+  border-color: #10b981;
+  color: #10b981;
+  background: #f0fdf4;
+}
+
+.tev__footer-hint {
+  font-size: 11px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* ── Sin viajes / loading ── */
+
+.tev__sin-viajes {
+  padding: 40px 20px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.tev__sin-viajes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* td con display flex no funciona — usar div interno */
+.tev__sin-viajes-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.tev__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.tev__spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #ff6b35;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* ========================================
+   RESPONSIVE
+======================================== */
+
+@media (max-width: 640px) {
+  .mev__panel {
+    max-height: 95vh;
+    border-radius: 12px 12px 0 0;
+    align-self: flex-end;
+    width: 100%;
+  }
+
+  .mev__overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .tev__info-detalle {
+    gap: 14px 20px;
+  }
+
+  .mev__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mev__footer-der {
+    flex-direction: column;
+  }
+
+  .mev__btn {
+    justify-content: center;
+    width: 100%;
+  }
+}

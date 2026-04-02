@@ -1190,3 +1190,38 @@
   margin-bottom: 3px;
   align-items: center;
 }
+
+/* ========================================
+   BOTÓN EDITAR VALE (agregar en vales.css)
+   Pegar después de los estilos de .vale-card-compact__estado
+======================================== */
+
+.vale-card__btn-editar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  border: 1.5px solid #e5e7eb;
+  background: white;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.vale-card__btn-editar:hover {
+  border-color: #ff6b35;
+  background: #fff7f4;
+  color: #ff6b35;
+}
+
+/* Variante dentro del header del detalle expandido */
+.vale-card__btn-editar--detalle {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 3px 8px;
+}
