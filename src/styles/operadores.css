@@ -964,3 +964,137 @@
   font-weight: 500;
   color: #333;
 }
+
+/* ============================================
+   TABLA DE VALES POR EMPRESA
+   ============================================ */
+
+.empresa-group__content {
+  padding: 0 1rem 1rem;
+}
+
+.operadores-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.operadores-table thead tr {
+  border-bottom: 1.5px solid var(--color-border-secondary, #e5e7eb);
+}
+
+.operadores-table thead th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.operadores-table__col-num {
+  text-align: right !important;
+}
+
+/* ── Filas de datos ── */
+.operadores-table__row {
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.operadores-table__row:hover {
+  background: #f9fafb;
+}
+
+.operadores-table__row--expanded {
+  background: #f0f9ff;
+  border-bottom: none;
+}
+
+.operadores-table__row--expanded:hover {
+  background: #e0f2fe;
+}
+
+.operadores-table tbody td {
+  padding: 9px 10px;
+  color: #374151;
+  vertical-align: middle;
+}
+
+/* ── Columnas específicas ── */
+.operadores-table__fecha {
+  white-space: nowrap;
+  color: #6b7280 !important;
+  font-size: 12px !important;
+}
+
+.operadores-table__folio {
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px !important;
+  color: #2563eb !important;
+  white-space: nowrap;
+}
+
+.operadores-table__placas {
+  font-weight: 600;
+  white-space: nowrap;
+  font-size: 12px !important;
+}
+
+.operadores-table__obra {
+  color: #374151;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.operadores-table__operador {
+  color: #4b5563;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Badge de estado ── */
+.operadores-table__estado-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: transparent;
+}
+
+/* ── Fila del ValeCard expandido ── */
+.operadores-table__row-card {
+  border-bottom: 2px solid #e0f2fe;
+}
+
+.operadores-table__card-cell {
+  padding: 0 !important;
+  background: #f8fafc;
+}
+
+/* El ValeCard dentro de la tabla no necesita borde propio */
+.operadores-table__card-cell .vale-card-compact {
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+  border-top: 1px solid #e0f2fe;
+}
+
+/* ── Sin datos ── */
+.operadores-table__empty {
+  padding: 20px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+}

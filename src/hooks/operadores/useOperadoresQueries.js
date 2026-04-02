@@ -118,6 +118,15 @@ const construirQueryBase = (tipoVale) => {
             bancos (
               id_banco,
               banco
+            ),
+            vale_material_viajes (
+              id_viaje,
+              numero_viaje,
+              hora_registro,
+              peso_ton,
+              volumen_m3,
+              costo_viaje,
+              folio_vale_fisico
             )
           )`
           : `vale_renta_detalle (
@@ -143,6 +152,11 @@ const construirQueryBase = (tipoVale) => {
               id_precios_renta,
               costo_hr,
               costo_dia
+            ),
+            vale_renta_viajes (
+              id_viaje,
+              numero_viaje,
+              hora_registro
             )
           )`
       }
