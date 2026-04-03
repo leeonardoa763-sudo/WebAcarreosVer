@@ -42,7 +42,7 @@ const construirQueryBase = (tipoVale) => {
     .from("vales")
     .select(
       `
-     id_vale,
+      id_vale,
       folio,
       tipo_vale,
       estado,
@@ -118,12 +118,11 @@ const construirQueryBase = (tipoVale) => {
                 tipo_de_material
               )
             ),
-     
             bancos (
               id_banco,
               banco
             ),
-         vale_material_viajes (
+            vale_material_viajes (
               id_viaje,
               numero_viaje,
               hora_registro,
@@ -136,9 +135,8 @@ const construirQueryBase = (tipoVale) => {
           tickets_material (
             id_ticket,
             numero_ticket,
-            hora_registro,
-            volumen_m3,
-            foto_url
+            folio_ticket,
+            fecha_impresion
           )`
           : `vale_renta_detalle (
             id_vale_renta_detalle,
