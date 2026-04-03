@@ -45,7 +45,6 @@ const OperadoresList = ({
         estadoGrupo.vales.forEach((vale) => {
           vales.push({
             ...vale,
-            // Adjuntar placas al vale para mostrar en tabla
             _placas: vehiculo.placas,
           });
         });
@@ -167,7 +166,10 @@ const OperadoresList = ({
                         <th>Operador</th>
                         <th>Estado</th>
                         {tipoVale === "material" ? (
-                          <th className="operadores-table__col-num">M³</th>
+                          <>
+                            <th>Material</th>
+                            <th className="operadores-table__col-num">M³</th>
+                          </>
                         ) : (
                           <>
                             <th className="operadores-table__col-num">Días</th>
@@ -191,13 +193,21 @@ const OperadoresList = ({
                               .join("/")
                           : "—";
 
-                        // Color de estado
+                        // Color y etiqueta de estado
                         const colorEstado = helpers.obtenerColorEstado(
                           vale.estado,
                         );
                         const etiquetaEstado = helpers.obtenerEtiquetaEstado(
                           vale.estado,
                         );
+
+                        // Nombre de material (primer detalle)
+                        // Nombre de material (primer detalle)
+                        const nombreMaterial =
+                          tipoVale === "material"
+                            ? vale.vale_material_detalles?.[0]?.material
+                                ?.material || "—"
+                            : null;
 
                         // Totales por fila
                         let totalM3 = null;
@@ -210,14 +220,18 @@ const OperadoresList = ({
                               const esTipo3 =
                                 d.material?.tipo_de_material
                                   ?.id_tipo_de_material === 3;
-                              return (
-                                sum +
-                                Number(
-                                  esTipo3
-                                    ? d.cantidad_pedida_m3
-                                    : d.volumen_real_m3 || 0,
-                                )
-                              );
+                              const volumen = esTipo3
+                                ? Number(
+                                    d.cantidad_pedida_m3 ||
+                                      d.volumen_real_m3 ||
+                                      0,
+                                  )
+                                : Number(
+                                    d.volumen_real_m3 ||
+                                      d.cantidad_pedida_m3 ||
+                                      0,
+                                  );
+                              return sum + volumen;
                             },
                             0,
                           );
@@ -266,6 +280,11 @@ const OperadoresList = ({
                                   {etiquetaEstado}
                                 </span>
                               </td>
+                              {tipoVale === "material" && (
+                                <td className="operadores-table__obra">
+                                  {nombreMaterial}
+                                </td>
+                              )}
                               {tipoVale === "material" ? (
                                 <td className="operadores-table__col-num">
                                   {totalM3 > 0
@@ -292,7 +311,7 @@ const OperadoresList = ({
                             {expandido && (
                               <tr className="operadores-table__row-card">
                                 <td
-                                  colSpan={tipoVale === "material" ? 7 : 8}
+                                  colSpan={tipoVale === "material" ? 8 : 8}
                                   className="operadores-table__card-cell"
                                 >
                                   <ValeCard

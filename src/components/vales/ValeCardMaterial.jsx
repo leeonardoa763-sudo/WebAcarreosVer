@@ -645,7 +645,67 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                 );
               })
             )}
+            {/* Desglose de tickets - solo tipo 3 */}
+            {esTipo3 && detalle.tickets_material?.length > 0 && (
+              <div className="vale-card__viajes-desglose vale-card__viajes-desglose--material">
+                <h5 className="vale-card__viajes-title">
+                  <Receipt size={13} aria-hidden="true" />
+                  Tickets Registrados ({detalle.tickets_material.length})
+                </h5>
 
+                <div
+                  className="vale-card__viajes-tabla-header"
+                  style={{ gridTemplateColumns: "50px 1fr 80px" }}
+                >
+                  <span>Ticket</span>
+                  <span>Hora</span>
+                  <span>M³</span>
+                </div>
+
+                <div className="vale-card__viajes-lista">
+                  {[...detalle.tickets_material]
+                    .sort((a, b) => a.numero_ticket - b.numero_ticket)
+                    .map((ticket) => (
+                      <div
+                        key={ticket.id_ticket}
+                        className="vale-card__viaje-item vale-card__viaje-item--material"
+                        style={{ gridTemplateColumns: "50px 1fr 80px" }}
+                      >
+                        <span className="vale-card__viaje-numero">
+                          #{ticket.numero_ticket}
+                        </span>
+                        <span className="vale-card__viaje-hora">
+                          {ticket.hora_registro
+                            ? formatearHora(ticket.hora_registro)
+                            : "—"}
+                        </span>
+                        <span className="vale-card__viaje-m3">
+                          {ticket.volumen_m3
+                            ? formatearVolumen(Number(ticket.volumen_m3))
+                            : "—"}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+
+                <div
+                  className="vale-card__viajes-totales"
+                  style={{ gridTemplateColumns: "1fr 80px" }}
+                >
+                  <span className="vale-card__viajes-totales-label">
+                    Total m³:
+                  </span>
+                  <span className="vale-card__viajes-totales-ton">
+                    {formatearVolumen(
+                      detalle.tickets_material.reduce(
+                        (s, t) => s + Number(t.volumen_m3 || 0),
+                        0,
+                      ),
+                    )}
+                  </span>
+                </div>
+              </div>
+            )}
             {/* Total General del Vale */}
             {vale.vale_material_detalles?.length > 0 && (
               <div className="vale-card__total">

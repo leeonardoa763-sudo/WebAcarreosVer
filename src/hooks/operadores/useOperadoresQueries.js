@@ -42,18 +42,21 @@ const construirQueryBase = (tipoVale) => {
     .from("vales")
     .select(
       `
-      id_vale,
+     id_vale,
       folio,
       tipo_vale,
       estado,
       fecha_creacion,
       fecha_programada,
+      fecha_verificacion,
+      fecha_completado,
+      fecha_cancelacion,
+      motivo_cancelacion,
       id_obra,
       id_empresa,
       id_operador,
       id_vehiculo,
       verificado_por_sindicato,
-      fecha_verificacion,
       archivado,
 
       obras!inner (
@@ -115,11 +118,12 @@ const construirQueryBase = (tipoVale) => {
                 tipo_de_material
               )
             ),
+     
             bancos (
               id_banco,
               banco
             ),
-            vale_material_viajes (
+         vale_material_viajes (
               id_viaje,
               numero_viaje,
               hora_registro,
@@ -128,6 +132,13 @@ const construirQueryBase = (tipoVale) => {
               costo_viaje,
               folio_vale_fisico
             )
+          ),
+          tickets_material (
+            id_ticket,
+            numero_ticket,
+            hora_registro,
+            volumen_m3,
+            foto_url
           )`
           : `vale_renta_detalle (
             id_vale_renta_detalle,
@@ -384,11 +395,14 @@ const calcularTotalesEstado = (vales, tipoVale) => {
 
     const totalM3 = vales.reduce((sum, vale) => {
       const detalles = vale.vale_material_detalles || [];
-      const m3Vale = detalles.reduce(
-        (sumDetalle, detalle) =>
-          sumDetalle + (Number(detalle.volumen_real_m3) || 0),
-        0,
-      );
+      const m3Vale = detalles.reduce((sumDetalle, detalle) => {
+        const esTipo3 =
+          detalle.material?.tipo_de_material?.id_tipo_de_material === 3;
+        const volumen = esTipo3
+          ? Number(detalle.cantidad_pedida_m3 || detalle.volumen_real_m3 || 0)
+          : Number(detalle.volumen_real_m3 || detalle.cantidad_pedida_m3 || 0);
+        return sumDetalle + volumen;
+      }, 0);
       return sum + m3Vale;
     }, 0);
 
