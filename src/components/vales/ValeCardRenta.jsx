@@ -9,6 +9,7 @@
  * - Muestra fecha de creación Y fecha de emisión (programada) si son distintas
  * - Desglose de viajes individuales desde vale_renta_viajes
  * - Lógica condicional basada en es_renta_por_dia
+ * - Botón de editar tipo de renta (solo Administrador, solo vales no conciliados ni verificados)
  *
  * Usado en: ValeCard.jsx
  */
@@ -29,6 +30,7 @@ import {
   UserCheck,
   MapPin,
   XCircle,
+  Pencil,
 } from "lucide-react";
 
 // 3. Utils
@@ -41,6 +43,14 @@ import {
   formatearMoneda,
   getNombreCompleto,
 } from "../../utils/formatters";
+
+// 4. Hooks personalizados
+import { useAuth } from "../../hooks/useAuth";
+
+// 5. Componentes
+import ModalEditarValeRenta from "./editar/ModalEditarValeRenta";
+
+// ─── Helpers locales ──────────────────────────────────────────────────────────
 
 /**
  * Formatear una fecha ISO a dd/mm/yyyy
@@ -77,8 +87,15 @@ const obtenerFechaEfectiva = (vale) => {
   return fecha;
 };
 
+// ─── Componente ───────────────────────────────────────────────────────────────
+
 const ValeCardRenta = ({ vale, empresaColor }) => {
+  const { userProfile } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Estado del modal de edición — null cuando está cerrado
+  const [modalEditar, setModalEditar] = useState(null);
+
   const badgeEstado = getBadgeEstado(vale.estado);
 
   // Fecha de creación (cuando se registró en el sistema)
@@ -94,15 +111,31 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
     vale.fecha_programada &&
     vale.fecha_programada !== vale.fecha_creacion?.split("T")[0];
 
-  /**
-   * Calcular costo total del vale
-   */
+  // El vale es editable si: es Administrador Y no está conciliado ni verificado
+  const valeEditable =
+    userProfile?.roles?.role === "Administrador" &&
+    vale.estado !== "conciliado" &&
+    vale.estado !== "verificado";
+
+  // ── Handlers del modal ─────────────────────────────────────────────────────
+
+  const abrirModalEditar = (e, idValeRentaDetalle) => {
+    e.stopPropagation();
+    setModalEditar({ idValeRentaDetalle });
+  };
+
+  const cerrarModal = () => setModalEditar(null);
+
+  // ── Calcular costo total del vale ──────────────────────────────────────────
+
   const calcularCostoTotal = () => {
     return vale.vale_renta_detalle.reduce(
       (sum, detalle) => sum + Number(detalle.costo_total || 0),
       0,
     );
   };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="vale-card-compact">
@@ -409,6 +442,7 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                     key={detalle.id_vale_renta_detalle}
                     className="vale-card__detalle-renta"
                   >
+                    {/* Header del detalle con botón editar */}
                     <div className="vale-card__detalle-header">
                       <span className="vale-card__detalle-number">
                         #{index + 1}
@@ -416,6 +450,21 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
                       <span className="vale-card__detalle-material-name">
                         {detalle.material?.material || "N/A"}
                       </span>
+
+                      {/* Botón editar tipo de renta — solo Administrador, solo vales editables */}
+                      {valeEditable && (
+                        <button
+                          type="button"
+                          className="vale-card__btn-editar vale-card__btn-editar--detalle"
+                          onClick={(e) =>
+                            abrirModalEditar(e, detalle.id_vale_renta_detalle)
+                          }
+                          title="Editar tipo de renta"
+                        >
+                          <Pencil size={11} />
+                          Editar tipo
+                        </button>
+                      )}
                     </div>
 
                     <div className="vale-card__detalle-grid">
@@ -573,6 +622,16 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
             )}
           </div>
         </div>
+      )}
+
+      {/* Modal editar tipo de renta */}
+      {modalEditar && (
+        <ModalEditarValeRenta
+          idValeRentaDetalle={modalEditar.idValeRentaDetalle}
+          folioVale={vale.folio}
+          onCerrar={cerrarModal}
+          onGuardadoExitoso={cerrarModal}
+        />
       )}
     </div>
   );
