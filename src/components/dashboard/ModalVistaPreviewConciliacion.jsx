@@ -1,12 +1,14 @@
 /**
  * src/components/dashboard/ModalVistaPreviewConciliacion.jsx
  *
- * Modal que muestra vista previa de conciliación similar al PDF
+ * Modal que muestra vista previa de conciliación similar al PDF.
+ * Incluye botón para exportar los vales de renta en PDF (4 por hoja).
  *
  * Funcionalidades:
  * - Simula el diseño del PDF generado
  * - Muestra encabezados, tabla, totales y firmas
  * - Cierra con X o click fuera
+ * - Exporta vales de renta en PDF bulk (solo tipo renta)
  *
  * Usado en: SeccionConciliaciones.jsx
  */
@@ -15,10 +17,11 @@
 import { useEffect, useState } from "react";
 
 // 2. Icons
-import { X, Loader2 } from "lucide-react";
+import { X, Loader2, FileDown } from "lucide-react";
 
 // 3. Config
 import { supabase } from "../../config/supabase";
+import { colors } from "../../config/colors";
 
 // 4. Componentes
 import VistaPreviewRenta from "./preview/VistaPreviewRenta";
@@ -29,8 +32,11 @@ import { formatearFechaCorta } from "../../utils/formatters";
 
 const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
   const [valesAgrupados, setValesAgrupados] = useState(null);
+  // Guardamos el array plano de vales para el export PDF
+  const [valesPlanos, setValesPlanos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [exportandoPDF, setExportandoPDF] = useState(false);
 
   /**
    * Cargar vales de la conciliación
@@ -57,9 +63,41 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
             .from("vales")
             .select(
               `
-              *,
+              id_vale,
+              folio,
+              tipo_vale,
+              estado,
+              fecha_creacion,
+              fecha_programada,
+              fecha_completado,
+              qr_verification_url,
+              obras:id_obra (
+                id_obra,
+                obra,
+                cc,
+                empresas:id_empresa (
+                  id_empresa,
+                  empresa
+                )
+              ),
               vehiculos:id_vehiculo (
                 placas
+              ),
+              operadores:id_operador (
+                nombre_completo,
+                sindicatos:id_sindicato (
+                  sindicato
+                )
+              ),
+              persona:id_persona_creador (
+                nombre,
+                primer_apellido,
+                segundo_apellido
+              ),
+              persona_completador:id_persona_completador (
+                nombre,
+                primer_apellido,
+                segundo_apellido
               ),
               vale_renta_detalle (
                 capacidad_m3,
@@ -78,25 +116,48 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                   costo_dia
                 )
               )
-            `
+            `,
             )
             .in("id_vale", idsVales)
             .order("fecha_creacion", { ascending: true });
 
           if (errorVales) throw errorVales;
 
-          // Agrupar por placas
+          // Guardar array plano para export
+          setValesPlanos(vales || []);
+
+          // Agrupar por placas para la vista previa
           const grupos = agruparPorPlacasRenta(vales);
           setValesAgrupados(grupos);
         } else {
-          // Material (implementar después)
+          // Material
           const { data: vales, error: errorVales } = await supabase
             .from("vales")
             .select(
               `
               *,
+              obras:id_obra (
+                id_obra,
+                obra,
+                cc,
+                empresas:id_empresa (
+                  id_empresa,
+                  empresa
+                )
+              ),
               vehiculos:id_vehiculo (
                 placas
+              ),
+              operadores:id_operador (
+                nombre_completo,
+                sindicatos:id_sindicato (
+                  sindicato
+                )
+              ),
+              persona:id_persona_creador (
+                nombre,
+                primer_apellido,
+                segundo_apellido
               ),
               vale_material_detalles (
                 capacidad_m3,
@@ -105,6 +166,7 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                 peso_ton,
                 volumen_real_m3,
                 folio_banco,
+                requisicion,
                 precio_m3,
                 costo_total,
                 material:id_material (
@@ -118,7 +180,7 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                   banco
                 )
               )
-            `
+            `,
             )
             .in("id_vale", idsVales)
             .order("fecha_creacion", { ascending: true });
@@ -183,45 +245,46 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
         grupos[placas] = {
           placas,
           vales: [],
+          totalM3: 0,
           subtotal: 0,
-          totalesTipo1: { totalM3: 0, totalToneladas: 0, totalViajes: 0 },
-          totalesTipo2: { totalM3: 0, totalToneladas: 0, totalViajes: 0 },
-          totalesTipo3: { totalM3: 0, totalViajes: 0 },
         };
       }
 
-      vale.vale_material_detalles.forEach((detalle) => {
-        const idTipo = detalle.material?.tipo_de_material?.id_tipo_de_material;
+      vale.vale_material_detalles?.forEach((detalle) => {
+        grupos[placas].totalM3 += Number(detalle.volumen_real_m3 || 0);
         grupos[placas].subtotal += Number(detalle.costo_total || 0);
-
-        if (idTipo === 1) {
-          grupos[placas].totalesTipo1.totalM3 += Number(
-            detalle.volumen_real_m3 || 0
-          );
-          grupos[placas].totalesTipo1.totalToneladas += Number(
-            detalle.peso_ton || 0
-          );
-          grupos[placas].totalesTipo1.totalViajes += 1;
-        } else if (idTipo === 2) {
-          grupos[placas].totalesTipo2.totalM3 += Number(
-            detalle.volumen_real_m3 || 0
-          );
-          grupos[placas].totalesTipo2.totalToneladas += Number(
-            detalle.peso_ton || 0
-          );
-          grupos[placas].totalesTipo2.totalViajes += 1;
-        } else if (idTipo === 3) {
-          grupos[placas].totalesTipo3.totalM3 += Number(
-            detalle.cantidad_pedida_m3 || 0
-          );
-          grupos[placas].totalesTipo3.totalViajes += 1;
-        }
       });
 
       grupos[placas].vales.push(vale);
     });
 
     return grupos;
+  };
+
+  /**
+   * Exportar vales de renta en PDF bulk (4 por página)
+   */
+  const handleExportarValesPDF = async () => {
+    if (exportandoPDF || valesPlanos.length === 0) return;
+
+    try {
+      setExportandoPDF(true);
+
+      // Importación dinámica para no cargar qrcode en el bundle principal
+      const { generarPDFValesRentaBulk } = await import(
+        "../../utils/conciliaciones/generarPDFValesRentaBulk"
+      );
+
+      await generarPDFValesRentaBulk(valesPlanos, conciliacion.folio);
+    } catch (err) {
+      console.error(
+        "[ModalVistaPreviewConciliacion] Error al exportar PDF:",
+        err,
+      );
+      alert("Error al generar el PDF de vales. Intenta de nuevo.");
+    } finally {
+      setExportandoPDF(false);
+    }
   };
 
   /**
@@ -253,13 +316,46 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
           <h2 className="modal-preview__title">
             Vista Previa - {conciliacion.folio}
           </h2>
-          <button
-            className="modal-preview__close"
-            onClick={onCerrar}
-            aria-label="Cerrar modal"
-          >
-            <X size={24} />
-          </button>
+
+          <div className="modal-preview__header-actions">
+            {/* Botón exportar vales PDF — solo visible para conciliaciones de renta */}
+            {tipo === "renta" &&
+              !loading &&
+              !error &&
+              valesPlanos.length > 0 && (
+                <button
+                  className="modal-preview__btn-export"
+                  onClick={handleExportarValesPDF}
+                  disabled={exportandoPDF}
+                  title={`Exportar ${valesPlanos.length} vales en PDF`}
+                  style={{ backgroundColor: colors.secondary }}
+                >
+                  {exportandoPDF ? (
+                    <>
+                      <Loader2
+                        size={16}
+                        className="modal-preview__btn-export-spinner"
+                      />
+                      <span>Generando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileDown size={16} />
+                      <span>Exportar Vales PDF</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+            {/* Botón cerrar */}
+            <button
+              className="modal-preview__close"
+              onClick={onCerrar}
+              aria-label="Cerrar modal"
+            >
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
         {/* Contenido */}

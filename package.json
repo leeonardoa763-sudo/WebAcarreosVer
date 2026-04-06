@@ -20,6 +20,7 @@
     "lucide-react": "^0.553.0",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.4.394",
+    "qrcode": "^1.5.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.5",

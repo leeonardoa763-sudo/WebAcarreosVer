@@ -793,3 +793,77 @@
     min-width: 100px;
   }
 }
+/* ========================================
+   PARCHE: agregar al final de dashboard-conciliaciones.css
+   Nuevas clases para el header del modal con acciones
+   ======================================== */
+
+/* Contenedor de acciones en el header del modal */
+.modal-preview__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Botón exportar vales PDF */
+.modal-preview__btn-export {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.modal-preview__btn-export:hover:not(:disabled) {
+  opacity: 0.85;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.modal-preview__btn-export:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.modal-preview__btn-export:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Spinner dentro del botón */
+.modal-preview__btn-export-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive: en móvil el botón ocupa ancho completo */
+@media (max-width: 600px) {
+  .modal-preview__header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .modal-preview__header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .modal-preview__btn-export {
+    flex: 1;
+    justify-content: center;
+  }
+}
