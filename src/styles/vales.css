@@ -954,7 +954,6 @@
 
 /* ========================================
    DESGLOSE DE VIAJES - vale_renta_viajes
-   Agregar al final de vales.css
    ======================================== */
 
 .vale-card__viajes-desglose {
@@ -1003,8 +1002,9 @@
   color: #6b7280;
   font-weight: 500;
 }
+
 /* ========================================
-   DESGLOSE DE VIAJES - vale_material_viajes
+   DESGLOSE DE VIAJES - vale_material_viajes (tipo 1 y 2)
    ======================================== */
 
 .vale-card__viajes-desglose--material {
@@ -1027,6 +1027,7 @@
   letter-spacing: 0.03em;
 }
 
+/* Header tipo 1 y 2: viaje, hora, folio, ton, m3, costo */
 .vale-card__viajes-tabla-header {
   display: grid;
   grid-template-columns: 40px 1fr 80px 70px 90px;
@@ -1057,12 +1058,6 @@
   align-items: center;
 }
 
-.vale-card__viaje-numero {
-  font-size: 11px;
-  font-weight: 700;
-  color: #16a34a;
-}
-
 .vale-card__viaje-folio {
   font-size: 11px;
   font-weight: 600;
@@ -1089,9 +1084,10 @@
   text-align: right;
 }
 
+/* Totales tipo 1 y 2: label + ton + vacío + costo */
 .vale-card__viajes-totales {
   display: grid;
-  grid-template-columns: 1fr 80px 80px 90px;
+  grid-template-columns: 1fr 80px 90px;
   gap: 6px;
   padding: 6px 8px;
   background: #dcfce7;
@@ -1121,22 +1117,76 @@
   text-align: right;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .vale-card__viajes-tabla-header,
-  .vale-card__viaje-item--material {
-    grid-template-columns: 40px 60px 1fr 80px 70px 90px;
-  }
+/* ========================================
+   DESGLOSE DE VIAJES - tipo 3 (Producto de Corte / Tepetate)
+   Columnas: viaje | banco | distancia | m3 | costo
+   ======================================== */
 
-  .vale-card__viajes-tabla-header {
-    grid-template-columns: 40px 60px 1fr 80px 70px 90px;
-  }
-  .vale-card__viaje-hora {
-    font-size: 11px;
-    color: #6b7280;
-    font-weight: 500;
-  }
+/* Header tipo 3: 5 columnas */
+.vale-card__viajes-tabla-header--tipo3 {
+  display: grid;
+  grid-template-columns: 44px 1fr 60px 60px 80px;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #dcfce7;
+  border-radius: 4px;
+  margin-bottom: 4px;
 }
+
+.vale-card__viajes-tabla-header--tipo3 span {
+  font-size: 10px;
+  font-weight: 700;
+  color: #15803d;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Fila tipo 3: misma grilla de 5 columnas */
+.vale-card__viaje-item--tipo3 {
+  display: grid;
+  grid-template-columns: 44px 1fr 60px 60px 80px;
+  gap: 6px;
+  padding: 5px 8px;
+  background: #ffffff;
+  border-radius: 4px;
+  border: 1px solid #bbf7d0;
+  margin-bottom: 3px;
+  align-items: center;
+}
+
+/* Fila con override: fondo levemente diferenciado */
+.vale-card__viaje-item--override {
+  background: #fefce8;
+  border-color: #fde68a;
+}
+
+/* Asterisco que indica override de banco/distancia */
+.vale-card__override-dot {
+  font-size: 10px;
+  font-weight: 700;
+  color: #d97706;
+  margin-left: 2px;
+  vertical-align: super;
+  line-height: 1;
+}
+
+/* Banco del viaje (tipo 3) */
+.vale-card__viaje-banco {
+  font-size: 11px;
+  font-weight: 600;
+  color: #2c3e50;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Distancia del viaje (tipo 3) */
+.vale-card__viaje-distancia {
+  font-size: 11px;
+  color: #6b7280;
+  text-align: right;
+}
+
 /* ========================================
    MOTIVO DE CANCELACION
 ======================================== */
@@ -1165,9 +1215,11 @@
   margin: 0;
   line-height: 1.5;
 }
+
 /* ========================================
-   DESGLOSE DE TICKETS - tipo 3 (Producto de Corte)
-======================================== */
+   DESGLOSE DE TICKETS - tipo 3 legacy (tickets_material)
+   Se mantiene por compatibilidad pero ya no se usa en ValeCardMaterial
+   ======================================== */
 
 .vale-card__viajes-tabla-header--tickets {
   display: grid;
@@ -1192,8 +1244,7 @@
 }
 
 /* ========================================
-   BOTÓN EDITAR VALE (agregar en vales.css)
-   Pegar después de los estilos de .vale-card-compact__estado
+   BOTÓN EDITAR VALE
 ======================================== */
 
 .vale-card__btn-editar {
@@ -1224,4 +1275,26 @@
   margin-left: auto;
   font-size: 10px;
   padding: 3px 8px;
+}
+
+/* ========================================
+   RESPONSIVE - viajes
+======================================== */
+
+@media (max-width: 768px) {
+  .vale-card__viajes-tabla-header,
+  .vale-card__viaje-item--material {
+    grid-template-columns: 40px 60px 1fr 70px 80px;
+  }
+
+  .vale-card__viaje-hora {
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  .vale-card__viajes-tabla-header--tipo3,
+  .vale-card__viaje-item--tipo3 {
+    grid-template-columns: 40px 1fr 55px 55px 70px;
+  }
 }

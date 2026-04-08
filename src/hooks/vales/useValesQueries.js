@@ -10,7 +10,8 @@
  * - Obtener vale por folio
  * - Incluye es_renta_por_dia en queries de renta
  * - Incluye vale_renta_viajes para desglose de viajes individuales
- * - Incluye tickets_material para desglose de viajes en vales tipo 3
+ * - Incluye campos override (banco, distancia, precio, costo) en vale_material_viajes
+ *   para soportar viajes tipo 3 con banco/distancia variable por viaje
  *
  * Usado en: useVales.js
  */
@@ -28,7 +29,7 @@ export const useValesQueries = () => {
   /**
    * Query base con todas las relaciones
    * Incluye vale_renta_viajes para mostrar desglose de viajes en el card
-   * Incluye tickets_material para desglose de viajes en vales tipo 3 (Producto de Corte)
+   * Incluye campos override en vale_material_viajes para viajes tipo 3
    */
   const buildBaseQuery = useCallback(() => {
     return supabase.from("vales").select(
@@ -98,8 +99,17 @@ export const useValesQueries = () => {
             hora_registro,
             peso_ton,
             volumen_m3,
+            precio_m3,
             costo_viaje,
-            folio_vale_fisico
+            folio_vale_fisico,
+            id_banco_override,
+            distancia_km_override,
+            precio_m3_override,
+            costo_viaje_override,
+            bancos_override:id_banco_override (
+              id_banco,
+              banco
+            )
           )
         ),
         vale_renta_detalle (
@@ -163,7 +173,7 @@ export const useValesQueries = () => {
   /**
    * Obtener un vale específico por ID
    * Incluye vale_renta_viajes para desglose completo
-   * Incluye tickets_material para desglose de viajes tipo 3
+   * Incluye campos override en vale_material_viajes para viajes tipo 3
    */
   const fetchValeById = useCallback(async (id_vale) => {
     try {
@@ -234,8 +244,17 @@ export const useValesQueries = () => {
               hora_registro,
               peso_ton,
               volumen_m3,
+              precio_m3,
               costo_viaje,
-              folio_vale_fisico
+              folio_vale_fisico,
+              id_banco_override,
+              distancia_km_override,
+              precio_m3_override,
+              costo_viaje_override,
+              bancos_override:id_banco_override (
+                id_banco,
+                banco
+              )
             )
           ),
           vale_renta_detalle (
@@ -279,7 +298,7 @@ export const useValesQueries = () => {
   /**
    * Obtener vale por folio (para verificación pública)
    * Incluye vale_renta_viajes para desglose completo
-   * Incluye tickets_material para desglose de viajes tipo 3
+   * Incluye campos override en vale_material_viajes para viajes tipo 3
    */
   const fetchValeByFolio = useCallback(async (folio) => {
     try {
@@ -337,8 +356,17 @@ export const useValesQueries = () => {
               hora_registro,
               peso_ton,
               volumen_m3,
+              precio_m3,
               costo_viaje,
-              folio_vale_fisico
+              folio_vale_fisico,
+              id_banco_override,
+              distancia_km_override,
+              precio_m3_override,
+              costo_viaje_override,
+              bancos_override:id_banco_override (
+                id_banco,
+                banco
+              )
             )
           ),
           vale_renta_detalle (
