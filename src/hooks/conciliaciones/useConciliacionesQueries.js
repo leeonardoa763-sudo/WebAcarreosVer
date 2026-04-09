@@ -729,24 +729,25 @@ export const useConciliacionesQueries = () => {
 
         if (errorConc) throw errorConc;
 
-        // 2. Insertar relación con vales
+        // [PRUEBAS] Pasos 2 y 3 desactivados temporalmente
+        // para no afectar vales reales durante desarrollo.
+        // Reactivar antes de producción.
+
+        //2. Insertar relación con vales
         const valesRelacion = idsVales.map((id_vale) => ({
           id_conciliacion: conciliacion.id_conciliacion,
           id_vale,
         }));
-
         const { error: errorRel } = await supabase
           .from("conciliacion_vales")
           .insert(valesRelacion);
-
         if (errorRel) throw errorRel;
 
-        // 3. Actualizar estado de vales a 'conciliado'
+        //3. Actualizar estado de vales a 'conciliado'
         const { error: errorUpdate } = await supabase
           .from("vales")
           .update({ estado: "conciliado" })
           .in("id_vale", idsVales);
-
         if (errorUpdate) throw errorUpdate;
 
         return { success: true, data: conciliacion };

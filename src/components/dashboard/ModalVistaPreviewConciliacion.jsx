@@ -160,6 +160,7 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                 segundo_apellido
               ),
               vale_material_detalles (
+                id_detalle_material,
                 capacidad_m3,
                 distancia_km,
                 cantidad_pedida_m3,
@@ -177,7 +178,16 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                   )
                 ),
                 bancos:id_banco (
+                  id_banco,
                   banco
+                ),
+                vale_material_viajes (
+                  id_viaje,
+                  numero_viaje,
+                  folio_vale_fisico,
+                  peso_ton,
+                  volumen_m3,
+                  costo_viaje
                 )
               )
             `,

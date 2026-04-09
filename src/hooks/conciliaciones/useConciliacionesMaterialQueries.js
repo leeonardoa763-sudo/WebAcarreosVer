@@ -97,9 +97,18 @@ export const useConciliacionesMaterialQueries = () => {
                   tipo_de_material
                 )
               ),
-              bancos:id_banco (
+            bancos:id_banco (
                 id_banco,
                 banco
+              ),
+              vale_material_viajes (
+                id_viaje,
+                numero_viaje,
+                hora_registro,
+                peso_ton,
+                volumen_m3,
+                costo_viaje,
+                folio_vale_fisico
               )
             )
           `,

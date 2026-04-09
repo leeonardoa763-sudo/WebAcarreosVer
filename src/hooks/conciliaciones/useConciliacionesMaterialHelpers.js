@@ -23,7 +23,7 @@ export const useConciliacionesMaterialHelpers = () => {
   const agruparValesPorPlacas = (vales) => {
     console.log(
       "[useConciliacionesMaterialHelpers] Total vales a agrupar:",
-      vales.length
+      vales.length,
     );
 
     const grupos = {};
@@ -61,28 +61,27 @@ export const useConciliacionesMaterialHelpers = () => {
 
         grupos[placas].subtotal += costo;
 
-        // Sumar totales según tipo de material
-        if (idTipo === 1) {
-          grupos[placas].totalesTipo1.totalM3 += Number(
-            detalle.volumen_real_m3 || 0
-          );
-          grupos[placas].totalesTipo1.totalToneladas += Number(
-            detalle.peso_ton || 0
-          );
-          grupos[placas].totalesTipo1.totalViajes += 1; // 1 viaje por vale
-        } else if (idTipo === 2) {
-          grupos[placas].totalesTipo2.totalM3 += Number(
-            detalle.volumen_real_m3 || 0
-          );
-          grupos[placas].totalesTipo2.totalToneladas += Number(
-            detalle.peso_ton || 0
-          );
-          grupos[placas].totalesTipo2.totalViajes += 1;
+        // Viajes reales registrados en la tabla hija
+        // Fallback a 1 si aún no se han registrado viajes
+        const viajes = detalle.vale_material_viajes || [];
+        const numViajes = viajes.length > 0 ? viajes.length : 1;
+
+        if (idTipo === 1 || idTipo === 2) {
+          // Tipo 1 y 2 se comportan igual — m³ y toneladas vienen del detalle
+          // porque son los valores ya conciliados/calculados
+          const targetTipo =
+            idTipo === 1
+              ? grupos[placas].totalesTipo1
+              : grupos[placas].totalesTipo2;
+
+          targetTipo.totalM3 += Number(detalle.volumen_real_m3 || 0);
+          targetTipo.totalToneladas += Number(detalle.peso_ton || 0);
+          targetTipo.totalViajes += numViajes;
         } else if (idTipo === 3) {
           grupos[placas].totalesTipo3.totalM3 += Number(
-            detalle.cantidad_pedida_m3 || 0
+            detalle.volumen_real_m3 || 0,
           );
-          grupos[placas].totalesTipo3.totalViajes += 1;
+          grupos[placas].totalesTipo3.totalViajes += numViajes;
         }
       });
 
@@ -91,7 +90,7 @@ export const useConciliacionesMaterialHelpers = () => {
 
     console.log(
       "[useConciliacionesMaterialHelpers] Grupos de placas creados:",
-      Object.keys(grupos).length
+      Object.keys(grupos).length,
     );
 
     return grupos;
@@ -166,7 +165,7 @@ export const useConciliacionesMaterialHelpers = () => {
 
     // Validar que todos los vales tengan detalles de material
     const sinDetalles = vales.filter(
-      (v) => !v.vale_material_detalles || v.vale_material_detalles.length === 0
+      (v) => !v.vale_material_detalles || v.vale_material_detalles.length === 0,
     );
 
     if (sinDetalles.length > 0) {
@@ -179,8 +178,8 @@ export const useConciliacionesMaterialHelpers = () => {
     // Validar que todos los vales tengan costo calculado
     const sinCosto = vales.filter((v) =>
       v.vale_material_detalles.some(
-        (d) => !d.costo_total || d.costo_total === 0
-      )
+        (d) => !d.costo_total || d.costo_total === 0,
+      ),
     );
 
     if (sinCosto.length > 0) {
@@ -204,10 +203,10 @@ export const useConciliacionesMaterialHelpers = () => {
     totales,
     filtros,
     idSindicato,
-    idPersona
+    idPersona,
   ) => {
     console.log(
-      "[useConciliacionesMaterialHelpers] prepararDatosConciliacion - Inicio"
+      "[useConciliacionesMaterialHelpers] prepararDatosConciliacion - Inicio",
     );
 
     const obra = vales[0]?.obras;
