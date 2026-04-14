@@ -89,9 +89,10 @@ const PlacasGroup = ({
 
     vales.forEach((vale) => {
       const fechaClave = vale.fecha_creacion
-        ? vale.fecha_creacion.split("T")[0]
+        ? new Date(vale.fecha_creacion).toLocaleDateString("en-CA", {
+            timeZone: "America/Mexico_City", // da formato YYYY-MM-DD
+          })
         : "sin-fecha";
-
       if (!grupos[fechaClave]) {
         grupos[fechaClave] = [];
       }

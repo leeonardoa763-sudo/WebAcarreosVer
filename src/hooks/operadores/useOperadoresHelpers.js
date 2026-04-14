@@ -31,7 +31,13 @@ import { colors } from "../../config/colors";
 const obtenerFechaEfectivaFormateada = (vale) => {
   const fechaRaw = vale.fecha_programada || vale.fecha_creacion || "";
   if (!fechaRaw) return "";
-  return fechaRaw.split("T")[0].split("-").reverse().join("/");
+  const date = new Date(fechaRaw);
+  return date.toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "America/Mexico_City",
+  });
 };
 
 /**
@@ -118,47 +124,37 @@ export const formatearNumero = (numero, decimales = 2) => {
   });
 };
 
-/**
- * Formatear fecha a formato legible
- */
 export const formatearFecha = (fecha) => {
   if (!fecha) return "Sin fecha";
-
   const date = new Date(fecha);
   return date.toLocaleDateString("es-MX", {
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: "America/Mexico_City", // ✅
   });
 };
 
-/**
- * Formatear fecha corta (DD/MM/YYYY)
- */
 export const formatearFechaCorta = (fecha) => {
   if (!fecha) return "Sin fecha";
-
   const date = new Date(fecha);
   return date.toLocaleDateString("es-MX", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
+    timeZone: "America/Mexico_City", // ✅
   });
 };
 
-/**
- * Formatear hora (HH:MM)
- */
 export const formatearHora = (fecha) => {
   if (!fecha) return "Sin hora";
-
   const date = new Date(fecha);
   return date.toLocaleTimeString("es-MX", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "America/Mexico_City", // ✅
   });
 };
-
 /**
  * Validar si hay filtros activos
  */
