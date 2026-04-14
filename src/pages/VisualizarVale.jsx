@@ -20,37 +20,26 @@ import { useParams, useNavigate } from "react-router-dom";
 
 // 2. Icons
 import {
-  FileText,
   Download,
   CheckCircle,
   XCircle,
   Loader2,
   LogIn,
-  Eye,
-  EyeOff,
   Lock,
-  MapPin,
-  Clock,
-  Expand,
-  ImageOff,
-  X,
 } from "lucide-react";
 
 // 3. Hooks personalizados
 import { useAuth } from "../hooks/useAuth";
 
-// 3. Config
+// 4. Config
 import { supabase } from "../config/supabase";
 import { colors } from "../config/colors";
 
-// 4. Utils
+// 5. Utils
 import {
   formatearFecha,
   formatearFechaCorta,
   formatearHora,
-  formatearMoneda,
-  formatearVolumen,
-  formatearPeso,
   getBadgeEstado,
   getBadgeTipo,
 } from "../utils/formatters";
@@ -59,120 +48,77 @@ import {
   generarPDFRentaPublico,
 } from "../utils/pdfPublicGenerator";
 
-// 5. Estilos
+// 6. Componentes
+import DetallesMaterial from "../components/visualizar-vale/DetallesMaterial";
+import DetallesRenta from "../components/visualizar-vale/DetallesRenta";
+import ListaViajesMaterial from "../components/visualizar-vale/ListaViajesMaterial";
+import LoginModal from "../components/visualizar-vale/LoginModal";
+
+// 7. Estilos
 import "../styles/visualizar-vale.css";
 
 const VisualizarVale = () => {
   const { folio } = useParams();
   const navigate = useNavigate();
-  const { user, userProfile, signIn } = useAuth();
+  const { user, userProfile } = useAuth();
 
   // Estados
   const [vale, setVale] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
-
-  // Login estados
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [loginError, setLoginError] = useState(null);
+  const [fechaConciliacion, setFechaConciliacion] = useState(null);
 
   /**
    * Obtener clase de fondo según estado del vale
-   * Aplica colores distintivos para identificación rápida:
-   * - en_proceso: rojo
-   * - emitido: azul
-   * - verificado: amarillo
    */
   const getBackgroundClass = (estado) => {
-    const backgroundClasses = {
+    const clases = {
       en_proceso: "bg-estado-proceso",
       emitido: "bg-estado-emitido",
       verificado: "bg-estado-verificado",
     };
-    return backgroundClasses[estado] || "";
+    return clases[estado] || "";
   };
 
   /**
    * Verificar si el usuario puede ver precios
-   * Lógica:
-   * - Sin sesión: NO ver precios
-   * - Administrador: SÍ ver precios de todos los vales
-   * - Sindicato: SÍ ver precios SOLO de vales de su sindicato
+   * - Sin sesión: NO
+   * - Administrador: SÍ siempre
+   * - Sindicato: SÍ solo si el operador pertenece a su sindicato
    */
   const puedeVerPrecios = () => {
-    console.log("=== DEBUG puedeVerPrecios ===");
-    console.log("1. user:", user);
-    console.log("2. userProfile:", userProfile);
-    console.log("3. vale completo:", vale);
-
-    // Sin autenticación, no puede ver precios
-    if (!user || !userProfile) {
-      console.log("❌ NO hay user o userProfile");
-      return false;
-    }
-
-    console.log("4. Role del usuario:", userProfile.roles?.role);
-
-    // Administrador ve todos los precios
-    if (userProfile.roles?.role === "Administrador") {
-      console.log("✅ Es ADMINISTRADOR - puede ver precios");
-      return true;
-    }
-
-    // Sindicato solo ve precios de vales de su sindicato
+    if (!user || !userProfile) return false;
+    if (userProfile.roles?.role === "Administrador") return true;
     if (userProfile.roles?.role === "Sindicato") {
       const sindicatoUsuario = userProfile.id_sindicato;
       const sindicatoOperador = vale?.operadores?.id_sindicato;
-
-      console.log("5. Es SINDICATO");
-      console.log("6. sindicatoUsuario:", sindicatoUsuario);
-      console.log("7. sindicatoOperador:", sindicatoOperador);
-      console.log("8. vale.operadores completo:", vale?.operadores);
-
-      const tienePermiso =
-        sindicatoUsuario && sindicatoUsuario === sindicatoOperador;
-      console.log("9. ¿Tiene permiso?", tienePermiso);
-
-      return tienePermiso;
+      return Boolean(
+        sindicatoUsuario && sindicatoUsuario === sindicatoOperador,
+      );
     }
-
-    console.log("❌ Rol no reconocido:", userProfile.roles?.role);
-    // Otros roles no ven precios
     return false;
   };
 
   const mostrarPrecios = puedeVerPrecios();
-  console.log("10. RESULTADO FINAL mostrarPrecios:", mostrarPrecios);
 
   /**
-   * Cargar datos del vale desde BD
+   * Cargar datos del vale desde BD con reintentos por timeout
    */
   useEffect(() => {
     let isMounted = true;
     let retryCount = 0;
     const MAX_RETRIES = 3;
-    const TIMEOUT_MS = 10000; // 10 segundos
+    const TIMEOUT_MS = 10000;
 
     const fetchVale = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        console.log(
-          `[VisualizarVale] Intentando cargar vale: ${folio} (intento ${retryCount + 1}/${MAX_RETRIES + 1})`,
-        );
-
-        // Crear controlador de timeout para móviles
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          console.log("[VisualizarVale] ⏱️ Timeout alcanzado, abortando...");
-          controller.abort();
-        }, TIMEOUT_MS);
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
         const { data, error: fetchError } = await supabase
           .from("vales")
@@ -180,6 +126,9 @@ const VisualizarVale = () => {
             `
             *,
             total_descargas_web,
+            fecha_creacion,
+            fecha_completado,
+            fecha_verificacion,
             obras:id_obra (
               id_obra,
               obra,
@@ -235,6 +184,24 @@ const VisualizarVale = () => {
               ),
               sindicatos:id_sindicato (
                 sindicato
+              ),
+              vale_material_viajes (
+                id_viaje,
+                numero_viaje,
+                hora_registro,
+                peso_ton,
+                volumen_m3,
+                precio_m3,
+                costo_viaje,
+                folio_vale_fisico,
+                id_banco_override,
+                distancia_km_override,
+                precio_m3_override,
+                costo_viaje_override,
+                bancos_override:id_banco_override (
+                  id_banco,
+                  banco
+                )
               )
             ),
             vale_renta_detalle (
@@ -270,188 +237,170 @@ const VisualizarVale = () => {
           .abortSignal(controller.signal)
           .single();
 
-        // Limpiar timeout si la petición terminó antes
         clearTimeout(timeoutId);
 
         if (fetchError) {
-          // Detectar si fue timeout
           const isTimeout =
             fetchError.message?.includes("aborted") ||
             fetchError.message?.includes("timeout") ||
             fetchError.name === "AbortError";
 
-          // Si fue timeout y aún hay reintentos disponibles
           if (isTimeout && retryCount < MAX_RETRIES) {
             retryCount++;
-            console.log(
-              `⚠️ Timeout detectado, reintentando en ${retryCount} segundos...`,
-            );
-
-            // Esperar más tiempo en cada reintento (1s, 2s, 3s)
             setTimeout(() => {
-              if (isMounted) {
-                fetchVale();
-              }
+              if (isMounted) fetchVale();
             }, 1000 * retryCount);
             return;
           }
 
-          // Si no hay más reintentos o es otro tipo de error
-          console.error("[VisualizarVale] Error en query:", fetchError);
           throw fetchError;
         }
 
         if (!data) {
-          console.log("[VisualizarVale] Vale no encontrado");
           setError("Vale no encontrado");
           return;
         }
 
-        console.log("[VisualizarVale] ✅ Vale encontrado:", data.folio);
-
-        // Solo actualizar estado si el componente sigue montado
         if (isMounted) {
           setVale(data);
-          // Registrar acceso (sin esperar respuesta)
           registrarAcceso(data.id_vale);
-        }
-      } catch (error) {
-        console.error("[VisualizarVale] Error al cargar vale:", error);
 
-        // Solo actualizar estado si el componente sigue montado
+          // Buscar fecha de conciliación si el vale está conciliado
+          if (data.estado === "conciliado") {
+            fetchFechaConciliacion(data.id_vale);
+          }
+        }
+      } catch (err) {
         if (isMounted) {
-          // Mensajes de error más específicos
-          if (
-            error.name === "AbortError" ||
-            error.message?.includes("aborted")
-          ) {
+          if (err.name === "AbortError" || err.message?.includes("aborted")) {
             setError(
               "La conexión está tardando demasiado. Por favor, verifica tu conexión a internet y vuelve a escanear el código QR.",
             );
-          } else if (error.code === "PGRST116") {
+          } else if (err.code === "PGRST116") {
             setError("Vale no encontrado en el sistema.");
           } else {
             setError("Error al cargar el vale. Por favor, intenta nuevamente.");
           }
         }
       } finally {
-        // Solo actualizar loading si el componente sigue montado
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     };
 
-    if (folio) {
-      fetchVale();
-    }
+    if (folio) fetchVale();
 
-    // Cleanup: prevenir actualizaciones de estado en componente desmontado
     return () => {
       isMounted = false;
     };
   }, [folio]);
 
   /**
-   * Registrar acceso al vale (auditoría)
+   * Buscar fecha de conciliación via conciliacion_vales → conciliaciones
+   */
+  const fetchFechaConciliacion = async (idVale) => {
+    try {
+      const { data, error } = await supabase
+        .from("conciliacion_vales")
+        .select(
+          `
+          conciliaciones:id_conciliacion (
+            fecha_creacion
+          )
+        `,
+        )
+        .eq("id_vale", idVale)
+        .limit(1)
+        .single();
+
+      if (error) return;
+      if (data?.conciliaciones?.fecha_creacion) {
+        setFechaConciliacion(data.conciliaciones.fecha_creacion);
+      }
+    } catch {
+      // No bloquear si falla
+    }
+  };
+
+  /**
+   * Registrar acceso al vale para auditoría (sin bloquear el render)
    */
   const registrarAcceso = async (idVale) => {
     try {
       await supabase.from("vale_accesos").insert({
         id_vale: idVale,
-        id_persona: null, // Acceso público
+        id_persona: null,
         tipo_accion: "visualizacion_publica",
         ip_address: null,
         user_agent: navigator.userAgent,
       });
-
-      console.log("[VisualizarVale] Acceso registrado");
-    } catch (error) {
-      // No bloqueamos si falla el registro
-      console.error("[VisualizarVale] Error al registrar acceso:", error);
+    } catch (err) {
+      console.error("[VisualizarVale] Error al registrar acceso:", err);
     }
   };
 
   /**
-   * Manejar login desde el modal
-   */
-  const handleLogin = async (e) => {
-    e.preventDefault();
-
-    try {
-      setLoginLoading(true);
-      setLoginError(null);
-
-      // Intentar iniciar sesión
-      const { error } = await signIn(loginEmail, loginPassword);
-
-      if (error) {
-        setLoginError(error.message || "Credenciales inválidas");
-        return;
-      }
-
-      // Si login exitoso, cerrar modal
-      setShowLoginModal(false);
-      setLoginEmail("");
-      setLoginPassword("");
-
-      // Recargar datos del vale para verificar permisos
-      // (el useEffect se ejecutará automáticamente al cambiar user)
-    } catch (error) {
-      console.error("[VisualizarVale] Error en login:", error);
-      setLoginError("Error al iniciar sesión. Intenta nuevamente.");
-    } finally {
-      setLoginLoading(false);
-    }
-  };
-
-  /**
-   * Cerrar modal de login
-   */
-  const handleCloseModal = () => {
-    setShowLoginModal(false);
-    setLoginEmail("");
-    setLoginPassword("");
-    setLoginError(null);
-  };
-
-  /**
-   * Descargar PDF con marca de agua (registra descarga sin límites)
+   * Descargar PDF con marca de agua
    */
   const handleDescargarPDF = async () => {
     try {
       setDownloadingPDF(true);
 
-      // Registrar descarga en BD
-      const { data, error } = await supabase.rpc(
-        "registrar_descarga_vale_web",
-        {
-          p_folio: folio,
-          p_user_agent: navigator.userAgent,
-        },
-      );
+      const { error } = await supabase.rpc("registrar_descarga_vale_web", {
+        p_folio: folio,
+        p_user_agent: navigator.userAgent,
+      });
 
       if (error) {
         console.error("[VisualizarVale] Error al registrar descarga:", error);
-        // Continuar con la descarga aunque falle el registro
       }
 
-      // Generar PDF
       if (vale.tipo_vale === "material") {
         generarPDFMaterialPublico(vale);
       } else {
         generarPDFRentaPublico(vale);
       }
-
-      console.log(
-        `✅ Descarga registrada. Total: ${data?.total_descargas || "?"}`,
-      );
-    } catch (error) {
-      console.error("[VisualizarVale] Error al descargar:", error);
+    } catch (err) {
+      console.error("[VisualizarVale] Error al descargar:", err);
       alert("Error al descargar PDF. Intente nuevamente.");
     } finally {
       setDownloadingPDF(false);
     }
+  };
+
+  /**
+   * Aplanar viajes: un objeto por cada vale_material_viaje con contexto del detalle padre.
+   * foto y coordenadas viven en vale_material_detalles, no en vale_material_viajes.
+   */
+  const aplanarViajesMaterial = (detalles) => {
+    return detalles.flatMap((det) => {
+      const viajes = det.vale_material_viajes || [];
+
+      if (viajes.length === 0) {
+        return [{ ...det, _esDetalleFallback: true }];
+      }
+
+      return viajes.map((viaje) => ({
+        ...viaje,
+        // Contexto del detalle padre
+        material: det.material,
+        capacidad_m3: det.capacidad_m3, // siempre del detalle
+        cantidad_pedida_m3: det.cantidad_pedida_m3,
+        notas_adicionales: det.notas_adicionales,
+        folio_banco: det.folio_banco,
+        // Foto y geolocalización viven en el detalle
+        foto_evidencia_url: det.foto_evidencia_url,
+        latitud_completado: det.latitud_completado,
+        longitud_completado: det.longitud_completado,
+        distancia_obra_metros: det.distancia_obra_metros,
+        // Banco y distancia: usar override del viaje si existe
+        bancos: viaje.bancos_override ?? det.bancos,
+        distancia_km: viaje.distancia_km_override ?? det.distancia_km,
+        // Volumen, peso y costo del viaje individual
+        volumen_real_m3: viaje.volumen_m3 ?? det.volumen_real_m3,
+        peso_ton: viaje.peso_ton ?? det.peso_ton,
+        costo_total: viaje.costo_viaje ?? det.costo_total,
+      }));
+    });
   };
 
   // ========================================
@@ -494,6 +443,10 @@ const VisualizarVale = () => {
   const detalleRenta = vale.vale_renta_detalle?.[0];
   const badgeEstado = getBadgeEstado(vale.estado);
   const badgeTipo = getBadgeTipo(vale.tipo_vale);
+  const viajesAplanados =
+    vale.tipo_vale === "material" && vale.vale_material_detalles?.length > 0
+      ? aplanarViajesMaterial(vale.vale_material_detalles)
+      : [];
 
   return (
     <div className={`visualizar-vale-page ${getBackgroundClass(vale.estado)}`}>
@@ -551,18 +504,6 @@ const VisualizarVale = () => {
             <span className="info-label">Folio:</span>
             <span className="info-value">{vale.folio}</span>
           </div>
-          <div className="info-row">
-            <span className="info-label">Fecha:</span>
-            <span className="info-value">
-              {formatearFechaCorta(vale.fecha_creacion)}
-            </span>
-          </div>
-          <div className="info-row">
-            <span className="info-label">Hora:</span>
-            <span className="info-value">
-              {formatearHora(vale.fecha_creacion)}
-            </span>
-          </div>
           <div className="info-full">
             <span className="info-label">Obra:</span>
             <span className="info-value">{vale.obras?.obra}</span>
@@ -587,6 +528,77 @@ const VisualizarVale = () => {
 
         <div className="divider"></div>
 
+        {/* LÍNEA DE TIEMPO DE FECHAS */}
+        <div className="vale-section">
+          <h3 className="section-title">HISTORIAL DE FECHAS</h3>
+
+          <div className="fechas-timeline">
+            {/* Creación */}
+            <div className="fecha-item fecha-item--creacion">
+              <div className="fecha-item__dot" />
+              <div className="fecha-item__contenido">
+                <span className="fecha-item__label">Creación</span>
+                <span className="fecha-item__valor">
+                  {formatearFecha(vale.fecha_creacion)}
+                </span>
+                <span className="fecha-item__hora">
+                  {formatearHora(vale.fecha_creacion)}
+                </span>
+              </div>
+            </div>
+
+            {/* Emisión (fecha_completado = cuando se emitió el vale físico) */}
+            {vale.fecha_completado && (
+              <div className="fecha-item fecha-item--emision">
+                <div className="fecha-item__dot" />
+                <div className="fecha-item__contenido">
+                  <span className="fecha-item__label">Emisión</span>
+                  <span className="fecha-item__valor">
+                    {formatearFecha(vale.fecha_completado)}
+                  </span>
+                  <span className="fecha-item__hora">
+                    {formatearHora(vale.fecha_completado)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Verificación */}
+            {vale.fecha_verificacion && (
+              <div className="fecha-item fecha-item--verificacion">
+                <div className="fecha-item__dot" />
+                <div className="fecha-item__contenido">
+                  <span className="fecha-item__label">Verificación</span>
+                  <span className="fecha-item__valor">
+                    {formatearFecha(vale.fecha_verificacion)}
+                  </span>
+                  <span className="fecha-item__hora">
+                    {formatearHora(vale.fecha_verificacion)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Conciliación (solo si estado === "conciliado") */}
+            {fechaConciliacion && (
+              <div className="fecha-item fecha-item--conciliacion">
+                <div className="fecha-item__dot" />
+                <div className="fecha-item__contenido">
+                  <span className="fecha-item__label">Conciliación</span>
+                  <span className="fecha-item__valor">
+                    {formatearFecha(fechaConciliacion)}
+                  </span>
+                  <span className="fecha-item__hora">
+                    {formatearHora(fechaConciliacion)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="divider"></div>
+
         {/* DATOS ESPECÍFICOS POR TIPO */}
         {vale.tipo_vale === "material" && detalleMaterial && (
           <DetallesMaterial
@@ -603,13 +615,12 @@ const VisualizarVale = () => {
         )}
 
         {/* LISTA DE VIAJES - MATERIAL */}
-        {vale.tipo_vale === "material" &&
-          vale.vale_material_detalles?.length > 0 && (
-            <ListaViajesMaterial
-              detalles={vale.vale_material_detalles}
-              mostrarPrecios={mostrarPrecios}
-            />
-          )}
+        {viajesAplanados.length > 0 && (
+          <ListaViajesMaterial
+            detalles={viajesAplanados}
+            mostrarPrecios={mostrarPrecios}
+          />
+        )}
 
         <div className="divider"></div>
 
@@ -695,7 +706,7 @@ const VisualizarVale = () => {
             )}
           </button>
 
-          {/* Botón para iniciar sesión si no está autenticado */}
+          {/* Botón de login si no está autenticado */}
           {!user && (
             <button
               onClick={() => setShowLoginModal(true)}
@@ -707,7 +718,7 @@ const VisualizarVale = () => {
             </button>
           )}
 
-          {/* Mensaje si está autenticado pero no tiene permisos */}
+          {/* Mensaje si autenticado sin permisos */}
           {user && !mostrarPrecios && (
             <div className="info-message">
               <Lock size={20} />
@@ -724,645 +735,7 @@ const VisualizarVale = () => {
 
       {/* Modal de login */}
       {showLoginModal && (
-        <div className="modal-overlay" onClick={handleCloseModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Iniciar Sesión</h3>
-              <button
-                className="modal-close"
-                onClick={handleCloseModal}
-                aria-label="Cerrar"
-              >
-                ×
-              </button>
-            </div>
-
-            <form onSubmit={handleLogin} className="login-form">
-              {loginError && (
-                <div className="login-error">
-                  <span>{loginError}</span>
-                </div>
-              )}
-
-              <div className="form-group">
-                <label htmlFor="email">Correo Electrónico</label>
-                <input
-                  id="email"
-                  type="email"
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  placeholder="tu@correo.com"
-                  required
-                  autoComplete="email"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="password">Contraseña</label>
-                <div className="password-input">
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    className="toggle-password"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={
-                      showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
-                    }
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="submit-button"
-                disabled={loginLoading}
-                style={{ backgroundColor: colors.primary }}
-              >
-                {loginLoading ? (
-                  <>
-                    <Loader2 size={20} className="spinner" />
-                    Iniciando...
-                  </>
-                ) : (
-                  <>
-                    <LogIn size={20} />
-                    Iniciar Sesión
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ========================================
-// COMPONENTE: DETALLES DE MATERIAL
-// ========================================
-
-const DetallesMaterial = ({ detalle, mostrarPrecios }) => {
-  return (
-    <div className="vale-section">
-      <h3 className="section-title">DATOS DE VALE</h3>
-
-      <div className="info-full">
-        <span className="info-label">Material:</span>
-        <span className="info-value">
-          {detalle.material?.material || "N/A"}
-        </span>
-      </div>
-
-      <div className="info-row">
-        <span className="info-label">Capacidad:</span>
-        <span className="info-value">
-          {formatearVolumen(detalle.capacidad_m3)}
-        </span>
-      </div>
-
-      <div className="info-row">
-        <span className="info-label">Distancia:</span>
-        <span className="info-value">{detalle.distancia_km || 0} Km</span>
-      </div>
-
-      <div className="divider-thin"></div>
-
-      <div className="info-row">
-        <span className="info-label">Cantidad Pedida:</span>
-        <span className="info-value">
-          {formatearVolumen(detalle.cantidad_pedida_m3)}
-        </span>
-      </div>
-
-      <div className="info-row">
-        <span className="info-label">Requisición:</span>
-        <span className="info-value">{detalle.requisicion || "N/A"}</span>
-      </div>
-
-      {detalle.folio_banco && (
-        <div className="info-row">
-          <span className="info-label">Folio Banco:</span>
-          <span className="info-value">{detalle.folio_banco}</span>
-        </div>
-      )}
-
-      {detalle.peso_ton && (
-        <div className="info-row">
-          <span className="info-label">Peso:</span>
-          <span className="info-value">{formatearPeso(detalle.peso_ton)}</span>
-        </div>
-      )}
-
-      {detalle.volumen_real_m3 && (
-        <div className="info-row">
-          <span className="info-label">Volumen Real:</span>
-          <span className="info-value">
-            {formatearVolumen(detalle.volumen_real_m3)}
-          </span>
-        </div>
-      )}
-
-      {/* PRECIOS (solo si tiene permiso) */}
-      {mostrarPrecios && detalle.costo_total && (
-        <>
-          <div className="divider-thin"></div>
-
-          {detalle.tarifa_primer_km && (
-            <div className="info-row">
-              <span className="info-label">Tarifa 1er Km:</span>
-              <span className="info-value">
-                {formatearMoneda(detalle.tarifa_primer_km)}
-              </span>
-            </div>
-          )}
-
-          {detalle.tarifa_subsecuente && (
-            <div className="info-row">
-              <span className="info-label">Tarifa Subsecuente:</span>
-              <span className="info-value">
-                {formatearMoneda(detalle.tarifa_subsecuente)}/km
-              </span>
-            </div>
-          )}
-
-          {detalle.precio_m3 && (
-            <div className="info-row">
-              <span className="info-label">Precio/m³:</span>
-              <span className="info-value">
-                {formatearMoneda(detalle.precio_m3)}
-              </span>
-            </div>
-          )}
-
-          <div className="info-row info-row-total">
-            <span className="info-label">Costo Total:</span>
-            <span className="info-value">
-              {formatearMoneda(detalle.costo_total)} MXN
-            </span>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
-
-// ========================================
-// COMPONENTE: LISTA DE VIAJES - MATERIAL
-// Muestra cada detalle de material como un viaje individual
-// con foto de evidencia, distancia a la obra y datos del viaje
-// ========================================
-
-const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
-  // Estado para el modal de foto ampliada
-  const [fotoModal, setFotoModal] = useState(null); // { url, indice }
-
-  // Calcular badge de proximidad a la obra según distancia en metros
-  const getDistanciaBadge = (metros) => {
-    if (metros === null || metros === undefined) return null;
-    if (metros <= 500)
-      return {
-        label: `${metros} m de la obra`,
-        clase: "distancia-badge--cerca",
-      };
-    if (metros <= 2000)
-      return {
-        label: `${(metros / 1000).toFixed(1)} km de la obra`,
-        clase: "distancia-badge--media",
-      };
-    return {
-      label: `${(metros / 1000).toFixed(1)} km de la obra`,
-      clase: "distancia-badge--lejos",
-    };
-  };
-
-  return (
-    <>
-      <div className="divider"></div>
-
-      <div className="vale-section">
-        <h3 className="section-title">
-          VIAJES REGISTRADOS
-          <span className="viajes-count-badge">{detalles.length}</span>
-        </h3>
-
-        <div className="viajes-lista">
-          {detalles.map((detalle, idx) => {
-            const distanciaBadge = getDistanciaBadge(
-              detalle.distancia_obra_metros,
-            );
-            const tieneGeo =
-              detalle.latitud_completado && detalle.longitud_completado;
-            const tieneFoto = Boolean(detalle.foto_evidencia_url);
-
-            return (
-              <div key={idx} className="viaje-item">
-                {/* Cabecera del viaje */}
-                <div className="viaje-item__header">
-                  <div className="viaje-item__numero">
-                    <span className="viaje-item__numero-label">Viaje</span>
-                    <span className="viaje-item__numero-valor">{idx + 1}</span>
-                    {detalles.length > 1 && (
-                      <span className="viaje-item__numero-total">
-                        / {detalles.length}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="viaje-item__header-badges">
-                    {/* Badge de distancia a la obra */}
-                    {distanciaBadge && (
-                      <span
-                        className={`distancia-badge ${distanciaBadge.clase}`}
-                      >
-                        <MapPin size={11} />
-                        {distanciaBadge.label}
-                      </span>
-                    )}
-                    {/* Tipo de material */}
-                    {detalle.material?.tipo_de_material?.tipo_de_material && (
-                      <span className="tipo-material-badge">
-                        {detalle.material.tipo_de_material.tipo_de_material}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Cuerpo: foto + datos */}
-                <div className="viaje-item__body">
-                  {/* Columna izquierda: foto de evidencia */}
-                  <div className="viaje-item__foto-col">
-                    {tieneFoto ? (
-                      <div className="viaje-item__foto-wrapper">
-                        <img
-                          src={detalle.foto_evidencia_url}
-                          alt={`Evidencia viaje ${idx + 1}`}
-                          className="viaje-item__foto"
-                          onClick={() =>
-                            setFotoModal({
-                              url: detalle.foto_evidencia_url,
-                              indice: idx,
-                              distanciaBadge,
-                            })
-                          }
-                        />
-                        <button
-                          className="viaje-item__foto-btn"
-                          onClick={() =>
-                            setFotoModal({
-                              url: detalle.foto_evidencia_url,
-                              indice: idx,
-                              distanciaBadge,
-                            })
-                          }
-                          aria-label="Ver foto completa"
-                        >
-                          <Expand size={13} />
-                          Ampliar
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="viaje-item__foto-placeholder">
-                        <ImageOff size={24} />
-                        <span>Sin foto</span>
-                      </div>
-                    )}
-
-                    {/* Link a mapa si tiene coordenadas */}
-                    {tieneGeo && (
-                      <a
-                        href={`https://www.google.com/maps?q=${detalle.latitud_completado},${detalle.longitud_completado}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="viaje-item__mapa-link"
-                      >
-                        <MapPin size={12} />
-                        Ver en mapa
-                      </a>
-                    )}
-                  </div>
-
-                  {/* Columna derecha: datos del viaje */}
-                  <div className="viaje-item__datos">
-                    <div className="viaje-item__dato">
-                      <span className="viaje-item__dato-label">Material</span>
-                      <span className="viaje-item__dato-valor">
-                        {detalle.material?.material || "N/A"}
-                      </span>
-                    </div>
-
-                    {detalle.bancos?.banco && (
-                      <div className="viaje-item__dato">
-                        <span className="viaje-item__dato-label">Banco</span>
-                        <span className="viaje-item__dato-valor">
-                          {detalle.bancos.banco}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="viaje-item__dato">
-                      <span className="viaje-item__dato-label">Capacidad</span>
-                      <span className="viaje-item__dato-valor">
-                        {formatearVolumen(detalle.capacidad_m3)}
-                      </span>
-                    </div>
-
-                    <div className="viaje-item__dato">
-                      <span className="viaje-item__dato-label">
-                        Dist. trayecto
-                      </span>
-                      <span className="viaje-item__dato-valor">
-                        {detalle.distancia_km || 0} km
-                      </span>
-                    </div>
-
-                    <div className="viaje-item__separador" />
-
-                    <div className="viaje-item__dato">
-                      <span className="viaje-item__dato-label">M³ Pedidos</span>
-                      <span className="viaje-item__dato-valor">
-                        {formatearVolumen(detalle.cantidad_pedida_m3)}
-                      </span>
-                    </div>
-
-                    {detalle.volumen_real_m3 && (
-                      <div className="viaje-item__dato">
-                        <span className="viaje-item__dato-label">
-                          Vol. Real
-                        </span>
-                        <span className="viaje-item__dato-valor viaje-item__dato-valor--highlight">
-                          {formatearVolumen(detalle.volumen_real_m3)}
-                        </span>
-                      </div>
-                    )}
-
-                    {detalle.peso_ton && (
-                      <div className="viaje-item__dato">
-                        <span className="viaje-item__dato-label">Peso</span>
-                        <span className="viaje-item__dato-valor">
-                          {formatearPeso(detalle.peso_ton)}
-                        </span>
-                      </div>
-                    )}
-
-                    {detalle.folio_banco && (
-                      <div className="viaje-item__dato">
-                        <span className="viaje-item__dato-label">
-                          Folio banco
-                        </span>
-                        <span className="viaje-item__dato-valor">
-                          {detalle.folio_banco}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Importe - solo si tiene permiso */}
-                    {mostrarPrecios && detalle.costo_total && (
-                      <>
-                        <div className="viaje-item__separador" />
-                        <div className="viaje-item__dato viaje-item__dato--costo">
-                          <span className="viaje-item__dato-label">
-                            Importe
-                          </span>
-                          <span className="viaje-item__dato-valor viaje-item__dato-valor--costo">
-                            {formatearMoneda(detalle.costo_total)}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Notas del viaje */}
-                {detalle.notas_adicionales && (
-                  <div className="viaje-item__notas">
-                    <span className="viaje-item__notas-label">Notas:</span>
-                    <span className="viaje-item__notas-texto">
-                      {detalle.notas_adicionales}
-                    </span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Modal foto ampliada */}
-      {fotoModal && (
-        <div
-          className="foto-modal-overlay"
-          onClick={() => setFotoModal(null)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Foto de evidencia ampliada"
-        >
-          <div
-            className="foto-modal-contenido"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="foto-modal-cerrar"
-              onClick={() => setFotoModal(null)}
-              aria-label="Cerrar foto"
-            >
-              <X size={20} />
-            </button>
-
-            <div className="foto-modal-titulo">
-              Evidencia — Viaje {fotoModal.indice + 1}
-            </div>
-
-            <img
-              src={fotoModal.url}
-              alt={`Evidencia viaje ${fotoModal.indice + 1}`}
-              className="foto-modal-imagen"
-            />
-
-            {fotoModal.distanciaBadge && (
-              <div
-                className={`foto-modal-distancia ${fotoModal.distanciaBadge.clase}`}
-              >
-                <MapPin size={14} />
-                {fotoModal.distanciaBadge.label}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </>
-  );
-};
-
-// ========================================
-// COMPONENTE: DETALLES DE RENTA
-// ========================================
-
-const DetallesRenta = ({ detalle, mostrarPrecios }) => {
-  // MODIFICADO: Detectar renta por día si total_dias > 0
-  const totalDias = Number(detalle.total_dias || 0);
-  const esRentaPorDia = totalDias > 0;
-
-  // Viajes registrados en vale_renta_viajes, ordenados por numero_viaje
-  const viajesRegistrados = detalle.vale_renta_viajes || [];
-  const viajesOrdenados = [...viajesRegistrados].sort(
-    (a, b) => a.numero_viaje - b.numero_viaje,
-  );
-
-  return (
-    <div className="vale-section">
-      <h3 className="section-title">SERVICIO DE RENTA</h3>
-
-      <div className="info-full">
-        <span className="info-label">Material Movido:</span>
-        <span className="info-value">
-          {detalle.material?.material || "N/A"}
-        </span>
-      </div>
-
-      <div className="info-row">
-        <span className="info-label">Capacidad:</span>
-        <span className="info-value">
-          {formatearVolumen(detalle.capacidad_m3)}
-        </span>
-      </div>
-
-      <div className="info-row">
-        <span className="info-label">Núm. Viajes:</span>
-        <span className="info-value">{detalle.numero_viajes || 1}</span>
-      </div>
-
-      <div className="divider-thin"></div>
-
-      <div className="info-row">
-        <span className="info-label">Hora Inicio:</span>
-        <span className="info-value">
-          {detalle.hora_inicio ? formatearHora(detalle.hora_inicio) : "N/A"}
-        </span>
-      </div>
-
-      <div className="info-row">
-        <span className="info-label">Hora Fin:</span>
-        <span className="info-value">
-          {esRentaPorDia
-            ? "Día completo"
-            : detalle.hora_fin
-              ? formatearHora(detalle.hora_fin)
-              : "Pendiente"}
-        </span>
-      </div>
-
-      <div className="info-row">
-        <span className="info-label">Total Horas:</span>
-        <span className="info-value">
-          {esRentaPorDia ? "N/A" : `${detalle.total_horas || 0} hrs`}
-        </span>
-      </div>
-
-      <div className="info-row">
-        <span className="info-label">Total Días:</span>
-        <span className="info-value">
-          {esRentaPorDia
-            ? totalDias === 0.5
-              ? "0.5 días (medio día)"
-              : `${totalDias} ${totalDias === 1 ? "día" : "días"}`
-            : "N/A"}
-        </span>
-      </div>
-
-      {/* PRECIOS (solo si tiene permiso) */}
-      {mostrarPrecios && (
-        <>
-          <div className="divider-thin"></div>
-
-          {detalle.precios_renta?.costo_hr && (
-            <div className="info-row">
-              <span className="info-label">Tarifa/Hora:</span>
-              <span className="info-value">
-                {formatearMoneda(detalle.precios_renta.costo_hr)}
-              </span>
-            </div>
-          )}
-
-          {detalle.precios_renta?.costo_dia && (
-            <div className="info-row">
-              <span className="info-label">Tarifa/Día:</span>
-              <span className="info-value">
-                {formatearMoneda(detalle.precios_renta.costo_dia)}
-              </span>
-            </div>
-          )}
-
-          {detalle.costo_total && (
-            <div className="info-row info-row-total">
-              <span className="info-label">Costo Total:</span>
-              <span className="info-value">
-                {formatearMoneda(detalle.costo_total)} MXN
-              </span>
-            </div>
-          )}
-        </>
-      )}
-
-      {detalle.notas_adicionales && (
-        <div className="info-full" style={{ marginTop: "8px" }}>
-          <span className="info-label">Notas:</span>
-          <span className="info-value">{detalle.notas_adicionales}</span>
-        </div>
-      )}
-
-      {/* Registro de viajes individuales (vale_renta_viajes) */}
-      {viajesOrdenados.length > 0 && (
-        <div className="viajes-renta">
-          <div className="viajes-renta__header">
-            <Clock size={14} />
-            <span>Registro de viajes</span>
-            <span className="viajes-renta__count">
-              {viajesOrdenados.length}
-            </span>
-          </div>
-
-          <div className="viajes-renta__tabla">
-            {/* Encabezados */}
-            <div className="viajes-renta__fila viajes-renta__fila--header">
-              <span>#</span>
-              <span>Hora de registro</span>
-              <span>Registrado por</span>
-            </div>
-
-            {/* Filas de viajes */}
-            {viajesOrdenados.map((viaje) => {
-              const registrador = viaje.persona_registro;
-              const nombreRegistrador = registrador
-                ? `${registrador.nombre} ${registrador.primer_apellido}`
-                : "N/A";
-
-              return (
-                <div key={viaje.id_viaje} className="viajes-renta__fila">
-                  <span className="viajes-renta__num">
-                    {viaje.numero_viaje}
-                  </span>
-                  <span className="viajes-renta__hora">
-                    {formatearHora(viaje.hora_registro)}
-                  </span>
-                  <span className="viajes-renta__persona">
-                    {nombreRegistrador}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <LoginModal onClose={() => setShowLoginModal(false)} />
       )}
     </div>
   );
