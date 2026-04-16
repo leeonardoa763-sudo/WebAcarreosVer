@@ -160,6 +160,7 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                 segundo_apellido
               ),
               vale_material_detalles (
+                id_detalle_material,
                 capacidad_m3,
                 distancia_km,
                 cantidad_pedida_m3,
@@ -178,16 +179,26 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                 ),
                 bancos:id_banco (
                   banco
+                ),
+                vale_material_viajes (
+                  id_viaje,
+                  numero_viaje,
+                  folio_vale_fisico,
+                  peso_ton,
+                  volumen_m3,
+                  costo_viaje
                 )
               )
             `,
             )
             .in("id_vale", idsVales)
             .order("fecha_creacion", { ascending: true });
-
           if (errorVales) throw errorVales;
 
-          const grupos = agruparPorPlacasMaterial(vales);
+          // Guardar array plano para export
+          setValesPlanos(vales || []);
+
+          const grupos = agruparPorPlacasMaterial(vales || []);
           setValesAgrupados(grupos);
         }
       } catch (err) {
@@ -245,14 +256,45 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
         grupos[placas] = {
           placas,
           vales: [],
-          totalM3: 0,
           subtotal: 0,
+          totalesTipo1: { totalM3: 0, totalToneladas: 0, totalViajes: 0 },
+          totalesTipo2: { totalM3: 0, totalToneladas: 0, totalViajes: 0 },
+          totalesTipo3: { totalM3: 0, totalViajes: 0 },
         };
       }
 
       vale.vale_material_detalles?.forEach((detalle) => {
-        grupos[placas].totalM3 += Number(detalle.volumen_real_m3 || 0);
-        grupos[placas].subtotal += Number(detalle.costo_total || 0);
+        const idTipo = detalle.material?.tipo_de_material?.id_tipo_de_material;
+        const costo = Number(detalle.costo_total || 0);
+
+        grupos[placas].subtotal += costo;
+
+        // Viajes reales registrados; fallback a 1 si aún no hay viajes
+        const viajes = detalle.vale_material_viajes || [];
+        const numViajes = viajes.length > 0 ? viajes.length : 1;
+
+        if (idTipo === 1) {
+          grupos[placas].totalesTipo1.totalViajes += numViajes;
+          grupos[placas].totalesTipo1.totalM3 += Number(
+            detalle.volumen_real_m3 || 0,
+          );
+          grupos[placas].totalesTipo1.totalToneladas += Number(
+            detalle.peso_ton || 0,
+          );
+        } else if (idTipo === 2) {
+          grupos[placas].totalesTipo2.totalViajes += numViajes;
+          grupos[placas].totalesTipo2.totalM3 += Number(
+            detalle.volumen_real_m3 || 0,
+          );
+          grupos[placas].totalesTipo2.totalToneladas += Number(
+            detalle.peso_ton || 0,
+          );
+        } else if (idTipo === 3) {
+          grupos[placas].totalesTipo3.totalViajes += numViajes;
+          grupos[placas].totalesTipo3.totalM3 += Number(
+            detalle.cantidad_pedida_m3 || detalle.volumen_real_m3 || 0,
+          );
+        }
       });
 
       grupos[placas].vales.push(vale);
@@ -270,12 +312,17 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
     try {
       setExportandoPDF(true);
 
-      // Importación dinámica para no cargar qrcode en el bundle principal
-      const { generarPDFValesRentaBulk } = await import(
-        "../../utils/conciliaciones/generarPDFValesRentaBulk"
-      );
-
-      await generarPDFValesRentaBulk(valesPlanos, conciliacion.folio);
+      if (tipo === "renta") {
+        const { generarPDFValesRentaBulk } = await import(
+          "../../utils/conciliaciones/generarPDFValesRentaBulk"
+        );
+        await generarPDFValesRentaBulk(valesPlanos, conciliacion.folio);
+      } else {
+        const { generarPDFValesMaterialBulk } = await import(
+          "../../utils/conciliaciones/generarPDFValesMaterialBulk"
+        );
+        await generarPDFValesMaterialBulk(valesPlanos, conciliacion.folio);
+      }
     } catch (err) {
       console.error(
         "[ModalVistaPreviewConciliacion] Error al exportar PDF:",
@@ -286,7 +333,6 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
       setExportandoPDF(false);
     }
   };
-
   /**
    * Cerrar modal con ESC
    */
@@ -319,33 +365,30 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
 
           <div className="modal-preview__header-actions">
             {/* Botón exportar vales PDF — solo visible para conciliaciones de renta */}
-            {tipo === "renta" &&
-              !loading &&
-              !error &&
-              valesPlanos.length > 0 && (
-                <button
-                  className="modal-preview__btn-export"
-                  onClick={handleExportarValesPDF}
-                  disabled={exportandoPDF}
-                  title={`Exportar ${valesPlanos.length} vales en PDF`}
-                  style={{ backgroundColor: colors.secondary }}
-                >
-                  {exportandoPDF ? (
-                    <>
-                      <Loader2
-                        size={16}
-                        className="modal-preview__btn-export-spinner"
-                      />
-                      <span>Generando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FileDown size={16} />
-                      <span>Exportar Vales PDF</span>
-                    </>
-                  )}
-                </button>
-              )}
+            {!loading && !error && valesPlanos.length > 0 && (
+              <button
+                className="modal-preview__btn-export"
+                onClick={handleExportarValesPDF}
+                disabled={exportandoPDF}
+                title={`Exportar ${valesPlanos.length} vales en PDF`}
+                style={{ backgroundColor: colors.secondary }}
+              >
+                {exportandoPDF ? (
+                  <>
+                    <Loader2
+                      size={16}
+                      className="modal-preview__btn-export-spinner"
+                    />
+                    <span>Generando...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileDown size={16} />
+                    <span>Exportar Vales PDF</span>
+                  </>
+                )}
+              </button>
+            )}
 
             {/* Botón cerrar */}
             <button
