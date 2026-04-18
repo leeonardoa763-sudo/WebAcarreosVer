@@ -55,10 +55,19 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
   const getDistanciaBadge = (metros) => {
     if (metros === null || metros === undefined) return null;
     if (metros <= 500)
-      return { label: `${metros} m de la obra`, clase: "distancia-badge--cerca" };
+      return {
+        label: `${metros} m de la obra`,
+        clase: "distancia-badge--cerca",
+      };
     if (metros <= 2000)
-      return { label: `${(metros / 1000).toFixed(1)} km de la obra`, clase: "distancia-badge--media" };
-    return { label: `${(metros / 1000).toFixed(1)} km de la obra`, clase: "distancia-badge--lejos" };
+      return {
+        label: `${(metros / 1000).toFixed(1)} km de la obra`,
+        clase: "distancia-badge--media",
+      };
+    return {
+      label: `${(metros / 1000).toFixed(1)} km de la obra`,
+      clase: "distancia-badge--lejos",
+    };
   };
 
   /**
@@ -68,7 +77,9 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
    */
   const getBancoEfectivo = (viaje) => {
     if (viaje._esFallback) return viaje._detallePadre.bancos?.banco || null;
-    return viaje.bancos_override?.banco || viaje._detallePadre.bancos?.banco || null;
+    return (
+      viaje.bancos_override?.banco || viaje._detallePadre.bancos?.banco || null
+    );
   };
 
   /**
@@ -99,7 +110,6 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
       <div className="vale-section">
         <h3 className="section-title">
           VIAJES REGISTRADOS
-          {/* Contador correcto: total de viajes aplanados */}
           <span className="viajes-count-badge">{viajesAplanados.length}</span>
         </h3>
 
@@ -111,8 +121,11 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
             const costoEfectivo = getCostoEfectivo(viaje);
 
             // La foto y geo siempre vienen del detalle padre
-            const distanciaBadge = getDistanciaBadge(detalle.distancia_obra_metros);
-            const tieneGeo = detalle.latitud_completado && detalle.longitud_completado;
+            const distanciaBadge = getDistanciaBadge(
+              detalle.distancia_obra_metros,
+            );
+            const tieneGeo =
+              detalle.latitud_completado && detalle.longitud_completado;
             const tieneFoto = Boolean(detalle.foto_evidencia_url);
 
             // Número de viaje: usar el del registro o idx+1 como fallback
@@ -121,9 +134,7 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
               : (viaje.numero_viaje ?? idx + 1);
 
             // Hora de llegada: del viaje individual
-            const horaRegistro = viaje._esFallback
-              ? null
-              : viaje.hora_registro;
+            const horaRegistro = viaje._esFallback ? null : viaje.hora_registro;
 
             // Volumen: del viaje individual (volumen_m3) o del detalle (volumen_real_m3)
             const volumenMostrar = viaje._esFallback
@@ -136,10 +147,13 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
               : viaje.peso_ton;
 
             // Folio físico del viaje (tipo 1 y 2)
-            const folioFisico = viaje._esFallback ? null : viaje.folio_vale_fisico;
+            const folioFisico = viaje._esFallback
+              ? null
+              : viaje.folio_vale_fisico;
 
             // Indicar si tiene override de banco o distancia (tipo 3)
-            const tieneOverride = !viaje._esFallback &&
+            const tieneOverride =
+              !viaje._esFallback &&
               (viaje.id_banco_override || viaje.distancia_km_override);
 
             return (
@@ -148,7 +162,9 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
                 <div className="viaje-item__header">
                   <div className="viaje-item__numero">
                     <span className="viaje-item__numero-label">Viaje</span>
-                    <span className="viaje-item__numero-valor">{numeroViaje}</span>
+                    <span className="viaje-item__numero-valor">
+                      {numeroViaje}
+                    </span>
                     <span className="viaje-item__numero-total">
                       / {viajesAplanados.length}
                     </span>
@@ -156,7 +172,9 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
 
                   <div className="viaje-item__header-badges">
                     {distanciaBadge && (
-                      <span className={`distancia-badge ${distanciaBadge.clase}`}>
+                      <span
+                        className={`distancia-badge ${distanciaBadge.clase}`}
+                      >
                         <MapPin size={11} />
                         {distanciaBadge.label}
                       </span>
@@ -166,9 +184,11 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
                         {detalle.material.tipo_de_material.tipo_de_material}
                       </span>
                     )}
-                    {/* Badge visual cuando el viaje tiene banco/distancia diferente al vale */}
                     {tieneOverride && (
-                      <span className="tipo-material-badge" style={{ background: "#fef3c7", color: "#92400e" }}>
+                      <span
+                        className="tipo-material-badge"
+                        style={{ background: "#fef3c7", color: "#92400e" }}
+                      >
                         Override
                       </span>
                     )}
@@ -186,13 +206,21 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
                           alt={`Evidencia viaje ${numeroViaje}`}
                           className="viaje-item__foto"
                           onClick={() =>
-                            setFotoModal({ url: detalle.foto_evidencia_url, indice: idx, distanciaBadge })
+                            setFotoModal({
+                              url: detalle.foto_evidencia_url,
+                              indice: idx,
+                              distanciaBadge,
+                            })
                           }
                         />
                         <button
                           className="viaje-item__foto-btn"
                           onClick={() =>
-                            setFotoModal({ url: detalle.foto_evidencia_url, indice: idx, distanciaBadge })
+                            setFotoModal({
+                              url: detalle.foto_evidencia_url,
+                              indice: idx,
+                              distanciaBadge,
+                            })
                           }
                           aria-label="Ver foto completa"
                         >
@@ -208,7 +236,7 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
                     )}
 
                     {tieneGeo && (
-                      
+                      <a
                         href={`https://www.google.com/maps?q=${detalle.latitud_completado},${detalle.longitud_completado}`}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -234,7 +262,9 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
                     {bancoEfectivo && (
                       <div className="viaje-item__dato">
                         <span className="viaje-item__dato-label">Banco</span>
-                        <span className="viaje-item__dato-valor">{bancoEfectivo}</span>
+                        <span className="viaje-item__dato-valor">
+                          {bancoEfectivo}
+                        </span>
                       </div>
                     )}
 
@@ -248,7 +278,9 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
 
                     {/* Distancia efectiva (puede ser override en tipo 3) */}
                     <div className="viaje-item__dato">
-                      <span className="viaje-item__dato-label">Dist. trayecto</span>
+                      <span className="viaje-item__dato-label">
+                        Dist. trayecto
+                      </span>
                       <span className="viaje-item__dato-valor">
                         {distanciaEfectiva} km
                       </span>
@@ -258,7 +290,10 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
                     {horaRegistro && (
                       <div className="viaje-item__dato">
                         <span className="viaje-item__dato-label">
-                          <Clock size={10} style={{ display: "inline", marginRight: 2 }} />
+                          <Clock
+                            size={10}
+                            style={{ display: "inline", marginRight: 2 }}
+                          />
                           Llegada
                         </span>
                         <span className="viaje-item__dato-valor">
@@ -270,8 +305,12 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
                     {/* Folio físico del viaje (tipo 1 y 2) */}
                     {folioFisico && (
                       <div className="viaje-item__dato">
-                        <span className="viaje-item__dato-label">Folio físico</span>
-                        <span className="viaje-item__dato-valor">{folioFisico}</span>
+                        <span className="viaje-item__dato-label">
+                          Folio físico
+                        </span>
+                        <span className="viaje-item__dato-valor">
+                          {folioFisico}
+                        </span>
                       </div>
                     )}
 
@@ -280,7 +319,9 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
                     {/* Volumen del viaje */}
                     {volumenMostrar && (
                       <div className="viaje-item__dato">
-                        <span className="viaje-item__dato-label">Vol. Real</span>
+                        <span className="viaje-item__dato-label">
+                          Vol. Real
+                        </span>
                         <span className="viaje-item__dato-valor viaje-item__dato-valor--highlight">
                           {formatearVolumen(volumenMostrar)}
                         </span>
@@ -300,8 +341,12 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
                     {/* Folio banco del detalle padre */}
                     {detalle.folio_banco && (
                       <div className="viaje-item__dato">
-                        <span className="viaje-item__dato-label">Folio banco</span>
-                        <span className="viaje-item__dato-valor">{detalle.folio_banco}</span>
+                        <span className="viaje-item__dato-label">
+                          Folio banco
+                        </span>
+                        <span className="viaje-item__dato-valor">
+                          {detalle.folio_banco}
+                        </span>
                       </div>
                     )}
 
@@ -310,7 +355,9 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
                       <>
                         <div className="viaje-item__separador" />
                         <div className="viaje-item__dato viaje-item__dato--costo">
-                          <span className="viaje-item__dato-label">Importe</span>
+                          <span className="viaje-item__dato-label">
+                            Importe
+                          </span>
                           <span className="viaje-item__dato-valor viaje-item__dato-valor--costo">
                             {formatearMoneda(costoEfectivo)}
                           </span>
@@ -367,7 +414,9 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
             />
 
             {fotoModal.distanciaBadge && (
-              <div className={`foto-modal-distancia ${fotoModal.distanciaBadge.clase}`}>
+              <div
+                className={`foto-modal-distancia ${fotoModal.distanciaBadge.clase}`}
+              >
                 <MapPin size={14} />
                 {fotoModal.distanciaBadge.label}
               </div>
