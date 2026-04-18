@@ -14,6 +14,8 @@ import { StyleSheet } from "@react-pdf/renderer";
 export const materialPetreoStyles = StyleSheet.create({
   // ========================================
   // COLUMNAS ESPECÍFICAS DE PÉTREO
+  // Total ancho: 55+50+55+50+75+48+33+36+36+47 = 485pt
+  // Página carta con padding 30c/lado = ~535pt disponibles
   // ========================================
   colPlacas: {
     width: 55,
@@ -22,57 +24,57 @@ export const materialPetreoStyles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   colFecha: {
-    width: 60,
-    fontSize: 7,
-    textAlign: "center",
-    paddingHorizontal: 2,
-  },
-  colFolio: {
-    width: 60,
-    fontSize: 7,
-    textAlign: "center",
-    paddingHorizontal: 2,
-  },
-  colFolioBanco: {
-    width: 60,
-    fontSize: 7,
-    textAlign: "center",
-    paddingHorizontal: 2,
-  },
-  colMaterial: {
-    width: 85,
-    fontSize: 7,
-    textAlign: "center",
-    paddingHorizontal: 2,
-  },
-  colBanco: {
     width: 50,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
   },
-  colDistancia: {
-    width: 40,
+  colFolio: {
+    width: 55,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
   },
-  colViajes: {
-    width: 40,
+  colRemision: {
+    width: 50,
+    fontSize: 7,
+    textAlign: "center",
+    paddingHorizontal: 2,
+  },
+  colMaterial: {
+    width: 75,
+    fontSize: 7,
+    textAlign: "center",
+    paddingHorizontal: 2,
+  },
+  colBanco: {
+    width: 48,
+    fontSize: 7,
+    textAlign: "center",
+    paddingHorizontal: 2,
+  },
+  colDistancia: {
+    width: 33,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
   },
   colVol: {
-    width: 40,
+    width: 36,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
   },
   colTon: {
-    width: 40,
+    width: 36,
     fontSize: 7,
     textAlign: "center",
+    paddingHorizontal: 2,
+  },
+  colImporte: {
+    width: 47,
+    fontSize: 7,
+    textAlign: "right",
     paddingHorizontal: 2,
   },
 

@@ -178,6 +178,7 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                   )
                 ),
                 bancos:id_banco (
+                  id_banco,
                   banco
                 ),
                 vale_material_viajes (

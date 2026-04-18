@@ -350,7 +350,12 @@ const TablaEmpresa = ({ valesPlanos, tipoVale, helpers, colorEmpresa }) => {
             const expandido = valesExpandidos.has(vale.id_vale);
             const fechaRaw = vale.fecha_programada || vale.fecha_creacion || "";
             const fechaStr = fechaRaw
-              ? fechaRaw.substring(0, 10).split("-").reverse().join("/")
+              ? new Date(fechaRaw).toLocaleDateString("es-MX", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  timeZone: "America/Mexico_City",
+                })
               : "—";
             const colorEstado = helpers.obtenerColorEstado(vale.estado);
             const etiquetaEstado = helpers.obtenerEtiquetaEstado(vale.estado);

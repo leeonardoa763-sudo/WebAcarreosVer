@@ -29,7 +29,7 @@ export const useConciliacionesMaterial = () => {
   const { userProfile, hasRole } = useAuth();
 
   const [conciliaciones, setConciliaciones] = useState(
-    initialConciliacionesState.conciliaciones
+    initialConciliacionesState.conciliaciones,
   );
   const [loading, setLoading] = useState(initialConciliacionesState.loading);
   const [error, setError] = useState(initialConciliacionesState.error);
@@ -118,7 +118,7 @@ export const useConciliacionesMaterial = () => {
       idSindicato,
       filtros.sindicatoSeleccionado,
       queriesMaterial,
-    ]
+    ],
   );
 
   /**
@@ -137,7 +137,7 @@ export const useConciliacionesMaterial = () => {
       const resultado = await queriesMaterial.fetchMaterialesConVales(
         semana,
         idObra,
-        sindicatoFiltro
+        sindicatoFiltro,
       );
 
       setMateriales(resultado.data);
@@ -149,7 +149,7 @@ export const useConciliacionesMaterial = () => {
       idSindicato,
       queriesMaterial,
       filtros.sindicatoSeleccionado,
-    ]
+    ],
   );
 
   /**
@@ -170,7 +170,7 @@ export const useConciliacionesMaterial = () => {
 
       const resultado = await queriesMaterial.fetchValesVerificadosMaterial(
         filtros,
-        sindicatoFiltro
+        sindicatoFiltro,
       );
 
       if (!resultado.success) throw new Error(resultado.error);
@@ -193,7 +193,7 @@ export const useConciliacionesMaterial = () => {
     } catch (error) {
       console.error(
         "[useConciliacionesMaterial] Error en cargarVistaPrevia:",
-        error
+        error,
       );
       setVistaPrevia((prev) => ({
         ...prev,
@@ -244,13 +244,30 @@ export const useConciliacionesMaterial = () => {
     }
 
     try {
+      // --- LOGS DIAGNÓSTICO ---
+      console.log("[generarConciliacion] idSindicato:", idSindicato);
+      console.log("[generarConciliacion] idPersona:", idPersona);
+      console.log(
+        "[generarConciliacion] filtros.sindicatoSeleccionado:",
+        filtros.sindicatoSeleccionado,
+      );
+      console.log(
+        "[generarConciliacion] primer vale - operador:",
+        vistaPrevia.valesOriginales[0]?.operadores,
+      );
+      console.log(
+        "[generarConciliacion] primer vale - viajes detalle:",
+        vistaPrevia.valesOriginales[0]?.vale_material_detalles?.[0]
+          ?.vale_material_viajes,
+      );
+      // --- FIN LOGS ---
       // Preparar datos
       const dataConciliacion = helpers.prepararDatosConciliacion(
         vistaPrevia.valesOriginales,
         vistaPrevia.totalesGenerales,
         filtros,
         idSindicato,
-        idPersona
+        idPersona,
       );
 
       // Extraer IDs de vales
@@ -259,7 +276,7 @@ export const useConciliacionesMaterial = () => {
       // Guardar en BD
       const resultado = await queriesGenerales.guardarConciliacion(
         dataConciliacion,
-        idsVales
+        idsVales,
       );
 
       if (!resultado.success) {
@@ -278,7 +295,7 @@ export const useConciliacionesMaterial = () => {
     } catch (error) {
       console.error(
         "[useConciliacionesMaterial] Error en generarConciliacion:",
-        error
+        error,
       );
       return {
         success: false,
@@ -311,7 +328,7 @@ export const useConciliacionesMaterial = () => {
       // ← CAMBIO: Usar fetchConciliacionesSinVales en vez de fetchConciliacionesGeneradas
       const resultado = await queriesGenerales.fetchConciliacionesSinVales(
         { tipo_conciliacion: "material" },
-        sindicatoFiltro
+        sindicatoFiltro,
       );
 
       if (!resultado.success) throw new Error(resultado.error);
@@ -320,7 +337,7 @@ export const useConciliacionesMaterial = () => {
     } catch (error) {
       console.error(
         "[useConciliacionesMaterial] Error en loadHistorial:",
-        error
+        error,
       );
       setError(error.message);
     } finally {

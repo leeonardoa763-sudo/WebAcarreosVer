@@ -128,8 +128,17 @@ const construirQueryBase = (tipoVale) => {
               hora_registro,
               peso_ton,
               volumen_m3,
+              precio_m3,
               costo_viaje,
-              folio_vale_fisico
+              folio_vale_fisico,
+              id_banco_override,
+              distancia_km_override,
+              precio_m3_override,
+              costo_viaje_override,
+              bancos_override:id_banco_override (
+                id_banco,
+                banco
+              )
             )
           ),
           tickets_material (

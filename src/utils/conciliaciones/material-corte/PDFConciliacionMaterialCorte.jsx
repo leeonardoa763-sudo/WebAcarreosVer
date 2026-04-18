@@ -129,7 +129,7 @@ const PDFConciliacionMaterialCorte = ({
             <Text style={materialCorteStyles.colDistancia}>Dist (km)</Text>
             <Text style={materialCorteStyles.colViajes}>Viaj</Text>
             <Text style={materialCorteStyles.colCapacidad}>Cap (m³)</Text>
-            <Text style={materialCorteStyles.colM3Pedidos}>M³ Ped</Text>
+            <Text style={materialCorteStyles.colM3Pedidos}>M³ Real</Text>
             <Text style={materialCorteStyles.colImporte}>Importe</Text>
           </View>
 
@@ -146,10 +146,14 @@ const PDFConciliacionMaterialCorte = ({
                       detalle.material?.tipo_de_material?.id_tipo_de_material;
 
                     // Solo procesar Tipo 3
+                    // Solo procesar Tipo 3
                     if (idTipo !== 3) return null;
 
-                    viajesGrupo += 1;
-                    m3Grupo += Number(detalle.cantidad_pedida_m3 || 0);
+                    const viajes = detalle.vale_material_viajes || [];
+                    const numViajes = viajes.length > 0 ? viajes.length : 1;
+
+                    viajesGrupo += numViajes;
+                    m3Grupo += Number(detalle.volumen_real_m3 || 0);
 
                     return (
                       <View
@@ -168,7 +172,7 @@ const PDFConciliacionMaterialCorte = ({
                         <Text style={materialCorteStyles.colMaterial}>
                           {(detalle.material?.material || "N/A").substring(
                             0,
-                            15
+                            15,
                           )}
                         </Text>
                         <Text style={materialCorteStyles.colBanco}>
@@ -177,19 +181,21 @@ const PDFConciliacionMaterialCorte = ({
                         <Text style={materialCorteStyles.colDistancia}>
                           {formatearNumero(detalle.distancia_km)}
                         </Text>
-                        <Text style={materialCorteStyles.colViajes}>1</Text>
+                        <Text style={materialCorteStyles.colViajes}>
+                          {numViajes}
+                        </Text>
                         <Text style={materialCorteStyles.colCapacidad}>
                           {formatearNumero(detalle.capacidad_m3)}
                         </Text>
                         <Text style={materialCorteStyles.colM3Pedidos}>
-                          {formatearNumero(detalle.cantidad_pedida_m3)}
+                          {formatearNumero(detalle.volumen_real_m3)}
                         </Text>
                         <Text style={materialCorteStyles.colImporte}>
                           ${formatearNumero(detalle.costo_total)}
                         </Text>
                       </View>
                     );
-                  })
+                  }),
                 )}
 
                 {/* Subtotal por placas */}
@@ -239,7 +245,7 @@ const PDFConciliacionMaterialCorte = ({
           </View>
 
           <View style={sharedStyles.totalRow}>
-            <Text style={sharedStyles.totalLabel}>Total m³ Pedidos:</Text>
+            <Text style={sharedStyles.totalLabel}>Total m³ Reales:</Text>
             <Text style={sharedStyles.totalValue}>
               {formatearNumero(totalM3)}
             </Text>

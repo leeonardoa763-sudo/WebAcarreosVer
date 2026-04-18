@@ -215,6 +215,10 @@ const VistaPreviewMaterial = ({ conciliacion, valesAgrupados }) => {
    ======================================== */
 
 const TablaMaterialPetreo = ({ valesAgrupados }) => {
+  console.log(
+    "[TablaMaterialPetreo] valesAgrupados:",
+    JSON.stringify(valesAgrupados, null, 2),
+  );
   return (
     <div className="preview-pdf__table">
       <table>
@@ -223,13 +227,13 @@ const TablaMaterialPetreo = ({ valesAgrupados }) => {
             <th>Placas</th>
             <th>Fecha</th>
             <th>Folio</th>
-            <th>F.Banco</th>
+            <th>Remisión</th>
             <th>Material</th>
             <th>Banco</th>
             <th>Dist (km)</th>
-            <th>Viajes</th>
-            <th>Vol (m³)</th>
+            <th>m³</th>
             <th>Ton</th>
+            <th>Importe</th>
           </tr>
         </thead>
         <tbody>
@@ -237,61 +241,125 @@ const TablaMaterialPetreo = ({ valesAgrupados }) => {
             let viajesGrupo = 0;
             let m3Grupo = 0;
             let toneladasGrupo = 0;
+            let importeGrupo = 0;
 
             return (
               <React.Fragment key={placas}>
                 {grupo.vales.map((vale) =>
-                  vale.vale_material_detalles.map((detalle, idx) => {
+                  vale.vale_material_detalles.map((detalle) => {
                     const idTipo =
                       detalle.material?.tipo_de_material?.id_tipo_de_material;
-
-                    // Solo mostrar Tipo 1 y 2
                     if (idTipo !== 1 && idTipo !== 2) return null;
 
-                    viajesGrupo += 1;
-                    m3Grupo += Number(detalle.volumen_real_m3 || 0);
-                    toneladasGrupo += Number(detalle.peso_ton || 0);
+                    const viajes = detalle.vale_material_viajes || [];
 
-                    return (
-                      <tr key={`${vale.id_vale}-${idx}`}>
-                        <td>{placas}</td>
-                        <td>
-                          {formatearFechaCorta(
-                            vale.fecha_creacion.split("T")[0]
-                          )}
-                        </td>
-                        <td>{vale.folio}</td>
-                        <td>{detalle.folio_banco || "N/A"}</td>
-                        <td>{detalle.material?.material || "N/A"}</td>
-                        <td>{detalle.bancos?.banco || "N/A"}</td>
-                        <td className="text-center">
-                          {Number(detalle.distancia_km).toFixed(1)}
-                        </td>
-                        <td className="text-center">1</td>
-                        <td className="text-right">
-                          {Number(detalle.volumen_real_m3).toFixed(2)}
-                        </td>
-                        <td className="text-right">
-                          {Number(detalle.peso_ton).toFixed(2)}
-                        </td>
-                      </tr>
-                    );
-                  })
+                    // Sin viajes: 1 fila fallback con datos del detalle
+                    if (viajes.length === 0) {
+                      viajesGrupo += 1;
+                      m3Grupo += Number(detalle.volumen_real_m3 || 0);
+                      toneladasGrupo += Number(detalle.peso_ton || 0);
+                      importeGrupo += Number(detalle.costo_total || 0);
+
+                      return (
+                        <tr
+                          key={`${vale.id_vale}-${detalle.id_detalle_material}-fallback`}
+                        >
+                          <td>{placas}</td>
+                          <td>
+                            {formatearFechaCorta(
+                              vale.fecha_creacion.split("T")[0],
+                            )}
+                          </td>
+                          <td>{vale.folio}</td>
+                          <td>{detalle.folio_banco || "—"}</td>
+                          <td>{detalle.material?.material || "N/A"}</td>
+                          <td>{detalle.bancos?.banco || "N/A"}</td>
+                          <td className="text-center">
+                            {Number(detalle.distancia_km).toFixed(1)}
+                          </td>
+                          <td className="text-right">
+                            {Number(detalle.volumen_real_m3 || 0).toFixed(2)}
+                          </td>
+                          <td className="text-right">
+                            {Number(detalle.peso_ton || 0).toFixed(2)}
+                          </td>
+                          <td className="text-right">
+                            {formatearMoneda(detalle.costo_total || 0)}
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    // 1 fila por viaje registrado
+                    return viajes
+                      .sort((a, b) => a.numero_viaje - b.numero_viaje)
+                      .map((viaje) => {
+                        viajesGrupo += 1;
+                        m3Grupo += Number(
+                          viaje.volumen_m3 || detalle.volumen_real_m3 || 0,
+                        );
+                        toneladasGrupo += Number(
+                          viaje.peso_ton || detalle.peso_ton || 0,
+                        );
+                        importeGrupo += Number(
+                          viaje.costo_viaje || detalle.costo_total || 0,
+                        );
+
+                        return (
+                          <tr key={`viaje-${viaje.id_viaje}`}>
+                            <td>{placas}</td>
+                            <td>
+                              {formatearFechaCorta(
+                                vale.fecha_creacion.split("T")[0],
+                              )}
+                            </td>
+                            <td>{vale.folio}</td>
+                            <td>
+                              {viaje.folio_vale_fisico ||
+                                detalle.folio_banco ||
+                                "—"}
+                            </td>
+                            <td>{detalle.material?.material || "N/A"}</td>
+                            <td>{detalle.bancos?.banco || "N/A"}</td>
+                            <td className="text-center">
+                              {Number(detalle.distancia_km).toFixed(1)}
+                            </td>
+                            <td className="text-right">
+                              {Number(
+                                viaje.volumen_m3 ||
+                                  detalle.volumen_real_m3 ||
+                                  0,
+                              ).toFixed(2)}
+                            </td>
+                            <td className="text-right">
+                              {Number(
+                                viaje.peso_ton || detalle.peso_ton || 0,
+                              ).toFixed(2)}
+                            </td>
+                            <td className="text-right">
+                              {formatearMoneda(
+                                viaje.costo_viaje || detalle.costo_total || 0,
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      });
+                  }),
                 )}
 
-                {/* Subtotal por placas */}
+                {/* Subtotal por placas — colSpan ajustado a 10 columnas */}
                 <tr className="subtotal-row">
                   <td colSpan="7" className="text-right">
                     <strong>Subtotal {placas}:</strong>
-                  </td>
-                  <td className="text-center">
-                    <strong>{viajesGrupo}</strong>
                   </td>
                   <td className="text-right">
                     <strong>{m3Grupo.toFixed(2)}</strong>
                   </td>
                   <td className="text-right">
                     <strong>{toneladasGrupo.toFixed(2)}</strong>
+                  </td>
+                  <td className="text-right">
+                    <strong>{formatearMoneda(importeGrupo)}</strong>
                   </td>
                 </tr>
               </React.Fragment>
@@ -348,7 +416,7 @@ const TablaMaterialCorte = ({ valesAgrupados }) => {
                         <td>{placas}</td>
                         <td>
                           {formatearFechaCorta(
-                            vale.fecha_creacion.split("T")[0]
+                            vale.fecha_creacion.split("T")[0],
                           )}
                         </td>
                         <td>{vale.folio}</td>
@@ -369,7 +437,7 @@ const TablaMaterialCorte = ({ valesAgrupados }) => {
                         </td>
                       </tr>
                     );
-                  })
+                  }),
                 )}
 
                 {/* Subtotal por placas */}

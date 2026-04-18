@@ -114,13 +114,13 @@ const PDFConciliacionMaterialPetreo = ({
             <Text style={materialPetreoStyles.colPlacas}>Placas</Text>
             <Text style={materialPetreoStyles.colFecha}>Fecha</Text>
             <Text style={materialPetreoStyles.colFolio}>Folio</Text>
-            <Text style={materialPetreoStyles.colFolioBanco}>F.Banco</Text>
+            <Text style={materialPetreoStyles.colRemision}>Remisión</Text>
             <Text style={materialPetreoStyles.colMaterial}>Material</Text>
             <Text style={materialPetreoStyles.colBanco}>Banco</Text>
-            <Text style={materialPetreoStyles.colDistancia}>Dist (Km)</Text>
-            <Text style={materialPetreoStyles.colViajes}>Viajes</Text>
-            <Text style={materialPetreoStyles.colVol}>Vol (m³)</Text>
-            <Text style={materialPetreoStyles.colTon}>Toneladas</Text>
+            <Text style={materialPetreoStyles.colDistancia}>Dist</Text>
+            <Text style={materialPetreoStyles.colVol}>m³</Text>
+            <Text style={materialPetreoStyles.colTon}>Ton</Text>
+            <Text style={materialPetreoStyles.colImporte}>Importe</Text>
           </View>
 
           {/* Datos por placas */}
@@ -132,56 +132,129 @@ const PDFConciliacionMaterialPetreo = ({
             return (
               <View key={placas}>
                 {grupo.vales.map((vale) =>
-                  vale.vale_material_detalles.map((detalle, idx) => {
+                  vale.vale_material_detalles.map((detalle) => {
                     const idTipo =
                       detalle.material?.tipo_de_material?.id_tipo_de_material;
                     if (idTipo !== 1 && idTipo !== 2) return null;
 
-                    viajesGrupo += 1;
-                    m3Grupo += Number(detalle.volumen_real_m3 || 0);
-                    toneladasGrupo += Number(detalle.peso_ton || 0);
+                    const viajes = detalle.vale_material_viajes || [];
 
-                    return (
-                      <View
-                        style={sharedStyles.tableRow}
-                        key={`${vale.id_vale}-${idx}`}
-                      >
-                        <Text style={materialPetreoStyles.colPlacas}>
-                          {placas}
-                        </Text>
-                        <Text style={materialPetreoStyles.colFecha}>
-                          {formatearFecha(vale.fecha_creacion.split("T")[0])}
-                        </Text>
-                        <Text style={materialPetreoStyles.colFolio}>
-                          {vale.folio}
-                        </Text>
-                        <Text style={materialPetreoStyles.colFolioBanco}>
-                          {detalle.folio_banco || "N/A"}
-                        </Text>
-                        <Text style={materialPetreoStyles.colMaterial}>
-                          {(detalle.material?.material || "N/A").substring(
-                            0,
-                            15
-                          )}
-                        </Text>
-                        <Text style={materialPetreoStyles.colBanco}>
-                          {(detalle.bancos?.banco || "N/A").substring(0, 12)}
-                        </Text>
-                        <Text style={materialPetreoStyles.colDistancia}>
-                          {formatearNumero(detalle.distancia_km)}
-                        </Text>
-                        <Text style={materialPetreoStyles.colViajes}>1</Text>
-                        <Text style={materialPetreoStyles.colVol}>
-                          {formatearNumero(detalle.volumen_real_m3)}
-                        </Text>
-                        <Text style={materialPetreoStyles.colTon}>
-                          {formatearNumero(detalle.peso_ton)}
-                        </Text>
-                      </View>
-                    );
-                  })
+                    // Sin viajes registrados: 1 fila con datos del detalle (fallback)
+                    if (viajes.length === 0) {
+                      viajesGrupo += 1;
+                      m3Grupo += Number(detalle.volumen_real_m3 || 0);
+                      toneladasGrupo += Number(detalle.peso_ton || 0);
+
+                      return (
+                        <View
+                          style={sharedStyles.tableRow}
+                          key={`${vale.id_vale}-${detalle.id_detalle_material}-fallback`}
+                        >
+                          <Text style={materialPetreoStyles.colPlacas}>
+                            {placas}
+                          </Text>
+                          <Text style={materialPetreoStyles.colFecha}>
+                            {formatearFecha(vale.fecha_creacion.split("T")[0])}
+                          </Text>
+                          <Text style={materialPetreoStyles.colFolio}>
+                            {vale.folio}
+                          </Text>
+                          <Text style={materialPetreoStyles.colRemision}>
+                            {detalle.folio_banco || "—"}
+                          </Text>
+                          <Text style={materialPetreoStyles.colMaterial}>
+                            {(detalle.material?.material || "N/A").substring(
+                              0,
+                              15,
+                            )}
+                          </Text>
+                          <Text style={materialPetreoStyles.colBanco}>
+                            {(detalle.bancos?.banco || "N/A").substring(0, 12)}
+                          </Text>
+                          <Text style={materialPetreoStyles.colDistancia}>
+                            {formatearNumero(detalle.distancia_km)}
+                          </Text>
+                          <Text style={materialPetreoStyles.colVol}>
+                            {formatearNumero(detalle.volumen_real_m3)}
+                          </Text>
+                          <Text style={materialPetreoStyles.colTon}>
+                            {formatearNumero(detalle.peso_ton)}
+                          </Text>
+                          <Text style={materialPetreoStyles.colImporte}>
+                            {formatearNumero(detalle.costo_total)}
+                          </Text>
+                        </View>
+                      );
+                    }
+
+                    // 1 fila por viaje registrado
+                    return viajes
+                      .sort((a, b) => a.numero_viaje - b.numero_viaje)
+                      .map((viaje) => {
+                        viajesGrupo += 1;
+                        m3Grupo += Number(
+                          viaje.volumen_m3 || detalle.volumen_real_m3 || 0,
+                        );
+                        toneladasGrupo += Number(
+                          viaje.peso_ton || detalle.peso_ton || 0,
+                        );
+
+                        return (
+                          <View
+                            style={sharedStyles.tableRow}
+                            key={`viaje-${viaje.id_viaje}`}
+                          >
+                            <Text style={materialPetreoStyles.colPlacas}>
+                              {placas}
+                            </Text>
+                            <Text style={materialPetreoStyles.colFecha}>
+                              {formatearFecha(
+                                vale.fecha_creacion.split("T")[0],
+                              )}
+                            </Text>
+                            <Text style={materialPetreoStyles.colFolio}>
+                              {vale.folio}
+                            </Text>
+                            <Text style={materialPetreoStyles.colRemision}>
+                              {viaje.folio_vale_fisico ||
+                                detalle.folio_banco ||
+                                "—"}
+                            </Text>
+                            <Text style={materialPetreoStyles.colMaterial}>
+                              {(detalle.material?.material || "N/A").substring(
+                                0,
+                                15,
+                              )}
+                            </Text>
+                            <Text style={materialPetreoStyles.colBanco}>
+                              {(detalle.bancos?.banco || "N/A").substring(
+                                0,
+                                12,
+                              )}
+                            </Text>
+                            <Text style={materialPetreoStyles.colDistancia}>
+                              {formatearNumero(detalle.distancia_km)}
+                            </Text>
+                            <Text style={materialPetreoStyles.colVol}>
+                              {formatearNumero(
+                                viaje.volumen_m3 || detalle.volumen_real_m3,
+                              )}
+                            </Text>
+                            <Text style={materialPetreoStyles.colTon}>
+                              {formatearNumero(
+                                viaje.peso_ton || detalle.peso_ton,
+                              )}
+                            </Text>
+                            <Text style={materialPetreoStyles.colImporte}>
+                              {formatearNumero(
+                                viaje.costo_viaje || detalle.costo_total,
+                              )}
+                            </Text>
+                          </View>
+                        );
+                      });
+                  }),
                 )}
-
                 {/* Subtotal por placas */}
                 <View style={materialPetreoStyles.subtotalRow}>
                   <Text style={materialPetreoStyles.subtotalLabel}>

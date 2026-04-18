@@ -1,9 +1,12 @@
 /**
  * src/components/vales/editar/TablaEditarViajes.jsx
  *
- * Tabla editable de viajes internos para vales de material tipo 1.
- * Permite editar toneladas, folio físico y distancia del detalle.
- * Muestra recálculo automático de m3 y costo al editar.
+ * Tabla editable de viajes internos para vales de material tipo 1, 2 y 3.
+ *
+ * Tipo 1 y 2: edición de toneladas, folio físico y distancia del detalle.
+ *             Recálculo automático de m3 y costo.
+ * Tipo 3:     edición de volumen_m3 directo, banco override, distancia override
+ *             por viaje. Recálculo automático de precio_m3_override y costo.
  *
  * Dependencias: useEditarValeViajes, lucide-react, colors
  * Usado en: ModalEditarVale.jsx
@@ -46,9 +49,9 @@ const fmtMoneda = (n) => {
   }).format(Number(n));
 };
 
-// ─── Sub-componente: fila de un viaje ────────────────────────────────────────
+// ─── Sub-componente: fila tipo 1 y 2 ─────────────────────────────────────────
 
-const FilaViaje = ({
+const FilaViajeT1T2 = ({
   viaje,
   marcadoEliminar,
   esNuevo,
@@ -57,9 +60,7 @@ const FilaViaje = ({
   onCancelarEliminacion,
   pesoEspecifico,
 }) => {
-  // Controla si esta fila está en modo edición activa
   const [editando, setEditando] = useState(esNuevo);
-
   const estaDeshabilitado = marcadoEliminar;
 
   const claseFila = marcadoEliminar
@@ -125,7 +126,7 @@ const FilaViaje = ({
         )}
       </td>
 
-      {/* Volumen m3 — calculado automático, solo lectura */}
+      {/* Volumen m3 — calculado automático */}
       <td className="tev__td tev__td--calculado">
         <span className="tev__valor tev__valor--calculado">
           {fmt3(viaje.volumen_m3)} m³
@@ -137,7 +138,7 @@ const FilaViaje = ({
         )}
       </td>
 
-      {/* Precio m3 — solo lectura, puede cambiar si se edita distancia */}
+      {/* Precio m3 — solo lectura */}
       <td className="tev__td tev__td--calculado">
         <span className="tev__valor">{fmtMoneda(viaje.precio_m3)}</span>
       </td>
@@ -196,12 +197,246 @@ const FilaViaje = ({
   );
 };
 
+// ─── Sub-componente: fila tipo 3 (Tepetate / Producto de Corte) ──────────────
+
+const FilaViajeT3 = ({
+  viaje,
+  marcadoEliminar,
+  esNuevo,
+  onEditarCampo,
+  onEliminar,
+  onCancelarEliminacion,
+  bancos,
+  detalle,
+}) => {
+  const [editando, setEditando] = useState(esNuevo);
+  const estaDeshabilitado = marcadoEliminar;
+
+  const claseFila = marcadoEliminar
+    ? "tev__fila tev__fila--eliminar"
+    : esNuevo
+      ? "tev__fila tev__fila--nueva"
+      : editando
+        ? "tev__fila tev__fila--editando"
+        : "tev__fila";
+
+  // Precio y costo efectivos: usar override si existe
+  const precioEfectivo = viaje.precio_m3_override ?? viaje.precio_m3;
+  const costoEfectivo = viaje.costo_viaje_override ?? viaje.costo_viaje;
+  const tieneOverride = viaje.id_banco_override || viaje.distancia_km_override;
+
+  return (
+    <tr className={claseFila}>
+      {/* Número de viaje */}
+      <td className="tev__td tev__td--centro">
+        <span className="tev__numero-viaje">#{viaje.numero_viaje}</span>
+        {esNuevo && <span className="tev__badge tev__badge--nuevo">Nuevo</span>}
+        {marcadoEliminar && (
+          <span className="tev__badge tev__badge--eliminar">Por eliminar</span>
+        )}
+        {tieneOverride && !marcadoEliminar && (
+          <span
+            className="tev__badge tev__badge--override"
+            title="Banco o distancia diferente al detalle"
+          >
+            Override
+          </span>
+        )}
+      </td>
+
+      {/* Volumen m3 — editable directo para tipo 3 */}
+      <td className="tev__td">
+        {editando && !estaDeshabilitado ? (
+          <div className="tev__input-group">
+            <input
+              type="number"
+              className="tev__input tev__input--numero tev__input--destacado"
+              value={viaje.volumen_m3 ?? ""}
+              onChange={(e) =>
+                onEditarCampo(viaje.id_viaje, "volumen_m3", e.target.value)
+              }
+              placeholder="0.000"
+              step="0.001"
+              min="0"
+            />
+            <span className="tev__input-suffix">m³</span>
+          </div>
+        ) : (
+          <span
+            className="tev__valor tev__valor--editable"
+            onClick={() => !estaDeshabilitado && setEditando(true)}
+            title="Clic para editar"
+          >
+            {fmt3(viaje.volumen_m3)} m³
+            {!estaDeshabilitado && (
+              <Edit3 size={11} className="tev__icono-editar" />
+            )}
+          </span>
+        )}
+      </td>
+
+      {/* Banco override — selector, opcional */}
+      <td className="tev__td">
+        {editando && !estaDeshabilitado ? (
+          <select
+            className="tev__select"
+            value={viaje.id_banco_override ?? ""}
+            onChange={(e) =>
+              onEditarCampo(
+                viaje.id_viaje,
+                "id_banco_override",
+                e.target.value ? Number(e.target.value) : null,
+              )
+            }
+          >
+            <option value="">
+              {detalle?.bancos?.banco ?? "— Sin override —"}
+            </option>
+            {bancos.map((b) => (
+              <option key={b.id_banco} value={b.id_banco}>
+                {b.banco}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span
+            className={`tev__valor ${tieneOverride ? "tev__valor--override" : ""}`}
+            onClick={() => !estaDeshabilitado && setEditando(true)}
+            title={
+              tieneOverride
+                ? "Banco diferente al del detalle"
+                : "Banco del detalle"
+            }
+          >
+            {viaje.bancos_override?.banco ?? detalle?.bancos?.banco ?? "—"}
+            {viaje.id_banco_override && (
+              <span className="tev__override-indicator">*</span>
+            )}
+          </span>
+        )}
+      </td>
+
+      {/* Distancia override — opcional */}
+      <td className="tev__td">
+        {editando && !estaDeshabilitado ? (
+          <div className="tev__input-group">
+            <input
+              type="number"
+              className="tev__input tev__input--numero"
+              value={viaje.distancia_km_override ?? ""}
+              onChange={(e) =>
+                onEditarCampo(
+                  viaje.id_viaje,
+                  "distancia_km_override",
+                  e.target.value,
+                )
+              }
+              placeholder={fmt2(detalle?.distancia_km)}
+              step="0.5"
+              min="0"
+            />
+            <span className="tev__input-suffix">km</span>
+          </div>
+        ) : (
+          <span
+            className={`tev__valor ${viaje.distancia_km_override ? "tev__valor--override" : ""}`}
+            onClick={() => !estaDeshabilitado && setEditando(true)}
+            title={
+              viaje.distancia_km_override
+                ? "Distancia diferente a la del detalle"
+                : "Distancia del detalle"
+            }
+          >
+            {viaje.distancia_km_override
+              ? `${fmt2(viaje.distancia_km_override)} km`
+              : `${fmt2(detalle?.distancia_km)} km`}
+            {viaje.distancia_km_override && (
+              <span className="tev__override-indicator">*</span>
+            )}
+          </span>
+        )}
+      </td>
+
+      {/* Precio m3 efectivo — solo lectura */}
+      <td className="tev__td tev__td--calculado">
+        <span
+          className={`tev__valor ${viaje.precio_m3_override ? "tev__valor--override" : ""}`}
+        >
+          {fmtMoneda(precioEfectivo)}
+        </span>
+        {viaje.precio_m3_override && (
+          <span className="tev__sub tev__sub--override">
+            Base: {fmtMoneda(viaje.precio_m3)}
+          </span>
+        )}
+      </td>
+
+      {/* Costo efectivo — calculado */}
+      <td className="tev__td tev__td--costo">
+        <span
+          className={`tev__costo ${viaje.costo_viaje_override != null ? "tev__costo--override" : ""}`}
+        >
+          {fmtMoneda(costoEfectivo)}
+        </span>
+      </td>
+
+      {/* Acciones */}
+      <td className="tev__td tev__td--acciones">
+        {!marcadoEliminar ? (
+          <div className="tev__acciones">
+            {!editando && !esNuevo && (
+              <button
+                type="button"
+                className="tev__btn tev__btn--editar"
+                onClick={() => setEditando(true)}
+                title="Editar viaje"
+              >
+                <Edit3 size={14} />
+              </button>
+            )}
+            {editando && !esNuevo && (
+              <button
+                type="button"
+                className="tev__btn tev__btn--listo"
+                onClick={() => setEditando(false)}
+                title="Confirmar cambios"
+              >
+                Listo
+              </button>
+            )}
+            <button
+              type="button"
+              className="tev__btn tev__btn--eliminar"
+              onClick={() => onEliminar(viaje.id_viaje)}
+              title="Eliminar viaje"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="tev__btn tev__btn--restaurar"
+            onClick={() => onCancelarEliminacion(viaje.id_viaje)}
+            title="Cancelar eliminación"
+          >
+            <RotateCcw size={14} />
+            Restaurar
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+};
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 const TablaEditarViajes = ({
   detalle,
   viajes,
   pesoEspecifico,
+  tipoMaterial,
+  bancos,
   viajesAEliminar,
   viajesNuevos,
   loading,
@@ -212,9 +447,11 @@ const TablaEditarViajes = ({
   onCancelarEliminacion,
   calcularTotalesDetalle,
 }) => {
-  // Estado local para edición de distancia
+  // Estado local para edición de distancia del detalle (tipo 1 y 2)
   const [editandoDistancia, setEditandoDistancia] = useState(false);
   const [distanciaInput, setDistanciaInput] = useState("");
+
+  const esTipo3 = tipoMaterial === 3;
 
   const handleIniciarEditarDistancia = () => {
     setDistanciaInput(String(detalle?.distancia_km ?? ""));
@@ -245,9 +482,7 @@ const TablaEditarViajes = ({
   if (!detalle) return null;
 
   const totales = calcularTotalesDetalle();
-  const viajesVisibles = viajes.filter(
-    (v) => !viajesAEliminar.has(v.id_viaje) || true,
-  );
+  const viajesVisibles = viajes;
 
   return (
     <div className="tev__contenedor">
@@ -260,12 +495,15 @@ const TablaEditarViajes = ({
               {detalle.material?.material ?? "—"}
             </span>
           </div>
+
+          {/* Banco del detalle — siempre visible */}
           <div className="tev__info-item">
             <span className="tev__info-label">Banco</span>
             <span className="tev__info-valor">
               {detalle.bancos?.banco ?? "—"}
             </span>
           </div>
+
           <div className="tev__info-item">
             <span className="tev__info-label">Capacidad</span>
             <span className="tev__info-valor">
@@ -273,10 +511,10 @@ const TablaEditarViajes = ({
             </span>
           </div>
 
-          {/* Distancia — editable */}
+          {/* Distancia del detalle — editable solo en tipo 1 y 2 */}
           <div className="tev__info-item">
             <span className="tev__info-label">Distancia</span>
-            {editandoDistancia ? (
+            {!esTipo3 && editandoDistancia ? (
               <div className="tev__distancia-edit">
                 <input
                   type="number"
@@ -305,12 +543,12 @@ const TablaEditarViajes = ({
               </div>
             ) : (
               <span
-                className="tev__info-valor tev__info-valor--editable"
-                onClick={handleIniciarEditarDistancia}
-                title="Clic para editar distancia"
+                className={`tev__info-valor ${!esTipo3 ? "tev__info-valor--editable" : ""}`}
+                onClick={!esTipo3 ? handleIniciarEditarDistancia : undefined}
+                title={!esTipo3 ? "Clic para editar distancia" : undefined}
               >
                 {fmt2(detalle.distancia_km)} km
-                <Edit3 size={11} className="tev__icono-editar" />
+                {!esTipo3 && <Edit3 size={11} className="tev__icono-editar" />}
               </span>
             )}
           </div>
@@ -322,7 +560,8 @@ const TablaEditarViajes = ({
             </span>
           </div>
 
-          {pesoEspecifico && (
+          {/* Peso específico — solo tipo 1 y 2 */}
+          {!esTipo3 && pesoEspecifico && (
             <div className="tev__info-item">
               <span className="tev__info-label">Peso específico</span>
               <span className="tev__info-valor">
@@ -332,13 +571,21 @@ const TablaEditarViajes = ({
           )}
         </div>
 
-        {/* Aviso si se edita distancia */}
+        {/* Aviso contextual según tipo */}
         <div className="tev__aviso-distancia">
           <Info size={13} />
-          <span>
-            Editar la distancia recalcula el precio/m³ y el costo de todos los
-            viajes.
-          </span>
+          {esTipo3 ? (
+            <span>
+              Tipo 3: edita el volumen m³ por viaje. Banco y distancia son
+              opcionales — se usan para calcular un precio diferente al del
+              detalle.
+            </span>
+          ) : (
+            <span>
+              Editar la distancia recalcula el precio/m³ y el costo de todos los
+              viajes.
+            </span>
+          )}
         </div>
       </div>
 
@@ -346,21 +593,36 @@ const TablaEditarViajes = ({
       <div className="tev__tabla-wrapper">
         <table className="tev__tabla">
           <thead>
-            <tr className="tev__thead-fila">
-              <th className="tev__th tev__th--angosto">Viaje</th>
-              <th className="tev__th">Folio Físico</th>
-              <th className="tev__th">Toneladas</th>
-              <th className="tev__th tev__th--calculado">
-                Volumen m³
-                <span className="tev__th-sub">calculado</span>
-              </th>
-              <th className="tev__th tev__th--calculado">
-                Precio/m³
-                <span className="tev__th-sub">calculado</span>
-              </th>
-              <th className="tev__th tev__th--costo">Costo</th>
-              <th className="tev__th tev__th--acciones">Acciones</th>
-            </tr>
+            {esTipo3 ? (
+              <tr className="tev__thead-fila">
+                <th className="tev__th tev__th--angosto">Viaje</th>
+                <th className="tev__th">Volumen m³</th>
+                <th className="tev__th">Banco</th>
+                <th className="tev__th">Distancia</th>
+                <th className="tev__th tev__th--calculado">
+                  Precio/m³
+                  <span className="tev__th-sub">calculado</span>
+                </th>
+                <th className="tev__th tev__th--costo">Costo</th>
+                <th className="tev__th tev__th--acciones">Acciones</th>
+              </tr>
+            ) : (
+              <tr className="tev__thead-fila">
+                <th className="tev__th tev__th--angosto">Viaje</th>
+                <th className="tev__th">Folio Físico</th>
+                <th className="tev__th">Toneladas</th>
+                <th className="tev__th tev__th--calculado">
+                  Volumen m³
+                  <span className="tev__th-sub">calculado</span>
+                </th>
+                <th className="tev__th tev__th--calculado">
+                  Precio/m³
+                  <span className="tev__th-sub">calculado</span>
+                </th>
+                <th className="tev__th tev__th--costo">Costo</th>
+                <th className="tev__th tev__th--acciones">Acciones</th>
+              </tr>
+            )}
           </thead>
           <tbody>
             {viajesVisibles.length === 0 ? (
@@ -372,9 +634,23 @@ const TablaEditarViajes = ({
                   </span>
                 </td>
               </tr>
+            ) : esTipo3 ? (
+              viajesVisibles.map((viaje) => (
+                <FilaViajeT3
+                  key={viaje.id_viaje}
+                  viaje={viaje}
+                  marcadoEliminar={viajesAEliminar.has(viaje.id_viaje)}
+                  esNuevo={viajesNuevos.has(viaje.id_viaje)}
+                  onEditarCampo={onEditarCampoViaje}
+                  onEliminar={onEliminarViaje}
+                  onCancelarEliminacion={onCancelarEliminacion}
+                  bancos={bancos}
+                  detalle={detalle}
+                />
+              ))
             ) : (
               viajesVisibles.map((viaje) => (
-                <FilaViaje
+                <FilaViajeT1T2
                   key={viaje.id_viaje}
                   viaje={viaje}
                   marcadoEliminar={viajesAEliminar.has(viaje.id_viaje)}
@@ -401,13 +677,27 @@ const TablaEditarViajes = ({
                   }{" "}
                   viajes activos)
                 </td>
-                <td className="tev__totales-valor">
-                  {fmt2(totales.peso_ton)} ton
-                </td>
-                <td className="tev__totales-valor">
-                  {fmt3(totales.volumen_real_m3)} m³
-                </td>
-                <td />
+                {esTipo3 ? (
+                  <>
+                    {/* Tipo 3: mostrar volumen total, sin peso */}
+                    <td className="tev__totales-valor">
+                      {fmt3(totales.volumen_real_m3)} m³
+                    </td>
+                    <td />
+                    <td />
+                  </>
+                ) : (
+                  <>
+                    {/* Tipo 1 y 2: mostrar peso y volumen */}
+                    <td className="tev__totales-valor">
+                      {fmt2(totales.peso_ton)} ton
+                    </td>
+                    <td className="tev__totales-valor">
+                      {fmt3(totales.volumen_real_m3)} m³
+                    </td>
+                    <td />
+                  </>
+                )}
                 <td className="tev__totales-costo">
                   {fmtMoneda(totales.costo_total)}
                 </td>

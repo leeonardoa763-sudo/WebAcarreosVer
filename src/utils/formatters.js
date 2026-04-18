@@ -111,15 +111,18 @@ export const formatearFechaHora = (fecha) => {
   if (!fecha) return { fecha: "N/A", hora: "N/A" };
 
   try {
-    // Fecha: sin conversión de zona horaria
-    const fechaFormateada = formatearFechaCorta(fecha);
-
-    // Hora: con zona horaria México
     const date = new Date(fecha);
-    if (isNaN(date.getTime())) {
-      return { fecha: "Fecha inválida", hora: "" };
-    }
+    if (isNaN(date.getTime())) return { fecha: "Fecha inválida", hora: "" };
 
+    // Fecha: extraer en zona horaria México para evitar desfase de día
+    const fechaFormateada = date.toLocaleDateString("es-MX", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      timeZone: "America/Mexico_City",
+    });
+
+    // Hora: con zona horaria México (sin cambio)
     const hora = date.toLocaleTimeString("es-MX", {
       hour: "2-digit",
       minute: "2-digit",

@@ -1,7 +1,7 @@
 /**
  * src/components/vales/editar/ModalEditarVale.jsx
  *
- * Modal contenedor para la edición de viajes de un vale de material tipo 1.
+ * Modal contenedor para la edición de viajes de un vale de material tipo 1, 2 y 3.
  * Se abre desde ValeCardMaterial. Solo visible para Administrador.
  *
  * Responsabilidades:
@@ -41,6 +41,19 @@ import TablaEditarViajes from "./TablaEditarViajes";
 // 6. Estilos
 import "../../../styles/modal-editar-vale.css";
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Retorna el subtítulo descriptivo según el tipo de material.
+ */
+const getSubtituloTipo = (tipoMaterial, folioVale) => {
+  if (folioVale) return `Folio: ${folioVale}`;
+  if (tipoMaterial === 1) return "Tipo 1 — Materiales Pétreos";
+  if (tipoMaterial === 2) return "Tipo 2 — Base Asfáltica";
+  if (tipoMaterial === 3) return "Tipo 3 — Producto de Corte / Tepetate";
+  return "Material";
+};
+
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 const ModalEditarVale = ({
@@ -59,6 +72,8 @@ const ModalEditarVale = ({
     detalle,
     viajes,
     pesoEspecifico,
+    tipoMaterial,
+    bancos,
     loading,
     guardando,
     error,
@@ -141,9 +156,7 @@ const ModalEditarVale = ({
             <div>
               <h2 className="mev__titulo">Editar viajes del vale</h2>
               <p className="mev__subtitulo">
-                {folioVale
-                  ? `Folio: ${folioVale}`
-                  : "Material tipo 1 — Materiales Pétreos"}
+                {getSubtituloTipo(tipoMaterial, folioVale)}
               </p>
             </div>
           </div>
@@ -196,6 +209,8 @@ const ModalEditarVale = ({
             detalle={detalle}
             viajes={viajes}
             pesoEspecifico={pesoEspecifico}
+            tipoMaterial={tipoMaterial}
+            bancos={bancos}
             viajesAEliminar={viajesAEliminar}
             viajesNuevos={viajesNuevos}
             loading={loading}

@@ -91,10 +91,10 @@ const ValePreview = ({ vale }) => {
       return null;
     }
 
-    // Separar por tipo de material y convertir a número
+    // Tipo 3 (Tepetate): cantidad_pedida_m3 es siempre null → usar volumen_real_m3
     const totalM3Tipo3 = vale.vale_material_detalles
       .filter((d) => d.material?.tipo_de_material?.id_tipo_de_material === 3)
-      .reduce((sum, d) => sum + Number(d.cantidad_pedida_m3 || 0), 0);
+      .reduce((sum, d) => sum + Number(d.volumen_real_m3 || 0), 0);
 
     const totalM3Otros = vale.vale_material_detalles
       .filter((d) => d.material?.tipo_de_material?.id_tipo_de_material !== 3)
