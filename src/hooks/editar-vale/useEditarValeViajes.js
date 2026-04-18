@@ -99,6 +99,8 @@ export const useEditarValeViajes = () => {
 
   // IDs de viajes marcados para eliminar
   const [viajesAEliminar, setViajesAEliminar] = useState(new Set());
+  // Notas adicionales del detalle (editable)
+  const [notasAdicionales, setNotasAdicionales] = useState("");
 
   // Estados de carga y error
   const [loading, setLoading] = useState(false);
@@ -223,6 +225,7 @@ export const useEditarValeViajes = () => {
       ].sort((a, b) => a.numero_viaje - b.numero_viaje);
 
       setDetalle(dataDetalle);
+      setNotasAdicionales(dataDetalle.notas_adicionales || "");
       setViajesOriginales(viajesOrdenados);
       setViajes(viajesOrdenados.map((v) => ({ ...v })));
       setPesoEspecifico(pesoEsp);
@@ -698,11 +701,10 @@ export const useEditarValeViajes = () => {
         const camposDetalle = {
           volumen_real_m3: totales.volumen_real_m3,
           costo_total: totales.costo_total,
-          // Actualizar distancia y precio_m3 del detalle
           distancia_km: Number(detalle.distancia_km),
           precio_m3: Number(detalle.precio_m3),
+          notas_adicionales: notasAdicionales.trim() || null,
         };
-
         // Tipo 1 y 2: también actualizar peso_ton total
         if (!esTipo3) {
           camposDetalle.peso_ton = totales.peso_ton;
@@ -767,7 +769,8 @@ export const useEditarValeViajes = () => {
   const hayCambiosPendientes =
     viajesEditados.size > 0 ||
     viajesNuevos.size > 0 ||
-    viajesAEliminar.size > 0;
+    viajesAEliminar.size > 0 ||
+    notasAdicionales !== (detalle?.notas_adicionales || "");
 
   return {
     // Datos
@@ -776,6 +779,10 @@ export const useEditarValeViajes = () => {
     pesoEspecifico,
     tipoMaterial,
     bancos,
+
+    // Notas
+    notasAdicionales,
+    setNotasAdicionales,
 
     // Flags
     loading,

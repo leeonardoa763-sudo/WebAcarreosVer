@@ -85,10 +85,21 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
    * Calcular costo total del vale sumando todos los detalles
    */
   const calcularCostoTotal = () => {
-    return vale.vale_material_detalles.reduce(
-      (sum, detalle) => sum + Number(detalle.costo_total || 0),
-      0,
-    );
+    return vale.vale_material_detalles.reduce((sum, detalle) => {
+      const idTipo = detalle.material?.tipo_de_material?.id_tipo_de_material;
+      const esTipo3Det = idTipo === 3;
+
+      if (esTipo3Det) {
+        // Recalcular desde viajes para reflejar overrides correctamente
+        const costoViajes = (detalle.vale_material_viajes || []).reduce(
+          (s, v) => s + Number(v.costo_viaje_override ?? v.costo_viaje ?? 0),
+          0,
+        );
+        return sum + costoViajes;
+      }
+
+      return sum + Number(detalle.costo_total || 0);
+    }, 0);
   };
 
   /**
@@ -356,7 +367,19 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
 
                 const volumen = Number(detalle.volumen_real_m3 || 0);
                 const precioM3 = Number(detalle.precio_m3 || 0);
-                const costoTotal = Number(detalle.costo_total || 0);
+                // Para tipo 3: recalcular desde viajes para reflejar overrides correctamente
+                const viajesDetalleTemp = esTipo3
+                  ? detalle.vale_material_viajes || []
+                  : [];
+
+                const costoTotal = esTipo3
+                  ? viajesDetalleTemp.reduce(
+                      (sum, v) =>
+                        sum +
+                        Number(v.costo_viaje_override ?? v.costo_viaje ?? 0),
+                      0,
+                    )
+                  : Number(detalle.costo_total || 0);
 
                 // Solo tipo 1 y 2 muestran peso
                 const pesoTon = esTipo3 ? 0 : Number(detalle.peso_ton || 0);

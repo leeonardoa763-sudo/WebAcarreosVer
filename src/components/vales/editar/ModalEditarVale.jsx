@@ -74,6 +74,8 @@ const ModalEditarVale = ({
     pesoEspecifico,
     tipoMaterial,
     bancos,
+    notasAdicionales,
+    setNotasAdicionales,
     loading,
     guardando,
     error,
@@ -221,6 +223,26 @@ const ModalEditarVale = ({
             onCancelarEliminacion={cancelarEliminacion}
             calcularTotalesDetalle={calcularTotalesDetalle}
           />
+
+          {/* ── Notas adicionales ────────────────────────────────────── */}
+          <div className="mev__notas-section">
+            <label className="mev__notas-label" htmlFor="mev-notas">
+              Notas adicionales
+            </label>
+            <textarea
+              id="mev-notas"
+              className="mev__notas-textarea"
+              value={notasAdicionales}
+              onChange={(e) => setNotasAdicionales(e.target.value)}
+              placeholder="Escribe observaciones o notas del vale..."
+              maxLength={500}
+              rows={3}
+              disabled={guardando}
+            />
+            <span className="mev__notas-contador">
+              {notasAdicionales.length}/500
+            </span>
+          </div>
         </div>
 
         {/* ── Footer con acciones ──────────────────────────────────────── */}
