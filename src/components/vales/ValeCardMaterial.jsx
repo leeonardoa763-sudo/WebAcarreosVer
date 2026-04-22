@@ -111,6 +111,20 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
       ? Number(viaje.costo_viaje_override)
       : Number(viaje.costo_viaje || 0);
 
+  const fmtRegistrador = (persona) => {
+    if (!persona) return null;
+    return `${persona.nombre || ""} ${persona.primer_apellido || ""}`.trim() || null;
+  };
+
+  const fmtTarifaTooltip = (viaje) => {
+    const parts = [];
+    if (viaje.tarifa_primer_km != null)
+      parts.push(`1er km: ${formatearMoneda(viaje.tarifa_primer_km)}/m³`);
+    if (viaje.tarifa_subsecuente != null)
+      parts.push(`Subsec.: ${formatearMoneda(viaje.tarifa_subsecuente)}/m³`);
+    return parts.join("\n") || undefined;
+  };
+
   return (
     <div className="vale-card-compact">
       {/* Vista compacta */}
@@ -548,12 +562,13 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                           Registro de Viajes ({viajesDetalle.length})
                         </h5>
 
-                        {/* Header tipo 3: viaje, banco, distancia, m3, costo */}
+                        {/* Header tipo 3: viaje, banco, distancia, m3, precio, costo */}
                         <div className="vale-card__viajes-tabla-header vale-card__viajes-tabla-header--tipo3">
                           <span>Viaje</span>
                           <span>Banco</span>
                           <span>Dist.</span>
                           <span>M³</span>
+                          <span>Precio/m³</span>
                           <span>Costo</span>
                         </div>
 
@@ -572,6 +587,11 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                                 viaje.distancia_km_override ??
                                 detalle.distancia_km;
                               const costoEfectivo = getCostoEfectivo(viaje);
+                              const precioEfectivo =
+                                viaje.precio_m3_override ?? viaje.precio_m3;
+                              const registrador = fmtRegistrador(
+                                viaje.persona_registro,
+                              );
 
                               return (
                                 <div
@@ -579,13 +599,23 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                                   className={`vale-card__viaje-item vale-card__viaje-item--tipo3 ${tieneOverride ? "vale-card__viaje-item--override" : ""}`}
                                 >
                                   <span className="vale-card__viaje-numero">
-                                    #{viaje.numero_viaje}
-                                    {tieneOverride && (
+                                    <span>
+                                      #{viaje.numero_viaje}
+                                      {tieneOverride && (
+                                        <span
+                                          className="vale-card__override-dot"
+                                          title="Banco o distancia diferente al detalle"
+                                        >
+                                          *
+                                        </span>
+                                      )}
+                                    </span>
+                                    {registrador && (
                                       <span
-                                        className="vale-card__override-dot"
-                                        title="Banco o distancia diferente al detalle"
+                                        className="vale-card__viaje-registrador"
+                                        title={`Registrado por ${registrador}`}
                                       >
-                                        *
+                                        {registrador}
                                       </span>
                                     )}
                                   </span>
@@ -602,6 +632,14 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                                       ? formatearVolumen(
                                           Number(viaje.volumen_m3),
                                         )
+                                      : "—"}
+                                  </span>
+                                  <span
+                                    className="vale-card__viaje-precio"
+                                    title={fmtTarifaTooltip(viaje)}
+                                  >
+                                    {precioEfectivo != null
+                                      ? formatearMoneda(Number(precioEfectivo))
                                       : "—"}
                                   </span>
                                   <span className="vale-card__viaje-costo">
@@ -651,48 +689,74 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
                         <div className="vale-card__viajes-tabla-header">
                           <span>Viaje</span>
                           <span>Hora</span>
-                          <span>Folio Físico</span>
-                          <span>Toneladas</span>
+                          <span>Folio</span>
+                          <span>Ton</span>
                           <span>M³</span>
+                          <span>Precio/m³</span>
                           <span>Costo</span>
                         </div>
 
                         <div className="vale-card__viajes-lista">
                           {[...viajesDetalle]
                             .sort((a, b) => a.numero_viaje - b.numero_viaje)
-                            .map((viaje) => (
-                              <div
-                                key={viaje.id_viaje}
-                                className="vale-card__viaje-item vale-card__viaje-item--material"
-                              >
-                                <span className="vale-card__viaje-numero">
-                                  #{viaje.numero_viaje}
-                                </span>
-                                <span className="vale-card__viaje-hora">
-                                  {viaje.hora_registro
-                                    ? formatearHora(viaje.hora_registro)
-                                    : "—"}
-                                </span>
-                                <span className="vale-card__viaje-folio">
-                                  {viaje.folio_vale_fisico || "—"}
-                                </span>
-                                <span className="vale-card__viaje-ton">
-                                  {viaje.peso_ton
-                                    ? `${Number(viaje.peso_ton).toFixed(2)} ton`
-                                    : "—"}
-                                </span>
-                                <span className="vale-card__viaje-m3">
-                                  {viaje.volumen_m3
-                                    ? formatearVolumen(Number(viaje.volumen_m3))
-                                    : "—"}
-                                </span>
-                                <span className="vale-card__viaje-costo">
-                                  {viaje.costo_viaje
-                                    ? formatearMoneda(Number(viaje.costo_viaje))
-                                    : "—"}
-                                </span>
-                              </div>
-                            ))}
+                            .map((viaje) => {
+                              const registrador = fmtRegistrador(
+                                viaje.persona_registro,
+                              );
+                              return (
+                                <div
+                                  key={viaje.id_viaje}
+                                  className="vale-card__viaje-item vale-card__viaje-item--material"
+                                >
+                                  <span className="vale-card__viaje-numero">
+                                    #{viaje.numero_viaje}
+                                    {registrador && (
+                                      <span
+                                        className="vale-card__viaje-registrador"
+                                        title={`Registrado por ${registrador}`}
+                                      >
+                                        {registrador}
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="vale-card__viaje-hora">
+                                    {viaje.hora_registro
+                                      ? formatearHora(viaje.hora_registro)
+                                      : "—"}
+                                  </span>
+                                  <span className="vale-card__viaje-folio">
+                                    {viaje.folio_vale_fisico || "—"}
+                                  </span>
+                                  <span className="vale-card__viaje-ton">
+                                    {viaje.peso_ton
+                                      ? `${Number(viaje.peso_ton).toFixed(2)} ton`
+                                      : "—"}
+                                  </span>
+                                  <span className="vale-card__viaje-m3">
+                                    {viaje.volumen_m3
+                                      ? formatearVolumen(
+                                          Number(viaje.volumen_m3),
+                                        )
+                                      : "—"}
+                                  </span>
+                                  <span
+                                    className="vale-card__viaje-precio"
+                                    title={fmtTarifaTooltip(viaje)}
+                                  >
+                                    {viaje.precio_m3
+                                      ? formatearMoneda(Number(viaje.precio_m3))
+                                      : "—"}
+                                  </span>
+                                  <span className="vale-card__viaje-costo">
+                                    {viaje.costo_viaje
+                                      ? formatearMoneda(
+                                          Number(viaje.costo_viaje),
+                                        )
+                                      : "—"}
+                                  </span>
+                                </div>
+                              );
+                            })}
                         </div>
 
                         <div className="vale-card__viajes-totales">

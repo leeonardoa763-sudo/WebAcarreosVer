@@ -99,8 +99,15 @@ export const useEditarValeViajes = () => {
 
   // IDs de viajes marcados para eliminar
   const [viajesAEliminar, setViajesAEliminar] = useState(new Set());
+
   // Notas adicionales del detalle (editable)
   const [notasAdicionales, setNotasAdicionales] = useState("");
+
+  // Datos del vale padre (para el panel de información)
+  const [vale, setVale] = useState(null);
+
+  // Conciliación vinculada al vale (si estado === 'conciliado')
+  const [conciliacion, setConciliacion] = useState(null);
 
   // Estados de carga y error
   const [loading, setLoading] = useState(false);
@@ -124,6 +131,8 @@ export const useEditarValeViajes = () => {
       setViajesEditados(new Set());
       setViajesNuevos(new Set());
       setViajesAEliminar(new Set());
+      setVale(null);
+      setConciliacion(null);
 
       // 1. Cargar detalle con viajes — incluye campos override para tipo 3
       const { data: dataDetalle, error: errorDetalle } = await supabase
@@ -179,6 +188,10 @@ export const useEditarValeViajes = () => {
             bancos_override:id_banco_override (
               id_banco,
               banco
+            ),
+            persona_registro:id_persona_registro (
+              nombre,
+              primer_apellido
             )
           )
         `,
@@ -229,6 +242,50 @@ export const useEditarValeViajes = () => {
       setViajesOriginales(viajesOrdenados);
       setViajes(viajesOrdenados.map((v) => ({ ...v })));
       setPesoEspecifico(pesoEsp);
+
+      // 3. Cargar datos del vale padre (fechas, responsables)
+      const { data: dataVale } = await supabase
+        .from("vales")
+        .select(
+          `
+          folio,
+          estado,
+          fecha_creacion,
+          fecha_verificacion,
+          fecha_completado,
+          fecha_cancelacion,
+          motivo_cancelacion,
+          persona_creador:id_persona_creador (nombre, primer_apellido, segundo_apellido),
+          persona_completador:id_persona_completador (nombre, primer_apellido, segundo_apellido),
+          persona_verificador:id_persona_verificador (nombre, primer_apellido, segundo_apellido)
+        `,
+        )
+        .eq("id_vale", dataDetalle.id_vale)
+        .single();
+
+      if (dataVale) {
+        setVale(dataVale);
+
+        // 4. Si está conciliado, buscar la conciliación vinculada
+        if (dataVale.estado === "conciliado") {
+          const { data: dataConc } = await supabase
+            .from("conciliacion_vales")
+            .select(
+              `
+              conciliaciones (
+                folio,
+                fecha_inicio,
+                fecha_fin,
+                fecha_generacion
+              )
+            `,
+            )
+            .eq("id_vale", dataDetalle.id_vale)
+            .maybeSingle();
+
+          setConciliacion(dataConc?.conciliaciones || null);
+        }
+      }
     } catch (err) {
       console.error("Error en cargarDetalle:", err);
       setError(err.message);
@@ -743,6 +800,7 @@ export const useEditarValeViajes = () => {
       viajesAEliminar,
       pesoEspecifico,
       tipoMaterial,
+      notasAdicionales,
       calcularTotalesDetalle,
       cargarDetalle,
     ],
@@ -757,6 +815,7 @@ export const useEditarValeViajes = () => {
     if (!detalle) return;
     setViajes(viajesOriginales.map((v) => ({ ...v })));
     setDetalle((prev) => ({ ...prev }));
+    setNotasAdicionales(detalle.notas_adicionales || "");
     setViajesEditados(new Set());
     setViajesNuevos(new Set());
     setViajesAEliminar(new Set());
@@ -779,6 +838,8 @@ export const useEditarValeViajes = () => {
     pesoEspecifico,
     tipoMaterial,
     bancos,
+    vale,
+    conciliacion,
 
     // Notas
     notasAdicionales,

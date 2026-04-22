@@ -11,7 +11,7 @@
  * Usado en: generarPDFConciliacionMaterialPetreo.jsx
  */
 
-import { Document, Page, View, Text, Font } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Font, Image } from "@react-pdf/renderer";
 
 // Estilos
 import { sharedStyles } from "../shared/styles/sharedStyles";
@@ -55,6 +55,7 @@ const PDFConciliacionMaterialPetreo = ({
   conciliacion,
   valesAgrupados,
   totales,
+  qrDataUrl,
 }) => {
   const totalViajes =
     (totales.totalViajesTipo1 || 0) + (totales.totalViajesTipo2 || 0);
@@ -370,6 +371,32 @@ const PDFConciliacionMaterialPetreo = ({
             </Text>
           </View>
         </View>
+
+        {/* QR DE SOPORTE */}
+        {qrDataUrl && (
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              gap: 6,
+              marginTop: 8,
+              marginBottom: 30,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 6,
+                color: "#555555",
+                textAlign: "right",
+                lineHeight: 1.4,
+              }}
+            >
+              Escanea para ver{"\n"}soporte de vales
+            </Text>
+            <Image src={qrDataUrl} style={{ width: 48, height: 48 }} />
+          </View>
+        )}
 
         {/* FOOTER */}
         <Text style={sharedStyles.footer}>

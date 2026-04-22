@@ -30,6 +30,11 @@ import { colors } from "../../../config/colors";
 
 // ─── Helpers de formato ───────────────────────────────────────────────────────
 
+const fmtRegistrador = (persona) => {
+  if (!persona) return null;
+  return `${persona.nombre || ""} ${persona.primer_apellido || ""}`.trim();
+};
+
 const fmt2 = (n) =>
   n !== null && n !== undefined && !isNaN(Number(n))
     ? Number(n).toFixed(2)
@@ -71,11 +76,18 @@ const FilaViajeT1T2 = ({
         ? "tev__fila tev__fila--editando"
         : "tev__fila";
 
+  const registrador = fmtRegistrador(viaje.persona_registro);
+
   return (
     <tr className={claseFila}>
       {/* Número de viaje */}
       <td className="tev__td tev__td--centro">
         <span className="tev__numero-viaje">#{viaje.numero_viaje}</span>
+        {registrador && !esNuevo && (
+          <span className="tev__registrador" title={`Registrado por ${registrador}`}>
+            {registrador}
+          </span>
+        )}
         {esNuevo && <span className="tev__badge tev__badge--nuevo">Nuevo</span>}
         {marcadoEliminar && (
           <span className="tev__badge tev__badge--eliminar">Por eliminar</span>
@@ -225,11 +237,18 @@ const FilaViajeT3 = ({
   const costoEfectivo = viaje.costo_viaje_override ?? viaje.costo_viaje;
   const tieneOverride = viaje.id_banco_override || viaje.distancia_km_override;
 
+  const registrador = fmtRegistrador(viaje.persona_registro);
+
   return (
     <tr className={claseFila}>
       {/* Número de viaje */}
       <td className="tev__td tev__td--centro">
         <span className="tev__numero-viaje">#{viaje.numero_viaje}</span>
+        {registrador && !esNuevo && (
+          <span className="tev__registrador" title={`Registrado por ${registrador}`}>
+            {registrador}
+          </span>
+        )}
         {esNuevo && <span className="tev__badge tev__badge--nuevo">Nuevo</span>}
         {marcadoEliminar && (
           <span className="tev__badge tev__badge--eliminar">Por eliminar</span>

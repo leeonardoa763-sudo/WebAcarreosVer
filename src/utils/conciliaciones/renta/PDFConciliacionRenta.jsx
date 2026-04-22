@@ -13,7 +13,7 @@
  * Usado en: generarPDFConciliacionRenta.jsx
  */
 
-import { Document, Page, View, Text, Font } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Font, Image } from "@react-pdf/renderer";
 
 // Estilos
 import { sharedStyles } from "../shared/styles/sharedStyles";
@@ -74,7 +74,7 @@ const obtenerFechaEfectiva = (vale) => {
 // COMPONENTE PRINCIPAL
 // ========================================
 
-const PDFConciliacionRenta = ({ conciliacion, valesAgrupados, totales }) => {
+const PDFConciliacionRenta = ({ conciliacion, valesAgrupados, totales, qrDataUrl }) => {
   return (
     <Document>
       <Page size="LETTER" style={sharedStyles.page}>
@@ -325,6 +325,34 @@ const PDFConciliacionRenta = ({ conciliacion, valesAgrupados, totales }) => {
             </Text>
           </View>
         </View>
+
+        {/* ========================================
+            QR DE SOPORTE
+            ======================================== */}
+        {qrDataUrl && (
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              gap: 6,
+              marginTop: 8,
+              marginBottom: 30,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 6,
+                color: "#555555",
+                textAlign: "right",
+                lineHeight: 1.4,
+              }}
+            >
+              Escanea para ver{"\n"}soporte de vales
+            </Text>
+            <Image src={qrDataUrl} style={{ width: 48, height: 48 }} />
+          </View>
+        )}
 
         {/* ========================================
             FOOTER

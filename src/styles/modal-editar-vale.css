@@ -38,7 +38,7 @@
     0 24px 60px rgba(0, 0, 0, 0.2),
     0 8px 24px rgba(0, 0, 0, 0.12);
   width: 100%;
-  max-width: 900px;
+  max-width: 1100px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
@@ -173,6 +173,139 @@
   flex: 1;
   overflow-y: auto;
   padding: 0;
+}
+
+/* ── Layout 2 columnas ─────────────────────────────────────────── */
+
+.mev__layout {
+  display: flex;
+  align-items: flex-start;
+  min-height: 100%;
+}
+
+.mev__layout-izq {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Panel de información del vale (columna derecha) ─────────── */
+
+.mev__panel-info {
+  width: 250px;
+  flex-shrink: 0;
+  border-left: 1px solid #f0f1f4;
+  background: #fafbfc;
+  padding: 16px 14px;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  min-height: 100%;
+}
+
+.mev__panel-info-header {
+  margin-bottom: 12px;
+}
+
+.mev__panel-info-titulo {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.mev__panel-info-folio {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.mev__info-estado {
+  margin-bottom: 14px;
+}
+
+.mev__info-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mev__info-grupo {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.mev__info-grupo:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.mev__info-grupo-titulo {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.mev__info-fila {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.mev__info-fila:last-child {
+  margin-bottom: 0;
+}
+
+.mev__info-icono {
+  flex-shrink: 0;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.mev__info-contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.mev__info-label {
+  font-size: 10px;
+  color: #9ca3af;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.mev__info-valor {
+  font-size: 12px;
+  color: #374151;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.mev__info-motivo {
+  font-size: 12px;
+  color: #DC2626;
+  margin: 0;
+  line-height: 1.4;
+  font-style: italic;
+}
+
+.mev__info-grupo--conciliacion .mev__info-grupo-titulo {
+  color: #7C3AED;
 }
 
 /* ========================================
@@ -1005,6 +1138,19 @@
   font-size: 14px;
 }
 
+/* ── Registrador del viaje (sub-línea bajo número) ─────────── */
+.tev__registrador {
+  display: block;
+  font-size: 10px;
+  color: #9ca3af;
+  font-weight: 500;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+}
+
 /* Responsive */
 @media (max-width: 520px) {
   .mer__opciones-grid {
@@ -1013,6 +1159,19 @@
 
   .mer__tarifa-item {
     font-size: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .mev__layout {
+    flex-direction: column;
+  }
+
+  .mev__panel-info {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #f0f1f4;
+    position: static;
   }
 }
 

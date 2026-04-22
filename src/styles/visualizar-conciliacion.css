@@ -1,0 +1,736 @@
+/**
+ * src/styles/visualizar-conciliacion.css
+ *
+ * Estilos para la página pública de soporte de conciliaciones
+ *
+ * Diseño tipo "documento" vertical responsive
+ * Prefijo BEM: vc__ (VisualizarConciliacion)
+ */
+
+/* ========================================
+   PÁGINA PRINCIPAL
+   ======================================== */
+
+.vc-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a3a5c 0%, #0d2137 100%);
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* ========================================
+   CONTAINER
+   ======================================== */
+
+.vc-container {
+  background: white;
+  max-width: 640px;
+  width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  position: relative;
+  animation: vcSlideIn 0.3s ease-out;
+  margin: 0 auto;
+}
+
+@keyframes vcSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========================================
+   MARCA DE AGUA
+   ======================================== */
+
+.vc-marca-agua {
+  background: #1a3a5c;
+  color: white;
+  text-align: center;
+  padding: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+/* ========================================
+   HEADER
+   ======================================== */
+
+.vc-header {
+  padding: 20px;
+  text-align: center;
+  background: #f8f9fa;
+}
+
+.vc-logo {
+  max-width: 80px;
+  max-height: 80px;
+  margin-bottom: 12px;
+  object-fit: contain;
+}
+
+.vc-empresa {
+  font-size: 16px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0 0 6px 0;
+}
+
+.vc-titulo {
+  font-size: 13px;
+  font-weight: 600;
+  color: #7f8c8d;
+  margin: 0;
+}
+
+/* ========================================
+   BADGES
+   ======================================== */
+
+.vc-badges {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 20px;
+  flex-wrap: wrap;
+}
+
+.vc-badge {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.vc-badge--tipo {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.vc-badge--estado-generada {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.vc-badge--estado-enviada {
+  background: #fef9c3;
+  color: #92400e;
+}
+
+.vc-badge--estado-pagada {
+  background: #f0fdf4;
+  color: #14532d;
+}
+
+.vc-badge--estado-cancelada {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ========================================
+   DIVISORES
+   ======================================== */
+
+.vc-divider {
+  border-top: 2px dashed #e0e0e0;
+  margin: 0 20px;
+}
+
+/* ========================================
+   SECCIONES
+   ======================================== */
+
+.vc-section {
+  padding: 14px 20px;
+}
+
+.vc-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0 0 10px 0;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+/* ========================================
+   FILAS DE INFORMACIÓN
+   ======================================== */
+
+.vc-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+  font-size: 13px;
+  gap: 8px;
+}
+
+.vc-info-label {
+  font-weight: 600;
+  color: #7f8c8d;
+  flex-shrink: 0;
+  min-width: 100px;
+}
+
+.vc-info-value {
+  font-weight: 400;
+  color: #2c3e50;
+  text-align: right;
+  word-break: break-word;
+}
+
+/* ========================================
+   RESUMEN FINANCIERO
+   ======================================== */
+
+.vc-financiero {
+  background: #f8faff;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 0 4px;
+}
+
+.vc-financiero-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 13px;
+}
+
+.vc-financiero-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.vc-financiero-value {
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.vc-financiero-row--retencion .vc-financiero-value {
+  color: #dc2626;
+}
+
+.vc-financiero-total {
+  border-top: 2px solid #1e40af;
+  margin-top: 6px;
+  padding-top: 6px;
+}
+
+.vc-financiero-total .vc-financiero-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e40af;
+}
+
+.vc-financiero-total .vc-financiero-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e40af;
+}
+
+/* ========================================
+   LISTA DE VALES (ACORDEÓN)
+   ======================================== */
+
+.vc-vales-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vc-vale-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Header del accordion - clickeable */
+.vc-vale-header {
+  width: 100%;
+  background: #f1f5f9;
+  border: none;
+  cursor: pointer;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  transition: background 0.15s ease;
+  font-family: inherit;
+}
+
+.vc-vale-header:hover {
+  background: #e2e8f0;
+}
+
+.vc-vale-header--expanded {
+  background: #1a3a5c;
+  color: white;
+}
+
+.vc-vale-header__left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.vc-vale-folio {
+  font-size: 13px;
+  font-weight: 700;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vc-vale-meta {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vc-vale-header--expanded .vc-vale-meta {
+  color: #94a3b8;
+}
+
+.vc-vale-header__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.vc-vale-estado {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.vc-vale-estado--emitido {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.vc-vale-estado--verificado {
+  background: #fef9c3;
+  color: #92400e;
+}
+
+.vc-vale-estado--conciliado {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.vc-vale-estado--en_proceso {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.vc-vale-chevron {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.vc-vale-header--expanded .vc-vale-chevron {
+  color: #94a3b8;
+}
+
+/* Body expandible */
+.vc-vale-body {
+  padding: 14px;
+  border-top: 1px solid #e5e7eb;
+  background: white;
+}
+
+/* ========================================
+   TIMELINE POR VALE
+   ======================================== */
+
+.vc-timeline {
+  padding: 4px 0 10px 4px;
+}
+
+.vc-timeline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  position: relative;
+  padding-bottom: 14px;
+}
+
+.vc-timeline-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 12px;
+  bottom: 0;
+  width: 2px;
+  background: #e5e7eb;
+}
+
+.vc-timeline-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 3px;
+  position: relative;
+  z-index: 1;
+  border: 2px solid white;
+  box-shadow: 0 0 0 2px currentColor;
+}
+
+.vc-timeline-item--creacion .vc-timeline-dot { background: #6b7280; color: #6b7280; }
+.vc-timeline-item--emision .vc-timeline-dot  { background: #3b82f6; color: #3b82f6; }
+.vc-timeline-item--verificacion .vc-timeline-dot { background: #eab308; color: #eab308; }
+.vc-timeline-item--conciliacion .vc-timeline-dot { background: #10b981; color: #10b981; }
+
+.vc-timeline-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.vc-timeline-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.vc-timeline-item--creacion .vc-timeline-label    { color: #6b7280; }
+.vc-timeline-item--emision .vc-timeline-label     { color: #3b82f6; }
+.vc-timeline-item--verificacion .vc-timeline-label { color: #ca8a04; }
+.vc-timeline-item--conciliacion .vc-timeline-label { color: #10b981; }
+
+.vc-timeline-fecha {
+  font-size: 12px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.vc-timeline-hora {
+  font-size: 10px;
+  color: #7f8c8d;
+}
+
+.vc-timeline-persona {
+  font-size: 10px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* ========================================
+   DATOS GENERALES DEL VALE (dentro de accordion)
+   ======================================== */
+
+.vc-vale-datos {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #e5e7eb;
+}
+
+.vc-dato-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 4px;
+  gap: 8px;
+}
+
+.vc-dato-label {
+  font-weight: 600;
+  color: #7f8c8d;
+  flex-shrink: 0;
+}
+
+.vc-dato-value {
+  color: #2c3e50;
+  text-align: right;
+  word-break: break-word;
+}
+
+/* ========================================
+   DETALLES RENTA (dentro de accordion)
+   ======================================== */
+
+.vc-renta-detalle {
+  background: #f8f9fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.vc-renta-detalle__titulo {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.vc-renta-foto {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.vc-renta-foto-placeholder {
+  width: 100%;
+  height: 70px;
+  background: #f3f4f6;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #9ca3af;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+
+.vc-renta-viajes {
+  margin-top: 8px;
+}
+
+.vc-renta-viajes__titulo {
+  font-size: 10px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.vc-renta-viaje-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 11px;
+  gap: 8px;
+}
+
+.vc-renta-viaje-item:last-child {
+  border-bottom: none;
+}
+
+.vc-renta-viaje-num {
+  font-weight: 700;
+  color: #2c3e50;
+  flex-shrink: 0;
+}
+
+.vc-renta-viaje-hora {
+  color: #6b7280;
+}
+
+.vc-renta-viaje-persona {
+  color: #6b7280;
+  font-style: italic;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ========================================
+   FOOTER DE LA PÁGINA
+   ======================================== */
+
+.vc-footer {
+  padding: 16px 20px;
+  text-align: center;
+  background: #f8f9fa;
+  border-top: 1px solid #e5e7eb;
+}
+
+.vc-footer-text {
+  font-size: 11px;
+  color: #7f8c8d;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* ========================================
+   ESTADOS DE CARGA Y ERROR
+   ======================================== */
+
+.vc-loading,
+.vc-error {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  padding: 40px;
+  text-align: center;
+  background: linear-gradient(135deg, #1a3a5c 0%, #0d2137 100%);
+  color: white;
+}
+
+.vc-loading p,
+.vc-error p {
+  font-size: 16px;
+  margin: 0;
+}
+
+.vc-error h2 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.vc-btn-volver {
+  margin-top: 16px;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  background: #1e40af;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vc-btn-volver:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Spinner */
+.vc-spinner {
+  animation: vcSpin 1s linear infinite;
+}
+
+@keyframes vcSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ========================================
+   MODAL FOTO AMPLIADA (renta)
+   ======================================== */
+
+.vc-foto-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.vc-foto-contenido {
+  position: relative;
+  background: #1a1a1a;
+  border-radius: 12px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.vc-foto-cerrar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1;
+  font-size: 18px;
+}
+
+.vc-foto-imagen {
+  max-width: 100%;
+  max-height: 85vh;
+  object-fit: contain;
+  display: block;
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 480px) {
+  .vc-page {
+    padding: 10px;
+  }
+
+  .vc-container {
+    border-radius: 8px;
+  }
+
+  .vc-header {
+    padding: 16px;
+  }
+
+  .vc-empresa {
+    font-size: 14px;
+  }
+
+  .vc-titulo {
+    font-size: 12px;
+  }
+
+  .vc-info-row,
+  .vc-dato-row {
+    font-size: 12px;
+  }
+
+  .vc-info-label {
+    min-width: 80px;
+  }
+}
+
+@media (min-width: 640px) {
+  .vc-container {
+    max-width: 640px;
+  }
+}

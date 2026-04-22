@@ -994,8 +994,12 @@
 }
 
 .vale-card__viaje-numero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   font-weight: 600;
   color: #4f46e5;
+  gap: 1px;
 }
 
 .vale-card__viaje-hora {
@@ -1027,10 +1031,10 @@
   letter-spacing: 0.03em;
 }
 
-/* Header tipo 1 y 2: viaje, hora, folio, ton, m3, costo */
+/* Header tipo 1 y 2: viaje | hora | folio | ton | m3 | precio/m3 | costo */
 .vale-card__viajes-tabla-header {
   display: grid;
-  grid-template-columns: 40px 1fr 80px 70px 90px;
+  grid-template-columns: 50px 1fr 1fr 1fr 1fr 1fr 1fr;
   gap: 6px;
   padding: 4px 8px;
   background: #dcfce7;
@@ -1046,9 +1050,13 @@
   letter-spacing: 0.03em;
 }
 
+.vale-card__viajes-tabla-header span:nth-child(n+3) {
+  text-align: right;
+}
+
 .vale-card__viaje-item--material {
   display: grid;
-  grid-template-columns: 40px 1fr 80px 70px 90px;
+  grid-template-columns: 50px 1fr 1fr 1fr 1fr 1fr 1fr;
   gap: 6px;
   padding: 5px 8px;
   background: #ffffff;
@@ -1082,6 +1090,25 @@
   font-weight: 600;
   color: #10b981;
   text-align: right;
+}
+
+.vale-card__viaje-precio {
+  font-size: 11px;
+  color: #6366f1;
+  text-align: right;
+  cursor: default;
+}
+
+.vale-card__viaje-registrador {
+  display: block;
+  font-size: 9px;
+  font-weight: 500;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 44px;
+  margin-top: 1px;
 }
 
 /* Totales tipo 1 y 2: label + ton + vacío + costo */
@@ -1122,10 +1149,10 @@
    Columnas: viaje | banco | distancia | m3 | costo
    ======================================== */
 
-/* Header tipo 3: 5 columnas */
+/* Header tipo 3: 6 columnas — viaje | banco | dist | m3 | precio/m3 | costo */
 .vale-card__viajes-tabla-header--tipo3 {
   display: grid;
-  grid-template-columns: 44px 1fr 60px 60px 80px;
+  grid-template-columns: 50px 2fr 1fr 1fr 1fr 1fr;
   gap: 6px;
   padding: 4px 8px;
   background: #dcfce7;
@@ -1141,10 +1168,14 @@
   letter-spacing: 0.03em;
 }
 
-/* Fila tipo 3: misma grilla de 5 columnas */
+.vale-card__viajes-tabla-header--tipo3 span:nth-child(n+3) {
+  text-align: right;
+}
+
+/* Fila tipo 3: 6 columnas */
 .vale-card__viaje-item--tipo3 {
   display: grid;
-  grid-template-columns: 44px 1fr 60px 60px 80px;
+  grid-template-columns: 50px 2fr 1fr 1fr 1fr 1fr;
   gap: 6px;
   padding: 5px 8px;
   background: #ffffff;
@@ -1284,7 +1315,7 @@
 @media (max-width: 768px) {
   .vale-card__viajes-tabla-header,
   .vale-card__viaje-item--material {
-    grid-template-columns: 40px 60px 1fr 70px 80px;
+    grid-template-columns: 44px 1fr 1fr 1fr 1fr 1fr 1fr;
   }
 
   .vale-card__viaje-hora {
@@ -1295,6 +1326,6 @@
 
   .vale-card__viajes-tabla-header--tipo3,
   .vale-card__viaje-item--tipo3 {
-    grid-template-columns: 40px 1fr 55px 55px 70px;
+    grid-template-columns: 44px 2fr 1fr 1fr 1fr 1fr;
   }
 }

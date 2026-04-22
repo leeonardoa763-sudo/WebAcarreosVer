@@ -26,6 +26,12 @@ import {
   CheckCircle,
   Loader,
   PenLine,
+  Calendar,
+  User,
+  ShieldCheck,
+  CheckSquare,
+  XCircle,
+  FileCheck,
 } from "lucide-react";
 
 // 3. Config
@@ -35,6 +41,13 @@ import { colors } from "../../../config/colors";
 import { useAuth } from "../../../hooks/useAuth";
 import { useEditarValeViajes } from "../../../hooks/editar-vale/useEditarValeViajes";
 
+// 5. Utils
+import {
+  formatearFechaHora,
+  getBadgeEstado,
+  getNombreCompleto,
+} from "../../../utils/formatters";
+
 // 5. Componentes
 import TablaEditarViajes from "./TablaEditarViajes";
 
@@ -42,6 +55,154 @@ import TablaEditarViajes from "./TablaEditarViajes";
 import "../../../styles/modal-editar-vale.css";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const formatFechaCorta = (ts) => {
+  if (!ts) return null;
+  const { fecha, hora } = formatearFechaHora(ts);
+  return `${fecha} ${hora}`;
+};
+
+/**
+ * Panel lateral con información de contexto del vale padre.
+ */
+const PanelInfoVale = ({ vale, conciliacion }) => {
+  if (!vale) return null;
+
+  const badge = getBadgeEstado(vale.estado);
+
+  const InfoFila = ({ icono: Icono, label, valor, color }) => (
+    <div className="mev__info-fila">
+      <Icono size={13} className="mev__info-icono" style={color ? { color } : {}} />
+      <div className="mev__info-contenido">
+        <span className="mev__info-label">{label}</span>
+        <span className="mev__info-valor" style={color ? { color } : {}}>{valor}</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <aside className="mev__panel-info">
+      <div className="mev__panel-info-header">
+        <span className="mev__panel-info-titulo">Información del vale</span>
+        {vale.folio && (
+          <span className="mev__panel-info-folio">{vale.folio}</span>
+        )}
+      </div>
+
+      {/* Estado */}
+      <div className="mev__info-estado">
+        <span
+          className="mev__info-badge"
+          style={{ color: badge.color, backgroundColor: badge.background }}
+        >
+          {badge.label}
+        </span>
+      </div>
+
+      <div className="mev__info-grupo">
+        <span className="mev__info-grupo-titulo">Fechas</span>
+
+        <InfoFila
+          icono={Calendar}
+          label="Creación"
+          valor={formatFechaCorta(vale.fecha_creacion)}
+        />
+
+        {vale.fecha_verificacion && (
+          <InfoFila
+            icono={ShieldCheck}
+            label="Verificación"
+            valor={formatFechaCorta(vale.fecha_verificacion)}
+            color="#004E89"
+          />
+        )}
+
+        {vale.fecha_completado && (
+          <InfoFila
+            icono={CheckSquare}
+            label="Completado"
+            valor={formatFechaCorta(vale.fecha_completado)}
+            color="#10B981"
+          />
+        )}
+
+        {vale.fecha_cancelacion && (
+          <InfoFila
+            icono={XCircle}
+            label="Cancelación"
+            valor={formatFechaCorta(vale.fecha_cancelacion)}
+            color="#DC2626"
+          />
+        )}
+      </div>
+
+      <div className="mev__info-grupo">
+        <span className="mev__info-grupo-titulo">Responsables</span>
+
+        {vale.persona_creador && (
+          <InfoFila
+            icono={User}
+            label="Creado por"
+            valor={getNombreCompleto(vale.persona_creador)}
+          />
+        )}
+
+        {vale.persona_verificador && (
+          <InfoFila
+            icono={ShieldCheck}
+            label="Verificado por"
+            valor={getNombreCompleto(vale.persona_verificador)}
+            color="#004E89"
+          />
+        )}
+
+        {vale.persona_completador && (
+          <InfoFila
+            icono={CheckSquare}
+            label="Completado por"
+            valor={getNombreCompleto(vale.persona_completador)}
+            color="#10B981"
+          />
+        )}
+      </div>
+
+      {vale.motivo_cancelacion && (
+        <div className="mev__info-grupo">
+          <span className="mev__info-grupo-titulo">Motivo de cancelación</span>
+          <p className="mev__info-motivo">{vale.motivo_cancelacion}</p>
+        </div>
+      )}
+
+      {conciliacion && (
+        <div className="mev__info-grupo mev__info-grupo--conciliacion">
+          <span className="mev__info-grupo-titulo">Conciliación</span>
+          <InfoFila
+            icono={FileCheck}
+            label="Folio"
+            valor={conciliacion.folio}
+            color="#7C3AED"
+          />
+          {conciliacion.fecha_inicio && conciliacion.fecha_fin && (
+            <InfoFila
+              icono={Calendar}
+              label="Período"
+              valor={`${formatearFechaHora(conciliacion.fecha_inicio + "T12:00:00").fecha} – ${formatearFechaHora(conciliacion.fecha_fin + "T12:00:00").fecha}`}
+              color="#7C3AED"
+            />
+          )}
+          {conciliacion.fecha_generacion && (
+            <InfoFila
+              icono={Calendar}
+              label="Generada"
+              valor={formatFechaCorta(conciliacion.fecha_generacion)}
+              color="#7C3AED"
+            />
+          )}
+        </div>
+      )}
+    </aside>
+  );
+};
 
 /**
  * Retorna el subtítulo descriptivo según el tipo de material.
@@ -74,6 +235,8 @@ const ModalEditarVale = ({
     pesoEspecifico,
     tipoMaterial,
     bancos,
+    vale,
+    conciliacion,
     notasAdicionales,
     setNotasAdicionales,
     loading,
@@ -205,43 +368,51 @@ const ModalEditarVale = ({
           </div>
         )}
 
-        {/* ── Cuerpo — tabla de viajes ─────────────────────────────────── */}
+        {/* ── Cuerpo — tabla de viajes + panel info ───────────────────── */}
         <div className="mev__cuerpo">
-          <TablaEditarViajes
-            detalle={detalle}
-            viajes={viajes}
-            pesoEspecifico={pesoEspecifico}
-            tipoMaterial={tipoMaterial}
-            bancos={bancos}
-            viajesAEliminar={viajesAEliminar}
-            viajesNuevos={viajesNuevos}
-            loading={loading}
-            onEditarCampoViaje={editarCampoViaje}
-            onEditarDistanciaDetalle={editarDistanciaDetalle}
-            onAgregarViaje={agregarViaje}
-            onEliminarViaje={eliminarViaje}
-            onCancelarEliminacion={cancelarEliminacion}
-            calcularTotalesDetalle={calcularTotalesDetalle}
-          />
+          <div className="mev__layout">
+            {/* Columna izquierda: tabla y notas */}
+            <div className="mev__layout-izq">
+              <TablaEditarViajes
+                detalle={detalle}
+                viajes={viajes}
+                pesoEspecifico={pesoEspecifico}
+                tipoMaterial={tipoMaterial}
+                bancos={bancos}
+                viajesAEliminar={viajesAEliminar}
+                viajesNuevos={viajesNuevos}
+                loading={loading}
+                onEditarCampoViaje={editarCampoViaje}
+                onEditarDistanciaDetalle={editarDistanciaDetalle}
+                onAgregarViaje={agregarViaje}
+                onEliminarViaje={eliminarViaje}
+                onCancelarEliminacion={cancelarEliminacion}
+                calcularTotalesDetalle={calcularTotalesDetalle}
+              />
 
-          {/* ── Notas adicionales ────────────────────────────────────── */}
-          <div className="mev__notas-section">
-            <label className="mev__notas-label" htmlFor="mev-notas">
-              Notas adicionales
-            </label>
-            <textarea
-              id="mev-notas"
-              className="mev__notas-textarea"
-              value={notasAdicionales}
-              onChange={(e) => setNotasAdicionales(e.target.value)}
-              placeholder="Escribe observaciones o notas del vale..."
-              maxLength={500}
-              rows={3}
-              disabled={guardando}
-            />
-            <span className="mev__notas-contador">
-              {notasAdicionales.length}/500
-            </span>
+              {/* ── Notas adicionales ──────────────────────────────── */}
+              <div className="mev__notas-section">
+                <label className="mev__notas-label" htmlFor="mev-notas">
+                  Notas adicionales
+                </label>
+                <textarea
+                  id="mev-notas"
+                  className="mev__notas-textarea"
+                  value={notasAdicionales}
+                  onChange={(e) => setNotasAdicionales(e.target.value)}
+                  placeholder="Escribe observaciones o notas del vale..."
+                  maxLength={500}
+                  rows={3}
+                  disabled={guardando}
+                />
+                <span className="mev__notas-contador">
+                  {notasAdicionales.length}/500
+                </span>
+              </div>
+            </div>
+
+            {/* Columna derecha: panel de información del vale */}
+            <PanelInfoVale vale={vale} conciliacion={conciliacion} />
           </div>
         </div>
 

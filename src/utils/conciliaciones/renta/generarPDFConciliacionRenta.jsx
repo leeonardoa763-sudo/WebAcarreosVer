@@ -3,12 +3,15 @@
  *
  * Entry point para generar PDF de conciliaciones de Renta
  *
- * Dependencias: @react-pdf/renderer
+ * Dependencias: @react-pdf/renderer, qrcode
  * Usado en: BotonGenerarPDF.jsx
  */
 
 import { pdf } from "@react-pdf/renderer";
+import QRCode from "qrcode";
 import PDFConciliacionRenta from "./PDFConciliacionRenta";
+
+const BASE_URL = "https://web-acarreos.vercel.app";
 
 /**
  * Generar y descargar PDF de conciliación de Renta
@@ -28,12 +31,19 @@ export const generarPDFConciliacionRenta = async (
       conciliacion.folio
     );
 
+    // Generar QR con URL de soporte de vales
+    const qrDataUrl = await QRCode.toDataURL(
+      `${BASE_URL}/conciliacion/${conciliacion.folio}`,
+      { width: 80, margin: 1, color: { dark: "#000000", light: "#FFFFFF" } }
+    );
+
     // Generar el blob del PDF
     const blob = await pdf(
       <PDFConciliacionRenta
         conciliacion={conciliacion}
         valesAgrupados={valesAgrupados}
         totales={totales}
+        qrDataUrl={qrDataUrl}
       />
     ).toBlob();
 

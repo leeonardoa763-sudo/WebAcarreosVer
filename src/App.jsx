@@ -25,6 +25,7 @@ import Vales from "./pages/Vales";
 import Conciliaciones from "./pages/Conciliaciones";
 import VerificarVales from "./pages/VerificarVales";
 import VisualizarVale from "./pages/VisualizarVale";
+import VisualizarConciliacion from "./pages/VisualizarConciliacion";
 import Operadores from "./pages/Operadores";
 import HistorialConciliaciones from "./pages/HistorialConciliaciones";
 
@@ -116,6 +117,9 @@ const App = () => {
 
           {/* RUTA PÚBLICA - Visualización de vale sin autenticación */}
           <Route path="/vale/:folio" element={<VisualizarVale />} />
+
+          {/* RUTA PÚBLICA - Soporte de conciliación sin autenticación */}
+          <Route path="/conciliacion/:folio" element={<VisualizarConciliacion />} />
 
           {/* Ruta 404 - Redirige a vales */}
           <Route path="*" element={<Navigate to="/vales" replace />} />

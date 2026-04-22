@@ -102,6 +102,8 @@ export const useValesQueries = () => {
             precio_m3,
             costo_viaje,
             folio_vale_fisico,
+            tarifa_primer_km,
+            tarifa_subsecuente,
             id_banco_override,
             distancia_km_override,
             precio_m3_override,
@@ -109,6 +111,10 @@ export const useValesQueries = () => {
             bancos_override:id_banco_override (
               id_banco,
               banco
+            ),
+            persona_registro:id_persona_registro (
+              nombre,
+              primer_apellido
             )
           )
         ),
