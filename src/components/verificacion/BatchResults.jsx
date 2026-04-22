@@ -1,12 +1,11 @@
 /**
  * src/components/verificacion/BatchResults.jsx
  *
- * Muestra resultados del procesamiento masivo con detalles
- *
- * Funcionalidades:
- * - Muestra vales exitosos, ya verificados y con errores
- * - Para RENTA: usa lógica de es_renta_por_dia
- * - Permite confirmar verificación masiva
+ * Muestra resultados del procesamiento masivo con detalles expandidos.
+ * Para material: muestra por banco — distancia, tarifas, precio/m³, viajes, m³.
+ * Para renta: muestra duración, viajes y costo.
+ * Dependencias: date-fns, formatters, colors
+ * Usado en: VerificarVales.jsx
  */
 
 import {
@@ -17,7 +16,11 @@ import {
   Package,
   Clock,
   DollarSign,
+  Truck,
+  MapPin,
+  Calendar,
 } from "lucide-react";
+import { getISOWeek } from "date-fns";
 import { colors } from "../../config/colors";
 import {
   formatearVolumen,
@@ -33,113 +36,158 @@ const BatchResults = ({
 }) => {
   const { success, alreadyVerified, errors } = results;
 
-  const getValeDetails = (vale) => {
-    if (vale.tipo_vale === "material" && vale.vale_material_detalles) {
-      const materiales = vale.vale_material_detalles
-        .map((d) => d.material?.material)
-        .filter(Boolean)
-        .join(", ");
-
-      // Usar el costo_total que viene de la BD, convertir a número
-      const costoTotal = vale.vale_material_detalles.reduce(
-        (sum, d) => sum + Number(d.costo_total || 0),
-        0,
-      );
-
-      // Calcular volumen según tipo, convertir a número
-      // Tipo 3: usar volumen_real_m3
-      const totalM3Tipo3 = vale.vale_material_detalles
-        .filter((d) => d.material?.tipo_de_material?.id_tipo_de_material === 3)
-        .reduce((sum, d) => sum + Number(d.volumen_real_m3 || 0), 0);
-
-      const totalM3Otros = vale.vale_material_detalles
-        .filter((d) => d.material?.tipo_de_material?.id_tipo_de_material !== 3)
-        .reduce((sum, d) => sum + Number(d.volumen_real_m3 || 0), 0);
-
-      const cantidadDisplay =
-        totalM3Tipo3 > 0 && totalM3Otros > 0
-          ? `${formatearVolumen(totalM3Tipo3)} (Pedidos) + ${formatearVolumen(totalM3Otros)} (Reales)}`
-          : totalM3Tipo3 > 0
-            ? `${formatearVolumen(totalM3Tipo3)} (Pedidos)`
-            : `${formatearVolumen(totalM3Otros)} (Reales)`;
-
-      return {
-        tipo: "Material",
-        detalle: materiales || "Sin especificar",
-        cantidad: cantidadDisplay,
-        costo: formatearMoneda(costoTotal),
-        icon: Package,
-      };
+  const calcularSemana = (vale) => {
+    const fechaRef = vale.fecha_programada || vale.fecha_creacion;
+    if (!fechaRef) return null;
+    try {
+      return getISOWeek(new Date(fechaRef.substring(0, 10) + "T12:00:00"));
+    } catch {
+      return null;
     }
+  };
 
-    if (vale.tipo_vale === "renta" && vale.vale_renta_detalle) {
-      // Sumar número de viajes
-      const totalViajes = vale.vale_renta_detalle.reduce(
-        (sum, detalle) => sum + (detalle.numero_viajes || 0),
-        0,
-      );
+  const getMaterialInfo = (vale) => {
+    if (!vale.vale_material_detalles?.length) return null;
 
-      // Calcular totales basados en es_renta_por_dia
-      let totalHorasPorHora = 0;
-      let totalDiasPorDia = 0;
-      let tieneRentaPorDia = false;
-      let tieneRentaPorHora = false;
+    const grupos = [];
 
-      vale.vale_renta_detalle.forEach((detalle) => {
-        // MODIFICADO: Detectar renta por día si total_dias > 0
-        const totalDias = Number(detalle.total_dias || 0);
-        const esRentaPorDia = totalDias > 0;
+    vale.vale_material_detalles
+      .filter(
+        (d) =>
+          Number(d.volumen_real_m3 ?? d.cantidad_pedida_m3 ?? 0) > 0 ||
+          Number(d.costo_total ?? 0) > 0,
+      )
+      .forEach((d) => {
+        const esTipo3 =
+          d.material?.tipo_de_material?.id_tipo_de_material === 3;
+        const labelM3 = esTipo3 ? "Pedidos" : "Reales";
+        const viajes = d.vale_material_viajes ?? [];
 
-        if (esRentaPorDia) {
-          totalDiasPorDia += Number(detalle.total_dias || 0);
-          tieneRentaPorDia = true;
-        } else {
-          totalHorasPorHora += Number(detalle.total_horas || 0);
-          tieneRentaPorHora = true;
+        if (viajes.length === 0) {
+          grupos.push({
+            material: d.material?.material ?? "Sin especificar",
+            banco: d.bancos?.banco ?? "Sin banco",
+            distancia: Number(d.distancia_km ?? 0),
+            precioM3: Number(d.precio_m3 ?? 0),
+            tarifaPrimerKm: null,
+            tarifaSubsecuente: null,
+            numViajes: 0,
+            m3: Number(d.volumen_real_m3 ?? d.cantidad_pedida_m3 ?? 0),
+            labelM3,
+            costo: Number(d.costo_total ?? 0),
+          });
+          return;
         }
+
+        // Agrupar viajes por banco efectivo (override o default)
+        const bancoMap = new Map();
+        viajes.forEach((v) => {
+          const key = v.id_banco_override ?? "default";
+          if (!bancoMap.has(key)) {
+            const esOverride = v.id_banco_override != null;
+            bancoMap.set(key, {
+              banco: esOverride
+                ? (v.bancos_override?.banco ?? "Banco override")
+                : (d.bancos?.banco ?? "Sin banco"),
+              distancia: esOverride
+                ? Number(v.distancia_km_override ?? d.distancia_km ?? 0)
+                : Number(d.distancia_km ?? 0),
+              precioM3: esOverride
+                ? Number(v.precio_m3_override ?? 0)
+                : Number(v.precio_m3 ?? d.precio_m3 ?? 0),
+              tarifaPrimerKm:
+                v.tarifa_primer_km != null
+                  ? Number(v.tarifa_primer_km)
+                  : null,
+              tarifaSubsecuente:
+                v.tarifa_subsecuente != null
+                  ? Number(v.tarifa_subsecuente)
+                  : null,
+              viajes: [],
+            });
+          }
+          bancoMap.get(key).viajes.push(v);
+        });
+
+        bancoMap.forEach((grupo) => {
+          const costo = grupo.viajes.reduce(
+            (s, v) =>
+              s + Number(v.costo_viaje_override ?? v.costo_viaje ?? 0),
+            0,
+          );
+          const m3 = grupo.viajes.reduce(
+            (s, v) => s + Number(v.volumen_m3 ?? 0),
+            0,
+          );
+          grupos.push({
+            material: d.material?.material ?? "Sin especificar",
+            banco: grupo.banco,
+            distancia: grupo.distancia,
+            precioM3: grupo.precioM3,
+            tarifaPrimerKm: grupo.tarifaPrimerKm,
+            tarifaSubsecuente: grupo.tarifaSubsecuente,
+            numViajes: grupo.viajes.length,
+            m3,
+            labelM3,
+            costo,
+          });
+        });
       });
 
-      // Determinar qué cantidad mostrar
-      let cantidad = "Pendiente";
+    return grupos;
+  };
 
-      if (tieneRentaPorDia && totalDiasPorDia > 0) {
-        // Mostrar correctamente medio día
-        if (totalDiasPorDia === 0.5) {
-          cantidad = "0.5 días (medio día)";
-        } else {
-          cantidad = `${totalDiasPorDia} ${totalDiasPorDia === 1 ? "día" : "días"}`;
-        }
+  const getRentaInfo = (vale) => {
+    if (!vale.vale_renta_detalle?.length) return null;
 
-        // Si también tiene horas, agregar
-        if (tieneRentaPorHora && totalHorasPorHora > 0) {
-          cantidad += ` + ${formatearDuracion(totalHorasPorHora)}`;
-        }
-      } else if (tieneRentaPorHora && totalHorasPorHora > 0) {
-        cantidad = formatearDuracion(totalHorasPorHora);
+    const totalViajes = vale.vale_renta_detalle.reduce(
+      (sum, d) => sum + (d.numero_viajes ?? 0),
+      0,
+    );
+
+    let totalHorasPorHora = 0;
+    let totalDiasPorDia = 0;
+    let tieneRentaPorDia = false;
+    let tieneRentaPorHora = false;
+
+    vale.vale_renta_detalle.forEach((d) => {
+      const totalDias = Number(d.total_dias ?? 0);
+      if (totalDias > 0) {
+        totalDiasPorDia += totalDias;
+        tieneRentaPorDia = true;
+      } else {
+        totalHorasPorHora += Number(d.total_horas ?? 0);
+        tieneRentaPorHora = true;
       }
+    });
 
-      // Usar el costo_total que viene de la BD, convertir a número
-      const costoTotal = vale.vale_renta_detalle.reduce(
-        (sum, d) => sum + Number(d.costo_total || 0),
-        0,
-      );
-
-      return {
-        tipo: "Renta",
-        detalle: `${totalViajes} ${totalViajes === 1 ? "viaje" : "viajes"}`,
-        cantidad: cantidad,
-        costo: formatearMoneda(costoTotal),
-        icon: Clock,
-      };
+    let cantidad = "Pendiente";
+    if (tieneRentaPorDia && totalDiasPorDia > 0) {
+      cantidad =
+        totalDiasPorDia === 0.5
+          ? "0.5 días (medio día)"
+          : `${totalDiasPorDia} ${totalDiasPorDia === 1 ? "día" : "días"}`;
+      if (tieneRentaPorHora && totalHorasPorHora > 0)
+        cantidad += ` + ${formatearDuracion(totalHorasPorHora)}`;
+    } else if (tieneRentaPorHora && totalHorasPorHora > 0) {
+      cantidad = formatearDuracion(totalHorasPorHora);
     }
 
-    return {
-      tipo: vale.tipo_vale,
-      detalle: "Sin detalles",
-      cantidad: "N/A",
-      costo: "N/A",
-      icon: FileCheck,
-    };
+    const costoTotal = vale.vale_renta_detalle.reduce(
+      (sum, d) => sum + Number(d.costo_total ?? 0),
+      0,
+    );
+
+    const detalles = vale.vale_renta_detalle.map((d) => ({
+      material: d.material?.material ?? "Sin especificar",
+      cantidad,
+      totalViajes,
+      costoPorHr: d.precios_renta?.costo_hr,
+      costoPorDia: d.precios_renta?.costo_dia,
+      costo: Number(d.costo_total ?? 0),
+    }));
+
+    return { detalles, costoTotal };
   };
 
   return (
@@ -184,20 +232,34 @@ const BatchResults = ({
           </h4>
           <div className="batch-results__list">
             {success.map((item, index) => {
-              const details = getValeDetails(item.vale);
-              const IconComponent = details.icon;
+              const semana = calcularSemana(item.vale);
+              const placas = item.vale.vehiculos?.placas;
+              const esMaterial = item.vale.tipo_vale === "material";
+              const materialInfo = esMaterial ? getMaterialInfo(item.vale) : null;
+              const rentaInfo = !esMaterial ? getRentaInfo(item.vale) : null;
+              const costoTotal = esMaterial
+                ? (materialInfo?.reduce((s, d) => s + d.costo, 0) ?? 0)
+                : (rentaInfo?.costoTotal ?? 0);
 
               return (
                 <div
                   key={index}
                   className="batch-results__item batch-results__item--success"
                 >
+                  {/* Encabezado: folio + semana */}
                   <div className="batch-results__item-header">
                     <FileCheck size={16} />
                     <span className="batch-results__folio">{item.folio}</span>
+                    {semana && (
+                      <span className="batch-results__semana">
+                        <Calendar size={12} />
+                        Sem. {semana}
+                      </span>
+                    )}
                   </div>
 
                   <div className="batch-results__item-details">
+                    {/* Obra */}
                     <div className="batch-results__detail">
                       <span className="batch-results__detail-label">Obra:</span>
                       <span className="batch-results__detail-value">
@@ -205,33 +267,178 @@ const BatchResults = ({
                       </span>
                     </div>
 
+                    {/* Placas */}
                     <div className="batch-results__detail">
-                      <IconComponent size={14} />
+                      <Truck size={13} />
                       <span className="batch-results__detail-label">
-                        {details.tipo}:
+                        Placas:
                       </span>
                       <span className="batch-results__detail-value">
-                        {details.detalle}
+                        {placas ?? "—"}
                       </span>
                     </div>
 
-                    <div className="batch-results__detail">
-                      <span className="batch-results__detail-label">
-                        Cantidad:
-                      </span>
-                      <span className="batch-results__detail-value batch-results__detail-value--highlight">
-                        {details.cantidad}
-                      </span>
-                    </div>
+                    {/* Bloques por banco (material) */}
+                    {esMaterial &&
+                      materialInfo?.map((d, i) => (
+                        <div key={i} className="batch-results__banco-block">
+                          <div className="batch-results__banco-header">
+                            <Package size={13} />
+                            <span className="batch-results__banco-material">
+                              {d.material}
+                            </span>
+                            <span className="batch-results__detail-label">
+                              — {d.banco}
+                            </span>
+                          </div>
 
-                    {details.costo && details.costo !== "$0.00" && (
-                      <div className="batch-results__detail">
+                          <div className="batch-results__banco-grid">
+                            <div className="batch-results__banco-cell">
+                              <MapPin size={11} />
+                              <span className="batch-results__detail-label">
+                                Dist:
+                              </span>
+                              <span className="batch-results__detail-value">
+                                {d.distancia} km
+                              </span>
+                            </div>
+
+                            {d.tarifaPrimerKm != null && (
+                              <div className="batch-results__banco-cell">
+                                <span className="batch-results__detail-label">
+                                  1er km:
+                                </span>
+                                <span className="batch-results__detail-value">
+                                  {formatearMoneda(d.tarifaPrimerKm)}/m³
+                                </span>
+                              </div>
+                            )}
+
+                            {d.tarifaSubsecuente != null && (
+                              <div className="batch-results__banco-cell">
+                                <span className="batch-results__detail-label">
+                                  Subs:
+                                </span>
+                                <span className="batch-results__detail-value">
+                                  {formatearMoneda(d.tarifaSubsecuente)}/m³
+                                </span>
+                              </div>
+                            )}
+
+                            <div className="batch-results__banco-cell">
+                              <span className="batch-results__detail-label">
+                                $/m³:
+                              </span>
+                              <span className="batch-results__detail-value batch-results__detail-value--highlight">
+                                {formatearMoneda(d.precioM3)}
+                              </span>
+                            </div>
+
+                            <div className="batch-results__banco-cell">
+                              <span className="batch-results__detail-label">
+                                Viajes:
+                              </span>
+                              <span className="batch-results__detail-value">
+                                {d.numViajes}
+                              </span>
+                            </div>
+
+                            <div className="batch-results__banco-cell">
+                              <span className="batch-results__detail-label">
+                                m³ ({d.labelM3}):
+                              </span>
+                              <span className="batch-results__detail-value batch-results__detail-value--highlight">
+                                {formatearVolumen(d.m3)}
+                              </span>
+                            </div>
+
+                            <div className="batch-results__banco-cell">
+                              <DollarSign size={11} />
+                              <span className="batch-results__detail-label">
+                                Subtotal:
+                              </span>
+                              <span className="batch-results__detail-value">
+                                {formatearMoneda(d.costo)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                    {/* Bloques por detalle (renta) */}
+                    {!esMaterial &&
+                      rentaInfo?.detalles.map((d, i) => (
+                        <div key={i} className="batch-results__banco-block">
+                          <div className="batch-results__banco-header">
+                            <Clock size={13} />
+                            <span className="batch-results__banco-material">
+                              {d.material}
+                            </span>
+                          </div>
+
+                          <div className="batch-results__banco-grid">
+                            <div className="batch-results__banco-cell">
+                              <span className="batch-results__detail-label">
+                                Viajes:
+                              </span>
+                              <span className="batch-results__detail-value">
+                                {d.totalViajes}
+                              </span>
+                            </div>
+
+                            <div className="batch-results__banco-cell">
+                              <span className="batch-results__detail-label">
+                                Duración:
+                              </span>
+                              <span className="batch-results__detail-value batch-results__detail-value--highlight">
+                                {d.cantidad}
+                              </span>
+                            </div>
+
+                            {d.costoPorHr != null && (
+                              <div className="batch-results__banco-cell">
+                                <span className="batch-results__detail-label">
+                                  $/hr:
+                                </span>
+                                <span className="batch-results__detail-value">
+                                  {formatearMoneda(d.costoPorHr)}
+                                </span>
+                              </div>
+                            )}
+
+                            {d.costoPorDia != null && (
+                              <div className="batch-results__banco-cell">
+                                <span className="batch-results__detail-label">
+                                  $/día:
+                                </span>
+                                <span className="batch-results__detail-value">
+                                  {formatearMoneda(d.costoPorDia)}
+                                </span>
+                              </div>
+                            )}
+
+                            <div className="batch-results__banco-cell">
+                              <DollarSign size={11} />
+                              <span className="batch-results__detail-label">
+                                Subtotal:
+                              </span>
+                              <span className="batch-results__detail-value">
+                                {formatearMoneda(d.costo)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                    {/* Costo total (siempre) */}
+                    {costoTotal > 0 && (
+                      <div className="batch-results__detail batch-results__total">
                         <DollarSign size={14} />
                         <span className="batch-results__detail-label">
                           Costo Total:
                         </span>
                         <span className="batch-results__detail-value batch-results__detail-value--highlight">
-                          {details.costo}
+                          {formatearMoneda(costoTotal)}
                         </span>
                       </div>
                     )}

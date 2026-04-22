@@ -988,6 +988,60 @@
   flex: 1;
 }
 
+.batch-results__semana {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a936f;
+  background: #d1fae5;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.batch-results__banco-block {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+}
+
+.batch-results__banco-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.batch-results__banco-material {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.batch-results__banco-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.batch-results__banco-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.batch-results__total {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #86efac;
+  font-size: 13px;
+}
+
 .batch-results__actions {
   display: flex;
   gap: 12px;

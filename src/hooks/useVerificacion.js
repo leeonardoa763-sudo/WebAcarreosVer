@@ -200,10 +200,7 @@ export const useVerificacion = () => {
         setProcessing(true);
         setError(null);
 
-        const { data, error: searchError } = await supabase
-          .from("vales")
-          .select(
-            `
+        const selectVale = `
           *,
           obras:id_obra (
             id_obra,
@@ -249,6 +246,21 @@ export const useVerificacion = () => {
             ),
             bancos:id_banco (
               banco
+            ),
+            vale_material_viajes (
+              id_viaje,
+              volumen_m3,
+              precio_m3,
+              costo_viaje,
+              id_banco_override,
+              distancia_km_override,
+              precio_m3_override,
+              costo_viaje_override,
+              tarifa_primer_km,
+              tarifa_subsecuente,
+              bancos_override:id_banco_override (
+                banco
+              )
             )
           ),
           vale_renta_detalle (
@@ -269,14 +281,32 @@ export const useVerificacion = () => {
               costo_dia
             )
           )
-        `
-          )
+        `;
+
+        let { data, error: searchError } = await supabase
+          .from("vales")
+          .select(selectVale)
           .eq("folio", folio)
           .maybeSingle();
 
         // Si hay error de query
         if (searchError) {
           throw new Error(`Error al buscar vale: ${searchError.message}`);
+        }
+
+        // TODO TEMPORAL: fallback por migración de CC (148→149).
+        // Eliminar cuando los PDFs impresos con el CC anterior ya no estén en circulación.
+        if (!data) {
+          const partes = folio.split("-");
+          if (partes.length === 3) {
+            const patron = `${partes[0]}-%-${partes[2]}`;
+            const { data: df, error: ef } = await supabase
+              .from("vales")
+              .select(selectVale)
+              .ilike("folio", patron)
+              .maybeSingle();
+            if (!ef && df) data = df;
+          }
         }
 
         // Si no se encontró el vale (RLS lo bloqueó o no existe)
