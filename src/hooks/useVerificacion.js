@@ -492,7 +492,8 @@ export const useVerificacion = () => {
           );
 
           if (rpcError) throw rpcError;
-          if (!data.success) throw new Error(data.error);
+          if (!data) throw new Error("La función verificar_vale no devolvió respuesta");
+          if (!data.success) throw new Error(data.error || "Error desconocido en verificar_vale");
 
           console.log(`  ✓ Vale ${item.folio} verificado correctamente`);
 
@@ -594,10 +595,10 @@ export const useVerificacion = () => {
 
           console.log("  ✓ Vale encontrado y válido");
 
-          // Agregar a lista de éxitos
+          // Agregar a lista de éxitos — usar folio real de la BD (puede diferir del QR por migración de CC)
           results.success.push({
             fileName: file.name,
-            folio: extractResult.folio,
+            folio: searchResult.vale.folio,
             vale: searchResult.vale,
           });
         } catch (error) {

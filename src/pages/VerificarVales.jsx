@@ -81,6 +81,21 @@ const VerificarVales = () => {
         setSuccessMessage(null);
       }, 4000);
     } else {
+      // Mover los ítems fallidos desde success → errors con el mensaje de error de verificación
+      setBatchResults((prev) => ({
+        ...prev,
+        success: prev.success.filter((s) =>
+          results.verified.some((v) => v.folio === s.folio)
+        ),
+        errors: [
+          ...prev.errors,
+          ...results.errors.map((e) => ({
+            fileName: e.fileName,
+            folio: e.folio,
+            error: e.error || "Error al verificar",
+          })),
+        ],
+      }));
       setStep("batch-results");
     }
   };
