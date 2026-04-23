@@ -35,13 +35,13 @@ export const materialCorteStyles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   colMaterial: {
-    width: 80,
+    width: 65,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
   },
   colBanco: {
-    width: 55,
+    width: 70,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,

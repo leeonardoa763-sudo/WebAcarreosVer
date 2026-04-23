@@ -177,7 +177,7 @@ const PDFConciliacionMaterialCorte = ({
                           )}
                         </Text>
                         <Text style={materialCorteStyles.colBanco}>
-                          {(detalle.bancos?.banco || "N/A").substring(0, 12)}
+                          {(detalle.bancos?.banco || "N/A").substring(0, 15)}
                         </Text>
                         <Text style={materialCorteStyles.colDistancia}>
                           {formatearNumero(detalle.distancia_km)}

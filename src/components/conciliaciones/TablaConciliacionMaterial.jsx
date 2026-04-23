@@ -82,6 +82,9 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
             <td>{formatearVolumen(detalle.volumen_real_m3)}</td>
             <td>{formatearPeso(detalle.peso_ton)}</td>
             <td className="tabla-vales__costo">
+              {formatearMoneda(detalle.precio_m3 || 0)}
+            </td>
+            <td className="tabla-vales__costo">
               {formatearMoneda(detalle.costo_total || 0)}
             </td>
           </tr>
@@ -91,35 +94,46 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
       // 1 fila por viaje
       return viajes
         .sort((a, b) => a.numero_viaje - b.numero_viaje)
-        .map((viaje) => (
-          <tr key={`viaje-${viaje.id_viaje}`}>
-            <td>{formatearFechaCorta(vale.fecha_creacion)}</td>
-            <td className="tabla-vales__folio">{vale.folio}</td>
-            <td className="tabla-vales__folio-banco">
-              {viaje.folio_vale_fisico || detalle.folio_banco || "—"}
-            </td>
-            <td>
-              <div className="tabla-vales__material">
-                <Package size={14} aria-hidden="true" />
-                <span>{detalle.material?.material || "N/A"}</span>
-              </div>
-            </td>
-            <td>{detalle.bancos?.banco || "N/A"}</td>
-            <td>{detalle.distancia_km?.toFixed(1) || 0} km</td>
-            <td className="tabla-vales__viajes">{viaje.numero_viaje}</td>
-            <td>
-              {formatearVolumen(viaje.volumen_m3 || detalle.volumen_real_m3)}
-            </td>
-            <td>{formatearPeso(viaje.peso_ton || detalle.peso_ton)}</td>
-            <td className="tabla-vales__costo">
-              {formatearMoneda(viaje.costo_viaje || detalle.costo_total || 0)}
-            </td>
-          </tr>
-        ));
+        .map((viaje) => {
+          const precioEfectivo = viaje.precio_m3_override != null
+            ? Number(viaje.precio_m3_override)
+            : Number(detalle.precio_m3 || 0);
+          const importeViaje = Number(viaje.volumen_m3 || 0) * precioEfectivo;
+
+          return (
+            <tr key={`viaje-${viaje.id_viaje}`}>
+              <td>{formatearFechaCorta(vale.fecha_creacion)}</td>
+              <td className="tabla-vales__folio">{vale.folio}</td>
+              <td className="tabla-vales__folio-banco">
+                {viaje.folio_vale_fisico || detalle.folio_banco || "—"}
+              </td>
+              <td>
+                <div className="tabla-vales__material">
+                  <Package size={14} aria-hidden="true" />
+                  <span>{detalle.material?.material || "N/A"}</span>
+                </div>
+              </td>
+              <td>{detalle.bancos?.banco || "N/A"}</td>
+              <td>{detalle.distancia_km?.toFixed(1) || 0} km</td>
+              <td className="tabla-vales__viajes">{viaje.numero_viaje}</td>
+              <td>
+                {formatearVolumen(viaje.volumen_m3 || detalle.volumen_real_m3)}
+              </td>
+              <td>{formatearPeso(viaje.peso_ton || detalle.peso_ton)}</td>
+              <td className="tabla-vales__costo">
+                {formatearMoneda(precioEfectivo)}
+              </td>
+              <td className="tabla-vales__costo">
+                {formatearMoneda(importeViaje)}
+              </td>
+            </tr>
+          );
+        });
     }
 
-    // TIPO 3: Producto de Corte — sin cambios
+    // TIPO 3: Producto de Corte
     if (idTipo === 3) {
+      const capacidad = detalle.capacidad_m3 ?? vale.vehiculos?.capacidad_m3;
       return (
         <tr key={`${vale.id_vale}-${idx}`}>
           <td>{formatearFechaCorta(vale.fecha_creacion)}</td>
@@ -130,12 +144,16 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
               <span>{detalle.material?.material || "N/A"}</span>
             </div>
           </td>
+          <td>{detalle.bancos?.banco || "N/A"}</td>
           <td>{formatearVolumen(detalle.distancia_km)} km</td>
           <td className="tabla-vales__viajes">
             {detalle.vale_material_viajes?.length || 1}
           </td>
-          <td>{formatearVolumen(detalle.capacidad_m3)}</td>
+          <td>{capacidad != null ? formatearVolumen(capacidad) : "—"}</td>
           <td>{formatearVolumen(detalle.volumen_real_m3)}</td>
+          <td className="tabla-vales__costo">
+            {formatearMoneda(detalle.precio_m3 || 0)}
+          </td>
           <td className="tabla-vales__costo">
             {formatearMoneda(detalle.costo_total || 0)}
           </td>
@@ -178,9 +196,9 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
             <th>Distancia</th>
             <th>Viajes</th>
             <th>Cap. (m³)</th>
-            <th>Vol. Real (m³)</th>
-            <th>M³ Totales</th>
+            <th>m³</th>
             <th>Toneladas</th>
+            <th>Precio/m³</th>
             <th>Importe</th>
           </tr>
         </thead>
@@ -195,10 +213,12 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
             <th>Fecha</th>
             <th>Folio</th>
             <th>Material</th>
+            <th>Banco</th>
             <th>Distancia</th>
             <th>Viajes</th>
             <th>Cap. (m³)</th>
-            <th>M³ Pedidos</th>
+            <th>m³</th>
+            <th>Precio/m³</th>
             <th>Importe</th>
           </tr>
         </thead>
@@ -216,8 +236,9 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
           <th>Banco</th>
           <th>Distancia</th>
           <th>Viajes</th>
-          <th>Vol. Real (m³)</th>
+          <th>m³</th>
           <th>Toneladas</th>
+          <th>Precio/m³</th>
           <th>Importe</th>
         </tr>
       </thead>

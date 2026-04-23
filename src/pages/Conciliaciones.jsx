@@ -19,6 +19,7 @@ import { useState } from "react";
 // 2. Hooks personalizados
 import { useConciliaciones } from "../hooks/useConciliaciones";
 import { useConciliacionesMaterial } from "../hooks/useConciliacionesMaterial";
+import { useAuth } from "../hooks/useAuth";
 
 // 3. Config
 import { supabase } from "../config/supabase";
@@ -52,6 +53,10 @@ const Conciliaciones = () => {
   // Estado del tab activo
   const [tabActivo, setTabActivo] = useState("renta"); // 'renta' o 'material'
 
+  // Auth
+  const { userProfile, hasRole } = useAuth();
+  const esAdmin = hasRole("Administrador");
+
   // Hooks de Renta
   const rentaHook = useConciliaciones();
 
@@ -60,6 +65,7 @@ const Conciliaciones = () => {
 
   // Estados locales para generación
   const [generando, setGenerando] = useState(false);
+  const [previsualizando, setPrevisualizando] = useState(false);
   const [mensaje, setMensaje] = useState({ tipo: null, texto: "" });
   const [conciliacionGenerada, setConciliacionGenerada] = useState(null);
   const [datosParaPDF, setDatosParaPDF] = useState(null);
@@ -213,6 +219,81 @@ const Conciliaciones = () => {
     await ejecutarGeneracion();
   };
 
+  /**
+   * Genera el PDF sin guardar nada en BD — solo para Administrador
+   */
+  const handlePrevisualizarPDF = async () => {
+    const vistaPrevia = hookActivo.vistaPrevia;
+    const filtros = hookActivo.filtros;
+
+    try {
+      setPrevisualizando(true);
+      setMensaje({ tipo: null, texto: "" });
+
+      const primerGrupo = Object.values(vistaPrevia.valesAgrupados)[0];
+      const primerVale = primerGrupo?.vales?.[0];
+
+      // Prioridad: filtro de sindicato → perfil del usuario → sindicato del operador del primer vale
+      const idSindicatoUsado =
+        filtros.sindicatoSeleccionado ||
+        userProfile?.id_sindicato ||
+        primerVale?.operadores?.sindicatos?.id_sindicato;
+
+      console.log("[Preview PDF] id_sindicato resuelto:", idSindicatoUsado, {
+        filtros: filtros.sindicatoSeleccionado,
+        perfil: userProfile?.id_sindicato,
+        operador: primerVale?.operadores?.sindicatos?.id_sindicato,
+      });
+
+      if (!idSindicatoUsado) {
+        throw new Error("No se pudo determinar el sindicato — verifica que los vales tengan operador asignado");
+      }
+
+      console.log("[Preview PDF] primerVale.obras:", primerVale?.obras);
+
+      const { data: sindicatoData, error: sindicatoError } = await supabase
+        .from("sindicatos")
+        .select("id_sindicato, sindicato, nombre_completo, nombre_firma_conciliacion")
+        .eq("id_sindicato", idSindicatoUsado)
+        .single();
+
+      if (sindicatoError) throw sindicatoError;
+
+      console.log("[Preview PDF] sindicatoData:", sindicatoData);
+
+      const mockConciliacion = {
+        folio: "BORRADOR",
+        tipo_conciliacion: tabActivo,
+        numero_semana: filtros.semanaSeleccionada?.numero,
+        año: filtros.semanaSeleccionada?.año,
+        fecha_inicio: filtros.semanaSeleccionada?.fechaInicio,
+        fecha_fin: filtros.semanaSeleccionada?.fechaFin,
+        subtotal: vistaPrevia.totalesGenerales?.subtotal,
+        iva_16_porciento: vistaPrevia.totalesGenerales?.iva,
+        retencion_4_porciento: vistaPrevia.totalesGenerales?.retencion,
+        total_final: vistaPrevia.totalesGenerales?.total,
+        estado: "borrador",
+        obras: primerVale?.obras,
+        sindicatos: sindicatoData,
+        empresas: primerVale?.obras?.empresas,
+      };
+
+      console.log("[Preview PDF] mockConciliacion:", mockConciliacion);
+
+      setConciliacionGenerada(mockConciliacion);
+      setDatosParaPDF({
+        valesAgrupados: vistaPrevia.valesAgrupados,
+        totalesGenerales: vistaPrevia.totalesGenerales,
+      });
+      setMostrarModalConciliacion(true);
+    } catch (error) {
+      console.error("[Preview PDF] Error:", error);
+      setMensaje({ tipo: "error", texto: `Error al generar vista previa: ${error.message}` });
+    } finally {
+      setPrevisualizando(false);
+    }
+  };
+
   return (
     <div className="conciliaciones-page">
       <div className="conciliaciones-page__header">
@@ -318,19 +399,30 @@ const Conciliaciones = () => {
               />
             )}
 
-            {/* Botón de generar */}
+            {/* Botones de acción */}
             <div className="conciliaciones-actions">
-              {Object.keys(hookActivo.vistaPrevia.valesAgrupados || {}).length >
-                0 &&
+              {Object.keys(hookActivo.vistaPrevia.valesAgrupados || {}).length > 0 &&
                 !conciliacionGenerada && (
-                  <button
-                    onClick={handleGenerar}
-                    disabled={generando}
-                    className="btn btn--primary btn--generar-conciliacion"
-                    style={{ backgroundColor: colors.accent }}
-                  >
-                    {generando ? "Generando..." : "Generar Conciliación"}
-                  </button>
+                  <>
+                    {esAdmin && (
+                      <button
+                        onClick={handlePrevisualizarPDF}
+                        disabled={previsualizando || generando}
+                        className="btn btn--secondary"
+                        title="Genera el PDF sin guardar la conciliación"
+                      >
+                        {previsualizando ? "Generando..." : "Previsualizar PDF"}
+                      </button>
+                    )}
+                    <button
+                      onClick={handleGenerar}
+                      disabled={generando || previsualizando}
+                      className="btn btn--primary btn--generar-conciliacion"
+                      style={{ backgroundColor: colors.accent }}
+                    >
+                      {generando ? "Generando..." : "Generar Conciliación"}
+                    </button>
+                  </>
                 )}
             </div>
           </>

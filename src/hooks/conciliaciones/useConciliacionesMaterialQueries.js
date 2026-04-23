@@ -72,7 +72,8 @@ export const useConciliacionesMaterialQueries = () => {
             ),
             vehiculos:id_vehiculo (
               id_vehiculo,
-              placas
+              placas,
+              capacidad_m3
             ),
             persona:id_persona_creador (
               nombre,
@@ -108,6 +109,7 @@ export const useConciliacionesMaterialQueries = () => {
                 peso_ton,
                 volumen_m3,
                 costo_viaje,
+                precio_m3_override,
                 folio_vale_fisico
               )
             )

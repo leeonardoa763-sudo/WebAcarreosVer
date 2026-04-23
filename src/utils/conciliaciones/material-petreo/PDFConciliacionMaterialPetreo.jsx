@@ -248,7 +248,9 @@ const PDFConciliacionMaterialPetreo = ({
                             </Text>
                             <Text style={materialPetreoStyles.colImporte}>
                               {formatearNumero(
-                                viaje.costo_viaje || detalle.costo_total,
+                                viaje.precio_m3_override != null
+                                  ? Number(viaje.volumen_m3) * Number(viaje.precio_m3_override)
+                                  : (viaje.costo_viaje || detalle.costo_total),
                               )}
                             </Text>
                           </View>

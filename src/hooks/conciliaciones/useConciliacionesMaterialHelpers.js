@@ -57,14 +57,24 @@ export const useConciliacionesMaterialHelpers = () => {
       // Procesar cada detalle de material
       vale.vale_material_detalles.forEach((detalle) => {
         const idTipo = detalle.material?.tipo_de_material?.id_tipo_de_material;
-        const costo = Number(detalle.costo_total || 0);
-
-        grupos[placas].subtotal += costo;
-
-        // Viajes reales registrados en la tabla hija
-        // Fallback a 1 si aún no se han registrado viajes
         const viajes = detalle.vale_material_viajes || [];
         const numViajes = viajes.length > 0 ? viajes.length : 1;
+
+        // Calcular costo real: cada viaje puede tener banco distinto con precio diferente.
+        // costo_viaje en BD usa precio_m3_detalle aunque haya override — recalcular aquí.
+        let costo;
+        if (viajes.length > 0) {
+          costo = viajes.reduce((suma, viaje) => {
+            const precio = viaje.precio_m3_override != null
+              ? Number(viaje.precio_m3_override)
+              : Number(detalle.precio_m3 || 0);
+            return suma + Number(viaje.volumen_m3 || 0) * precio;
+          }, 0);
+        } else {
+          costo = Number(detalle.costo_total || 0);
+        }
+
+        grupos[placas].subtotal += costo;
 
         if (idTipo === 1 || idTipo === 2) {
           // Tipo 1 y 2 se comportan igual — m³ y toneladas vienen del detalle

@@ -329,8 +329,24 @@ useEffect(() => { fetchVales(); }, [idObra, estado]);
 
 - Solo se aceptan **copias blancas** (`COPIA BLANCA` / `COPIA BLANCO`)
 - **Copias rojas** → rechazar con error explícito
-- Flujo: OCR primero → si falla, decodificar QR
+- Flujo: OCR primero → si falla, decodificar QR a escala 2x → si falla, reintentar QR a escala 3x
 - Validar que el PDF contenga `VALE DE MATERIAL` o `VALE DE RENTA` + `OPERADOR`
+
+### Extracción de folio (`pdfExtractor.js` + `qrDecoder.js`)
+
+- **OCR**: `extractFolioFromPDF` extrae texto con pdf.js y busca regex `/[A-Z]{2,3}-\d{3}-\d{5}/`
+- **QR**: `convertPDFToImage(file, scale)` acepta escala como parámetro (default `2.0`). Si el QR no se decodifica a 2x, `useVerificacion.js` reintenta con `3.0`
+- **jsQR**: usa `inversionAttempts: "attemptBoth"` — intenta imagen normal e invertida (cubre QRs con fondo de color o bajo contraste)
+- PDFs escaneados (sin texto extraíble) solo pueden resolverse por QR
+
+### Búsqueda de vale por folio — migración CC148/CC149
+
+```js
+// TODO TEMPORAL: si el folio extraído del PDF no encuentra vale exacto,
+// hace búsqueda wildcard ignorando el número de CC (folio parcial con %)
+// Eliminar cuando los PDFs con CC anterior dejen de circular
+const patron = `${partes[0]}-%-${partes[2]}`;
+```
 
 ---
 
