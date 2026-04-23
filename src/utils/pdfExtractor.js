@@ -78,13 +78,13 @@ export const extractFolioFromText = (text) => {
  * Convertir primera página del PDF a imagen (Canvas)
  * Necesario para decodificar QR
  */
-export const convertPDFToImage = async (file) => {
+export const convertPDFToImage = async (file, scale = 2.0) => {
   try {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const page = await pdf.getPage(1); // Primera página
 
-    const viewport = page.getViewport({ scale: 2.0 }); // Escala 2x para mejor calidad
+    const viewport = page.getViewport({ scale });
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
 

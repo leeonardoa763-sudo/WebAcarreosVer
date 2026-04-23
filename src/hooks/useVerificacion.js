@@ -108,9 +108,9 @@ export const useVerificacion = () => {
         };
       }
 
-      // MÉTODO 2: Intentar extraer folio por QR
+      // MÉTODO 2: Intentar extraer folio por QR (2x y luego 3x si falla)
       console.log("OCR falló, intentando decodificar QR...");
-      const imageResult = await convertPDFToImage(file);
+      const imageResult = await convertPDFToImage(file, 2.0);
 
       if (!imageResult.success) {
         throw new Error(
@@ -118,7 +118,15 @@ export const useVerificacion = () => {
         );
       }
 
-      const qrResult = await extractFolioFromQR(imageResult.canvas);
+      let qrResult = await extractFolioFromQR(imageResult.canvas);
+
+      if (!qrResult.success) {
+        console.log("QR falló a escala 2x, reintentando a 3x...");
+        const imageResult3x = await convertPDFToImage(file, 3.0);
+        if (imageResult3x.success) {
+          qrResult = await extractFolioFromQR(imageResult3x.canvas);
+        }
+      }
 
       if (qrResult.success) {
         console.log("Folio extraído por QR:", qrResult.folio);

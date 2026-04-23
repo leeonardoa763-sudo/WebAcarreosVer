@@ -21,7 +21,7 @@ export const decodeQRFromCanvas = (canvas) => {
     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
     const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: "dontInvert",
+      inversionAttempts: "attemptBoth",
     });
 
     if (code && code.data) {
