@@ -64,6 +64,23 @@ const PDFConciliacionMaterialPetreo = ({
     (totales.totalToneladasTipo1 || 0) + (totales.totalToneladasTipo2 || 0);
   const precioM3 = totalM3 > 0 ? totales.subtotal / totalM3 : 0;
 
+  // Extraer tarifas del primer detalle disponible (todo el archivo usa las mismas)
+  let tarifaPrimerKm = null;
+  let tarifaSubsecuente = null;
+  for (const grupo of Object.values(valesAgrupados)) {
+    for (const vale of grupo.vales) {
+      for (const detalle of vale.vale_material_detalles) {
+        if (detalle.tarifa_primer_km != null) {
+          tarifaPrimerKm = Number(detalle.tarifa_primer_km);
+          tarifaSubsecuente = Number(detalle.tarifa_subsecuente);
+          break;
+        }
+      }
+      if (tarifaPrimerKm != null) break;
+    }
+    if (tarifaPrimerKm != null) break;
+  }
+
   return (
     <Document>
       <Page size="LETTER" style={sharedStyles.page}>
@@ -121,6 +138,7 @@ const PDFConciliacionMaterialPetreo = ({
             <Text style={materialPetreoStyles.colDistancia}>Dist</Text>
             <Text style={materialPetreoStyles.colVol}>m³</Text>
             <Text style={materialPetreoStyles.colTon}>Ton</Text>
+            <Text style={materialPetreoStyles.colPU}>PU/m³</Text>
             <Text style={materialPetreoStyles.colImporte}>Importe</Text>
           </View>
 
@@ -181,6 +199,9 @@ const PDFConciliacionMaterialPetreo = ({
                           <Text style={materialPetreoStyles.colTon}>
                             {formatearNumero(detalle.peso_ton)}
                           </Text>
+                          <Text style={materialPetreoStyles.colPU}>
+                            ${formatearNumero(detalle.precio_m3 || 0)}
+                          </Text>
                           <Text style={materialPetreoStyles.colImporte}>
                             {formatearNumero(detalle.costo_total)}
                           </Text>
@@ -199,6 +220,10 @@ const PDFConciliacionMaterialPetreo = ({
                         toneladasGrupo += Number(
                           viaje.peso_ton || detalle.peso_ton || 0,
                         );
+                        const precioEfectivo =
+                          viaje.precio_m3_override != null
+                            ? Number(viaje.precio_m3_override)
+                            : Number(detalle.precio_m3 || 0);
 
                         return (
                           <View
@@ -245,6 +270,9 @@ const PDFConciliacionMaterialPetreo = ({
                               {formatearNumero(
                                 viaje.peso_ton || detalle.peso_ton,
                               )}
+                            </Text>
+                            <Text style={materialPetreoStyles.colPU}>
+                              ${formatearNumero(precioEfectivo)}
                             </Text>
                             <Text style={materialPetreoStyles.colImporte}>
                               {formatearNumero(
@@ -353,6 +381,44 @@ const PDFConciliacionMaterialPetreo = ({
             </Text>
           </View>
         </View>
+
+        {/* Tarifas aplicadas */}
+        {(tarifaPrimerKm != null || tarifaSubsecuente != null) && (
+          <View
+            style={{
+              marginTop: 8,
+              borderTop: "0.5pt solid #E0E0E0",
+              paddingTop: 5,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 7,
+                fontWeight: 700,
+                textAlign: "right",
+                marginBottom: 3,
+              }}
+            >
+              Tarifas aplicadas:
+            </Text>
+            {tarifaPrimerKm != null && (
+              <View style={sharedStyles.totalRow}>
+                <Text style={sharedStyles.totalLabel}>1er km:</Text>
+                <Text style={sharedStyles.totalValue}>
+                  ${formatearNumero(tarifaPrimerKm)}/m³
+                </Text>
+              </View>
+            )}
+            {tarifaSubsecuente != null && (
+              <View style={sharedStyles.totalRow}>
+                <Text style={sharedStyles.totalLabel}>km subsecuente:</Text>
+                <Text style={sharedStyles.totalValue}>
+                  ${formatearNumero(tarifaSubsecuente)}/m³
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* FIRMAS */}
         <View style={sharedStyles.firmasSection}>

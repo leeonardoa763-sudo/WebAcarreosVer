@@ -131,11 +131,76 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
         });
     }
 
-    // TIPO 3: Producto de Corte
+    // TIPO 3: Producto de Corte — agrupar viajes por banco+precio efectivo
     if (idTipo === 3) {
+      const viajes = detalle.vale_material_viajes || [];
       const capacidad = detalle.capacidad_m3 ?? vale.vehiculos?.capacidad_m3;
-      return (
-        <tr key={`${vale.id_vale}-${idx}`}>
+
+      // Sin viajes: una sola fila con datos del detalle
+      if (viajes.length === 0) {
+        return (
+          <tr key={`${vale.id_vale}-${idx}`}>
+            <td>{formatearFechaCorta(vale.fecha_creacion)}</td>
+            <td className="tabla-vales__folio">{vale.folio}</td>
+            <td>
+              <div className="tabla-vales__material">
+                <Package size={14} aria-hidden="true" />
+                <span>{detalle.material?.material || "N/A"}</span>
+              </div>
+            </td>
+            <td>{detalle.bancos?.banco || "N/A"}</td>
+            <td>{Number(detalle.distancia_km || 0).toFixed(1)} km</td>
+            <td className="tabla-vales__viajes">0</td>
+            <td>{capacidad != null ? formatearVolumen(capacidad) : "—"}</td>
+            <td>{formatearVolumen(detalle.volumen_real_m3)}</td>
+            <td className="tabla-vales__costo">
+              {formatearMoneda(detalle.precio_m3 || 0)}
+            </td>
+            <td className="tabla-vales__costo">
+              {formatearMoneda(detalle.costo_total || 0)}
+            </td>
+          </tr>
+        );
+      }
+
+      // Agrupar por banco efectivo + precio efectivo
+      const grupos = {};
+      viajes.forEach((viaje) => {
+        const bancoNombre =
+          viaje.id_banco_override != null
+            ? viaje.banco_override?.banco || "N/A"
+            : detalle.bancos?.banco || "N/A";
+        const distanciaEfectiva =
+          viaje.distancia_km_override != null
+            ? Number(viaje.distancia_km_override)
+            : Number(detalle.distancia_km || 0);
+        const precioEfectivo =
+          viaje.precio_m3_override != null
+            ? Number(viaje.precio_m3_override)
+            : Number(detalle.precio_m3 || 0);
+        const costoViaje =
+          viaje.costo_viaje_override != null
+            ? Number(viaje.costo_viaje_override)
+            : Number(viaje.volumen_m3 || 0) * precioEfectivo;
+
+        const grupoKey = `${bancoNombre}__${precioEfectivo}`;
+        if (!grupos[grupoKey]) {
+          grupos[grupoKey] = {
+            bancoNombre,
+            distanciaEfectiva,
+            precioEfectivo,
+            cantidadViajes: 0,
+            totalVolumen: 0,
+            totalCosto: 0,
+          };
+        }
+        grupos[grupoKey].cantidadViajes++;
+        grupos[grupoKey].totalVolumen += Number(viaje.volumen_m3 || 0);
+        grupos[grupoKey].totalCosto += costoViaje;
+      });
+
+      return Object.entries(grupos).map(([grupoKey, g]) => (
+        <tr key={`${vale.id_vale}-${idx}-${grupoKey}`}>
           <td>{formatearFechaCorta(vale.fecha_creacion)}</td>
           <td className="tabla-vales__folio">{vale.folio}</td>
           <td>
@@ -144,21 +209,19 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
               <span>{detalle.material?.material || "N/A"}</span>
             </div>
           </td>
-          <td>{detalle.bancos?.banco || "N/A"}</td>
-          <td>{formatearVolumen(detalle.distancia_km)} km</td>
-          <td className="tabla-vales__viajes">
-            {detalle.vale_material_viajes?.length || 1}
-          </td>
+          <td>{g.bancoNombre}</td>
+          <td>{g.distanciaEfectiva.toFixed(1)} km</td>
+          <td className="tabla-vales__viajes">{g.cantidadViajes}</td>
           <td>{capacidad != null ? formatearVolumen(capacidad) : "—"}</td>
-          <td>{formatearVolumen(detalle.volumen_real_m3)}</td>
+          <td>{formatearVolumen(g.totalVolumen)}</td>
           <td className="tabla-vales__costo">
-            {formatearMoneda(detalle.precio_m3 || 0)}
+            {formatearMoneda(g.precioEfectivo)}
           </td>
           <td className="tabla-vales__costo">
-            {formatearMoneda(detalle.costo_total || 0)}
+            {formatearMoneda(g.totalCosto)}
           </td>
         </tr>
-      );
+      ));
     }
 
     return null;

@@ -4,7 +4,7 @@
  * Estilos específicos para PDFs de Material Pétreo (Tipo 1 y 2)
  *
  * COLUMNAS:
- * - Placas, Fecha, Folio, Folio Banco, Material, Banco, Distancia, Viajes, Volumen, Toneladas, Importe
+ * - Placas, Fecha, Folio, Folio Banco, Material, Banco, Distancia, Viajes, Volumen, Toneladas, PU/m³, Importe
  *
  * Usado en: PDFConciliacionMaterialPetreo.jsx
  */
@@ -14,11 +14,11 @@ import { StyleSheet } from "@react-pdf/renderer";
 export const materialPetreoStyles = StyleSheet.create({
   // ========================================
   // COLUMNAS ESPECÍFICAS DE PÉTREO
-  // Total ancho: 55+50+55+50+75+48+33+36+36+47 = 485pt
-  // Página carta con padding 30c/lado = ~535pt disponibles
+  // Total: 53+50+54+50+60+63+33+36+36+40+47 = 522pt
+  // Carta paddingHorizontal:30 + table paddingHorizontal:15 => 522pt disponibles
   // ========================================
   colPlacas: {
-    width: 55,
+    width: 53,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
@@ -30,7 +30,7 @@ export const materialPetreoStyles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   colFolio: {
-    width: 55,
+    width: 54,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
@@ -42,13 +42,13 @@ export const materialPetreoStyles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   colMaterial: {
-    width: 75,
+    width: 60,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
   },
   colBanco: {
-    width: 48,
+    width: 63,
     fontSize: 7,
     textAlign: "center",
     paddingHorizontal: 2,
@@ -69,6 +69,12 @@ export const materialPetreoStyles = StyleSheet.create({
     width: 36,
     fontSize: 7,
     textAlign: "center",
+    paddingHorizontal: 2,
+  },
+  colPU: {
+    width: 40,
+    fontSize: 7,
+    textAlign: "right",
     paddingHorizontal: 2,
   },
   colImporte: {
