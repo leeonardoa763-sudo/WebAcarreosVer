@@ -9,6 +9,7 @@
  * - Tipo 1 y 2 (Pétreo / Base Asfáltica): volumen_real_m3, peso, banco, requisición, viajes físicos
  * - Tipo 3 (Producto de Corte): volumen_real_m3, capacidad, viajes con banco/distancia override
  * - Botón de editar viajes (solo Administrador, tipos 1/2/3, vales no conciliados ni verificados)
+ * - Botón de cancelar vale (solo Administrador, estados emitido/en_proceso)
  *
  * Usado en: ValeCard.jsx
  */
@@ -50,8 +51,11 @@ import { useAuth } from "../../hooks/useAuth";
 
 // 5. Componentes
 import ModalEditarVale from "./editar/ModalEditarVale";
+import ModalCancelarVale from "./ModalCancelarVale";
 
-const ValeCardMaterial = ({ vale, empresaColor }) => {
+const ESTADOS_CANCELABLES = ["emitido", "en_proceso"];
+
+const ValeCardMaterial = ({ vale, empresaColor, onValeActualizado }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const badgeEstado = getBadgeEstado(vale.estado);
   const { fecha, hora } = formatearFechaHora(vale.fecha_creacion);
@@ -66,11 +70,18 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
     idDetalle: null,
   });
 
+  // Estado del modal de cancelación
+  const [modalCancelar, setModalCancelar] = useState(false);
+
   // El vale es editable si es admin y no está conciliado ni verificado
   const valeEditable =
     esAdministrador &&
     vale.estado !== "conciliado" &&
     vale.estado !== "verificado";
+
+  // El vale es cancelable si es admin y está en estado emitido o en_proceso
+  const valeCancelable =
+    esAdministrador && ESTADOS_CANCELABLES.includes(vale.estado);
 
   const abrirModalEditar = (e, idDetalle) => {
     e.stopPropagation();
@@ -152,6 +163,22 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
             </span>
           </div>
         </div>
+
+        {/* Botón cancelar — solo Administrador, estados cancelables */}
+        {valeCancelable && (
+          <button
+            type="button"
+            className="vale-card__btn-cancelar"
+            onClick={(e) => {
+              e.stopPropagation();
+              setModalCancelar(true);
+            }}
+            title="Cancelar este vale"
+          >
+            <XCircle size={12} aria-hidden="true" />
+            Cancelar
+          </button>
+        )}
 
         <button
           onClick={(e) => {
@@ -805,6 +832,18 @@ const ValeCardMaterial = ({ vale, empresaColor }) => {
           folioVale={vale.folio}
           onCerrar={cerrarModalEditar}
           onGuardadoExitoso={cerrarModalEditar}
+        />
+      )}
+
+      {/* Modal de cancelación */}
+      {modalCancelar && (
+        <ModalCancelarVale
+          vale={vale}
+          onCerrar={() => setModalCancelar(false)}
+          onCanceladoExitoso={() => {
+            setModalCancelar(false);
+            onValeActualizado?.();
+          }}
         />
       )}
     </div>

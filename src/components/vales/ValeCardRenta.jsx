@@ -10,6 +10,7 @@
  * - Desglose de viajes individuales desde vale_renta_viajes
  * - Lógica condicional basada en es_renta_por_dia
  * - Botón de editar tipo de renta (solo Administrador, solo vales no conciliados ni verificados)
+ * - Botón de cancelar vale (solo Administrador, estados emitido/en_proceso)
  *
  * Usado en: ValeCard.jsx
  */
@@ -49,6 +50,7 @@ import { useAuth } from "../../hooks/useAuth";
 
 // 5. Componentes
 import ModalEditarValeRenta from "./editar/ModalEditarValeRenta";
+import ModalCancelarVale from "./ModalCancelarVale";
 
 // ─── Helpers locales ──────────────────────────────────────────────────────────
 
@@ -87,14 +89,21 @@ const obtenerFechaEfectiva = (vale) => {
   return fecha;
 };
 
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
+const ESTADOS_CANCELABLES = ["emitido", "en_proceso"];
+
 // ─── Componente ───────────────────────────────────────────────────────────────
 
-const ValeCardRenta = ({ vale, empresaColor }) => {
+const ValeCardRenta = ({ vale, empresaColor, onValeActualizado }) => {
   const { userProfile } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Estado del modal de edición — null cuando está cerrado
   const [modalEditar, setModalEditar] = useState(null);
+
+  // Estado del modal de cancelación
+  const [modalCancelar, setModalCancelar] = useState(false);
 
   const badgeEstado = getBadgeEstado(vale.estado);
 
@@ -116,6 +125,11 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
     userProfile?.roles?.role === "Administrador" &&
     vale.estado !== "conciliado" &&
     vale.estado !== "verificado";
+
+  // El vale es cancelable si es admin y está en estado emitido o en_proceso
+  const valeCancelable =
+    userProfile?.roles?.role === "Administrador" &&
+    ESTADOS_CANCELABLES.includes(vale.estado);
 
   // ── Handlers del modal ─────────────────────────────────────────────────────
 
@@ -164,6 +178,22 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
             </span>
           </div>
         </div>
+
+        {/* Botón cancelar — solo Administrador, estados cancelables */}
+        {valeCancelable && (
+          <button
+            type="button"
+            className="vale-card__btn-cancelar"
+            onClick={(e) => {
+              e.stopPropagation();
+              setModalCancelar(true);
+            }}
+            title="Cancelar este vale"
+          >
+            <XCircle size={12} aria-hidden="true" />
+            Cancelar
+          </button>
+        )}
 
         <button
           onClick={(e) => {
@@ -631,6 +661,18 @@ const ValeCardRenta = ({ vale, empresaColor }) => {
           folioVale={vale.folio}
           onCerrar={cerrarModal}
           onGuardadoExitoso={cerrarModal}
+        />
+      )}
+
+      {/* Modal de cancelación */}
+      {modalCancelar && (
+        <ModalCancelarVale
+          vale={vale}
+          onCerrar={() => setModalCancelar(false)}
+          onCanceladoExitoso={() => {
+            setModalCancelar(false);
+            onValeActualizado?.();
+          }}
         />
       )}
     </div>

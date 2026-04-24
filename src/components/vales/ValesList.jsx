@@ -28,7 +28,7 @@ import { calcularSemanaISO } from "../../utils/dateUtils";
 // 4. Componentes
 import ValeCard from "./ValeCard";
 
-const ValesList = ({ vales }) => {
+const ValesList = ({ vales, onValeActualizado }) => {
   /**
    * Obtener color según empresa
    */
@@ -256,6 +256,7 @@ const ValesList = ({ vales }) => {
                                         <ValeCard
                                           key={vale.id_vale}
                                           vale={vale}
+                                          onValeActualizado={onValeActualizado}
                                         />
                                       ))}
                                     </div>

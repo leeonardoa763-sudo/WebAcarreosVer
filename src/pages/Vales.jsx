@@ -49,6 +49,7 @@ const Vales = () => {
     updateFilters,
     clearFilters,
     hasFilters,
+    fetchVales,
   } = useVales();
 
   // Estado local para mostrar/ocultar filtros
@@ -259,7 +260,11 @@ const Vales = () => {
             )}
           </div>
         ) : (
-          <ValesList vales={valesFiltrados} onValeClick={handleValeClick} />
+          <ValesList
+            vales={valesFiltrados}
+            onValeClick={handleValeClick}
+            onValeActualizado={fetchVales}
+          />
         )}
       </main>
     </div>

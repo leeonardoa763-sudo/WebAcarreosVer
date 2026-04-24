@@ -15,14 +15,26 @@
 import ValeCardMaterial from "./ValeCardMaterial";
 import ValeCardRenta from "./ValeCardRenta";
 
-const ValeCard = ({ vale, empresaColor }) => {
+const ValeCard = ({ vale, empresaColor, onValeActualizado }) => {
   // Decidir qué componente renderizar según tipo_vale
   if (vale.tipo_vale === "material") {
-    return <ValeCardMaterial vale={vale} empresaColor={empresaColor} />;
+    return (
+      <ValeCardMaterial
+        vale={vale}
+        empresaColor={empresaColor}
+        onValeActualizado={onValeActualizado}
+      />
+    );
   }
 
   if (vale.tipo_vale === "renta") {
-    return <ValeCardRenta vale={vale} empresaColor={empresaColor} />;
+    return (
+      <ValeCardRenta
+        vale={vale}
+        empresaColor={empresaColor}
+        onValeActualizado={onValeActualizado}
+      />
+    );
   }
 
   // Fallback: tipo desconocido (no debería pasar)
