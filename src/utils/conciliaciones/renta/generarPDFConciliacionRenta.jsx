@@ -26,11 +26,6 @@ export const generarPDFConciliacionRenta = async (
   totales
 ) => {
   try {
-    console.log(
-      "[generarPDFConciliacionRenta] Generando PDF para:",
-      conciliacion.folio
-    );
-
     // Generar QR con URL de soporte de vales
     const qrDataUrl = await QRCode.toDataURL(
       `${BASE_URL}/conciliacion/${conciliacion.folio}`,
@@ -56,8 +51,6 @@ export const generarPDFConciliacionRenta = async (
 
     // Limpiar URL temporal
     URL.revokeObjectURL(url);
-
-    console.log("[generarPDFConciliacionRenta] PDF generado exitosamente");
   } catch (error) {
     console.error("[generarPDFConciliacionRenta] Error al generar PDF:", error);
     throw error;

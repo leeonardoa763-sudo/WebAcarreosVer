@@ -858,3 +858,132 @@
 .modal-actions .btn:hover {
   transform: translateY(-2px);
 }
+
+/* ========================================
+   DETALLES EXPANDIBLES DE VIAJES
+======================================== */
+
+.tabla-vales__fila-viaje {
+  background: #ffffff;
+}
+
+.tabla-vales__fila-viaje:hover {
+  background: linear-gradient(135deg, #f5f6fa 0%, #ffffff 100%);
+}
+
+.tabla-vales__detalle-viaje {
+  background: linear-gradient(135deg, #fafbfc 0%, #f5f6fa 100%);
+  border-top: 1px solid #e5e7eb;
+}
+
+.tabla-vales__detalle-viaje--expanded {
+  animation: expandDown 0.3s ease;
+}
+
+.detalle-viaje {
+  width: 100%;
+}
+
+.detalle-viaje__toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.detalle-viaje__toggle:hover {
+  background: rgba(255, 107, 53, 0.05);
+}
+
+.detalle-viaje__toggle svg {
+  color: #ff6b35;
+  flex-shrink: 0;
+}
+
+.detalle-viaje__header {
+  color: #ff6b35;
+  font-weight: 700;
+}
+
+.detalle-viaje__content {
+  padding: 16px 24px 16px 48px;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+  }
+}
+
+.detalle-viaje__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.detalle-viaje__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+  border-radius: 6px;
+  border-left: 3px solid #ff6b35;
+}
+
+.detalle-viaje__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.detalle-viaje__value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.detalle-viaje__value--destacado {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a936f;
+  background: rgba(26, 147, 111, 0.05);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+@media (max-width: 768px) {
+  .detalle-viaje__content {
+    padding: 12px 16px 12px 32px;
+  }
+
+  .detalle-viaje__grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .detalle-viaje__item {
+    padding: 10px;
+  }
+}

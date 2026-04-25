@@ -17,23 +17,33 @@
 import { useEffect, useState } from "react";
 
 // 2. Icons
-import { X, Loader2, FileDown } from "lucide-react";
+import { X, Loader2, FileDown, Printer } from "lucide-react";
 
 // 3. Config
 import { supabase } from "../../config/supabase";
 import { colors } from "../../config/colors";
 
-// 4. Componentes
+// 4. Hooks personalizados
+import { useAuth } from "../../hooks/useAuth";
+
+// 5. Componentes
 import VistaPreviewRenta from "./preview/VistaPreviewRenta";
 import VistaPreviewMaterial from "./preview/VistaPreviewMaterial";
+import BotonGenerarPDF from "../conciliaciones/BotonGenerarPDF";
 
-// 5. Utils
+// 6. Utils
 import { formatearFechaCorta } from "../../utils/formatters";
 
 const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
+  const { userProfile } = useAuth();
+  const esAdmin = userProfile?.roles?.role === "Administrador";
+
   const [valesAgrupados, setValesAgrupados] = useState(null);
   // Guardamos el array plano de vales para el export PDF
   const [valesPlanos, setValesPlanos] = useState([]);
+  const [totalesPDF, setTotalesPDF] = useState(null);
+  // Versión normalizada con la estructura que esperan los generadores PDF
+  const [conciliacionNormalizada, setConciliacionNormalizada] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [exportandoPDF, setExportandoPDF] = useState(false);
@@ -129,6 +139,16 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
           // Agrupar por placas para la vista previa
           const grupos = agruparPorPlacasRenta(vales);
           setValesAgrupados(grupos);
+
+          // Totales para reimprimir PDF (renta no tiene retención)
+          const gruposArr = Object.values(grupos);
+          setTotalesPDF({
+            subtotal: conciliacion.subtotal,
+            iva: conciliacion.iva_16_porciento,
+            total: conciliacion.total_final,
+            totalDias: gruposArr.reduce((s, g) => s + g.totalDias, 0),
+            totalHoras: gruposArr.reduce((s, g) => s + g.totalHoras, 0),
+          });
         } else {
           // Material
           const { data: vales, error: errorVales } = await supabase
@@ -201,7 +221,40 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
 
           const grupos = agruparPorPlacasMaterial(vales || []);
           setValesAgrupados(grupos);
+
+          // Totales para reimprimir PDF (material incluye retención)
+          const gruposArr = Object.values(grupos);
+          setTotalesPDF({
+            subtotal: conciliacion.subtotal,
+            iva: conciliacion.iva_16_porciento,
+            retencion: conciliacion.retencion_4_porciento,
+            total: conciliacion.total_final,
+            totalViajesTipo1: gruposArr.reduce((s, g) => s + (g.totalesTipo1?.totalViajes || 0), 0),
+            totalViajesTipo2: gruposArr.reduce((s, g) => s + (g.totalesTipo2?.totalViajes || 0), 0),
+            totalM3Tipo1: gruposArr.reduce((s, g) => s + (g.totalesTipo1?.totalM3 || 0), 0),
+            totalM3Tipo2: gruposArr.reduce((s, g) => s + (g.totalesTipo2?.totalM3 || 0), 0),
+            totalToneladasTipo1: gruposArr.reduce((s, g) => s + (g.totalesTipo1?.totalToneladas || 0), 0),
+            totalToneladasTipo2: gruposArr.reduce((s, g) => s + (g.totalesTipo2?.totalToneladas || 0), 0),
+          });
         }
+
+        // Normalizar conciliacion para los generadores PDF:
+        // - En historial: empresas está anidada en obras.empresas (no en raíz)
+        // - En creación fresca: empresas está en la raíz
+        // - sindicatos.nombre_firma_conciliacion puede no existir en historial
+        setConciliacionNormalizada({
+          ...conciliacion,
+          empresas: conciliacion.empresas ?? conciliacion.obras?.empresas,
+          sindicatos: conciliacion.sindicatos
+            ? {
+                ...conciliacion.sindicatos,
+                nombre_firma_conciliacion:
+                  conciliacion.sindicatos.nombre_firma_conciliacion ??
+                  conciliacion.sindicatos.nombre_completo ??
+                  "",
+              }
+            : conciliacion.sindicatos,
+        });
       } catch (err) {
         console.error("[ModalVistaPreviewConciliacion] Error:", err);
         setError(err.message);
@@ -365,6 +418,20 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
           </h2>
 
           <div className="modal-preview__header-actions">
+            {/* Botón reimprimir conciliación PDF — solo Administrador */}
+            {esAdmin && !loading && !error && conciliacionNormalizada && totalesPDF && (
+              <BotonGenerarPDF
+                conciliacion={conciliacionNormalizada}
+                valesAgrupados={valesAgrupados}
+                totales={totalesPDF}
+                tipoConciliacion={tipo}
+                customIcon={<Printer size={16} />}
+                customText="Reimprimir PDF"
+                customClassName="modal-preview__btn-export modal-preview__btn-export--reimprimir"
+                onPdfGenerado={() => {}}
+              />
+            )}
+
             {/* Botón exportar vales PDF — solo visible para conciliaciones de renta */}
             {!loading && !error && valesPlanos.length > 0 && (
               <button

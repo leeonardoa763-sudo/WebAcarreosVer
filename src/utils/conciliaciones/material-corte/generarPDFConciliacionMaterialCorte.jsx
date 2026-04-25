@@ -26,11 +26,6 @@ export const generarPDFConciliacionMaterialCorte = async (
   totales
 ) => {
   try {
-    console.log(
-      "[generarPDFConciliacionMaterialCorte] Generando PDF para:",
-      conciliacion.folio
-    );
-
     // Generar QR con URL de soporte de vales
     const qrDataUrl = await QRCode.toDataURL(
       `${BASE_URL}/conciliacion/${conciliacion.folio}`,
@@ -56,10 +51,6 @@ export const generarPDFConciliacionMaterialCorte = async (
 
     // Limpiar URL temporal
     URL.revokeObjectURL(url);
-
-    console.log(
-      "[generarPDFConciliacionMaterialCorte] PDF generado exitosamente"
-    );
   } catch (error) {
     console.error(
       "[generarPDFConciliacionMaterialCorte] Error al generar PDF:",

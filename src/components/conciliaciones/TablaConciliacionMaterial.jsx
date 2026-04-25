@@ -22,6 +22,7 @@ import {
   Truck,
   FileText,
   Package,
+  ChevronUp,
 } from "lucide-react";
 
 // 3. Utils
@@ -34,11 +35,19 @@ import {
 
 const TablaConciliacionMaterial = ({ valesAgrupados }) => {
   const [collapsed, setCollapsed] = useState({});
+  const [expandedViajes, setExpandedViajes] = useState({});
 
   const toggleGroup = (placas) => {
     setCollapsed((prev) => ({
       ...prev,
       [placas]: !prev[placas],
+    }));
+  };
+
+  const toggleViaje = (viajeId) => {
+    setExpandedViajes((prev) => ({
+      ...prev,
+      [viajeId]: !prev[viajeId],
     }));
   };
 
@@ -50,6 +59,108 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
       </div>
     );
   }
+
+  /**
+   * Renderizar detalles expandibles de un viaje
+   */
+  const renderDetallesViaje = (viaje, detalle) => {
+    const isExpanded = expandedViajes[viaje.id_viaje];
+
+    return (
+      <tr
+        key={`viaje-detail-${viaje.id_viaje}`}
+        className={`tabla-vales__detalle-viaje ${
+          isExpanded ? "tabla-vales__detalle-viaje--expanded" : ""
+        }`}
+      >
+        <td colSpan="12">
+          <div className="detalle-viaje">
+            <button
+              className="detalle-viaje__toggle"
+              onClick={() => toggleViaje(viaje.id_viaje)}
+              type="button"
+              aria-expanded={isExpanded}
+            >
+              {isExpanded ? (
+                <ChevronUp size={16} />
+              ) : (
+                <ChevronRight size={16} />
+              )}
+              <span className="detalle-viaje__header">
+                Viaje #{viaje.numero_viaje} — {viaje.hora_registro
+                  ? new Date(viaje.hora_registro).toLocaleString("es-MX", {
+                      timeZone: "America/Mexico_City",
+                      year: "numeric",
+                      month: "2-digit",
+                      day: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "Hora no registrada"}
+              </span>
+            </button>
+
+            {isExpanded && (
+              <div className="detalle-viaje__content">
+                <div className="detalle-viaje__grid">
+                  <div className="detalle-viaje__item">
+                    <span className="detalle-viaje__label">Volumen (m³):</span>
+                    <span className="detalle-viaje__value">
+                      {formatearVolumen(viaje.volumen_m3 || detalle.volumen_real_m3)}
+                    </span>
+                  </div>
+                  <div className="detalle-viaje__item">
+                    <span className="detalle-viaje__label">Peso (Ton):</span>
+                    <span className="detalle-viaje__value">
+                      {formatearPeso(viaje.peso_ton || detalle.peso_ton)}
+                    </span>
+                  </div>
+                  <div className="detalle-viaje__item">
+                    <span className="detalle-viaje__label">Distancia:</span>
+                    <span className="detalle-viaje__value">
+                      {viaje.distancia_km_override != null
+                        ? viaje.distancia_km_override.toFixed(1)
+                        : detalle.distancia_km?.toFixed(1) || 0}{" "}
+                      km
+                    </span>
+                  </div>
+                  <div className="detalle-viaje__item">
+                    <span className="detalle-viaje__label">Precio/m³:</span>
+                    <span className="detalle-viaje__value">
+                      {formatearMoneda(
+                        viaje.precio_m3_override != null
+                          ? viaje.precio_m3_override
+                          : detalle.precio_m3 || 0,
+                      )}
+                    </span>
+                  </div>
+                  <div className="detalle-viaje__item">
+                    <span className="detalle-viaje__label">Importe Viaje:</span>
+                    <span className="detalle-viaje__value detalle-viaje__value--destacado">
+                      {formatearMoneda(
+                        viaje.costo_viaje_override != null
+                          ? viaje.costo_viaje_override
+                          : Number(viaje.volumen_m3 || detalle.volumen_real_m3) *
+                              (viaje.precio_m3_override != null
+                                ? viaje.precio_m3_override
+                                : detalle.precio_m3 || 0),
+                      )}
+                    </span>
+                  </div>
+                  <div className="detalle-viaje__item">
+                    <span className="detalle-viaje__label">Folio Banco:</span>
+                    <span className="detalle-viaje__value">
+                      {viaje.id_banco_override ? "Banco override" : detalle.folio_banco || "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </td>
+      </tr>
+    );
+  };
 
   /**
    * Renderizar fila según tipo de material
@@ -91,17 +202,17 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
         );
       }
 
-      // 1 fila por viaje
+      // Renderizar viajes con detalles expandibles
       return viajes
         .sort((a, b) => a.numero_viaje - b.numero_viaje)
-        .map((viaje) => {
+        .flatMap((viaje) => {
           const precioEfectivo = viaje.precio_m3_override != null
             ? Number(viaje.precio_m3_override)
             : Number(detalle.precio_m3 || 0);
           const importeViaje = Number(viaje.volumen_m3 || 0) * precioEfectivo;
 
-          return (
-            <tr key={`viaje-${viaje.id_viaje}`}>
+          return [
+            <tr key={`viaje-${viaje.id_viaje}`} className="tabla-vales__fila-viaje">
               <td>{formatearFechaCorta(vale.fecha_creacion)}</td>
               <td className="tabla-vales__folio">{vale.folio}</td>
               <td className="tabla-vales__folio-banco">
@@ -126,8 +237,9 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
               <td className="tabla-vales__costo">
                 {formatearMoneda(importeViaje)}
               </td>
-            </tr>
-          );
+            </tr>,
+            renderDetallesViaje(viaje, detalle),
+          ];
         });
     }
 

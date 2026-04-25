@@ -417,14 +417,52 @@ export const useConciliacionesQueries = () => {
                     `
                     *,
                     vale_material_detalles (
+                      id_detalle_material,
                       cantidad_pedida_m3,
                       volumen_real_m3,
                       distancia_km,
                       precio_m3,
                       costo_total,
+                      folio_banco,
+                      requisicion,
+                      notas_adicionales,
                       material:id_material (
-                        material
+                        id_material,
+                        material,
+                        tipo_de_material:id_tipo_de_material (
+                          id_tipo_de_material,
+                          tipo_de_material
+                        )
+                      ),
+                      bancos:id_banco (
+                        id_banco,
+                        banco
+                      ),
+                      vale_material_viajes (
+                        id_viaje,
+                        numero_viaje,
+                        hora_registro,
+                        peso_ton,
+                        volumen_m3,
+                        id_banco_override,
+                        distancia_km_override,
+                        precio_m3_override,
+                        costo_viaje_override
                       )
+                    ),
+                    operadores:id_operador (
+                      id_operador,
+                      nombre_completo
+                    ),
+                    vehiculos:id_vehiculo (
+                      id_vehiculo,
+                      placas
+                    ),
+                    tickets_material (
+                      id_ticket,
+                      numero_ticket,
+                      folio_ticket,
+                      fecha_impresion
                     )
                   `,
                   )
@@ -576,14 +614,52 @@ export const useConciliacionesQueries = () => {
                   `
                   *,
                   vale_material_detalles (
+                    id_detalle_material,
                     cantidad_pedida_m3,
                     volumen_real_m3,
                     distancia_km,
                     precio_m3,
                     costo_total,
+                    folio_banco,
+                    requisicion,
+                    notas_adicionales,
                     material:id_material (
-                      material
+                      id_material,
+                      material,
+                      tipo_de_material:id_tipo_de_material (
+                        id_tipo_de_material,
+                        tipo_de_material
+                      )
+                    ),
+                    bancos:id_banco (
+                      id_banco,
+                      banco
+                    ),
+                    vale_material_viajes (
+                      id_viaje,
+                      numero_viaje,
+                      hora_registro,
+                      peso_ton,
+                      volumen_m3,
+                      id_banco_override,
+                      distancia_km_override,
+                      precio_m3_override,
+                      costo_viaje_override
                     )
+                  ),
+                  operadores:id_operador (
+                    id_operador,
+                    nombre_completo
+                  ),
+                  vehiculos:id_vehiculo (
+                    id_vehiculo,
+                    placas
+                  ),
+                  tickets_material (
+                    id_ticket,
+                    numero_ticket,
+                    folio_ticket,
+                    fecha_impresion
                   )
                 `,
                 )
