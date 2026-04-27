@@ -70,6 +70,23 @@ const PDFConciliacionMaterialCorte = ({
   const totalM3 = totales.totalM3Tipo3 || 0;
   const precioM3 = totalM3 > 0 ? totales.subtotal / totalM3 : 0;
 
+  // Extraer tarifas del primer detalle disponible (todo el archivo usa las mismas)
+  let tarifaPrimerKm = null;
+  let tarifaSubsecuente = null;
+  for (const grupo of Object.values(valesAgrupados)) {
+    for (const vale of grupo.vales) {
+      for (const detalle of vale.vale_material_detalles) {
+        if (detalle.tarifa_primer_km != null) {
+          tarifaPrimerKm = Number(detalle.tarifa_primer_km);
+          tarifaSubsecuente = Number(detalle.tarifa_subsecuente);
+          break;
+        }
+      }
+      if (tarifaPrimerKm != null) break;
+    }
+    if (tarifaPrimerKm != null) break;
+  }
+
   return (
     <Document>
       <Page size="LETTER" style={sharedStyles.page}>
@@ -131,73 +148,143 @@ const PDFConciliacionMaterialCorte = ({
             <Text style={materialCorteStyles.colViajes}>Viaj</Text>
             <Text style={materialCorteStyles.colCapacidad}>Cap (m³)</Text>
             <Text style={materialCorteStyles.colM3Pedidos}>M³ Real</Text>
+            <Text style={materialCorteStyles.colPU}>PU/m³</Text>
             <Text style={materialCorteStyles.colImporte}>Importe</Text>
           </View>
 
           {/* Datos por placas */}
           {Object.entries(valesAgrupados).map(([placas, grupo]) => {
-            let viajesGrupo = 0;
-            let m3Grupo = 0;
+            // Pre-computar filas agrupadas por banco para este grupo de placas
+            const filas = [];
+
+            grupo.vales.forEach((vale) =>
+              vale.vale_material_detalles.forEach((detalle, idx) => {
+                const idTipo =
+                  detalle.material?.tipo_de_material?.id_tipo_de_material;
+                if (idTipo !== 3) return;
+
+                const viajes = detalle.vale_material_viajes || [];
+                const capacidad =
+                  detalle.capacidad_m3 ?? vale.vehiculos?.capacidad_m3;
+
+                if (viajes.length === 0) {
+                  filas.push({
+                    key: `${vale.id_vale}-${idx}`,
+                    fecha: vale.fecha_creacion.split("T")[0],
+                    folio: vale.folio,
+                    material: detalle.material?.material || "N/A",
+                    banco: detalle.bancos?.banco || "N/A",
+                    distancia: Number(detalle.distancia_km || 0),
+                    numViajes: 1,
+                    capacidad,
+                    volumen: Number(detalle.volumen_real_m3 || 0),
+                    precioM3: Number(detalle.precio_m3 || 0),
+                    costo: Number(detalle.costo_total || 0),
+                  });
+                  return;
+                }
+
+                // Agrupar viajes por banco efectivo + precio efectivo
+                const gruposBanco = {};
+                viajes.forEach((viaje) => {
+                  const bancoNombre =
+                    viaje.id_banco_override != null
+                      ? viaje.banco_override?.banco || "N/A"
+                      : detalle.bancos?.banco || "N/A";
+                  const distanciaEfectiva =
+                    viaje.distancia_km_override != null
+                      ? Number(viaje.distancia_km_override)
+                      : Number(detalle.distancia_km || 0);
+                  const precioEfectivo =
+                    viaje.precio_m3_override != null
+                      ? Number(viaje.precio_m3_override)
+                      : Number(detalle.precio_m3 || 0);
+                  const costoViaje =
+                    viaje.costo_viaje_override != null
+                      ? Number(viaje.costo_viaje_override)
+                      : Number(viaje.volumen_m3 || 0) * precioEfectivo;
+
+                  const grupoKey = `${bancoNombre}__${precioEfectivo}`;
+                  if (!gruposBanco[grupoKey]) {
+                    gruposBanco[grupoKey] = {
+                      bancoNombre,
+                      distanciaEfectiva,
+                      precioM3: precioEfectivo,
+                      cantidadViajes: 0,
+                      totalVolumen: 0,
+                      totalCosto: 0,
+                    };
+                  }
+                  gruposBanco[grupoKey].cantidadViajes++;
+                  gruposBanco[grupoKey].totalVolumen += Number(
+                    viaje.volumen_m3 || 0,
+                  );
+                  gruposBanco[grupoKey].totalCosto += costoViaje;
+                });
+
+                Object.entries(gruposBanco).forEach(([grupoKey, g]) => {
+                  filas.push({
+                    key: `${vale.id_vale}-${idx}-${grupoKey}`,
+                    fecha: vale.fecha_creacion.split("T")[0],
+                    folio: vale.folio,
+                    material: detalle.material?.material || "N/A",
+                    banco: g.bancoNombre,
+                    distancia: g.distanciaEfectiva,
+                    numViajes: g.cantidadViajes,
+                    capacidad,
+                    volumen: g.totalVolumen,
+                    precioM3: g.precioM3,
+                    costo: g.totalCosto,
+                  });
+                });
+              }),
+            );
+
+            const totalViajesGrupo = filas.reduce(
+              (s, f) => s + f.numViajes,
+              0,
+            );
+            const totalM3Grupo = filas.reduce((s, f) => s + f.volumen, 0);
 
             return (
               <View key={placas}>
-                {grupo.vales.map((vale) =>
-                  vale.vale_material_detalles.map((detalle, idx) => {
-                    const idTipo =
-                      detalle.material?.tipo_de_material?.id_tipo_de_material;
-
-                    // Solo procesar Tipo 3
-                    // Solo procesar Tipo 3
-                    if (idTipo !== 3) return null;
-
-                    const viajes = detalle.vale_material_viajes || [];
-                    const numViajes = viajes.length > 0 ? viajes.length : 1;
-
-                    viajesGrupo += numViajes;
-                    m3Grupo += Number(detalle.volumen_real_m3 || 0);
-
-                    return (
-                      <View
-                        style={sharedStyles.tableRow}
-                        key={`${vale.id_vale}-${idx}`}
-                      >
-                        <Text style={materialCorteStyles.colPlacas}>
-                          {placas}
-                        </Text>
-                        <Text style={materialCorteStyles.colFecha}>
-                          {formatearFecha(vale.fecha_creacion.split("T")[0])}
-                        </Text>
-                        <Text style={materialCorteStyles.colFolio}>
-                          {vale.folio}
-                        </Text>
-                        <Text style={materialCorteStyles.colMaterial}>
-                          {(detalle.material?.material || "N/A").substring(
-                            0,
-                            15,
-                          )}
-                        </Text>
-                        <Text style={materialCorteStyles.colBanco}>
-                          {(detalle.bancos?.banco || "N/A").substring(0, 15)}
-                        </Text>
-                        <Text style={materialCorteStyles.colDistancia}>
-                          {formatearNumero(detalle.distancia_km)}
-                        </Text>
-                        <Text style={materialCorteStyles.colViajes}>
-                          {numViajes}
-                        </Text>
-                        <Text style={materialCorteStyles.colCapacidad}>
-                          {formatearNumero(detalle.capacidad_m3)}
-                        </Text>
-                        <Text style={materialCorteStyles.colM3Pedidos}>
-                          {formatearNumero(detalle.volumen_real_m3)}
-                        </Text>
-                        <Text style={materialCorteStyles.colImporte}>
-                          ${formatearNumero(detalle.costo_total)}
-                        </Text>
-                      </View>
-                    );
-                  }),
-                )}
+                {filas.map((fila) => (
+                  <View style={sharedStyles.tableRow} key={fila.key}>
+                    <Text style={materialCorteStyles.colPlacas}>{placas}</Text>
+                    <Text style={materialCorteStyles.colFecha}>
+                      {formatearFecha(fila.fecha)}
+                    </Text>
+                    <Text style={materialCorteStyles.colFolio}>
+                      {fila.folio}
+                    </Text>
+                    <Text style={materialCorteStyles.colMaterial}>
+                      {fila.material.substring(0, 15)}
+                    </Text>
+                    <Text style={materialCorteStyles.colBanco}>
+                      {fila.banco.substring(0, 15)}
+                    </Text>
+                    <Text style={materialCorteStyles.colDistancia}>
+                      {formatearNumero(fila.distancia)}
+                    </Text>
+                    <Text style={materialCorteStyles.colViajes}>
+                      {fila.numViajes}
+                    </Text>
+                    <Text style={materialCorteStyles.colCapacidad}>
+                      {fila.capacidad != null
+                        ? formatearNumero(fila.capacidad)
+                        : "—"}
+                    </Text>
+                    <Text style={materialCorteStyles.colM3Pedidos}>
+                      {formatearNumero(fila.volumen)}
+                    </Text>
+                    <Text style={materialCorteStyles.colPU}>
+                      ${formatearNumero(fila.precioM3)}
+                    </Text>
+                    <Text style={materialCorteStyles.colImporte}>
+                      ${formatearNumero(fila.costo)}
+                    </Text>
+                  </View>
+                ))}
 
                 {/* Subtotal por placas */}
                 <View style={materialCorteStyles.subtotalRow}>
@@ -211,7 +298,7 @@ const PDFConciliacionMaterialCorte = ({
                         { paddingRight: 64 },
                       ]}
                     >
-                      {viajesGrupo}
+                      {totalViajesGrupo}
                     </Text>
                     <Text
                       style={[
@@ -219,7 +306,7 @@ const PDFConciliacionMaterialCorte = ({
                         { paddingRight: 20 },
                       ]}
                     >
-                      {formatearNumero(m3Grupo)}
+                      {formatearNumero(totalM3Grupo)}
                     </Text>
                     <Text
                       style={[
@@ -287,6 +374,44 @@ const PDFConciliacionMaterialCorte = ({
             </Text>
           </View>
         </View>
+
+        {/* Tarifas aplicadas */}
+        {(tarifaPrimerKm != null || tarifaSubsecuente != null) && (
+          <View
+            style={{
+              marginTop: 8,
+              borderTop: "0.5pt solid #E0E0E0",
+              paddingTop: 5,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 7,
+                fontWeight: 700,
+                textAlign: "right",
+                marginBottom: 3,
+              }}
+            >
+              Tarifas aplicadas:
+            </Text>
+            {tarifaPrimerKm != null && (
+              <View style={sharedStyles.totalRow}>
+                <Text style={sharedStyles.totalLabel}>1er km:</Text>
+                <Text style={sharedStyles.totalValue}>
+                  ${formatearNumero(tarifaPrimerKm)}/m³
+                </Text>
+              </View>
+            )}
+            {tarifaSubsecuente != null && (
+              <View style={sharedStyles.totalRow}>
+                <Text style={sharedStyles.totalLabel}>km subsecuente:</Text>
+                <Text style={sharedStyles.totalValue}>
+                  ${formatearNumero(tarifaSubsecuente)}/m³
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* ========================================
             FIRMAS

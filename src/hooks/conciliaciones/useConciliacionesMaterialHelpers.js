@@ -60,14 +60,18 @@ export const useConciliacionesMaterialHelpers = () => {
         const viajes = detalle.vale_material_viajes || [];
         const numViajes = viajes.length > 0 ? viajes.length : 1;
 
-        // Calcular costo real: cada viaje puede tener banco distinto con precio diferente.
-        // costo_viaje en BD usa precio_m3_detalle aunque haya override — recalcular aquí.
+        // Calcular costo real: usa costo_viaje_override si existe,
+        // luego precio_m3_override × volumen, o precio base × volumen.
         let costo;
         if (viajes.length > 0) {
           costo = viajes.reduce((suma, viaje) => {
-            const precio = viaje.precio_m3_override != null
-              ? Number(viaje.precio_m3_override)
-              : Number(detalle.precio_m3 || 0);
+            if (viaje.costo_viaje_override != null) {
+              return suma + Number(viaje.costo_viaje_override);
+            }
+            const precio =
+              viaje.precio_m3_override != null
+                ? Number(viaje.precio_m3_override)
+                : Number(detalle.precio_m3 || 0);
             return suma + Number(viaje.volumen_m3 || 0) * precio;
           }, 0);
         } else {

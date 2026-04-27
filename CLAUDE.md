@@ -83,8 +83,8 @@ src/
 // 2. React Router
 // 3. Third party
 // 4. Config
-import { supabase } from '../config/supabase';
-import { colors } from '../config/colors';
+import { supabase } from "../config/supabase";
+import { colors } from "../config/colors";
 // 5. Hooks personalizados
 // 6. Componentes
 // 7. Estilos
@@ -118,9 +118,12 @@ export default ComponentName;
 ### CSS — BEM por componente
 
 ```css
-.component-name { }
-.component-name__element { }
-.component-name--modifier { }
+.component-name {
+}
+.component-name__element {
+}
+.component-name--modifier {
+}
 ```
 
 Prefijos BEM establecidos: `mev__` (ModalEditarVale), `tev__` (TablaEditarViajes), `mer__` (ModalEditarValeRenta)
@@ -131,29 +134,30 @@ Prefijos BEM establecidos: `mev__` (ModalEditarVale), `tev__` (TablaEditarViajes
 
 > Schema completo con todas las columnas y tipos en `.claude/database.sql`.
 > Las migraciones también van ahí — agregar una entrada cada vez que se modifique la BD.
+> Índice de todos los componentes, hooks y páginas en `.claude/components.md` — actualizar al agregar/renombrar archivos.
 
 ### Tablas principales
 
-| Tabla | Descripción |
-|---|---|
-| `vales` | Órdenes de trabajo (material o renta) |
-| `vale_material_detalles` | Detalles de material por vale |
-| `vale_material_viajes` | Viajes individuales (Tipos 1 y 2) |
-| `tickets_material` | Tickets físicos (Tipo 3 — corte) |
-| `vale_renta_detalle` | Detalle de renta por vale |
-| `vale_renta_viajes` | Viajes de renta individuales |
-| `conciliaciones` | Conciliaciones financieras |
-| `conciliacion_vales` | Relación conciliación ↔ vales |
-| `operadores` | Operadores de vehículos |
-| `vehiculos` | Vehículos (placas) |
-| `obras` | Obras de construcción |
-| `empresas` | CAPAM, TRIACO, COEDESSA |
-| `sindicatos` | Organizaciones sindicales |
-| `bancos` | Bancos/canteras de material |
-| `material` | Catálogo de materiales |
-| `distancias_banco_obra` | Distancias entre banco y obra |
-| `persona` | Usuarios del sistema |
-| `roles` | Roles de acceso |
+| Tabla                    | Descripción                           |
+| ------------------------ | ------------------------------------- |
+| `vales`                  | Órdenes de trabajo (material o renta) |
+| `vale_material_detalles` | Detalles de material por vale         |
+| `vale_material_viajes`   | Viajes individuales (Tipos 1 y 2)     |
+| `tickets_material`       | Tickets físicos (Tipo 3 — corte)      |
+| `vale_renta_detalle`     | Detalle de renta por vale             |
+| `vale_renta_viajes`      | Viajes de renta individuales          |
+| `conciliaciones`         | Conciliaciones financieras            |
+| `conciliacion_vales`     | Relación conciliación ↔ vales        |
+| `operadores`             | Operadores de vehículos               |
+| `vehiculos`              | Vehículos (placas)                    |
+| `obras`                  | Obras de construcción                 |
+| `empresas`               | CAPAM, TRIACO, COEDESSA               |
+| `sindicatos`             | Organizaciones sindicales             |
+| `bancos`                 | Bancos/canteras de material           |
+| `material`               | Catálogo de materiales                |
+| `distancias_banco_obra`  | Distancias entre banco y obra         |
+| `persona`                | Usuarios del sistema                  |
+| `roles`                  | Roles de acceso                       |
 
 ### Columnas clave en `vales`
 
@@ -177,11 +181,11 @@ Prefijos BEM establecidos: `mev__` (ModalEditarVale), `tev__` (TablaEditarViajes
 
 ### Tipos de material
 
-| Tipo | Nombre | Tabla de viajes | Columna volumen |
-|---|---|---|---|
-| 1 | Materiales Pétreos | `vale_material_viajes` | `volumen_m3 = peso_ton / peso_especifico` |
-| 2 | Base Asfáltica | `vale_material_viajes` | `volumen_m3 = peso_ton / peso_especifico` |
-| 3 | Tepetate/Corte | `tickets_material` | `volumen_real_m3` — **nunca** `cantidad_pedida_m3` |
+| Tipo | Nombre             | Tabla de viajes        | Columna volumen                                    |
+| ---- | ------------------ | ---------------------- | -------------------------------------------------- |
+| 1    | Materiales Pétreos | `vale_material_viajes` | `volumen_m3 = peso_ton / peso_especifico`          |
+| 2    | Base Asfáltica     | `vale_material_viajes` | `volumen_m3 = peso_ton / peso_especifico`          |
+| 3    | Tepetate/Corte     | `tickets_material`     | `volumen_real_m3` — **nunca** `cantidad_pedida_m3` |
 
 ### Fórmulas de precio
 
@@ -220,10 +224,10 @@ Edición **bloqueada** cuando `estado === 'conciliado'` o `estado === 'verificad
 
 ```js
 // CORRECTO
-userProfile?.roles?.role === 'Administrador'
+userProfile?.roles?.role === "Administrador";
 
 // INCORRECTO
-userProfile?.rol
+userProfile?.rol;
 ```
 
 Nombres de roles (title case): `'Administrador'`, `'Finanzas'`, `'Sindicato'`
@@ -245,7 +249,7 @@ Nombres de roles (title case): `'Administrador'`, `'Finanzas'`, `'Sindicato'`
 ### Query base de vales (relaciones completas)
 
 ```js
-supabase.from('vales').select(`
+supabase.from("vales").select(`
   *,
   obras:id_obra (id_obra, obra, cc, empresas:id_empresa (empresa, sufijo, logo)),
   operadores:id_operador (id_operador, id_sindicato, nombre_completo,
@@ -265,7 +269,7 @@ supabase.from('vales').select(`
       id_banco_override, distancia_km_override, precio_m3_override, costo_viaje_override
     )
   )
-`)
+`);
 ```
 
 ### Filtro por sindicato — solo en cliente
@@ -275,7 +279,8 @@ PostgREST **no soporta** filtrar por relaciones anidadas. Filtrar después de re
 ```js
 if (esSindicato && idSindicatoUsuario) {
   datos = datos.filter(
-    (vale) => Number(vale.operadores?.id_sindicato) === Number(idSindicatoUsuario)
+    (vale) =>
+      Number(vale.operadores?.id_sindicato) === Number(idSindicatoUsuario),
   );
 }
 ```
@@ -301,11 +306,11 @@ const fetchData = async () => {
   try {
     setLoading(true);
     setError(null);
-    const { data, error } = await supabase.from('tabla').select('*');
+    const { data, error } = await supabase.from("tabla").select("*");
     if (error) throw error;
     setData(data);
   } catch (error) {
-    console.error('Error en fetchData:', error);
+    console.error("Error en fetchData:", error);
     setError(error.message);
   } finally {
     setLoading(false);
@@ -317,10 +322,14 @@ const fetchData = async () => {
 
 ```js
 // MAL — fetchVales como dependencia causa loop
-useEffect(() => { fetchVales(); }, [fetchVales]);
+useEffect(() => {
+  fetchVales();
+}, [fetchVales]);
 
 // BIEN — valores primitivos
-useEffect(() => { fetchVales(); }, [idObra, estado]);
+useEffect(() => {
+  fetchVales();
+}, [idObra, estado]);
 ```
 
 ---
@@ -364,16 +373,16 @@ color: var(--color-primary);        // En CSS
 
 ## Rutas de la aplicación
 
-| Ruta | Página | Roles |
-|------|--------|-------|
-| `/login` | Login.jsx | Público |
-| `/vales` | Vales.jsx | Todos autenticados |
-| `/verificar-vales` | VerificarVales.jsx | Todos autenticados |
-| `/conciliaciones` | Conciliaciones.jsx | Todos autenticados |
-| `/historial-conciliaciones` | HistorialConciliaciones.jsx | Todos autenticados |
-| `/dashboard` | Dashboard.jsx | Solo Administrador |
-| `/operadores` | Operadores.jsx | Administrador, Sindicato |
-| `/vale/:folio` | VisualizarVale.jsx | **Público** (sin auth) |
+| Ruta                        | Página                      | Roles                    |
+| --------------------------- | --------------------------- | ------------------------ |
+| `/login`                    | Login.jsx                   | Público                  |
+| `/vales`                    | Vales.jsx                   | Todos autenticados       |
+| `/verificar-vales`          | VerificarVales.jsx          | Todos autenticados       |
+| `/conciliaciones`           | Conciliaciones.jsx          | Todos autenticados       |
+| `/historial-conciliaciones` | HistorialConciliaciones.jsx | Todos autenticados       |
+| `/dashboard`                | Dashboard.jsx               | Solo Administrador       |
+| `/operadores`               | Operadores.jsx              | Administrador, Sindicato |
+| `/vale/:folio`              | VisualizarVale.jsx          | **Público** (sin auth)   |
 
 ---
 
@@ -397,10 +406,3 @@ color: var(--color-primary);        // En CSS
 ## Checklist antes de escribir código
 
 - [ ] ¿Leí este `CLAUDE.md` completo?
-- [ ] ¿Verifiqué columnas exactas con `information_schema.columns`?
-- [ ] ¿El vale es Tipo 1/2 (`vale_material_viajes`) o Tipo 3 (`tickets_material`)?
-- [ ] ¿El estado permite edición (`!== 'conciliado'` y `!== 'verificado'`)?
-- [ ] ¿El rol se lee desde `userProfile?.roles?.role`?
-- [ ] ¿Los timestamps usan `timeZone: 'America/Mexico_City'`?
-- [ ] ¿Hay manejo de `loading` y `error` en el hook?
-- [ ] ¿El archivo lleva encabezado con ruta y descripción?

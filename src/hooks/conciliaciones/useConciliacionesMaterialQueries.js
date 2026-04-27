@@ -90,6 +90,8 @@ export const useConciliacionesMaterialQueries = () => {
               folio_banco,
               precio_m3,
               costo_total,
+              tarifa_primer_km,
+              tarifa_subsecuente,
               material:id_material (
                 id_material,
                 material,
@@ -108,9 +110,15 @@ export const useConciliacionesMaterialQueries = () => {
                 hora_registro,
                 peso_ton,
                 volumen_m3,
-                costo_viaje,
+                folio_vale_fisico,
+                id_banco_override,
+                distancia_km_override,
                 precio_m3_override,
-                folio_vale_fisico
+                costo_viaje_override,
+                banco_override:bancos!id_banco_override (
+                  id_banco,
+                  banco
+                )
               )
             )
           `,
