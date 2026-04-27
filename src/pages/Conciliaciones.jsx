@@ -40,7 +40,8 @@ import ResumenTotalesMaterial from "../components/conciliaciones/ResumenTotalesM
 // 7. Componentes comunes
 import BotonGenerarPDF from "../components/conciliaciones/BotonGenerarPDF";
 import { esSemanaCorriente } from "../utils/dateUtils";
-// 8. Icons
+
+// 9. Icons
 import { Truck, Package } from "lucide-react";
 
 // 9. Config
@@ -353,17 +354,17 @@ const Conciliaciones = () => {
       <div className="conciliaciones-content">
         {/* Filtros */}
         <FiltrosConciliacion
-          semanas={hookActivo.semanas}
-          obras={hookActivo.obras}
-          materiales={hookActivo.materiales}
-          sindicatos={hookActivo.sindicatos}
-          filtros={hookActivo.filtros}
-          onFiltrosChange={hookActivo.updateFiltros}
-          onCargarVistaPrevia={hookActivo.cargarVistaPrevia}
-          loadingCatalogos={hookActivo.loadingCatalogos}
-          disabled={false}
-          tipoActivo={tabActivo}
-        />
+              semanas={hookActivo.semanas}
+              obras={hookActivo.obras}
+              materiales={hookActivo.materiales}
+              sindicatos={hookActivo.sindicatos}
+              filtros={hookActivo.filtros}
+              onFiltrosChange={hookActivo.updateFiltros}
+              onCargarVistaPrevia={hookActivo.cargarVistaPrevia}
+              loadingCatalogos={hookActivo.loadingCatalogos}
+              disabled={false}
+              tipoActivo={tabActivo}
+            />
 
         {/* Error de vista previa */}
         {hookActivo.vistaPrevia.error && (

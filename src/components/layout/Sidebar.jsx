@@ -18,6 +18,7 @@ import {
   FileCheck,
   Truck,
   History,
+  BookOpen,
 } from "lucide-react";
 
 // 3. Hooks personalizados
@@ -29,6 +30,7 @@ const Sidebar = () => {
 
   // Flags de roles para controlar visibilidad
   const esAdministrador = rol === "Administrador";
+  const esFinanzas = rol === "Finanzas";
   const esSindicato = rol === "Sindicato";
 
   return (
@@ -107,6 +109,19 @@ const Sidebar = () => {
           >
             <History className="sidebar__icon" size={20} />
             <span className="sidebar__text">Historial</span>
+          </NavLink>
+        )}
+
+        {/* Contabilidad - Administrador y Finanzas */}
+        {(esAdministrador || esFinanzas) && (
+          <NavLink
+            to="/contabilidad"
+            className={({ isActive }) =>
+              isActive ? "sidebar__link sidebar__link--active" : "sidebar__link"
+            }
+          >
+            <BookOpen className="sidebar__icon" size={20} />
+            <span className="sidebar__text">Contabilidad</span>
           </NavLink>
         )}
       </nav>

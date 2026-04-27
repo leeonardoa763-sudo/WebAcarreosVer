@@ -23,6 +23,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Vales from "./pages/Vales";
 import Conciliaciones from "./pages/Conciliaciones";
+import Contabilidad from "./pages/Contabilidad";
 import VerificarVales from "./pages/VerificarVales";
 import VisualizarVale from "./pages/VisualizarVale";
 import VisualizarConciliacion from "./pages/VisualizarConciliacion";
@@ -110,6 +111,18 @@ const App = () => {
               <ProtectedRoute>
                 <Layout>
                   <HistorialConciliaciones />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Contabilidad - Administrador y Finanzas */}
+          <Route
+            path="/contabilidad"
+            element={
+              <ProtectedRoute requiredRole={["Administrador", "Finanzas"]}>
+                <Layout>
+                  <Contabilidad />
                 </Layout>
               </ProtectedRoute>
             }

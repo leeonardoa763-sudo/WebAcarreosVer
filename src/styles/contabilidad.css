@@ -1,0 +1,335 @@
+/**
+ * src/styles/contabilidad.css
+ *
+ * Estilos para la pestaña Contabilidad
+ * BEM prefix: ctb__
+ */
+
+.ctb-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+}
+
+/* Sub-tabs */
+.ctb-subtabs {
+  display: flex;
+  gap: 12px;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 12px;
+}
+
+.ctb-subtab {
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px 6px 0 0;
+  transition: all 0.2s ease;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.ctb-subtab:hover {
+  background: #f3f4f6;
+}
+
+.ctb-subtab--active {
+  color: white !important;
+  font-weight: 700;
+}
+
+/* Buscador */
+.ctb-buscador {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.ctb-input-busqueda {
+  flex: 1;
+  max-width: 400px;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--color-text, #1f2937);
+  background: white;
+  transition: all 0.2s;
+}
+
+.ctb-input-busqueda:focus {
+  outline: none;
+  border-color: var(--color-primary, #ff6b35);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+}
+
+.ctb-input-busqueda::placeholder {
+  color: #9ca3af;
+}
+
+/* Error */
+.ctb-error {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 12px 16px;
+  border-radius: 6px;
+  border-left: 4px solid #dc2626;
+  font-size: 14px;
+}
+
+/* Loading */
+.ctb-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 24px;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.ctb-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Tabla */
+.ctb-tabla-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: white;
+}
+
+.ctb-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.ctb-tabla thead {
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.ctb-tabla thead th {
+  padding: 14px 12px;
+  text-align: left;
+  font-weight: 700;
+  color: var(--color-text, #1f2937);
+  white-space: nowrap;
+}
+
+.ctb-tabla tbody tr {
+  border-bottom: 1px solid #e5e7eb;
+  transition: background-color 0.2s;
+}
+
+.ctb-tabla tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.ctb-tabla tbody td {
+  padding: 12px;
+  color: var(--color-text, #1f2937);
+  vertical-align: middle;
+}
+
+.ctb-codigo {
+  font-weight: 600;
+  color: var(--color-primary, #ff6b35);
+}
+
+.ctb-semana {
+  text-align: center;
+  font-weight: 500;
+}
+
+.ctb-volumen {
+  text-align: right;
+  padding-right: 24px;
+}
+
+.ctb-importe {
+  text-align: right;
+  padding-right: 24px;
+  color: var(--color-text, #1f2937);
+}
+
+.ctb-importe-total {
+  text-align: right;
+  padding-right: 24px;
+  font-weight: 600;
+  color: var(--color-text, #1f2937);
+}
+
+.ctb-factura,
+.ctb-oc,
+.ctb-proveedor {
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b7280);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctb-proveedor {
+  max-width: 150px;
+}
+
+/* Badges de estado */
+.ctb-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Acciones */
+.ctb-acciones {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+}
+
+.ctb-btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  color: var(--color-text-secondary, #6b7280);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ctb-btn-icon:hover {
+  background: #e5e7eb;
+  color: var(--color-primary, #ff6b35);
+}
+
+.ctb-btn-pagar {
+  color: var(--color-success, #10b981);
+}
+
+.ctb-btn-pagar:hover {
+  background: #d1fae5;
+}
+
+.ctb-btn-editar {
+  color: var(--color-secondary, #8b5cf6);
+}
+
+.ctb-btn-editar:hover {
+  background: #ede9fe;
+}
+
+/* Vacío */
+.ctb-vacio {
+  text-align: center;
+  padding: 40px 24px;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 14px;
+}
+
+/* Responsivo */
+@media (max-width: 1024px) {
+  .ctb-input-busqueda {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .ctb-container {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .ctb-tabla {
+    font-size: 13px;
+  }
+
+  .ctb-tabla thead th,
+  .ctb-tabla tbody td {
+    padding: 10px 8px;
+  }
+
+  .ctb-tabla thead th {
+    font-size: 12px;
+  }
+
+  .ctb-subtabs {
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+
+  .ctb-subtab {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .ctb-input-busqueda {
+    max-width: 100%;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .ctb-volumen,
+  .ctb-importe,
+  .ctb-importe-total {
+    padding-right: 12px;
+    font-size: 12px;
+  }
+
+  .ctb-codigo {
+    font-size: 13px;
+  }
+
+  .ctb-acciones {
+    gap: 6px;
+  }
+
+  .ctb-btn-icon {
+    padding: 4px;
+  }
+}
+
+@media (max-width: 640px) {
+  .ctb-tabla-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ctb-tabla {
+    min-width: 800px;
+    font-size: 12px;
+  }
+
+  .ctb-tabla thead th,
+  .ctb-tabla tbody td {
+    padding: 8px 6px;
+  }
+
+  .ctb-input-busqueda {
+    font-size: 12px;
+  }
+}
