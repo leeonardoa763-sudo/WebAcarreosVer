@@ -198,6 +198,10 @@ const VisualizarVale = () => {
                 distancia_km_override,
                 precio_m3_override,
                 costo_viaje_override,
+                foto_evidencia_url,
+                latitud_registro,
+                longitud_registro,
+                distancia_obra_metros,
                 bancos_override:id_banco_override (
                   id_banco,
                   banco
@@ -383,15 +387,15 @@ const VisualizarVale = () => {
         ...viaje,
         // Contexto del detalle padre
         material: det.material,
-        capacidad_m3: det.capacidad_m3, // siempre del detalle
+        capacidad_m3: det.capacidad_m3,
         cantidad_pedida_m3: det.cantidad_pedida_m3,
         notas_adicionales: det.notas_adicionales,
         folio_banco: det.folio_banco,
-        // Foto y geolocalización viven en el detalle
-        foto_evidencia_url: det.foto_evidencia_url,
-        latitud_completado: det.latitud_completado,
-        longitud_completado: det.longitud_completado,
-        distancia_obra_metros: det.distancia_obra_metros,
+        // Foto y geolocalización: usar del viaje si existe, sino del detalle padre
+        foto_evidencia_url: viaje.foto_evidencia_url || det.foto_evidencia_url,
+        latitud_completado: viaje.latitud_registro || det.latitud_completado,
+        longitud_completado: viaje.longitud_registro || det.longitud_completado,
+        distancia_obra_metros: viaje.distancia_obra_metros ?? det.distancia_obra_metros,
         // Banco y distancia: usar override del viaje si existe
         bancos: viaje.bancos_override ?? det.bancos,
         distancia_km: viaje.distancia_km_override ?? det.distancia_km,

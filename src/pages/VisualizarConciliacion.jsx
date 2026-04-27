@@ -13,7 +13,10 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
-// 2. Icons
+// 2. Utils
+import { formatearVolumen } from "../utils/formatters";
+
+// 3. Icons
 import {
   Loader2,
   XCircle,
@@ -24,17 +27,17 @@ import {
   X,
 } from "lucide-react";
 
-// 3. Config
+// 4. Config
 import { supabase } from "../config/supabase";
 import { colors } from "../config/colors";
 
-// 4. Utils
+// 5. Utils
 import { formatearFecha, formatearHora, formatearMoneda } from "../utils/formatters";
 
-// 5. Componentes reutilizables de VisualizarVale
+// 6. Componentes reutilizables de VisualizarVale
 import ListaViajesMaterial from "../components/visualizar-vale/ListaViajesMaterial";
 
-// 6. Estilos
+// 7. Estilos
 import "../styles/visualizar-vale.css";
 import "../styles/visualizar-conciliacion.css";
 
@@ -276,10 +279,110 @@ const ValeRentaDetalles = ({ detalles }) => {
 };
 
 // ========================================
+// SUBCOMPONENTE: GRUPO DE PLACAS
+// ========================================
+
+const GrupoPlacas = ({
+  placas,
+  valesGrupo,
+  isExpandedGrupo,
+  onToggleGrupo,
+  expandedVales,
+  onToggleVale,
+  personaGenerador,
+  fechaGeneracion,
+}) => {
+  // Calcular agregados sobre valesGrupo
+  const calcularAgregados = () => {
+    let totalImporte = 0;
+    let totalViajes = 0;
+    let totalM3 = 0;
+
+    valesGrupo.forEach((vale) => {
+      if (vale.tipo_vale === "material") {
+        vale.vale_material_detalles?.forEach((det) => {
+          totalImporte += Number(det.costo_total || 0);
+          const viajes = det.vale_material_viajes || [];
+          totalViajes += viajes.length || 1;
+          viajes.forEach((v) => {
+            totalM3 += Number(v.volumen_m3 || 0);
+          });
+        });
+      } else if (vale.tipo_vale === "renta") {
+        vale.vale_renta_detalle?.forEach((det) => {
+          totalImporte += Number(det.costo_total || 0);
+          totalViajes += det.numero_viajes || 1;
+        });
+      }
+    });
+
+    return { totalImporte, totalViajes, totalM3 };
+  };
+
+  const { totalImporte, totalViajes, totalM3 } = calcularAgregados();
+
+  return (
+    <div className="vc-grupo-placas">
+      {/* Header clickeable para expandir/contraer grupo */}
+      <button
+        className={`vc-grupo-header${isExpandedGrupo ? " vc-grupo-header--expanded" : ""}`}
+        onClick={onToggleGrupo}
+        aria-expanded={isExpandedGrupo}
+      >
+        <div className="vc-grupo-header__left">
+          <div className="vc-grupo-placas-badge">{placas}</div>
+          <div className="vc-grupo-badge-count">{valesGrupo.length}</div>
+        </div>
+
+        <div className="vc-grupo-header__stats">
+          <span className="vc-grupo-stat">
+            <strong>{totalViajes}</strong> viajes
+          </span>
+          {totalM3 > 0 && (
+            <span className="vc-grupo-stat">
+              <strong>{formatearVolumen(totalM3)}</strong>
+            </span>
+          )}
+          <span className="vc-grupo-stat">
+            <strong>{formatearMonedaMXN(totalImporte)}</strong>
+          </span>
+        </div>
+
+        <span className="vc-grupo-chevron">
+          {isExpandedGrupo ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </span>
+      </button>
+
+      {/* Body expandible con vales */}
+      {isExpandedGrupo && (
+        <div className="vc-grupo-vales">
+          {valesGrupo.map((vale) => (
+            <ValeCard
+              key={vale.id_vale}
+              vale={vale}
+              isExpanded={expandedVales.has(vale.id_vale)}
+              onToggle={() => onToggleVale(vale.id_vale)}
+              personaGenerador={personaGenerador}
+              fechaGeneracion={fechaGeneracion}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ========================================
 // SUBCOMPONENTE: TARJETA ACORDEÓN POR VALE
 // ========================================
 
-const ValeCard = ({ vale, isExpanded, onToggle, personaGenerador, fechaGeneracion }) => {
+const ValeCard = ({
+  vale,
+  isExpanded,
+  onToggle,
+  personaGenerador,
+  fechaGeneracion,
+}) => {
   const badgeEstadoClase = {
     emitido: "vc-vale-estado--emitido",
     verificado: "vc-vale-estado--verificado",
@@ -355,6 +458,7 @@ const ValeCard = ({ vale, isExpanded, onToggle, personaGenerador, fechaGeneracio
             <ListaViajesMaterial
               detalles={vale.vale_material_detalles}
               mostrarPrecios={true}
+              vehiculoCapacidad={vale.vehiculos?.capacidad_m3}
             />
           )}
 
@@ -387,7 +491,9 @@ const VisualizarConciliacion = () => {
   const [vales, setVales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [busquedaGlobal, setBusquedaGlobal] = useState("");
   const [expandedVales, setExpandedVales] = useState(new Set());
+  const [expandedGrupos, setExpandedGrupos] = useState(new Set());
 
   // Cargar datos
   useEffect(() => {
@@ -431,7 +537,7 @@ const VisualizarConciliacion = () => {
                 fecha_completado,
                 fecha_verificacion,
                 operadores:id_operador (nombre_completo, id_sindicato),
-                vehiculos:id_vehiculo (placas),
+                vehiculos:id_vehiculo (placas, capacidad_m3),
                 persona:id_persona_creador (nombre, primer_apellido),
                 persona_verificador:id_persona_verificador (nombre, primer_apellido),
                 persona_completador:id_persona_completador (nombre, primer_apellido),
@@ -471,6 +577,10 @@ const VisualizarConciliacion = () => {
                     distancia_km_override,
                     precio_m3_override,
                     costo_viaje_override,
+                    foto_evidencia_url,
+                    latitud_registro,
+                    longitud_registro,
+                    distancia_obra_metros,
                     bancos_override:id_banco_override (id_banco, banco)
                   )
                 ),
@@ -549,6 +659,15 @@ const VisualizarConciliacion = () => {
     });
   };
 
+  const toggleGrupo = (placas) => {
+    setExpandedGrupos((prev) => {
+      const next = new Set(prev);
+      if (next.has(placas)) next.delete(placas);
+      else next.add(placas);
+      return next;
+    });
+  };
+
   // ---- Estados de carga y error ----
 
   if (loading) {
@@ -588,6 +707,31 @@ const VisualizarConciliacion = () => {
     if (!fi || !ff) return `Semana ${conciliacion.numero_semana}`;
     return `Semana ${conciliacion.numero_semana} · ${formatearFecha(fi + "T12:00:00")} al ${formatearFecha(ff + "T12:00:00")}`;
   };
+
+  const calcularTotalesGlobales = () => {
+    let totalViajes = 0;
+    let totalM3 = 0;
+
+    vales.forEach((vale) => {
+      if (vale.tipo_vale === "material") {
+        vale.vale_material_detalles?.forEach((det) => {
+          const viajes = det.vale_material_viajes || [];
+          totalViajes += viajes.length || 1;
+          viajes.forEach((v) => {
+            totalM3 += Number(v.volumen_m3 || 0);
+          });
+        });
+      } else if (vale.tipo_vale === "renta") {
+        vale.vale_renta_detalle?.forEach((det) => {
+          totalViajes += det.numero_viajes || 1;
+        });
+      }
+    });
+
+    return { totalViajes, totalM3 };
+  };
+
+  const { totalViajes: totalViajesGlobal, totalM3: totalM3Global } = calcularTotalesGlobales();
 
   // ---- Render principal ----
 
@@ -666,6 +810,18 @@ const VisualizarConciliacion = () => {
           <h3 className="vc-section-title">RESUMEN FINANCIERO</h3>
           <div className="vc-financiero">
             <div className="vc-financiero-row">
+              <span className="vc-financiero-label">Viajes</span>
+              <span className="vc-financiero-value">{totalViajesGlobal}</span>
+            </div>
+            {totalM3Global > 0 && (
+              <div className="vc-financiero-row">
+                <span className="vc-financiero-label">Volumen total (m³)</span>
+                <span className="vc-financiero-value">
+                  {formatearVolumen(totalM3Global)}
+                </span>
+              </div>
+            )}
+            <div className="vc-financiero-row" style={{ borderTop: "1px solid #e5e7eb", marginTop: 8, paddingTop: 8 }}>
               <span className="vc-financiero-label">Subtotal</span>
               <span className="vc-financiero-value">
                 {formatearMonedaMXN(conciliacion.subtotal)}
@@ -718,17 +874,56 @@ const VisualizarConciliacion = () => {
             </span>
           </h3>
 
+          {/* Input de búsqueda global */}
+          <div className="vc-busqueda-global">
+            <input
+              type="text"
+              placeholder="Buscar por folio..."
+              value={busquedaGlobal}
+              onChange={(e) => setBusquedaGlobal(e.target.value)}
+              className="vc-busqueda-input"
+            />
+          </div>
+
           <div className="vc-vales-lista">
-            {vales.map((vale) => (
-              <ValeCard
-                key={vale.id_vale}
-                vale={vale}
-                isExpanded={expandedVales.has(vale.id_vale)}
-                onToggle={() => toggleVale(vale.id_vale)}
-                personaGenerador={conciliacion.persona_generador}
-                fechaGeneracion={conciliacion.fecha_generacion}
-              />
-            ))}
+            {(() => {
+              // Filtrar vales por búsqueda global
+              const valesFiltrados = busquedaGlobal.trim()
+                ? vales.filter((v) =>
+                    v.folio.toLowerCase().includes(busquedaGlobal.toLowerCase())
+                  )
+                : vales;
+
+              // Agrupar vales filtrados por placas
+              const gruposPorPlacas = valesFiltrados.reduce((acc, vale) => {
+                const key = vale.vehiculos?.placas || "SIN PLACAS";
+                if (!acc[key]) acc[key] = [];
+                acc[key].push(vale);
+                return acc;
+              }, {});
+
+              if (Object.keys(gruposPorPlacas).length === 0) {
+                return (
+                  <div className="vc-sin-resultados">
+                    Sin vales que coincidan con "{busquedaGlobal}"
+                  </div>
+                );
+              }
+
+              return Object.entries(gruposPorPlacas).map(([placas, valesGrupo]) => (
+                <GrupoPlacas
+                  key={placas}
+                  placas={placas}
+                  valesGrupo={valesGrupo}
+                  isExpandedGrupo={expandedGrupos.has(placas)}
+                  onToggleGrupo={() => toggleGrupo(placas)}
+                  expandedVales={expandedVales}
+                  onToggleVale={toggleVale}
+                  personaGenerador={conciliacion.persona_generador}
+                  fechaGeneracion={conciliacion.fecha_generacion}
+                />
+              ));
+            })()}
           </div>
         </div>
 

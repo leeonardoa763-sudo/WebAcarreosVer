@@ -23,7 +23,7 @@ import {
   formatearHora,
 } from "../../utils/formatters";
 
-const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
+const ListaViajesMaterial = ({ detalles, mostrarPrecios, vehiculoCapacidad }) => {
   const [fotoModal, setFotoModal] = useState(null);
 
   /**
@@ -120,13 +120,29 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
             const distanciaEfectiva = getDistanciaEfectiva(viaje);
             const costoEfectivo = getCostoEfectivo(viaje);
 
-            // La foto y geo siempre vienen del detalle padre
-            const distanciaBadge = getDistanciaBadge(
-              detalle.distancia_obra_metros,
-            );
-            const tieneGeo =
-              detalle.latitud_completado && detalle.longitud_completado;
-            const tieneFoto = Boolean(detalle.foto_evidencia_url);
+            // Foto efectiva: usar la del viaje si existe, sino del detalle padre
+            const fotoUrl = (!viaje._esFallback && viaje.foto_evidencia_url)
+              ? viaje.foto_evidencia_url
+              : detalle.foto_evidencia_url;
+            const tieneFoto = Boolean(fotoUrl);
+
+            // Geo efectiva: usar la del viaje si existe, sino del detalle padre
+            const latEfectiva = (!viaje._esFallback && viaje.latitud_registro)
+              ? viaje.latitud_registro
+              : detalle.latitud_completado;
+            const lngEfectiva = (!viaje._esFallback && viaje.longitud_registro)
+              ? viaje.longitud_registro
+              : detalle.longitud_completado;
+            const tieneGeo = latEfectiva && lngEfectiva;
+
+            // Distancia a obra efectiva: usar la del viaje si existe, sino del detalle
+            const distanciaObra = (!viaje._esFallback && viaje.distancia_obra_metros != null)
+              ? viaje.distancia_obra_metros
+              : detalle.distancia_obra_metros;
+            const distanciaBadge = getDistanciaBadge(distanciaObra);
+
+            // Capacidad con fallback al vehículo
+            const capacidadMostrar = detalle.capacidad_m3 || vehiculoCapacidad;
 
             // Número de viaje: usar el del registro o idx+1 como fallback
             const numeroViaje = viaje._esFallback
@@ -202,12 +218,12 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
                     {tieneFoto ? (
                       <div className="viaje-item__foto-wrapper">
                         <img
-                          src={detalle.foto_evidencia_url}
+                          src={fotoUrl}
                           alt={`Evidencia viaje ${numeroViaje}`}
                           className="viaje-item__foto"
                           onClick={() =>
                             setFotoModal({
-                              url: detalle.foto_evidencia_url,
+                              url: fotoUrl,
                               indice: idx,
                               distanciaBadge,
                             })
@@ -217,7 +233,7 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
                           className="viaje-item__foto-btn"
                           onClick={() =>
                             setFotoModal({
-                              url: detalle.foto_evidencia_url,
+                              url: fotoUrl,
                               indice: idx,
                               distanciaBadge,
                             })
@@ -237,7 +253,7 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
 
                     {tieneGeo && (
                       <a
-                        href={`https://www.google.com/maps?q=${detalle.latitud_completado},${detalle.longitud_completado}`}
+                        href={`https://www.google.com/maps?q=${latEfectiva},${lngEfectiva}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="viaje-item__mapa-link"
@@ -268,11 +284,11 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios }) => {
                       </div>
                     )}
 
-                    {/* Capacidad del detalle padre */}
+                    {/* Capacidad con fallback al vehículo */}
                     <div className="viaje-item__dato">
                       <span className="viaje-item__dato-label">Capacidad</span>
                       <span className="viaje-item__dato-valor">
-                        {formatearVolumen(detalle.capacidad_m3)}
+                        {capacidadMostrar ? formatearVolumen(capacidadMostrar) : "—"}
                       </span>
                     </div>
 
