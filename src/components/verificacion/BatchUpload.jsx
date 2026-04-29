@@ -57,11 +57,11 @@ const BatchUpload = ({ onBatchProcess, disabled = false }) => {
       return;
     }
 
-    const validFiles = pdfFiles.filter((file) => file.size <= 5 * 1024 * 1024);
+    const validFiles = pdfFiles.filter((file) => file.size <= 20 * 1024 * 1024);
 
     if (validFiles.length !== pdfFiles.length) {
       alert(
-        `${pdfFiles.length - validFiles.length} archivo(s) exceden 5MB y fueron omitidos`
+        `${pdfFiles.length - validFiles.length} archivo(s) exceden 20MB y fueron omitidos`
       );
     }
 
@@ -109,7 +109,7 @@ const BatchUpload = ({ onBatchProcess, disabled = false }) => {
           <h3 className="batch-upload__title">Verificación Masiva</h3>
           <p className="batch-upload__subtitle">Arrastra múltiples PDFs aquí</p>
           <p className="batch-upload__info">
-            Hasta 50 PDFs • Máximo 5MB cada uno
+            Hasta 50 PDFs • Máximo 20MB cada uno
           </p>
         </div>
       ) : (

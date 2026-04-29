@@ -77,6 +77,7 @@ const calcularCostoViaje = (volumen_m3, precio_m3) => {
 export const useEditarValeViajes = () => {
   // Datos originales del detalle y viajes (sin modificar)
   const [detalle, setDetalle] = useState(null);
+  const [detalleOriginal, setDetalleOriginal] = useState(null);
   const [viajesOriginales, setViajesOriginales] = useState([]);
 
   // Estado de edición — copia mutable de los viajes
@@ -90,6 +91,9 @@ export const useEditarValeViajes = () => {
 
   // Catálogo de bancos disponibles (para tipo 3 — selector de banco por viaje)
   const [bancos, setBancos] = useState([]);
+
+  // Catálogo de materiales disponibles (para editar material del detalle)
+  const [materiales, setMateriales] = useState([]);
 
   // IDs de viajes con cambios pendientes
   const [viajesEditados, setViajesEditados] = useState(new Set());
@@ -221,16 +225,23 @@ export const useEditarValeViajes = () => {
         pesoEsp = dataPeso?.peso_especifico ?? null;
       }
 
-      // 2b. Tipo 3: cargar catálogo de bancos para el selector por viaje
-      if (esTipo3) {
-        const { data: dataBancos, error: errorBancos } = await supabase
-          .from("bancos")
-          .select("id_banco, banco")
-          .order("banco", { ascending: true });
+      // 2b. Cargar catálogo de bancos (todos)
+      const { data: dataBancos, error: errorBancos } = await supabase
+        .from("bancos")
+        .select("id_banco, banco")
+        .order("banco", { ascending: true });
 
-        if (errorBancos) throw errorBancos;
-        setBancos(dataBancos || []);
-      }
+      if (errorBancos) throw errorBancos;
+      setBancos(dataBancos || []);
+
+      // 2c. Cargar catálogo de materiales
+      const { data: dataMateriales, error: errorMateriales } = await supabase
+        .from("material")
+        .select("id_material, material, tipo_de_material:id_tipo_de_material(id_tipo_de_material, tipo_de_material)")
+        .order("material", { ascending: true });
+
+      if (errorMateriales) throw errorMateriales;
+      setMateriales(dataMateriales || []);
 
       // Ordenar viajes por numero_viaje
       const viajesOrdenados = [
@@ -238,6 +249,7 @@ export const useEditarValeViajes = () => {
       ].sort((a, b) => a.numero_viaje - b.numero_viaje);
 
       setDetalle(dataDetalle);
+      setDetalleOriginal({ ...dataDetalle });
       setNotasAdicionales(dataDetalle.notas_adicionales || "");
       setViajesOriginales(viajesOrdenados);
       setViajes(viajesOrdenados.map((v) => ({ ...v })));
@@ -449,6 +461,62 @@ export const useEditarValeViajes = () => {
     },
     [detalle, viajes],
   );
+
+  // ── Edición de campos del detalle (material, banco) ────────────────────────
+
+  /**
+   * Edita el material del detalle (id_material).
+   * Actualiza también la información de tipo de material.
+   *
+   * @param {number} id_material
+   */
+  const editarMaterialDetalle = useCallback(
+    (id_material) => {
+      const materialSeleccionado = materiales.find(
+        (m) => m.id_material === id_material,
+      );
+      if (!materialSeleccionado) return;
+
+      setDetalle((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          id_material,
+          material: materialSeleccionado,
+        };
+      });
+
+      setViajesEditados((prev) => {
+        const nuevo = new Set(prev);
+        viajes.forEach((v) => nuevo.add(v.id_viaje));
+        return nuevo;
+      });
+    },
+    [materiales, viajes],
+  );
+
+  /**
+   * Edita el banco del detalle (id_banco).
+   *
+   * @param {number} id_banco
+   */
+  const editarBancoDetalle = useCallback((id_banco) => {
+    setDetalle((prev) => {
+      if (!prev) return prev;
+      const bancoSeleccionado = bancos.find((b) => b.id_banco === id_banco);
+      return {
+        ...prev,
+        id_banco,
+        bancos: bancoSeleccionado,
+      };
+    });
+
+    setViajesEditados((prev) => {
+      const nuevo = new Set(prev);
+      viajes.forEach((v) => nuevo.add(v.id_viaje));
+      return nuevo;
+    });
+  }, [bancos, viajes]);
 
   // ── Agregar viaje nuevo ────────────────────────────────────────────────────
 
@@ -756,6 +824,8 @@ export const useEditarValeViajes = () => {
         const totales = calcularTotalesDetalle();
 
         const camposDetalle = {
+          id_material: detalle.id_material,
+          id_banco: detalle.id_banco,
           volumen_real_m3: totales.volumen_real_m3,
           costo_total: totales.costo_total,
           distancia_km: Number(detalle.distancia_km),
@@ -812,16 +882,16 @@ export const useEditarValeViajes = () => {
    * Descarta todos los cambios y restaura el estado original.
    */
   const descartarCambios = useCallback(() => {
-    if (!detalle) return;
+    if (!detalleOriginal) return;
     setViajes(viajesOriginales.map((v) => ({ ...v })));
-    setDetalle((prev) => ({ ...prev }));
-    setNotasAdicionales(detalle.notas_adicionales || "");
+    setDetalle(detalleOriginal ? { ...detalleOriginal } : null);
+    setNotasAdicionales(detalleOriginal?.notas_adicionales || "");
     setViajesEditados(new Set());
     setViajesNuevos(new Set());
     setViajesAEliminar(new Set());
     setError(null);
     setMensajeExito(null);
-  }, [viajesOriginales, detalle]);
+  }, [viajesOriginales, detalleOriginal]);
 
   // ── Flags de estado útiles para la UI ────────────────────────────────────
 
@@ -829,7 +899,12 @@ export const useEditarValeViajes = () => {
     viajesEditados.size > 0 ||
     viajesNuevos.size > 0 ||
     viajesAEliminar.size > 0 ||
-    notasAdicionales !== (detalle?.notas_adicionales || "");
+    notasAdicionales !== (detalleOriginal?.notas_adicionales || "") ||
+    (detalle && detalleOriginal && (
+      detalle.id_material !== detalleOriginal.id_material ||
+      detalle.id_banco !== detalleOriginal.id_banco ||
+      detalle.distancia_km !== detalleOriginal.distancia_km
+    ));
 
   return {
     // Datos
@@ -838,6 +913,7 @@ export const useEditarValeViajes = () => {
     pesoEspecifico,
     tipoMaterial,
     bancos,
+    materiales,
     vale,
     conciliacion,
 
@@ -858,6 +934,8 @@ export const useEditarValeViajes = () => {
     cargarDetalle,
     editarCampoViaje,
     editarDistanciaDetalle,
+    editarMaterialDetalle,
+    editarBancoDetalle,
     agregarViaje,
     eliminarViaje,
     cancelarEliminacion,

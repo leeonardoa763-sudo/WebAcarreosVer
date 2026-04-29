@@ -235,6 +235,7 @@ const ModalEditarVale = ({
     pesoEspecifico,
     tipoMaterial,
     bancos,
+    materiales,
     vale,
     conciliacion,
     notasAdicionales,
@@ -249,6 +250,8 @@ const ModalEditarVale = ({
     cargarDetalle,
     editarCampoViaje,
     editarDistanciaDetalle,
+    editarMaterialDetalle,
+    editarBancoDetalle,
     agregarViaje,
     eliminarViaje,
     cancelarEliminacion,
@@ -373,6 +376,75 @@ const ModalEditarVale = ({
           <div className="mev__layout">
             {/* Columna izquierda: tabla y notas */}
             <div className="mev__layout-izq">
+              {/* ── Sección de información del material (editable) ──────────── */}
+              {detalle && (
+                <div className="mev__seccion-material">
+                  <h3 className="mev__seccion-titulo">Información del material</h3>
+
+                  <div className="mev__grid-3cols">
+                    {/* Material */}
+                    <div className="mev__campo-grupo">
+                      <label className="mev__campo-label" htmlFor="mev-material">
+                        Material
+                      </label>
+                      <select
+                        id="mev-material"
+                        className="mev__campo-input"
+                        value={detalle.id_material || ""}
+                        onChange={(e) => editarMaterialDetalle(Number(e.target.value))}
+                        disabled={guardando}
+                      >
+                        <option value="">Seleccionar material...</option>
+                        {materiales.map((mat) => (
+                          <option key={mat.id_material} value={mat.id_material}>
+                            {mat.material}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Banco */}
+                    <div className="mev__campo-grupo">
+                      <label className="mev__campo-label" htmlFor="mev-banco">
+                        Banco / Cantera
+                      </label>
+                      <select
+                        id="mev-banco"
+                        className="mev__campo-input"
+                        value={detalle.id_banco || ""}
+                        onChange={(e) => editarBancoDetalle(Number(e.target.value))}
+                        disabled={guardando}
+                      >
+                        <option value="">Seleccionar banco...</option>
+                        {bancos.map((banco) => (
+                          <option key={banco.id_banco} value={banco.id_banco}>
+                            {banco.banco}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Distancia */}
+                    <div className="mev__campo-grupo">
+                      <label className="mev__campo-label" htmlFor="mev-distancia">
+                        Distancia (km)
+                      </label>
+                      <input
+                        id="mev-distancia"
+                        type="number"
+                        className="mev__campo-input"
+                        value={detalle.distancia_km || ""}
+                        onChange={(e) => editarDistanciaDetalle(e.target.value)}
+                        placeholder="0"
+                        min="0"
+                        step="0.1"
+                        disabled={guardando}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <TablaEditarViajes
                 detalle={detalle}
                 viajes={viajes}
