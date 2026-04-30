@@ -602,80 +602,113 @@
 
 .vale-card-compact {
   background: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  border-radius: 7px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
   overflow: hidden;
-  transition: all 0.3s ease;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+  border: 1px solid #edf0f4;
+  cursor: pointer;
+  padding: 9px 12px 9px 14px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .vale-card-compact:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  transform: translateY(-2px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.11);
+  transform: translateY(-1px);
+  border-color: #d1d9e0;
 }
 
-.vale-card-compact__header {
-  padding: 12px 16px;
+.vale-card-compact:focus-visible {
+  outline: 2px solid #FF6B35;
+  outline-offset: 2px;
+}
+
+/* ── Fila principal: folio + estado ── */
+.vale-card-compact__row {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background: #ffffff;
-}
-
-.vale-card-compact__header:hover {
-  background: #fafbfc;
-}
-
-.vale-card-compact__main {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex: 1;
+  gap: 8px;
 }
 
 .vale-card-compact__folio {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 6px;
+  font-size: 13px;
   font-weight: 700;
   color: #2c3e50;
 }
 
-.vale-card-compact__info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.vale-card-compact__fecha {
-  font-size: 13px;
-  color: #7f8c8d;
-  font-weight: 500;
+.vale-card-compact__folio svg {
+  color: #FF6B35;
+  flex-shrink: 0;
 }
 
 .vale-card-compact__estado {
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 8px;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.vale-card-compact__toggle {
-  background: none;
-  border: none;
-  color: #7f8c8d;
-  cursor: pointer;
-  padding: 4px;
+/* ── Fila meta: operador · placas · fecha · costo ── */
+.vale-card-compact__meta {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: #6b7280;
+}
+
+.vale-card-compact__operador {
+  font-weight: 500;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.vale-card-compact__placas {
+  background: #f1f5f9;
+  color: #475569;
+  padding: 1px 6px;
   border-radius: 4px;
-  transition: all 0.2s ease;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: monospace;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.vale-card-compact__fecha {
+  color: #9ca3af;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.vale-card-compact__costo {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 12px;
+  color: #10B981;
+  flex-shrink: 0;
+}
+
+/* separadores visuales entre items meta */
+.vale-card-compact__meta > span + span::before {
+  content: "·";
+  margin-right: 8px;
+  color: #d1d5db;
 }
 
 .vale-card-compact__toggle:hover {
@@ -1557,4 +1590,510 @@
 
 .mcv__btn--cancelar:hover:not(:disabled) {
   background: #B91C1C;
+}
+
+/* ========================================
+   MODAL DETALLE DE VALE — prefijo vdm__
+======================================== */
+
+@keyframes vdmFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes vdmSlideUp {
+  from { opacity: 0; transform: translateY(24px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.vdm__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: vdmFadeIn 0.18s ease;
+}
+
+.vdm__panel {
+  background: #ffffff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22), 0 4px 16px rgba(0, 0, 0, 0.1);
+  animation: vdmSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ── */
+.vdm__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid #edf0f4;
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  z-index: 1;
+  border-radius: 14px 14px 0 0;
+}
+
+.vdm__header-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vdm__header-folio {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.vdm__header-folio svg {
+  color: #FF6B35;
+}
+
+.vdm__header-estado {
+  padding: 3px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.vdm__header-acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vdm__btn-cerrar {
+  background: #f1f5f9;
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #64748b;
+  transition: background 0.15s, color 0.15s;
+}
+
+.vdm__btn-cerrar:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.vdm__btn-cancelar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  color: #DC2626;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.vdm__btn-cancelar:hover {
+  background: #fee2e2;
+}
+
+/* ── Body ── */
+.vdm__body {
+  padding: 18px 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Info general ── */
+.vdm__info-general {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.vdm__info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.vdm__info-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.vdm__info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.vdm__info-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.vdm__info-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  word-break: break-word;
+}
+
+.vdm__info-sub {
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* ── Motivo cancelación ── */
+.vdm__cancelacion-motivo {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vdm__cancelacion-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #DC2626;
+  letter-spacing: 0.4px;
+}
+
+.vdm__cancelacion-texto {
+  font-size: 13px;
+  color: #7f1d1d;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Detalles section ── */
+.vdm__detalles-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vdm__section-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.vdm__sindicato-badge {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px 10px;
+  background: #ede9fe;
+  color: #6d28d9;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.vdm__no-data {
+  font-size: 13px;
+  color: #9ca3af;
+  margin: 0;
+  font-style: italic;
+}
+
+/* ── Detalle item ── */
+.vdm__detalle-item {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid #edf0f4;
+}
+
+.vdm__detalle-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vdm__detalle-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.vdm__detalle-nombre {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  flex: 1;
+}
+
+.vdm__btn-editar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.vdm__btn-editar:hover {
+  background: #dbeafe;
+}
+
+/* ── Grid de celdas ── */
+.vdm__detalle-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px 12px;
+}
+
+.vdm__detalle-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.vdm__detalle-cell--full {
+  grid-column: 1 / -1;
+}
+
+.vdm__cell-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.vdm__cell-value {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.vdm__cell-value--highlight {
+  color: #004E89;
+}
+
+.vdm__cell-value--cost {
+  color: #10B981;
+  font-size: 14px;
+}
+
+/* ── Notas ── */
+.vdm__notas {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vdm__notas-texto {
+  font-size: 12px;
+  color: #475569;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Tabla de viajes ── */
+.vdm__viajes {
+  margin-top: 4px;
+}
+
+.vdm__viajes--renta {
+  margin-top: 4px;
+}
+
+.vdm__viajes-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #64748b;
+  margin: 0 0 6px;
+}
+
+.vdm__viajes-tabla-header {
+  display: grid;
+  grid-template-columns: 60px 60px 60px 55px 75px 75px 75px;
+  gap: 4px;
+  padding: 4px 6px;
+  background: #e2e8f0;
+  border-radius: 5px 5px 0 0;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #64748b;
+}
+
+.vdm__viajes-tabla-header--tipo3 {
+  grid-template-columns: 80px 1fr 55px 55px 75px 75px;
+}
+
+.vdm__viajes-lista {
+  border: 1px solid #e2e8f0;
+  border-top: none;
+  border-radius: 0 0 5px 5px;
+  overflow: hidden;
+}
+
+.vdm__viajes-lista--renta {
+  border-radius: 5px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.vdm__viaje-row {
+  display: grid;
+  gap: 4px;
+  padding: 5px 6px;
+  font-size: 11.5px;
+  color: #374151;
+  border-bottom: 1px solid #f1f5f9;
+  align-items: center;
+}
+
+.vdm__viaje-row:last-child {
+  border-bottom: none;
+}
+
+.vdm__viaje-row:nth-child(even) {
+  background: #f8fafc;
+}
+
+.vdm__viaje-row--material {
+  grid-template-columns: 60px 60px 60px 55px 75px 75px 75px;
+}
+
+.vdm__viaje-row--tipo3 {
+  grid-template-columns: 80px 1fr 55px 55px 75px 75px;
+}
+
+.vdm__viaje-row--renta {
+  grid-template-columns: 1fr 1fr;
+}
+
+.vdm__viaje-row--override {
+  background: #fefce8 !important;
+}
+
+.vdm__viaje-num {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.vdm__viaje-reg {
+  font-size: 9.5px;
+  font-weight: 400;
+  color: #94a3b8;
+}
+
+.vdm__override-dot {
+  color: #f59e0b;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.vdm__viajes-totales {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px;
+  background: #f1f5f9;
+  border-radius: 0 0 5px 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  border-top: none;
+}
+
+.vdm__viajes-totales-label {
+  flex: 1;
+  color: #64748b;
+}
+
+.vdm__viajes-totales-costo {
+  color: #10B981;
+  font-size: 13px;
+}
+
+/* ── Total del vale ── */
+.vdm__total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-radius: 8px;
+  border: 1px solid #bbf7d0;
+  margin-top: 4px;
+}
+
+.vdm__total-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #166534;
+}
+
+.vdm__total-valor {
+  font-size: 18px;
+  font-weight: 800;
+  color: #15803d;
 }

@@ -15,7 +15,7 @@
  */
 
 // 1. React y hooks
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 
 // 2. Icons
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -146,10 +146,7 @@ const ValesList = ({ vales, onValeActualizado }) => {
   // Estado para grupos colapsados - todos colapsados al inicio
   const [collapsedGroups, setCollapsedGroups] = useState(todosLosGrupos);
 
-  /**
-   * Toggle collapse de grupo
-   */
-  const toggleGroup = (groupId) => {
+  const toggleGroup = useCallback((groupId) => {
     setCollapsedGroups((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(groupId)) {
@@ -159,14 +156,11 @@ const ValesList = ({ vales, onValeActualizado }) => {
       }
       return newSet;
     });
-  };
+  }, []);
 
-  /**
-   * Verificar si un grupo está colapsado
-   */
-  const isCollapsed = (groupId) => {
+  const isCollapsed = useCallback((groupId) => {
     return collapsedGroups.has(groupId);
-  };
+  }, [collapsedGroups]);
 
   return (
     <div className="vales-list">

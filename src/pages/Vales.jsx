@@ -15,7 +15,7 @@
  */
 
 // 1. React y hooks
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 // 2. React Router
 import { useNavigate } from "react-router-dom";
@@ -58,35 +58,18 @@ const Vales = () => {
   // Estado para pestaña activa (Renta por defecto)
   const [activeTab, setActiveTab] = useState("renta");
 
-  /**
-   * Manejar búsqueda por término
-   */
-  const handleSearch = (e) => {
-    const searchTerm = e.target.value;
-    updateFilters({ searchTerm });
-  };
+  const handleSearch = useCallback((e) => {
+    updateFilters({ searchTerm: e.target.value });
+  }, [updateFilters]);
 
-  /**
-   * Manejar clic en vale para ver detalle
-   */
-  const handleValeClick = (vale) => {
-    console.log("Vale seleccionado:", vale);
-  };
-
-  /**
-   * Limpiar todos los filtros
-   */
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     clearFilters();
     setShowFilters(false);
-  };
+  }, [clearFilters]);
 
-  /**
-   * Limpiar solo el término de búsqueda
-   */
-  const handleClearSearch = () => {
+  const handleClearSearch = useCallback(() => {
     updateFilters({ searchTerm: "" });
-  };
+  }, [updateFilters]);
 
   // Filtrar vales por tipo según pestaña activa
   const valesFiltrados = vales.filter((vale) => vale.tipo_vale === activeTab);
@@ -262,7 +245,6 @@ const Vales = () => {
         ) : (
           <ValesList
             vales={valesFiltrados}
-            onValeClick={handleValeClick}
             onValeActualizado={fetchVales}
           />
         )}

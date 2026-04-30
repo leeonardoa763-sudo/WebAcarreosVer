@@ -1,0 +1,658 @@
+/**
+ * src/components/vales/ModalValeDetalle.jsx
+ *
+ * Modal centrado para ver el detalle completo de un vale (material o renta).
+ * Reemplaza el desplegable inline de ValeCardMaterial y ValeCardRenta.
+ *
+ * Dependencias: formatters.js, useAuth.jsx, ModalEditarVale, ModalEditarValeRenta, ModalCancelarVale
+ * Usado en: ValeCardMaterial.jsx, ValeCardRenta.jsx
+ */
+
+// 1. React y hooks
+import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+
+// 2. Icons
+import {
+  X,
+  FileText,
+  Calendar,
+  Building2,
+  User,
+  Truck,
+  Package,
+  Clock,
+  UserCheck,
+  MapPin,
+  Receipt,
+  XCircle,
+  Pencil,
+} from "lucide-react";
+
+// 3. Utils
+import {
+  formatearFechaHora,
+  getBadgeEstado,
+  formatearVolumen,
+  formatearPeso,
+  formatearDistancia,
+  formatearFolio,
+  formatearMoneda,
+  getNombreCompleto,
+  formatearHora,
+  formatearDuracion,
+} from "../../utils/formatters";
+
+// 4. Hooks
+import { useAuth } from "../../hooks/useAuth";
+
+// 5. Componentes
+import ModalEditarVale from "./editar/ModalEditarVale";
+import ModalEditarValeRenta from "./editar/ModalEditarValeRenta";
+import ModalCancelarVale from "./ModalCancelarVale";
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const formatearFechaCorta = (fechaISO) => {
+  if (!fechaISO) return "N/A";
+  const date = new Date(fechaISO + (fechaISO.includes("T") ? "" : "T00:00:00"));
+  return date.toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+};
+
+const ESTADOS_CANCELABLES = ["emitido", "en_proceso"];
+
+// ─── Sub-componentes internos ─────────────────────────────────────────────────
+
+const InfoRow = ({ icon: Icon, label, value, subValue, color }) => (
+  <div className="vdm__info-row">
+    <Icon size={15} className="vdm__info-icon" style={color ? { color } : undefined} aria-hidden="true" />
+    <div className="vdm__info-content">
+      <span className="vdm__info-label" style={color ? { color } : undefined}>{label}</span>
+      <span className="vdm__info-value" style={color ? { color } : undefined}>{value}</span>
+      {subValue && <span className="vdm__info-sub">{subValue}</span>}
+    </div>
+  </div>
+);
+
+// ─── Detalle Material ─────────────────────────────────────────────────────────
+
+const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
+  const getCostoEfectivo = (viaje) =>
+    viaje.costo_viaje_override != null
+      ? Number(viaje.costo_viaje_override)
+      : Number(viaje.costo_viaje || 0);
+
+  const fmtTarifaTooltip = (viaje) => {
+    const parts = [];
+    if (viaje.tarifa_primer_km != null)
+      parts.push(`1er km: ${formatearMoneda(viaje.tarifa_primer_km)}/m³`);
+    if (viaje.tarifa_subsecuente != null)
+      parts.push(`Subsec.: ${formatearMoneda(viaje.tarifa_subsecuente)}/m³`);
+    return parts.join("\n") || undefined;
+  };
+
+  const fmtRegistrador = (persona) => {
+    if (!persona) return null;
+    return `${persona.nombre || ""} ${persona.primer_apellido || ""}`.trim() || null;
+  };
+
+  const calcularCostoTotal = () =>
+    vale.vale_material_detalles.reduce((sum, detalle) => {
+      const idTipo = detalle.material?.tipo_de_material?.id_tipo_de_material;
+      if (idTipo === 3) {
+        return sum + (detalle.vale_material_viajes || []).reduce(
+          (s, v) => s + Number(v.costo_viaje_override ?? v.costo_viaje ?? 0),
+          0,
+        );
+      }
+      return sum + Number(detalle.costo_total || 0);
+    }, 0);
+
+  return (
+    <div className="vdm__detalles-section">
+      <h4 className="vdm__section-title">
+        <Package size={15} aria-hidden="true" />
+        Detalles de Material
+      </h4>
+
+      {!vale.vale_material_detalles?.length ? (
+        <p className="vdm__no-data">Sin detalles de material</p>
+      ) : (
+        vale.vale_material_detalles.map((detalle, index) => {
+          const idTipo = detalle.material?.tipo_de_material?.id_tipo_de_material;
+          const esTipo3 = idTipo === 3;
+          const volumen = Number(detalle.volumen_real_m3 || 0);
+          const precioM3 = Number(detalle.precio_m3 || 0);
+          const viajesDetalle = detalle.vale_material_viajes || [];
+          const pesoTon = esTipo3 ? 0 : Number(detalle.peso_ton || 0);
+          const costoTotal = esTipo3
+            ? viajesDetalle.reduce((sum, v) => sum + Number(v.costo_viaje_override ?? v.costo_viaje ?? 0), 0)
+            : Number(detalle.costo_total || 0);
+
+          return (
+            <div key={detalle.id_detalle_material} className="vdm__detalle-item">
+              <div className="vdm__detalle-header">
+                <span className="vdm__detalle-num">#{index + 1}</span>
+                <span className="vdm__detalle-nombre">
+                  {detalle.material?.material || "N/A"}
+                </span>
+                {valeEditable && (
+                  <button
+                    type="button"
+                    className="vdm__btn-editar"
+                    onClick={() => onAbrirEditar(detalle.id_detalle_material)}
+                    title="Editar viajes de este detalle"
+                  >
+                    <Pencil size={11} />
+                    Editar viajes
+                  </button>
+                )}
+              </div>
+
+              <div className="vdm__detalle-grid">
+                <div className="vdm__detalle-cell">
+                  <span className="vdm__cell-label">Tipo:</span>
+                  <span className="vdm__cell-value">{detalle.material?.tipo_de_material?.tipo_de_material || "N/A"}</span>
+                </div>
+                {!esTipo3 && (
+                  <div className="vdm__detalle-cell">
+                    <span className="vdm__cell-label">Banco:</span>
+                    <span className="vdm__cell-value">{detalle.bancos?.banco || "N/A"}</span>
+                  </div>
+                )}
+                <div className="vdm__detalle-cell">
+                  <span className="vdm__cell-label">Capacidad:</span>
+                  <span className="vdm__cell-value">{formatearVolumen(detalle.capacidad_m3 || 0)}</span>
+                </div>
+                <div className="vdm__detalle-cell">
+                  <span className="vdm__cell-label">Distancia:</span>
+                  <span className="vdm__cell-value">{formatearDistancia(detalle.distancia_km || 0)}</span>
+                </div>
+                {viajesDetalle.length > 0 && (
+                  <div className="vdm__detalle-cell">
+                    <span className="vdm__cell-label">Viajes:</span>
+                    <span className="vdm__cell-value">{viajesDetalle.length}</span>
+                  </div>
+                )}
+                <div className="vdm__detalle-cell">
+                  <span className="vdm__cell-label">M³ Reales:</span>
+                  <span className="vdm__cell-value vdm__cell-value--highlight">
+                    {volumen > 0 ? formatearVolumen(volumen) : "Pendiente"}
+                  </span>
+                </div>
+                {!esTipo3 && (
+                  <div className="vdm__detalle-cell">
+                    <span className="vdm__cell-label">Requisición:</span>
+                    <span className="vdm__cell-value">{detalle.requisicion || "N/A"}</span>
+                  </div>
+                )}
+                <div className="vdm__detalle-cell">
+                  <span className="vdm__cell-label">Precio/M³:</span>
+                  <span className="vdm__cell-value">{precioM3 > 0 ? formatearMoneda(precioM3) : "Pendiente"}</span>
+                </div>
+                {!esTipo3 && pesoTon > 0 && (
+                  <div className="vdm__detalle-cell">
+                    <span className="vdm__cell-label">Peso:</span>
+                    <span className="vdm__cell-value">{formatearPeso(pesoTon)}</span>
+                  </div>
+                )}
+                <div className="vdm__detalle-cell vdm__detalle-cell--full">
+                  <span className="vdm__cell-label">Importe:</span>
+                  <span className="vdm__cell-value vdm__cell-value--cost">
+                    {costoTotal > 0 ? formatearMoneda(costoTotal) : "Pendiente"}
+                  </span>
+                </div>
+              </div>
+
+              {detalle.notas_adicionales && (
+                <div className="vdm__notas">
+                  <span className="vdm__cell-label">Notas:</span>
+                  <p className="vdm__notas-texto">{detalle.notas_adicionales}</p>
+                </div>
+              )}
+
+              {/* Viajes tipo 3 */}
+              {esTipo3 && viajesDetalle.length > 0 && (
+                <div className="vdm__viajes">
+                  <h5 className="vdm__viajes-title">
+                    <Receipt size={12} aria-hidden="true" />
+                    Registro de Viajes ({viajesDetalle.length})
+                  </h5>
+                  <div className="vdm__viajes-tabla-header vdm__viajes-tabla-header--tipo3">
+                    <span>Viaje</span><span>Banco</span><span>Dist.</span>
+                    <span>M³</span><span>Precio/m³</span><span>Costo</span>
+                  </div>
+                  <div className="vdm__viajes-lista">
+                    {[...viajesDetalle].sort((a, b) => a.numero_viaje - b.numero_viaje).map((viaje) => {
+                      const tieneOverride = viaje.id_banco_override || viaje.distancia_km_override;
+                      const bancoNombre = viaje.bancos_override?.banco || detalle.bancos?.banco || "—";
+                      const distancia = viaje.distancia_km_override ?? detalle.distancia_km;
+                      const costoEfectivo = getCostoEfectivo(viaje);
+                      const precioEfectivo = viaje.precio_m3_override ?? viaje.precio_m3;
+                      const registrador = fmtRegistrador(viaje.persona_registro);
+                      return (
+                        <div key={viaje.id_viaje} className={`vdm__viaje-row vdm__viaje-row--tipo3 ${tieneOverride ? "vdm__viaje-row--override" : ""}`}>
+                          <span className="vdm__viaje-num">
+                            #{viaje.numero_viaje}
+                            {tieneOverride && <span className="vdm__override-dot" title="Banco o distancia diferente al detalle">*</span>}
+                            {registrador && <span className="vdm__viaje-reg" title={`Registrado por ${registrador}`}>{registrador}</span>}
+                          </span>
+                          <span>{bancoNombre}</span>
+                          <span>{distancia != null ? `${Number(distancia).toFixed(1)} km` : "—"}</span>
+                          <span>{viaje.volumen_m3 ? formatearVolumen(Number(viaje.volumen_m3)) : "—"}</span>
+                          <span title={fmtTarifaTooltip(viaje)}>{precioEfectivo != null ? formatearMoneda(Number(precioEfectivo)) : "—"}</span>
+                          <span>{costoEfectivo > 0 ? formatearMoneda(costoEfectivo) : "—"}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="vdm__viajes-totales">
+                    <span className="vdm__viajes-totales-label">Subtotal viajes:</span>
+                    <span>{viajesDetalle.reduce((s, v) => s + Number(v.volumen_m3 || 0), 0).toFixed(3)} m³</span>
+                    <span className="vdm__viajes-totales-costo">
+                      {formatearMoneda(viajesDetalle.reduce((s, v) => s + getCostoEfectivo(v), 0))}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Viajes tipo 1 y 2 */}
+              {!esTipo3 && viajesDetalle.length > 0 && (
+                <div className="vdm__viajes">
+                  <h5 className="vdm__viajes-title">
+                    <Receipt size={12} aria-hidden="true" />
+                    Registro de Viajes ({viajesDetalle.length})
+                  </h5>
+                  <div className="vdm__viajes-tabla-header">
+                    <span>Viaje</span><span>Hora</span><span>Folio</span>
+                    <span>Ton</span><span>M³</span><span>Precio/m³</span><span>Costo</span>
+                  </div>
+                  <div className="vdm__viajes-lista">
+                    {[...viajesDetalle].sort((a, b) => a.numero_viaje - b.numero_viaje).map((viaje) => {
+                      const registrador = fmtRegistrador(viaje.persona_registro);
+                      return (
+                        <div key={viaje.id_viaje} className="vdm__viaje-row vdm__viaje-row--material">
+                          <span className="vdm__viaje-num">
+                            #{viaje.numero_viaje}
+                            {registrador && <span className="vdm__viaje-reg" title={`Registrado por ${registrador}`}>{registrador}</span>}
+                          </span>
+                          <span>{viaje.hora_registro ? formatearHora(viaje.hora_registro) : "—"}</span>
+                          <span>{viaje.folio_vale_fisico || "—"}</span>
+                          <span>{viaje.peso_ton ? `${Number(viaje.peso_ton).toFixed(2)} ton` : "—"}</span>
+                          <span>{viaje.volumen_m3 ? formatearVolumen(Number(viaje.volumen_m3)) : "—"}</span>
+                          <span title={fmtTarifaTooltip(viaje)}>{viaje.precio_m3 ? formatearMoneda(Number(viaje.precio_m3)) : "—"}</span>
+                          <span>{viaje.costo_viaje ? formatearMoneda(Number(viaje.costo_viaje)) : "—"}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="vdm__viajes-totales">
+                    <span className="vdm__viajes-totales-label">Subtotal viajes:</span>
+                    <span>{viajesDetalle.reduce((s, v) => s + Number(v.peso_ton || 0), 0).toFixed(2)} ton</span>
+                    <span className="vdm__viajes-totales-costo">
+                      {formatearMoneda(viajesDetalle.reduce((s, v) => s + Number(v.costo_viaje || 0), 0))}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+
+      {vale.vale_material_detalles?.length > 0 && (
+        <div className="vdm__total">
+          <span className="vdm__total-label">Total del Vale:</span>
+          <span className="vdm__total-valor">{formatearMoneda(calcularCostoTotal())}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Detalle Renta ────────────────────────────────────────────────────────────
+
+const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
+  const formatHora = (horaISO) => {
+    if (!horaISO) return null;
+    return new Date(horaISO).toLocaleTimeString("es-MX", {
+      hour: "2-digit", minute: "2-digit", hour12: true,
+    });
+  };
+
+  const calcularCostoTotal = () =>
+    vale.vale_renta_detalle.reduce((sum, d) => sum + Number(d.costo_total || 0), 0);
+
+  return (
+    <div className="vdm__detalles-section">
+      <h4 className="vdm__section-title">
+        <Clock size={15} aria-hidden="true" />
+        Detalles de Renta
+      </h4>
+
+      {vale.vale_renta_detalle?.[0]?.sindicatos?.sindicato && (
+        <div className="vdm__sindicato-badge">
+          Sindicato: {vale.vale_renta_detalle[0].sindicatos.sindicato}
+        </div>
+      )}
+
+      {!vale.vale_renta_detalle?.length ? (
+        <p className="vdm__no-data">Sin detalles de renta</p>
+      ) : (
+        vale.vale_renta_detalle.map((detalle, index) => {
+          const costoTotal = Number(detalle.costo_total || 0);
+          const totalHoras = Number(detalle.total_horas || 0);
+          const totalDias = Number(detalle.total_dias || 0);
+          const costoHr = Number(detalle.precios_renta?.costo_hr || 0);
+          const costoDia = Number(detalle.precios_renta?.costo_dia || 0);
+          const esRentaPorDia = totalDias > 0;
+          const viajesOrdenados = [...(detalle.vale_renta_viajes || [])].sort((a, b) => a.numero_viaje - b.numero_viaje);
+
+          return (
+            <div key={detalle.id_vale_renta_detalle} className="vdm__detalle-item">
+              <div className="vdm__detalle-header">
+                <span className="vdm__detalle-num">#{index + 1}</span>
+                <span className="vdm__detalle-nombre">{detalle.material?.material || "N/A"}</span>
+                {valeEditable && (
+                  <button
+                    type="button"
+                    className="vdm__btn-editar"
+                    onClick={() => onAbrirEditar(detalle.id_vale_renta_detalle)}
+                    title="Editar tipo de renta"
+                  >
+                    <Pencil size={11} />
+                    Editar tipo
+                  </button>
+                )}
+              </div>
+
+              <div className="vdm__detalle-grid">
+                <div className="vdm__detalle-cell">
+                  <span className="vdm__cell-label">Capacidad:</span>
+                  <span className="vdm__cell-value">{formatearVolumen(detalle.capacidad_m3 || 0)}</span>
+                </div>
+                <div className="vdm__detalle-cell">
+                  <span className="vdm__cell-label">Núm. Viajes:</span>
+                  <span className="vdm__cell-value">{detalle.numero_viajes || 0}</span>
+                </div>
+                {detalle.hora_inicio && (
+                  <div className="vdm__detalle-cell">
+                    <span className="vdm__cell-label">Hora Inicio:</span>
+                    <span className="vdm__cell-value">{formatHora(detalle.hora_inicio)}</span>
+                  </div>
+                )}
+                {detalle.hora_fin ? (
+                  <div className="vdm__detalle-cell">
+                    <span className="vdm__cell-label">Hora Fin:</span>
+                    <span className="vdm__cell-value">{formatHora(detalle.hora_fin)}</span>
+                  </div>
+                ) : esRentaPorDia ? (
+                  <div className="vdm__detalle-cell">
+                    <span className="vdm__cell-label">Hora Fin:</span>
+                    <span className="vdm__cell-value">{totalDias === 0.5 ? "Medio día" : "Día completo"}</span>
+                  </div>
+                ) : null}
+                {esRentaPorDia ? (
+                  <>
+                    <div className="vdm__detalle-cell">
+                      <span className="vdm__cell-label">Total Días:</span>
+                      <span className="vdm__cell-value vdm__cell-value--highlight">
+                        {totalDias > 0 ? `${totalDias} ${totalDias === 1 ? "día" : "días"}` : "Pendiente"}
+                      </span>
+                    </div>
+                    <div className="vdm__detalle-cell">
+                      <span className="vdm__cell-label">Tarifa/Día:</span>
+                      <span className="vdm__cell-value">{costoDia > 0 ? formatearMoneda(costoDia) : "N/A"}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="vdm__detalle-cell">
+                      <span className="vdm__cell-label">Total Horas:</span>
+                      <span className="vdm__cell-value vdm__cell-value--highlight">
+                        {totalHoras > 0 ? formatearDuracion(totalHoras) : "Pendiente"}
+                      </span>
+                    </div>
+                    <div className="vdm__detalle-cell">
+                      <span className="vdm__cell-label">Tarifa/Hora:</span>
+                      <span className="vdm__cell-value">{costoHr > 0 ? formatearMoneda(costoHr) : "N/A"}</span>
+                    </div>
+                  </>
+                )}
+                <div className="vdm__detalle-cell vdm__detalle-cell--full">
+                  <span className="vdm__cell-label">Costo Total:</span>
+                  <span className="vdm__cell-value vdm__cell-value--cost">
+                    {costoTotal > 0 ? formatearMoneda(costoTotal) : "Pendiente"}
+                  </span>
+                </div>
+              </div>
+
+              {viajesOrdenados.length > 0 && (
+                <div className="vdm__viajes vdm__viajes--renta">
+                  <h5 className="vdm__viajes-title">
+                    <MapPin size={12} aria-hidden="true" />
+                    Registro de Viajes
+                  </h5>
+                  <div className="vdm__viajes-lista vdm__viajes-lista--renta">
+                    {viajesOrdenados.map((viaje) => (
+                      <div key={viaje.id_viaje} className="vdm__viaje-row vdm__viaje-row--renta">
+                        <span>Viaje {viaje.numero_viaje}</span>
+                        <span>{formatHora(viaje.hora_registro)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {detalle.notas_adicionales && (
+                <div className="vdm__notas">
+                  <span className="vdm__cell-label">Notas:</span>
+                  <p className="vdm__notas-texto">{detalle.notas_adicionales}</p>
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+
+      {vale.vale_renta_detalle?.length > 0 && (
+        <div className="vdm__total">
+          <span className="vdm__total-label">Costo Total del Vale:</span>
+          <span className="vdm__total-valor">{formatearMoneda(calcularCostoTotal())}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Componente principal ─────────────────────────────────────────────────────
+
+const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
+  const { userProfile } = useAuth();
+  const esAdministrador = userProfile?.roles?.role === "Administrador";
+
+  const badgeEstado = getBadgeEstado(vale.estado);
+  const { fecha, hora } = formatearFechaHora(vale.fecha_creacion);
+
+  const tieneFechaProgramada =
+    vale.fecha_programada &&
+    vale.fecha_programada !== vale.fecha_creacion?.split("T")[0];
+
+  const valeEditable =
+    esAdministrador &&
+    vale.estado !== "conciliado" &&
+    vale.estado !== "verificado";
+
+  const valeCancelable =
+    esAdministrador && ESTADOS_CANCELABLES.includes(vale.estado);
+
+  // Modales anidados
+  const [modalEditar, setModalEditar] = useState({ abierto: false, idDetalle: null });
+  const [modalCancelar, setModalCancelar] = useState(false);
+
+  const abrirEditar = useCallback((idDetalle) => {
+    setModalEditar({ abierto: true, idDetalle });
+  }, []);
+
+  const cerrarEditar = useCallback(() => {
+    setModalEditar({ abierto: false, idDetalle: null });
+  }, []);
+
+  // Cerrar con Escape
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && !modalEditar.abierto && !modalCancelar) {
+        onCerrar();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onCerrar, modalEditar.abierto, modalCancelar]);
+
+  // Bloquear scroll del body
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  const handleOverlayClick = useCallback((e) => {
+    if (e.target === e.currentTarget) onCerrar();
+  }, [onCerrar]);
+
+  return createPortal(
+    <div
+      className="vdm__overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Detalle del vale ${formatearFolio(vale.folio)}`}
+      onClick={handleOverlayClick}
+    >
+      <div className="vdm__panel">
+        {/* Header */}
+        <div className="vdm__header">
+          <div className="vdm__header-info">
+            <div className="vdm__header-folio">
+              <FileText size={16} aria-hidden="true" />
+              <span>{formatearFolio(vale.folio)}</span>
+            </div>
+            <span
+              className="vdm__header-estado"
+              style={{ color: badgeEstado.color, backgroundColor: badgeEstado.background }}
+            >
+              {badgeEstado.label}
+            </span>
+          </div>
+          <div className="vdm__header-acciones">
+            {valeCancelable && (
+              <button
+                type="button"
+                className="vdm__btn-cancelar"
+                onClick={() => setModalCancelar(true)}
+                title="Cancelar este vale"
+              >
+                <XCircle size={13} />
+                Cancelar
+              </button>
+            )}
+            <button
+              type="button"
+              className="vdm__btn-cerrar"
+              onClick={onCerrar}
+              aria-label="Cerrar detalle del vale"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="vdm__body">
+          {/* Info general */}
+          <div className="vdm__info-general">
+            <InfoRow icon={Building2} label="Obra" value={vale.obras?.obra || "N/A"}
+              subValue={`CC: ${vale.obras?.cc || "N/A"} | ${vale.obras?.empresas?.empresa || "N/A"}`} />
+            <InfoRow icon={Calendar} label="Fecha de Creación" value={`${fecha} a las ${hora}`} />
+            {tieneFechaProgramada && (
+              <InfoRow icon={Calendar} label="Fecha de Emisión"
+                value={formatearFechaCorta(vale.fecha_programada)}
+                subValue="Vale planeado con anticipación" color="#8B5CF6" />
+            )}
+            <InfoRow icon={UserCheck} label="Residente" value={getNombreCompleto(vale.persona)} />
+            {vale.operadores && (
+              <InfoRow icon={User} label="Operador" value={vale.operadores.nombre_completo}
+                subValue={vale.operadores.sindicatos ? `Sindicato: ${vale.operadores.sindicatos.sindicato}` : null} />
+            )}
+            {vale.vehiculos && (
+              <InfoRow icon={Truck} label="Placas" value={vale.vehiculos.placas} />
+            )}
+            {vale.fecha_verificacion && (
+              <InfoRow icon={Calendar} label="Fecha de Verificación"
+                value={`${formatearFechaHora(vale.fecha_verificacion).fecha} a las ${formatearFechaHora(vale.fecha_verificacion).hora}`}
+                color="#004E89" />
+            )}
+            {vale.fecha_completado && (
+              <InfoRow icon={Calendar} label="Fecha de Completado"
+                value={`${formatearFechaHora(vale.fecha_completado).fecha} a las ${formatearFechaHora(vale.fecha_completado).hora}`}
+                color="#10B981" />
+            )}
+            {vale.fecha_cancelacion && (
+              <InfoRow icon={XCircle} label="Fecha de Cancelación"
+                value={`${formatearFechaHora(vale.fecha_cancelacion).fecha} a las ${formatearFechaHora(vale.fecha_cancelacion).hora}`}
+                color="#DC2626" />
+            )}
+          </div>
+
+          {vale.estado === "cancelado" && vale.motivo_cancelacion && (
+            <div className="vdm__cancelacion-motivo">
+              <span className="vdm__cancelacion-label">Motivo de cancelación:</span>
+              <p className="vdm__cancelacion-texto">{vale.motivo_cancelacion}</p>
+            </div>
+          )}
+
+          {/* Detalles según tipo */}
+          {vale.tipo_vale === "material" ? (
+            <DetalleMaterial vale={vale} valeEditable={valeEditable} onAbrirEditar={abrirEditar} />
+          ) : (
+            <DetalleRenta vale={vale} valeEditable={valeEditable} onAbrirEditar={abrirEditar} />
+          )}
+        </div>
+      </div>
+
+      {/* Modales anidados */}
+      {modalEditar.abierto && modalEditar.idDetalle && vale.tipo_vale === "material" && (
+        <ModalEditarVale
+          idDetalleM={modalEditar.idDetalle}
+          folioVale={vale.folio}
+          onCerrar={cerrarEditar}
+          onGuardadoExitoso={cerrarEditar}
+        />
+      )}
+      {modalEditar.abierto && modalEditar.idDetalle && vale.tipo_vale === "renta" && (
+        <ModalEditarValeRenta
+          idValeRentaDetalle={modalEditar.idDetalle}
+          folioVale={vale.folio}
+          onCerrar={cerrarEditar}
+          onGuardadoExitoso={cerrarEditar}
+        />
+      )}
+      {modalCancelar && (
+        <ModalCancelarVale
+          vale={vale}
+          onCerrar={() => setModalCancelar(false)}
+          onCanceladoExitoso={() => {
+            setModalCancelar(false);
+            onCerrar();
+            onValeActualizado?.();
+          }}
+        />
+      )}
+    </div>,
+    document.body
+  );
+};
+
+export default ModalValeDetalle;
