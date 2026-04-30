@@ -47,9 +47,9 @@ export const useVerificacion = () => {
       setCurrentVale(null);
       setExtractedFolio(null);
 
-      // Validar tamaño del archivo (máximo 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        throw new Error("El archivo es muy grande. Máximo 5MB.");
+      // Validar tamaño del archivo (máximo 20MB)
+      if (file.size > 20 * 1024 * 1024) {
+        throw new Error("El archivo es muy grande. Máximo 20MB.");
       }
 
       // Validar tipo de archivo
