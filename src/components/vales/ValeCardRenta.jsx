@@ -62,6 +62,10 @@ const ValeCardRenta = ({ vale, empresaColor, onValeActualizado }) => {
 
   const costoTotal = calcularCostoTotal();
 
+  const solicitudPendiente = vale.solicitudes_desverificacion?.find(
+    (s) => s.estado === "pendiente"
+  ) ?? null;
+
   return (
     <>
       <div
@@ -86,6 +90,15 @@ const ValeCardRenta = ({ vale, empresaColor, onValeActualizado }) => {
           >
             {badgeEstado.label}
           </span>
+
+          {solicitudPendiente && (
+            <span
+              className="vale-card-compact__desver-badge"
+              title="Solicitud de desverificación pendiente"
+            >
+              Desver.
+            </span>
+          )}
         </div>
 
         {/* Fila secundaria: operador + placas + fecha + costo */}

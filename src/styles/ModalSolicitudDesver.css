@@ -1,0 +1,454 @@
+/**
+ * src/styles/ModalSolicitudDesver.css
+ *
+ * Estilos para el modal de solicitud y respuesta de desverificación.
+ * Prefijo BEM: msd__
+ * Apilado sobre vdm__overlay (z-index: 1200 vs 1100)
+ */
+
+/* ── Overlay ── */
+.msd__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 16px;
+  animation: msdFadeIn 0.18s ease-out;
+}
+
+@keyframes msdFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Panel ── */
+.msd__panel {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
+  width: 100%;
+  max-width: 500px;
+  animation: msdSlideUp 0.2s ease-out;
+}
+
+@keyframes msdSlideUp {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ── Header ── */
+.msd__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.msd__header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.msd__header-icon {
+  color: var(--color-warning, #f59e0b);
+}
+
+.msd__header-icon--responder {
+  color: var(--color-secondary, #004e89);
+}
+
+.msd__titulo {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.msd__cerrar {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  line-height: 1;
+}
+
+.msd__cerrar:hover {
+  color: #475569;
+  background: #f1f5f9;
+}
+
+.msd__cerrar:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Body ── */
+.msd__body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Info rows ── */
+.msd__info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.msd__info-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.msd__info-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #94a3b8;
+  font-weight: 600;
+  min-width: 100px;
+}
+
+.msd__info-valor {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* ── Motivo solicitante (modo responder) ── */
+.msd__motivo-solicitante {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.msd__motivo-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #0369a1;
+}
+
+.msd__motivo-texto {
+  font-size: 13px;
+  color: #1e293b;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Advertencia ── */
+.msd__advertencia {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #92400e;
+  font-size: 13px;
+}
+
+.msd__advertencia svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--color-warning, #f59e0b);
+}
+
+.msd__advertencia p {
+  margin: 4px 0 0;
+  color: #78350f;
+  font-size: 12px;
+}
+
+/* ── Campo textarea ── */
+.msd__campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.msd__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.msd__label--opcional {
+  font-weight: 400;
+  color: #94a3b8;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.msd__textarea {
+  resize: vertical;
+  min-height: 90px;
+  padding: 10px 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1e293b;
+  font-family: inherit;
+  transition: border-color 0.15s;
+  outline: none;
+}
+
+.msd__textarea:focus {
+  border-color: var(--color-warning, #f59e0b);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+
+.msd__textarea:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.msd__contador {
+  font-size: 11px;
+  color: #9ca3af;
+  text-align: right;
+}
+
+/* ── Error ── */
+.msd__error {
+  font-size: 13px;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 0;
+}
+
+/* ── Acciones ── */
+.msd__acciones {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
+  flex-wrap: wrap;
+}
+
+.msd__btn {
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.msd__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.msd__btn--secundario {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.msd__btn--secundario:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.msd__btn--enviar {
+  background: var(--color-warning, #f59e0b);
+  color: #fff;
+}
+
+.msd__btn--enviar:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.msd__btn--aprobar {
+  background: var(--color-accent, #1a936f);
+  color: #fff;
+}
+
+.msd__btn--aprobar:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.msd__btn--rechazar {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.msd__btn--rechazar:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #ef4444;
+}
+
+/* ── Badge en ValeCard ── */
+.vale-card-compact__desver-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── Elementos adicionales en vdm__ ── */
+
+.vdm__btn-desver {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 7px;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.vdm__btn-desver:hover {
+  background: #fef3c7;
+}
+
+.vdm__badge-solicitud {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.vdm__badge-solicitud--pendiente {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  cursor: default;
+}
+
+.vdm__badge-solicitud--rechazada {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  cursor: pointer;
+}
+
+.vdm__badge-solicitud--rechazada:hover {
+  background: #fee2e2;
+}
+
+.vdm__solicitud-card {
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vdm__solicitud-card--pendiente {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.vdm__solicitud-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #92400e;
+}
+
+.vdm__solicitud-motivo {
+  font-size: 13px;
+  color: #78350f;
+  margin: 0;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.vdm__solicitud-meta {
+  font-size: 11px;
+  color: #a16207;
+}
+
+.vdm__solicitud-acciones {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.vdm__btn-responder {
+  padding: 7px 14px;
+  background: var(--color-secondary, #004e89);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.vdm__btn-responder:hover {
+  background: #003d6b;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .msd__acciones {
+    flex-direction: column;
+  }
+  .msd__btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

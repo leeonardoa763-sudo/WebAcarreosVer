@@ -142,6 +142,26 @@ export const useValesQueries = () => {
             numero_viaje,
             hora_registro
           )
+        ),
+        solicitudes_desverificacion (
+          id_solicitud,
+          estado,
+          motivo_solicitud,
+          motivo_respuesta,
+          fecha_solicitud,
+          fecha_respuesta,
+          id_sindicato_requerido,
+          sindicatos:id_sindicato_requerido (
+            sindicato
+          ),
+          persona_solicitante:id_persona_solicitante (
+            nombre,
+            primer_apellido
+          ),
+          persona_respondedor:id_persona_respondedor (
+            nombre,
+            primer_apellido
+          )
         )
       `,
       { count: "exact" },
@@ -287,6 +307,26 @@ export const useValesQueries = () => {
               numero_viaje,
               hora_registro
             )
+          ),
+          solicitudes_desverificacion (
+            id_solicitud,
+            estado,
+            motivo_solicitud,
+            motivo_respuesta,
+            fecha_solicitud,
+            fecha_respuesta,
+            id_sindicato_requerido,
+            sindicatos:id_sindicato_requerido (
+              sindicato
+            ),
+            persona_solicitante:id_persona_solicitante (
+              nombre,
+              primer_apellido
+            ),
+            persona_respondedor:id_persona_respondedor (
+              nombre,
+              primer_apellido
+            )
           )
         `,
         )
@@ -395,6 +435,26 @@ export const useValesQueries = () => {
               id_viaje,
               numero_viaje,
               hora_registro
+            )
+          ),
+          solicitudes_desverificacion (
+            id_solicitud,
+            estado,
+            motivo_solicitud,
+            motivo_respuesta,
+            fecha_solicitud,
+            fecha_respuesta,
+            id_sindicato_requerido,
+            sindicatos:id_sindicato_requerido (
+              sindicato
+            ),
+            persona_solicitante:id_persona_solicitante (
+              nombre,
+              primer_apellido
+            ),
+            persona_respondedor:id_persona_respondedor (
+              nombre,
+              primer_apellido
             )
           )
         `,

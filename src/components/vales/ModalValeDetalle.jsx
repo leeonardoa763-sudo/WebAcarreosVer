@@ -27,6 +27,7 @@ import {
   Receipt,
   XCircle,
   Pencil,
+  RotateCcw,
 } from "lucide-react";
 
 // 3. Utils
@@ -50,6 +51,10 @@ import { useAuth } from "../../hooks/useAuth";
 import ModalEditarVale from "./editar/ModalEditarVale";
 import ModalEditarValeRenta from "./editar/ModalEditarValeRenta";
 import ModalCancelarVale from "./ModalCancelarVale";
+import ModalSolicitudDesver from "./ModalSolicitudDesver";
+
+// 7. Estilos
+import "../../styles/ModalSolicitudDesver.css";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -474,6 +479,8 @@ const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
 const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
   const { userProfile } = useAuth();
   const esAdministrador = userProfile?.roles?.role === "Administrador";
+  const esSindicato = userProfile?.roles?.role === "Sindicato";
+  const idSindicatoUsuario = userProfile?.id_sindicato;
 
   const badgeEstado = getBadgeEstado(vale.estado);
   const { fecha, hora } = formatearFechaHora(vale.fecha_creacion);
@@ -490,9 +497,29 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
   const valeCancelable =
     esAdministrador && ESTADOS_CANCELABLES.includes(vale.estado);
 
+  // Solicitudes de desverificación
+  const solicitudPendiente = vale.solicitudes_desverificacion?.find(
+    (s) => s.estado === "pendiente"
+  ) ?? null;
+
+  const solicitudRechazada = vale.solicitudes_desverificacion
+    ?.filter((s) => s.estado === "rechazada")
+    .sort((a, b) => new Date(b.fecha_respuesta) - new Date(a.fecha_respuesta))[0] ?? null;
+
+  const puedeCrearSolicitud =
+    esAdministrador &&
+    vale.estado === "verificado" &&
+    !solicitudPendiente;
+
+  const puedeResponder =
+    esSindicato &&
+    !!solicitudPendiente &&
+    Number(solicitudPendiente.id_sindicato_requerido) === Number(idSindicatoUsuario);
+
   // Modales anidados
   const [modalEditar, setModalEditar] = useState({ abierto: false, idDetalle: null });
   const [modalCancelar, setModalCancelar] = useState(false);
+  const [modalSolicitud, setModalSolicitud] = useState(false);
 
   const abrirEditar = useCallback((idDetalle) => {
     setModalEditar({ abierto: true, idDetalle });
@@ -505,13 +532,13 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
   // Cerrar con Escape
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === "Escape" && !modalEditar.abierto && !modalCancelar) {
+      if (e.key === "Escape" && !modalEditar.abierto && !modalCancelar && !modalSolicitud) {
         onCerrar();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onCerrar, modalEditar.abierto, modalCancelar]);
+  }, [onCerrar, modalEditar.abierto, modalCancelar, modalSolicitud]);
 
   // Bloquear scroll del body
   useEffect(() => {
@@ -547,6 +574,32 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
             </span>
           </div>
           <div className="vdm__header-acciones">
+            {puedeCrearSolicitud && (
+              <button
+                type="button"
+                className="vdm__btn-desver"
+                onClick={() => setModalSolicitud(true)}
+                title="Solicitar desverificación de este vale"
+              >
+                <RotateCcw size={13} />
+                Solicitar desver.
+              </button>
+            )}
+            {esAdministrador && solicitudPendiente && (
+              <span className="vdm__badge-solicitud vdm__badge-solicitud--pendiente">
+                Desver. pendiente
+              </span>
+            )}
+            {esAdministrador && !solicitudPendiente && solicitudRechazada && (
+              <button
+                type="button"
+                className="vdm__badge-solicitud vdm__badge-solicitud--rechazada"
+                onClick={() => setModalSolicitud(true)}
+                title="Ver detalles del rechazo"
+              >
+                Desver. rechazada
+              </button>
+            )}
             {valeCancelable && (
               <button
                 type="button"
@@ -613,6 +666,28 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
             </div>
           )}
 
+          {puedeResponder && (
+            <div className="vdm__solicitud-card vdm__solicitud-card--pendiente">
+              <div className="vdm__solicitud-header">
+                <RotateCcw size={14} />
+                <span>Solicitud de desverificación pendiente</span>
+              </div>
+              <p className="vdm__solicitud-motivo">{solicitudPendiente.motivo_solicitud}</p>
+              <div className="vdm__solicitud-meta">
+                Solicitado: {new Date(solicitudPendiente.fecha_solicitud).toLocaleDateString("es-MX")}
+              </div>
+              <div className="vdm__solicitud-acciones">
+                <button
+                  type="button"
+                  className="vdm__btn-responder"
+                  onClick={() => setModalSolicitud(true)}
+                >
+                  Responder solicitud
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Detalles según tipo */}
           {vale.tipo_vale === "material" ? (
             <DetalleMaterial vale={vale} valeEditable={valeEditable} onAbrirEditar={abrirEditar} />
@@ -647,6 +722,19 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
             setModalCancelar(false);
             onCerrar();
             onValeActualizado?.();
+          }}
+        />
+      )}
+      {modalSolicitud && (
+        <ModalSolicitudDesver
+          vale={vale}
+          solicitud={puedeResponder ? solicitudPendiente : (solicitudRechazada ?? null)}
+          modo={puedeResponder ? "responder" : "crear"}
+          onCerrar={() => setModalSolicitud(false)}
+          onExitoso={({ aprobado }) => {
+            setModalSolicitud(false);
+            onValeActualizado?.();
+            if (aprobado) onCerrar();
           }}
         />
       )}
