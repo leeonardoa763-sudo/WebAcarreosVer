@@ -1,554 +1,600 @@
 /**
  * src/hooks/useDashboardAnalytics.js
  *
- * Hook para obtener métricas y analytics del dashboard
+ * Hook para obtener métricas y analytics del dashboard con filtros completos
  *
  * Funcionalidades:
- * - Métricas generales (total vales, m³, horas, valor)
- * - Tendencia mensual de vales (últimos 6 meses)
- * - Distribución por obra
- * - Distribución por tipo (material vs renta)
- * - Top materiales más solicitados
+ * - Filtros: período (hoy/ayer/semana/mes), empresa, sindicato, banco, obra, tipo_vale
+ * - Métricas generales con comparativa vs período anterior (% cambio)
+ * - Distribución por estado, tipo, empresa, sindicato
+ * - Top obras, materiales, bancos
+ * - Eficiencia de viajes por hora del día
+ * - Tendencia temporal según el período
  *
  * Dependencias: supabase, useAuth
  * Usado en: Dashboard.jsx
  */
 
-// 1. React y hooks
-import { useState, useEffect } from "react";
-
-// 2. Config
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../config/supabase";
-
-// 3. Hooks personalizados
 import { useAuth } from "./useAuth";
 
 export const useDashboardAnalytics = () => {
   const { userProfile, canViewAllVales } = useAuth();
 
-  // Estados para métricas
+  // Filter state
+  const [periodo, setPeriodo] = useState("semana");
+  const [año, setAño] = useState(new Date().getFullYear());
+  const [trimestre, setTrimestre] = useState(null);
+  const [idEmpresa, setIdEmpresa] = useState(null);
+  const [idSindicato, setIdSindicato] = useState(null);
+  const [idBanco, setIdBanco] = useState(null);
+  const [idObra, setIdObra] = useState(null);
+  const [tipoVale, setTipoVale] = useState(null);
+
+  // Raw data (memoized source of truth)
+  const rawValesRef = useRef([]);
+  const rawValesPrevRef = useRef([]);
+
+  // Computed analytics data
   const [metricas, setMetricas] = useState({
     totalVales: 0,
     totalM3: 0,
     totalHoras: 0,
     valorTotal: 0,
   });
-
-  const [tendenciaMensual, setTendenciaMensual] = useState([]);
-  const [distribucionObras, setDistribucionObras] = useState([]);
+  const [comparativa, setComparativa] = useState(null);
+  const [distribucionEstados, setDistribucionEstados] = useState([]);
   const [distribucionTipo, setDistribucionTipo] = useState([]);
+  const [distribucionEmpresas, setDistribucionEmpresas] = useState([]);
+  const [topObras, setTopObras] = useState([]);
   const [topMateriales, setTopMateriales] = useState([]);
-  const [periodoTendencia, setPeriodoTendencia] = useState("semana"); // 'semana' o 'mes'
-  const [obraSeleccionadaMateriales, setObraSeleccionadaMateriales] =
-    useState(null); // null = todas
-  const [obrasDisponibles, setObrasDisponibles] = useState([]);
+  const [topBancos, setTopBancos] = useState([]);
+  const [eficienciaViajes, setEficienciaViajes] = useState([]);
+  const [tendencia, setTendencia] = useState([]);
 
+  // Catalog data for filter dropdowns
+  const [catalogos, setCatalogos] = useState({
+    obras: [],
+    empresas: [],
+    sindicatos: [],
+    bancos: [],
+  });
+  const [loadingCatalogos, setLoadingCatalogos] = useState(true);
+
+  // Request states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  /**
-   * Obtener métricas generales
-   */
-  const fetchMetricasGenerales = async () => {
-    try {
-      // Query base para vales
-      let queryVales = supabase
-        .from("vales")
-        .select("id_vale, tipo_vale, fecha_creacion");
+  // Helper: Calculate date ranges
+  const calcularRangos = useCallback((periodoVal, añoVal, trimestreVal) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-      // Filtrar por obra si no puede ver todos
-      if (!canViewAllVales() && userProfile?.id_current_obra) {
-        queryVales = queryVales.eq("id_obra", userProfile.id_current_obra);
+    if (trimestreVal && añoVal) {
+      const mesInicio = (trimestreVal - 1) * 3;
+      const mesFin = mesInicio + 2;
+      const inicio = new Date(añoVal, mesInicio, 1);
+      const fin = new Date(añoVal, mesFin + 1, 0, 23, 59, 59);
+
+      const prevInicio = new Date(añoVal - 1, mesInicio, 1);
+      const prevFin = new Date(añoVal - 1, mesFin + 1, 0, 23, 59, 59);
+
+      return { inicio, fin, prevInicio, prevFin };
+    }
+
+    switch (periodoVal) {
+      case "hoy": {
+        const inicio = new Date(today);
+        const fin = new Date(today.getTime() + 86400000);
+        const prevInicio = new Date(today.getTime() - 86400000);
+        const prevFin = new Date(today);
+        return { inicio, fin, prevInicio, prevFin };
+      }
+      case "ayer": {
+        const ayer = new Date(today.getTime() - 86400000);
+        const inicio = new Date(ayer);
+        const fin = new Date(today);
+        const prevInicio = new Date(ayer.getTime() - 86400000);
+        const prevFin = new Date(ayer);
+        return { inicio, fin, prevInicio, prevFin };
+      }
+      case "semana": {
+        const semanaInicio = new Date(today.getTime() - 7 * 86400000);
+        const inicio = new Date(semanaInicio);
+        const fin = new Date(today.getTime() + 86400000);
+        const prevInicio = new Date(semanaInicio.getTime() - 7 * 86400000);
+        const prevFin = new Date(semanaInicio);
+        return { inicio, fin, prevInicio, prevFin };
+      }
+      case "mes": {
+        const mesInicio = new Date(today.getTime() - 30 * 86400000);
+        const inicio = new Date(mesInicio);
+        const fin = new Date(today.getTime() + 86400000);
+        const prevInicio = new Date(mesInicio.getTime() - 30 * 86400000);
+        const prevFin = new Date(mesInicio);
+        return { inicio, fin, prevInicio, prevFin };
+      }
+      case "año": {
+        const inicio = new Date(añoVal, 0, 1);
+        const fin = new Date(añoVal, 11, 31, 23, 59, 59);
+        const prevInicio = new Date(añoVal - 1, 0, 1);
+        const prevFin = new Date(añoVal - 1, 11, 31, 23, 59, 59);
+        return { inicio, fin, prevInicio, prevFin };
+      }
+      default:
+        return null;
+    }
+  }, []);
+
+  // Apply client-side filters
+  const applyClientFilters = useCallback(
+    (data, filtros) => {
+      let filtered = [...data];
+
+      // Excluir automáticamente obra de prueba (ID 14) y empresa de prueba (ID 4)
+      filtered = filtered.filter(
+        (v) => Number(v.id_obra) !== 14 && Number(v.id_empresa) !== 4
+      );
+
+      if (filtros.idEmpresa) {
+        filtered = filtered.filter((v) => Number(v.id_empresa) === Number(filtros.idEmpresa));
+      }
+      if (filtros.idSindicato) {
+        filtered = filtered.filter(
+          (v) => Number(v.operadores?.id_sindicato) === Number(filtros.idSindicato)
+        );
+      }
+      if (filtros.idObra) {
+        filtered = filtered.filter((v) => Number(v.id_obra) === Number(filtros.idObra));
+      }
+      if (filtros.tipoVale) {
+        filtered = filtered.filter((v) => v.tipo_vale === filtros.tipoVale);
+      }
+      if (filtros.idBanco) {
+        filtered = filtered.filter((v) =>
+          v.vale_material_detalles?.some((d) => Number(d.id_banco) === Number(filtros.idBanco))
+        );
       }
 
-      const { data: vales, error: errorVales } = await queryVales;
-      if (errorVales) throw errorVales;
+      return filtered;
+    },
+    []
+  );
 
-      // Contar vales
-      const totalVales = vales?.length || 0;
-      const valesMaterial =
-        vales
-          ?.filter((v) => v.tipo_vale === "material")
-          .map((v) => v.id_vale) || [];
-      const valesRenta =
-        vales?.filter((v) => v.tipo_vale === "renta").map((v) => v.id_vale) ||
-        [];
+  // Calculate metrics from vales
+  const calcularMetricas = useCallback((vales) => {
+    const totalVales = vales.length;
+    let totalM3 = 0;
+    let totalHoras = 0;
+    let valorTotal = 0;
 
-      // Obtener detalles de material (m³ y costos)
-      let totalM3 = 0;
-      let valorMaterial = 0;
-
-      if (valesMaterial.length > 0) {
-        const { data: detallesMaterial } = await supabase
-          .from("vale_material_detalles")
-          .select("volumen_real_m3, cantidad_pedida_m3, costo_total")
-          .in("id_vale", valesMaterial);
-
-        if (detallesMaterial) {
-          totalM3 = detallesMaterial.reduce((sum, d) => {
-            // Usar volumen_real_m3 si existe, sino cantidad_pedida_m3
-            const volumen = d.volumen_real_m3 || d.cantidad_pedida_m3 || 0;
-            return sum + parseFloat(volumen);
-          }, 0);
-
-          valorMaterial = detallesMaterial.reduce(
-            (sum, d) => sum + (parseFloat(d.costo_total) || 0),
-            0,
-          );
-        }
-      }
-
-      // Obtener detalles de renta (horas y costos)
-      let totalHoras = 0;
-      let valorRenta = 0;
-
-      if (valesRenta.length > 0) {
-        const { data: detallesRenta } = await supabase
-          .from("vale_renta_detalle")
-          .select("total_horas, total_dias, costo_total, es_renta_por_dia")
-          .in("id_vale", valesRenta);
-
-        if (detallesRenta) {
-          totalHoras = detallesRenta.reduce((sum, d) => {
-            // MODIFICADO: Si total_dias > 0, convertir días a horas (8 horas por día)
-            const totalDias = parseFloat(d.total_dias || 0);
-            if (totalDias > 0) {
-              return sum + totalDias * 8;
-            }
-            return sum + (parseFloat(d.total_horas) || 0);
-          }, 0);
-
-          valorRenta = detallesRenta.reduce(
-            (sum, d) => sum + (parseFloat(d.costo_total) || 0),
-            0,
-          );
-        }
-      }
-
-      const valorTotal = valorMaterial + valorRenta;
-
-      setMetricas({
-        totalVales,
-        totalM3: Math.round(totalM3 * 100) / 100,
-        totalHoras: Math.round(totalHoras * 100) / 100,
-        valorTotal: Math.round(valorTotal * 100) / 100,
+    vales.forEach((vale) => {
+      // Material
+      vale.vale_material_detalles?.forEach((detalle) => {
+        const volumen = detalle.volumen_real_m3 || detalle.cantidad_pedida_m3 || 0;
+        totalM3 += parseFloat(volumen) || 0;
+        valorTotal += parseFloat(detalle.costo_total) || 0;
       });
 
-      return vales;
-    } catch (error) {
-      console.error("Error en fetchMetricasGenerales:", error);
-      throw error;
-    }
-  };
+      // Renta
+      vale.vale_renta_detalle?.forEach((renta) => {
+        const dias = parseFloat(renta.total_dias) || 0;
+        const horas = parseFloat(renta.total_horas) || 0;
+        totalHoras += dias > 0 ? dias * 8 : horas;
+        valorTotal += parseFloat(renta.costo_total) || 0;
+      });
+    });
 
-  /**
-   * Obtener tendencia por período (semanal o mensual)
-   * @param {Array} vales - Array de vales
-   * @param {String} periodo - 'semana' o 'mes'
-   */
-  const fetchTendencia = async (vales, periodo = "semana") => {
-    try {
-      if (!vales || vales.length === 0) {
-        setTendenciaMensual([]);
-        return;
+    return {
+      totalVales,
+      totalM3: Math.round(totalM3 * 100) / 100,
+      totalHoras: Math.round(totalHoras * 100) / 100,
+      valorTotal: Math.round(valorTotal * 100) / 100,
+    };
+  }, []);
+
+  // Calculate comparison
+  const calcularComparativa = useCallback((actual, anterior) => {
+    if (!anterior || Object.keys(anterior).length === 0) return null;
+
+    const calcPct = (a, b) => {
+      if (b === 0 || b === null) return a === 0 ? 0 : 100;
+      const pct = ((a - b) / b) * 100;
+      return Math.round(pct);
+    };
+
+    return {
+      totalVales: {
+        valor: actual.totalVales - anterior.totalVales,
+        pct: calcPct(actual.totalVales, anterior.totalVales),
+        sube: actual.totalVales >= anterior.totalVales,
+      },
+      totalM3: {
+        valor: Math.round((actual.totalM3 - anterior.totalM3) * 100) / 100,
+        pct: calcPct(actual.totalM3, anterior.totalM3),
+        sube: actual.totalM3 >= anterior.totalM3,
+      },
+      totalHoras: {
+        valor: Math.round((actual.totalHoras - anterior.totalHoras) * 100) / 100,
+        pct: calcPct(actual.totalHoras, anterior.totalHoras),
+        sube: actual.totalHoras >= anterior.totalHoras,
+      },
+      valorTotal: {
+        valor: Math.round((actual.valorTotal - anterior.valorTotal) * 100) / 100,
+        pct: calcPct(actual.valorTotal, anterior.valorTotal),
+        sube: actual.valorTotal >= anterior.valorTotal,
+      },
+    };
+  }, []);
+
+  // Aggregations
+  const calcularDistribucionEstados = useCallback((vales) => {
+    const estados = {};
+    vales.forEach((v) => {
+      const estado = v.estado || "sin_estado";
+      estados[estado] = (estados[estado] || 0) + 1;
+    });
+
+    const colorMap = {
+      emitido: "rgba(59, 130, 246, 0.8)",
+      verificado: "rgba(26, 147, 111, 0.8)",
+      conciliado: "rgba(34, 197, 94, 0.8)",
+      pagado: "rgba(34, 197, 94, 0.8)",
+      en_proceso: "rgba(245, 158, 11, 0.8)",
+      cancelado: "rgba(239, 68, 68, 0.8)",
+      borrador: "rgba(107, 114, 128, 0.8)",
+    };
+
+    return Object.entries(estados)
+      .map(([estado, cantidad]) => ({
+        estado,
+        label: estado.charAt(0).toUpperCase() + estado.slice(1),
+        cantidad,
+        color: colorMap[estado] || "rgba(156, 163, 175, 0.8)",
+      }))
+      .sort((a, b) => b.cantidad - a.cantidad);
+  }, []);
+
+  const calcularDistribucionTipo = useCallback((vales) => {
+    const tipos = { material: 0, renta: 0 };
+    vales.forEach((v) => {
+      if (v.tipo_vale === "material") tipos.material++;
+      else if (v.tipo_vale === "renta") tipos.renta++;
+    });
+    const total = tipos.material + tipos.renta || 1;
+    return [
+      { tipo: "Material", cantidad: tipos.material, porcentaje: Math.round((tipos.material / total) * 100) },
+      { tipo: "Renta", cantidad: tipos.renta, porcentaje: Math.round((tipos.renta / total) * 100) },
+    ];
+  }, []);
+
+  const calcularDistribucionEmpresas = useCallback((vales) => {
+    const empresas = {};
+    vales.forEach((v) => {
+      const nombre = v.empresas?.empresa || "Sin empresa";
+      if (!empresas[nombre]) {
+        empresas[nombre] = { cantidad: 0, m3Total: 0 };
       }
+      empresas[nombre].cantidad++;
+      v.vale_material_detalles?.forEach((d) => {
+        empresas[nombre].m3Total += parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3 || 0);
+      });
+    });
 
-      if (periodo === "semana") {
-        // Agrupar por semana
-        const valesPorSemana = {};
+    return Object.entries(empresas)
+      .map(([empresa, data]) => ({
+        empresa,
+        cantidad: data.cantidad,
+        m3Total: Math.round(data.m3Total * 100) / 100,
+      }))
+      .sort((a, b) => b.cantidad - a.cantidad)
+      .slice(0, 6);
+  }, []);
 
-        vales.forEach((vale) => {
-          const fecha = new Date(vale.fecha_creacion);
+  const calcularTopObras = useCallback((vales) => {
+    const obras = {};
+    vales.forEach((v) => {
+      const nombre = v.obras?.obra || "Sin obra";
+      obras[nombre] = (obras[nombre] || 0) + 1;
+    });
 
-          // Calcular número de semana del año
-          const primerDiaAnio = new Date(fecha.getFullYear(), 0, 1);
-          const diasTranscurridos = Math.floor(
-            (fecha - primerDiaAnio) / (24 * 60 * 60 * 1000),
-          );
-          const numeroSemana = Math.ceil(
-            (diasTranscurridos + primerDiaAnio.getDay() + 1) / 7,
-          );
+    return Object.entries(obras)
+      .map(([obra, cantidad]) => ({ obra, cantidad }))
+      .sort((a, b) => b.cantidad - a.cantidad)
+      .slice(0, 5);
+  }, []);
 
-          const semanaKey = `${fecha.getFullYear()}-S${String(numeroSemana).padStart(2, "0")}`;
+  const calcularTopMateriales = useCallback((vales) => {
+    const materiales = {};
+    vales.forEach((v) => {
+      v.vale_material_detalles?.forEach((d) => {
+        const nombre = d.material?.material || "Sin material";
+        const vol = parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3 || 0);
+        materiales[nombre] = (materiales[nombre] || 0) + vol;
+      });
+    });
 
-          if (!valesPorSemana[semanaKey]) {
-            valesPorSemana[semanaKey] = {
-              periodo: semanaKey,
-              cantidad: 0,
-              fecha: fecha,
-            };
+    return Object.entries(materiales)
+      .map(([material, m3Total]) => ({ material, m3Total: Math.round(m3Total * 100) / 100 }))
+      .sort((a, b) => b.m3Total - a.m3Total)
+      .slice(0, 5);
+  }, []);
+
+  const calcularTopBancos = useCallback((vales) => {
+    const bancos = {};
+    vales.forEach((v) => {
+      v.vale_material_detalles?.forEach((d) => {
+        const nombre = d.bancos?.banco || "Sin banco";
+        const vol = parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3 || 0);
+        bancos[nombre] = (bancos[nombre] || 0) + vol;
+      });
+    });
+
+    return Object.entries(bancos)
+      .map(([banco, m3Total]) => ({ banco, m3Total: Math.round(m3Total * 100) / 100 }))
+      .sort((a, b) => b.m3Total - a.m3Total)
+      .slice(0, 5);
+  }, []);
+
+  const calcularEficienciaViajes = useCallback((vales) => {
+    const horas = {};
+    for (let h = 0; h < 24; h++) {
+      horas[h] = { viajes: 0, m3Total: 0 };
+    }
+
+    vales.forEach((v) => {
+      v.vale_material_detalles?.forEach((d) => {
+        d.vale_material_viajes?.forEach((viaje) => {
+          if (viaje.hora_registro) {
+            const fecha = new Date(viaje.hora_registro);
+            const hora = fecha.getUTCHours();
+            horas[hora].viajes++;
+            horas[hora].m3Total += parseFloat(viaje.volumen_m3 || 0);
           }
-          valesPorSemana[semanaKey].cantidad++;
         });
+      });
+    });
 
-        // Convertir a array y ordenar
-        const tendencia = Object.values(valesPorSemana)
-          .sort((a, b) => a.fecha - b.fecha)
-          .slice(-8) // Últimas 8 semanas
-          .map((item) => {
-            const [year, semana] = item.periodo.split("-S");
-            return {
-              periodo: `S${semana}/${year.slice(2)}`,
-              cantidad: item.cantidad,
-            };
-          });
+    return Object.entries(horas).map(([h, data]) => ({
+      hora: parseInt(h),
+      label: `${String(h).padStart(2, "0")}:00`,
+      viajes: data.viajes,
+      m3Total: Math.round(data.m3Total * 100) / 100,
+      eficiencia: data.viajes > 0 ? Math.round((data.m3Total / data.viajes) * 100) / 100 : 0,
+    }));
+  }, []);
 
-        setTendenciaMensual(tendencia);
+  const calcularTendencia = useCallback((vales, periodoVal) => {
+    const grupos = {};
+
+    vales.forEach((v) => {
+      const fecha = new Date(v.fecha_creacion);
+      let label;
+
+      if (periodoVal === "hoy" || periodoVal === "ayer") {
+        const h = fecha.getUTCHours();
+        const bloque = Math.floor(h / 6);
+        const labels = ["00-05", "06-11", "12-17", "18-23"];
+        label = labels[bloque];
+      } else if (periodoVal === "semana") {
+        const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+        label = dias[fecha.getUTCDay()];
       } else {
-        // Agrupar por mes (código original)
-        const valesPorMes = {};
-
-        vales.forEach((vale) => {
-          const fecha = new Date(vale.fecha_creacion);
-          const mesKey = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}`;
-
-          if (!valesPorMes[mesKey]) {
-            valesPorMes[mesKey] = {
-              mes: mesKey,
-              cantidad: 0,
-              fecha: fecha,
-            };
-          }
-          valesPorMes[mesKey].cantidad++;
-        });
-
-        // Convertir a array y ordenar
-        const tendencia = Object.values(valesPorMes)
-          .sort((a, b) => a.fecha - b.fecha)
-          .slice(-6) // Últimos 6 meses
-          .map((item) => {
-            const [year, month] = item.mes.split("-");
-            const meses = [
-              "Ene",
-              "Feb",
-              "Mar",
-              "Abr",
-              "May",
-              "Jun",
-              "Jul",
-              "Ago",
-              "Sep",
-              "Oct",
-              "Nov",
-              "Dic",
-            ];
-            return {
-              periodo: `${meses[parseInt(month) - 1]} ${year.slice(2)}`,
-              cantidad: item.cantidad,
-            };
-          });
-
-        setTendenciaMensual(tendencia);
-      }
-    } catch (error) {
-      console.error("Error en fetchTendencia:", error);
-    }
-  };
-
-  /**
-   * Obtener distribución por obra (top 5)
-   */
-  const fetchDistribucionObras = async () => {
-    try {
-      let query = supabase.from("vales").select(
-        `
-          id_vale,
-          obras:id_obra (
-            obra
-          )
-        `,
-        { count: "exact" },
-      );
-
-      // Filtrar por obra si no puede ver todos
-      if (!canViewAllVales() && userProfile?.id_current_obra) {
-        query = query.eq("id_obra", userProfile.id_current_obra);
+        const semana = Math.ceil(fecha.getUTCDate() / 7);
+        label = `S${semana}`;
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Agrupar por obra
-      const obrasCounts = {};
-      data?.forEach((vale) => {
-        const nombreObra = vale.obras?.obra || "Sin obra";
-        obrasCounts[nombreObra] = (obrasCounts[nombreObra] || 0) + 1;
+      if (!grupos[label]) {
+        grupos[label] = { cantidad: 0, m3Total: 0 };
+      }
+      grupos[label].cantidad++;
+      v.vale_material_detalles?.forEach((d) => {
+        grupos[label].m3Total += parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3 || 0);
       });
+    });
 
-      // Convertir a array y ordenar por cantidad
-      const distribucion = Object.entries(obrasCounts)
-        .map(([obra, cantidad]) => ({ obra, cantidad }))
-        .sort((a, b) => b.cantidad - a.cantidad)
-        .slice(0, 5); // Top 5
+    const orden = periodoVal === "semana" ? ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"] : null;
+    let resultado = Object.entries(grupos).map(([label, data]) => ({
+      label,
+      cantidad: data.cantidad,
+      m3Total: Math.round(data.m3Total * 100) / 100,
+    }));
 
-      setDistribucionObras(distribucion);
-    } catch (error) {
-      console.error("Error en fetchDistribucionObras:", error);
+    if (orden) {
+      resultado = resultado.sort((a, b) => orden.indexOf(a.label) - orden.indexOf(b.label));
     }
-  };
 
-  /**
-   * Obtener distribución por tipo (material vs renta)
-   */
-  const fetchDistribucionTipo = async () => {
+    return resultado;
+  }, []);
+
+  // Fetch catalogs (once on mount)
+  const fetchCatalogos = useCallback(async () => {
     try {
-      let query = supabase
-        .from("vales")
-        .select("tipo_vale", { count: "exact" });
-
-      // Filtrar por obra si no puede ver todos
-      if (!canViewAllVales() && userProfile?.id_current_obra) {
-        query = query.eq("id_obra", userProfile.id_current_obra);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Contar por tipo
-      const material =
-        data?.filter((v) => v.tipo_vale === "material").length || 0;
-      const renta = data?.filter((v) => v.tipo_vale === "renta").length || 0;
-
-      setDistribucionTipo([
-        {
-          tipo: "Material",
-          cantidad: material,
-          porcentaje: Math.round((material / (material + renta)) * 100) || 0,
-        },
-        {
-          tipo: "Renta",
-          cantidad: renta,
-          porcentaje: Math.round((renta / (material + renta)) * 100) || 0,
-        },
+      setLoadingCatalogos(true);
+      const [obraRes, empresaRes, sindicatoRes, bancoRes] = await Promise.all([
+        supabase.from("obras").select("id_obra, obra").order("obra"),
+        supabase.from("empresas").select("id_empresa, empresa").order("empresa"),
+        supabase.from("sindicatos").select("id_sindicato, sindicato").order("sindicato"),
+        supabase.from("bancos").select("id_banco, banco").order("banco"),
       ]);
-    } catch (error) {
-      console.error("Error en fetchDistribucionTipo:", error);
-    }
-  };
 
-  /**
-   * Obtener lista de obras disponibles
-   */
-  const fetchObrasDisponibles = async () => {
-    try {
-      let query = supabase.from("obras").select("id_obra, obra").order("obra");
-
-      // Si el usuario no puede ver todas, solo mostrar su obra
-      if (!canViewAllVales() && userProfile?.id_current_obra) {
-        query = query.eq("id_obra", userProfile.id_current_obra);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      setObrasDisponibles(data || []);
-    } catch (error) {
-      console.error("Error en fetchObrasDisponibles:", error);
-    }
-  };
-
-  /**
-   * Obtener top 5 materiales más solicitados (por M³)
-   * Ahora soporta filtrado por obra específica
-   */
-  const fetchTopMateriales = async () => {
-    try {
-      // Materiales de vales de material (con M³)
-      let queryMaterial = supabase.from("vale_material_detalles").select(
-        `
-          id_detalle_material,
-          id_vale,
-          volumen_real_m3,
-          cantidad_pedida_m3,
-          material:id_material (
-            material
-          )
-        `,
-      );
-
-      const { data: detallesMaterial, error: errorMaterial } =
-        await queryMaterial;
-      if (errorMaterial) throw errorMaterial;
-
-      // Materiales de vales de renta (con capacidad M³)
-      let queryRenta = supabase.from("vale_renta_detalle").select(
-        `
-          id_vale_renta_detalle,
-          id_vale,
-          capacidad_m3,
-          material:id_material (
-            material
-          )
-        `,
-      );
-
-      const { data: detallesRenta, error: errorRenta } = await queryRenta;
-      if (errorRenta) throw errorRenta;
-
-      // Si hay filtro por obra (global del usuario o selección específica)
-      const idObraFiltro =
-        obraSeleccionadaMateriales ||
-        (!canViewAllVales() && userProfile?.id_current_obra
-          ? userProfile.id_current_obra
-          : null);
-
-      if (idObraFiltro) {
-        const { data: valesObra } = await supabase
-          .from("vales")
-          .select("id_vale")
-          .eq("id_obra", idObraFiltro);
-
-        const idsValesObra = valesObra?.map((v) => v.id_vale) || [];
-
-        // Filtrar detalles por vales de la obra
-        const materialesFiltrados = detallesMaterial?.filter((d) =>
-          idsValesObra.includes(d.id_vale),
-        );
-        const rentaFiltrada = detallesRenta?.filter((d) =>
-          idsValesObra.includes(d.id_vale),
-        );
-
-        detallesMaterial.length = 0;
-        detallesRenta.length = 0;
-        detallesMaterial.push(...(materialesFiltrados || []));
-        detallesRenta.push(...(rentaFiltrada || []));
-      }
-
-      // Sumar M³ por material
-      const materialesM3 = {};
-
-      // Material: usar volumen_real_m3 o cantidad_pedida_m3
-      detallesMaterial?.forEach((detalle) => {
-        const nombreMaterial = detalle.material?.material || "Sin material";
-        const m3 = parseFloat(
-          detalle.volumen_real_m3 || detalle.cantidad_pedida_m3 || 0,
-        );
-
-        if (!materialesM3[nombreMaterial]) {
-          materialesM3[nombreMaterial] = 0;
-        }
-        materialesM3[nombreMaterial] += m3;
+      setCatalogos({
+        obras: obraRes.data || [],
+        empresas: empresaRes.data || [],
+        sindicatos: sindicatoRes.data || [],
+        bancos: bancoRes.data || [],
       });
-
-      // Renta: usar capacidad_m3
-      detallesRenta?.forEach((detalle) => {
-        const nombreMaterial = detalle.material?.material || "Sin material";
-        const m3 = parseFloat(detalle.capacidad_m3 || 0);
-
-        if (!materialesM3[nombreMaterial]) {
-          materialesM3[nombreMaterial] = 0;
-        }
-        materialesM3[nombreMaterial] += m3;
-      });
-
-      // Convertir a array y ordenar por M³
-      const top = Object.entries(materialesM3)
-        .map(([material, m3Total]) => ({
-          material,
-          m3Total: Math.round(m3Total * 100) / 100,
-        }))
-        .sort((a, b) => b.m3Total - a.m3Total)
-        .slice(0, 5);
-
-      setTopMateriales(top);
-    } catch (error) {
-      console.error("Error en fetchTopMateriales:", error);
+    } catch (err) {
+      console.error("Error al cargar catálogos:", err);
+    } finally {
+      setLoadingCatalogos(false);
     }
-  };
+  }, []);
 
-  /**
-   * Cargar todos los datos
-   */
-  const fetchAllData = async () => {
+  // Main fetch for current + previous period
+  const fetchAllData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // 1. Métricas generales (retorna vales para reutilizar)
-      const vales = await fetchMetricasGenerales();
+      const rangos = calcularRangos(periodo, año, trimestre);
+      if (!rangos) throw new Error("Invalid period");
 
-      // 2. Tendencia (usa los vales ya obtenidos)
-      await fetchTendencia(vales, periodoTendencia);
+      const baseSelect = `
+        id_vale, folio, tipo_vale, estado, fecha_creacion,
+        id_obra, id_empresa,
+        obras:id_obra (id_obra, obra),
+        empresas:id_empresa (id_empresa, empresa),
+        operadores:id_operador (id_operador, id_sindicato,
+          sindicatos:id_sindicato (id_sindicato, sindicato)),
+        vale_material_detalles (
+          id_detalle_material, volumen_real_m3, cantidad_pedida_m3, costo_total, id_banco,
+          bancos:id_banco (id_banco, banco),
+          material:id_material (id_material, material),
+          vale_material_viajes (id_viaje, hora_registro, volumen_m3)
+        ),
+        vale_renta_detalle (total_horas, total_dias, costo_total)
+      `;
 
-      // 3. Distribuciones (queries independientes)
-      await Promise.all([
-        fetchDistribucionObras(),
-        fetchDistribucionTipo(),
-        fetchTopMateriales(),
-        fetchObrasDisponibles(), // ← Nueva función
-      ]);
-    } catch (error) {
-      console.error("Error en fetchAllData:", error);
-      setError("No se pudieron cargar las estadísticas del dashboard");
+      // Fetch current period
+      let queryCurrent = supabase.from("vales").select(baseSelect);
+      if (!canViewAllVales() && userProfile?.id_current_obra) {
+        queryCurrent = queryCurrent.eq("id_obra", userProfile.id_current_obra);
+      }
+      queryCurrent = queryCurrent
+        .gte("fecha_creacion", rangos.inicio.toISOString())
+        .lte("fecha_creacion", rangos.fin.toISOString());
+
+      // Fetch previous period
+      let queryPrev = supabase.from("vales").select(baseSelect);
+      if (!canViewAllVales() && userProfile?.id_current_obra) {
+        queryPrev = queryPrev.eq("id_obra", userProfile.id_current_obra);
+      }
+      queryPrev = queryPrev
+        .gte("fecha_creacion", rangos.prevInicio.toISOString())
+        .lte("fecha_creacion", rangos.prevFin.toISOString());
+
+      const [resCurrent, resPrev] = await Promise.all([queryCurrent, queryPrev]);
+
+      if (resCurrent.error) throw resCurrent.error;
+      if (resPrev.error) throw resPrev.error;
+
+      const valesCurrent = resCurrent.data || [];
+      const valesPrev = resPrev.data || [];
+
+      // Apply client filters
+      const filtros = { idEmpresa, idSindicato, idBanco, idObra, tipoVale };
+      const valesFiltered = applyClientFilters(valesCurrent, filtros);
+      const valesFilteredPrev = applyClientFilters(valesPrev, filtros);
+
+      // Store raw data
+      rawValesRef.current = valesFiltered;
+      rawValesPrevRef.current = valesFilteredPrev;
+
+      // Calculate all metrics
+      const metricasActual = calcularMetricas(valesFiltered);
+      const metricasAnterior = calcularMetricas(valesFilteredPrev);
+
+      setMetricas(metricasActual);
+      setComparativa(calcularComparativa(metricasActual, metricasAnterior));
+      setDistribucionEstados(calcularDistribucionEstados(valesFiltered));
+      setDistribucionTipo(calcularDistribucionTipo(valesFiltered));
+      setDistribucionEmpresas(calcularDistribucionEmpresas(valesFiltered));
+      setTopObras(calcularTopObras(valesFiltered));
+      setTopMateriales(calcularTopMateriales(valesFiltered));
+      setTopBancos(calcularTopBancos(valesFiltered));
+      setEficienciaViajes(calcularEficienciaViajes(valesFiltered));
+      setTendencia(calcularTendencia(valesFiltered, periodo));
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error("Error en fetchAllData:", err);
+      setError(err.message || "Error al cargar datos");
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    periodo,
+    año,
+    trimestre,
+    idEmpresa,
+    idSindicato,
+    idBanco,
+    idObra,
+    tipoVale,
+    userProfile?.id_current_obra,
+    canViewAllVales,
+    calcularRangos,
+    applyClientFilters,
+    calcularMetricas,
+    calcularComparativa,
+    calcularDistribucionEstados,
+    calcularDistribucionTipo,
+    calcularDistribucionEmpresas,
+    calcularTopObras,
+    calcularTopMateriales,
+    calcularTopBancos,
+    calcularEficienciaViajes,
+    calcularTendencia,
+  ]);
 
-  /**
-   * Cambiar obra seleccionada para filtrar materiales
-   */
-  const cambiarObraMateriales = async (idObra) => {
-    setObraSeleccionadaMateriales(idObra);
-    // Recargar solo los materiales con el nuevo filtro
-    await fetchTopMateriales();
-  };
+  // Load catalogs on mount
+  useEffect(() => {
+    fetchCatalogos();
+  }, [fetchCatalogos]);
 
-  /**
-   * Cambiar período de tendencia
-   */
-  const cambiarPeriodo = async (nuevoPeriodo) => {
-    setPeriodoTendencia(nuevoPeriodo);
-
-    // Recargar solo la tendencia con el nuevo período
-    try {
-      let query = supabase
-        .from("vales")
-        .select("id_vale, tipo_vale, fecha_creacion");
-
-      if (!canViewAllVales() && userProfile?.id_current_obra) {
-        query = query.eq("id_obra", userProfile.id_current_obra);
-      }
-
-      const { data: vales } = await query;
-      await fetchTendencia(vales, nuevoPeriodo);
-    } catch (error) {
-      console.error("Error al cambiar período:", error);
-    }
-  };
-
-  // Cargar datos al montar componente
+  // Load data when filters change
   useEffect(() => {
     if (userProfile) {
       fetchAllData();
     }
-  }, [userProfile?.id_persona, userProfile?.id_current_obra, periodoTendencia]);
+  }, [userProfile?.id_persona, fetchAllData]);
 
-  // Recargar materiales cuando cambie el filtro de obra
-  useEffect(() => {
-    if (userProfile && obrasDisponibles.length > 0) {
-      fetchTopMateriales();
-    }
-  }, [obraSeleccionadaMateriales]);
+  const resetFiltros = useCallback(() => {
+    setPeriodo("semana");
+    setAño(new Date().getFullYear());
+    setTrimestre(null);
+    setIdEmpresa(null);
+    setIdSindicato(null);
+    setIdBanco(null);
+    setIdObra(null);
+    setTipoVale(null);
+  }, []);
 
   return {
-    // Datos
-    metricas,
-    tendenciaMensual,
-    distribucionObras,
-    distribucionTipo,
-    topMateriales,
-    periodoTendencia,
-    obrasDisponibles,
-    obraSeleccionadaMateriales,
+    // Filter state + setters
+    filtros: { periodo, año, trimestre, idEmpresa, idSindicato, idBanco, idObra, tipoVale },
+    setPeriodo,
+    setAño,
+    setTrimestre,
+    setIdEmpresa,
+    setIdSindicato,
+    setIdBanco,
+    setIdObra,
+    setTipoVale,
+    resetFiltros,
 
-    // Estados
+    // Catalog data
+    catalogos,
+    loadingCatalogos,
+
+    // Analytics data
+    metricas,
+    comparativa,
+    distribucionEstados,
+    distribucionTipo,
+    distribucionEmpresas,
+    topObras,
+    topMateriales,
+    topBancos,
+    eficienciaViajes,
+    tendencia,
+
+    // Status
     loading,
     error,
-
-    // Funciones
+    lastUpdated,
     refresh: fetchAllData,
-    cambiarPeriodo,
-    cambiarObraMateriales,
   };
 };

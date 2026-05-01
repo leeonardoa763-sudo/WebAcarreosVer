@@ -1,223 +1,184 @@
 /**
  * src/pages/Dashboard.jsx
  *
- * Vista principal del dashboard administrativo (MEJORADA)
- *
- * Muestra:
- * - Métricas principales en cards (Total vales, M³, Horas, Valor total)
- * - Gráfica de tendencia mensual con indicador de incremento/decremento
- * - Distribución por obras (top 5)
- * - Distribución por tipo (Material vs Renta)
- * - Top 5 materiales más solicitados
- * - Sección de conciliaciones recientes
- *
- * Acceso: Solo ADMINISTRADOR, FINANZAS, SINDICATO
+ * Dashboard principal con filtros completos y analytics avanzados
+ * Solo accesible para Administrador
+ * Dependencias: useDashboardAnalytics, todos los componentes dashboard
+ * Usado en: App.jsx, ruta /dashboard
  */
 
-// 1. React y hooks
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { FileText, Truck, Clock, DollarSign } from "lucide-react";
 
-// 2. Icons
-import { FileText, Truck, Clock, DollarSign, RefreshCw } from "lucide-react";
-
-// 3. Config
 import { colors } from "../config/colors";
-
-// 4. Hooks personalizados
 import { useAuth } from "../hooks/useAuth";
 import { useDashboardAnalytics } from "../hooks/useDashboardAnalytics";
 
-// 5. Componentes
-import MetricCard from "../components/dashboard/MetricCard";
-import GraficaTendenciaMensual from "../components/dashboard/GraficaTendenciaMensual";
-import GraficaDistribucionObras from "../components/dashboard/GraficaDistribucionObras";
+import DashboardHeader from "../components/dashboard/DashboardHeader";
+import DashboardFilters from "../components/dashboard/DashboardFilters";
+import DashboardSkeleton from "../components/dashboard/DashboardSkeleton";
+import KpiCard from "../components/dashboard/KpiCard";
+import GraficaTendencia from "../components/dashboard/GraficaTendencia";
+import GraficaEstados from "../components/dashboard/GraficaEstados";
 import GraficaTipoVales from "../components/dashboard/GraficaTipoVales";
+import GraficaTopObras from "../components/dashboard/GraficaTopObras";
+import GraficaEmpresas from "../components/dashboard/GraficaEmpresas";
 import GraficaTopMateriales from "../components/dashboard/GraficaTopMateriales";
+import GraficaTopBancos from "../components/dashboard/GraficaTopBancos";
+import GraficaEficienciaViajes from "../components/dashboard/GraficaEficienciaViajes";
 
-// 6. Estilos
 import "../styles/dashboard.css";
 
 const Dashboard = () => {
-  const navigate = useNavigate();
   const { userProfile } = useAuth();
-
-  // Hook de analytics
   const {
+    filtros,
+    setPeriodo,
+    setAño,
+    setTrimestre,
+    setIdEmpresa,
+    setIdSindicato,
+    setIdBanco,
+    setIdObra,
+    setTipoVale,
+    resetFiltros,
+    catalogos,
+    loadingCatalogos,
     metricas,
-    tendenciaMensual,
-    distribucionObras,
+    comparativa,
+    distribucionEstados,
     distribucionTipo,
+    distribucionEmpresas,
+    topObras,
     topMateriales,
-    periodoTendencia,
-    obrasDisponibles,
-    obraSeleccionadaMateriales,
+    topBancos,
+    eficienciaViajes,
+    tendencia,
     loading,
     error,
+    lastUpdated,
     refresh,
-    cambiarPeriodo,
-    cambiarObraMateriales,
   } = useDashboardAnalytics();
 
-  const [refreshing, setRefreshing] = useState(false);
+  // Dark theme toggle on mount
+  useEffect(() => {
+    document.body.classList.add("dashboard-page");
+    return () => document.body.classList.remove("dashboard-page");
+  }, []);
 
-  /**
-   * Refrescar datos del dashboard
-   */
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await refresh();
-    setTimeout(() => setRefreshing(false), 500);
-  };
-
-  if (loading) {
+  // Error state
+  if (error && loading) {
     return (
-      <div className="dashboard-loading">
-        <div className="loading-spinner"></div>
-        <p>Cargando dashboard...</p>
+      <div className="dashboard">
+        <div style={{textAlign: "center", padding: "40px", color: "var(--db-text-muted)"}}>
+          <p>{error}</p>
+          <button
+            onClick={refresh}
+            style={{
+              marginTop: "16px",
+              padding: "10px 20px",
+              background: "var(--db-orange)",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+            }}
+          >
+            Reintentar
+          </button>
+        </div>
       </div>
     );
   }
 
-  if (error) {
+  // Skeleton loading on first load only
+  if (loading) {
     return (
-      <div className="dashboard-error">
-        <p>{error}</p>
-        <button
-          onClick={handleRefresh}
-          style={{
-            marginTop: "16px",
-            padding: "12px 24px",
-            background: colors.primary,
-            color: "white",
-            border: "none",
-            borderRadius: "8px",
-            cursor: "pointer",
-            fontSize: "14px",
-            fontWeight: 600,
-          }}
-        >
-          Reintentar
-        </button>
+      <div className="dashboard">
+        <DashboardSkeleton />
       </div>
     );
   }
 
   return (
     <div className="dashboard">
-      {/* Header con botón de refresh */}
-      <div className="dashboard__header">
-        <div>
-          <h1 className="dashboard__title">Dashboard</h1>
-          <p className="dashboard__subtitle">
-            Bienvenido, {userProfile?.nombre}
-          </p>
-        </div>
+      {/* Header */}
+      <DashboardHeader
+        userProfile={userProfile}
+        lastUpdated={lastUpdated}
+        loading={loading}
+        onRefresh={refresh}
+      />
 
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          style={{
-            padding: "10px 20px",
-            background: refreshing ? "#e0e0e0" : "white",
-            border: `2px solid ${colors.primary}`,
-            borderRadius: "8px",
-            cursor: refreshing ? "not-allowed" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            color: colors.primary,
-            fontWeight: 600,
-            fontSize: "14px",
-            transition: "all 0.2s ease",
-          }}
-        >
-          <RefreshCw
-            size={18}
-            style={{
-              animation: refreshing ? "spin 1s linear infinite" : "none",
-            }}
-          />
-          Actualizar
-        </button>
-      </div>
+      {/* Filters */}
+      <DashboardFilters
+        filtros={filtros}
+        catalogos={catalogos}
+        onChangePeriodo={setPeriodo}
+        onChangeAño={setAño}
+        onChangeTrimestre={setTrimestre}
+        onChangeEmpresa={setIdEmpresa}
+        onChangeSindicato={setIdSindicato}
+        onChangeBanco={setIdBanco}
+        onChangeObra={setIdObra}
+        onChangeTipo={setTipoVale}
+        onReset={resetFiltros}
+      />
 
-      {/* ========================================
-          SECCIÓN 1: MÉTRICAS PRINCIPALES
-      ======================================== */}
-      <div className="dashboard__metrics-grid">
-        <MetricCard
+      {/* KPI Cards Grid */}
+      <div className="dashboard__kpi-grid">
+        <KpiCard
           title="Total Vales"
           value={metricas.totalVales}
-          subtitle="Todos los tiempos"
-          Icon={FileText}
+          unit="vales"
+          icon={FileText}
           color={colors.primary}
+          comparativa={comparativa?.totalVales}
         />
-
-        <MetricCard
-          title="M³ Totales"
+        <KpiCard
+          title="Volumen"
           value={metricas.totalM3}
-          subtitle="Material transportado"
-          Icon={Truck}
-          color={colors.secondary}
+          unit="m³"
+          icon={Truck}
+          color={colors.accent}
+          comparativa={comparativa?.totalM3}
         />
-
-        <MetricCard
+        <KpiCard
           title="Horas Renta"
           value={metricas.totalHoras}
-          subtitle="Total de horas trabajadas"
-          Icon={Clock}
-          color="#1A936F"
+          unit="hrs"
+          icon={Clock}
+          color={colors.secondary}
+          comparativa={comparativa?.totalHoras}
         />
-
-        <MetricCard
+        <KpiCard
           title="Valor Total"
-          value={`$${(metricas.valorTotal / 1000).toFixed(1)}K`}
-          subtitle="MXN en vales emitidos"
-          Icon={DollarSign}
-          color="#F59E0B"
+          value={`$${metricas.valorTotal.toLocaleString("es-MX")}`}
+          unit="MXN"
+          icon={DollarSign}
+          color="#f59e0b"
+          comparativa={comparativa?.valorTotal}
         />
       </div>
 
-      {/* ========================================
-          SECCIÓN 2: GRÁFICA DE TENDENCIA
-      ======================================== */}
-      <div style={{ marginTop: "32px" }}>
-        <GraficaTendenciaMensual
-          data={tendenciaMensual}
-          periodo={periodoTendencia}
-          onCambioPeriodo={cambiarPeriodo}
-        />
+      {/* Tendencia + Estados */}
+      <div className="dashboard__charts-row">
+        <GraficaTendencia data={tendencia} periodo={filtros.periodo} />
+        <GraficaEstados data={distribucionEstados} />
       </div>
 
-      {/* ========================================
-          SECCIÓN 3: DISTRIBUCIONES
-      ======================================== */}
-      <div
-        style={{
-          marginTop: "32px",
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))",
-          gap: "24px",
-        }}
-      >
-        {/* Distribución por obras */}
-        <GraficaDistribucionObras data={distribucionObras} />
-
-        {/* Distribución por tipo */}
+      {/* Empresas + Tipo + Top Obras */}
+      <div className="dashboard__charts-row-3">
+        <GraficaEmpresas data={distribucionEmpresas} />
         <GraficaTipoVales data={distribucionTipo} />
+        <GraficaTopObras data={topObras} />
       </div>
 
-      {/* ========================================
-          SECCIÓN 4: TOP MATERIALES
-      ======================================== */}
-      <div style={{ marginTop: "32px" }}>
-        <GraficaTopMateriales
-          data={topMateriales}
-          obras={obrasDisponibles}
-          obraSeleccionada={obraSeleccionadaMateriales}
-          onCambioObra={cambiarObraMateriales}
-        />
+      {/* Top Materiales + Top Bancos + Eficiencia */}
+      <div className="dashboard__charts-row-eficiencia">
+        <GraficaTopMateriales data={topMateriales} />
+        <GraficaTopBancos data={topBancos} />
+        <GraficaEficienciaViajes data={eficienciaViajes} />
       </div>
     </div>
   );
