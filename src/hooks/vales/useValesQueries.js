@@ -32,7 +32,8 @@ export const useValesQueries = () => {
    * Incluye campos override en vale_material_viajes para viajes tipo 3
    */
   const buildBaseQuery = useCallback(() => {
-    return supabase.from("vales").select(
+    console.log("🔄 buildBaseQuery llamado");
+    const query = supabase.from("vales").select(
       `
         *,
         obras:id_obra (
@@ -166,6 +167,8 @@ export const useValesQueries = () => {
       `,
       { count: "exact" },
     );
+    console.log("📤 Query buildBaseQuery retornada");
+    return query;
   }, []);
 
   /**
@@ -203,6 +206,7 @@ export const useValesQueries = () => {
    */
   const fetchValeById = useCallback(async (id_vale) => {
     try {
+      console.log("🔍 fetchValeById llamado con id_vale:", id_vale);
       const { data, error } = await supabase
         .from("vales")
         .select(
@@ -333,7 +337,13 @@ export const useValesQueries = () => {
         .eq("id_vale", id_vale)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Error en fetchValeById:", error);
+        throw error;
+      }
+      console.log("✅ Vale obtenido completo:", data);
+      console.log("✅ solicitudes_desverificacion:", data?.solicitudes_desverificacion);
+      console.log("✅ Vale estado:", data?.estado, "| Sindicato del operador:", data?.operadores?.sindicatos?.id_sindicato);
       return { success: true, data };
     } catch (error) {
       console.error("Error en fetchValeById:", error);

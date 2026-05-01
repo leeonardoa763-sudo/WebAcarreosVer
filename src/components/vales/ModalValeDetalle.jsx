@@ -477,6 +477,8 @@ const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
+  console.log("📋 ModalValeDetalle renderizado con vale:", vale?.folio);
+  console.log("📍 solicitudes_desverificacion:", vale?.solicitudes_desverificacion);
   const { userProfile } = useAuth();
   const esAdministrador = userProfile?.roles?.role === "Administrador";
   const esSindicato = userProfile?.roles?.role === "Sindicato";
