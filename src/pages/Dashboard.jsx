@@ -40,6 +40,7 @@ const Dashboard = () => {
     setIdSindicato,
     setIdBanco,
     setIdObra,
+    setIdMaterial,
     setTipoVale,
     resetFiltros,
     catalogos,
@@ -121,6 +122,7 @@ const Dashboard = () => {
         onChangeSindicato={setIdSindicato}
         onChangeBanco={setIdBanco}
         onChangeObra={setIdObra}
+        onChangeMaterial={setIdMaterial}
         onChangeTipo={setTipoVale}
         onReset={resetFiltros}
       />

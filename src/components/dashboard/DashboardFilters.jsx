@@ -16,6 +16,7 @@ const DashboardFilters = ({
   onChangeSindicato,
   onChangeBanco,
   onChangeObra,
+  onChangeMaterial,
   onChangeTipo,
   onReset,
 }) => {
@@ -25,6 +26,7 @@ const DashboardFilters = ({
     filtros.idSindicato,
     filtros.idBanco,
     filtros.idObra,
+    filtros.idMaterial,
     filtros.tipoVale,
   ].filter(Boolean).length;
 
@@ -141,6 +143,22 @@ const DashboardFilters = ({
               {catalogos.bancos?.map((b) => (
                 <option key={b.id_banco} value={b.id_banco}>
                   {b.banco}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="dashboard-filters__select-group">
+            <label className="dashboard-filters__select-label">Material</label>
+            <select
+              className="dashboard-filters__select"
+              value={filtros.idMaterial || ""}
+              onChange={(e) => onChangeMaterial(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">Todos</option>
+              {catalogos.materiales?.map((m) => (
+                <option key={m.id_material} value={m.id_material}>
+                  {m.material}
                 </option>
               ))}
             </select>

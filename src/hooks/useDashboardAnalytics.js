@@ -30,6 +30,7 @@ export const useDashboardAnalytics = () => {
   const [idSindicato, setIdSindicato] = useState(null);
   const [idBanco, setIdBanco] = useState(null);
   const [idObra, setIdObra] = useState(null);
+  const [idMaterial, setIdMaterial] = useState(null);
   const [tipoVale, setTipoVale] = useState(null);
 
   // Raw data (memoized source of truth)
@@ -59,6 +60,7 @@ export const useDashboardAnalytics = () => {
     empresas: [],
     sindicatos: [],
     bancos: [],
+    materiales: [],
   });
   const [loadingCatalogos, setLoadingCatalogos] = useState(true);
 
@@ -155,6 +157,11 @@ export const useDashboardAnalytics = () => {
       if (filtros.idBanco) {
         filtered = filtered.filter((v) =>
           v.vale_material_detalles?.some((d) => Number(d.id_banco) === Number(filtros.idBanco))
+        );
+      }
+      if (filtros.idMaterial) {
+        filtered = filtered.filter((v) =>
+          v.vale_material_detalles?.some((d) => Number(d.material?.id_material) === Number(filtros.idMaterial))
         );
       }
 
@@ -413,11 +420,12 @@ export const useDashboardAnalytics = () => {
   const fetchCatalogos = useCallback(async () => {
     try {
       setLoadingCatalogos(true);
-      const [obraRes, empresaRes, sindicatoRes, bancoRes] = await Promise.all([
+      const [obraRes, empresaRes, sindicatoRes, bancoRes, materialRes] = await Promise.all([
         supabase.from("obras").select("id_obra, obra").order("obra"),
         supabase.from("empresas").select("id_empresa, empresa").order("empresa"),
         supabase.from("sindicatos").select("id_sindicato, sindicato").order("sindicato"),
         supabase.from("bancos").select("id_banco, banco").order("banco"),
+        supabase.from("material").select("id_material, material").order("material"),
       ]);
 
       setCatalogos({
@@ -425,6 +433,7 @@ export const useDashboardAnalytics = () => {
         empresas: empresaRes.data || [],
         sindicatos: sindicatoRes.data || [],
         bancos: bancoRes.data || [],
+        materiales: materialRes.data || [],
       });
     } catch (err) {
       console.error("Error al cargar catálogos:", err);
@@ -485,7 +494,7 @@ export const useDashboardAnalytics = () => {
       const valesPrev = resPrev.data || [];
 
       // Apply client filters
-      const filtros = { idEmpresa, idSindicato, idBanco, idObra, tipoVale };
+      const filtros = { idEmpresa, idSindicato, idBanco, idObra, idMaterial, tipoVale };
       const valesFiltered = applyClientFilters(valesCurrent, filtros);
       const valesFilteredPrev = applyClientFilters(valesPrev, filtros);
 
@@ -522,6 +531,7 @@ export const useDashboardAnalytics = () => {
     idSindicato,
     idBanco,
     idObra,
+    idMaterial,
     tipoVale,
     userProfile?.id_current_obra,
     canViewAllVales,
@@ -559,12 +569,13 @@ export const useDashboardAnalytics = () => {
     setIdSindicato(null);
     setIdBanco(null);
     setIdObra(null);
+    setIdMaterial(null);
     setTipoVale(null);
   }, []);
 
   return {
     // Filter state + setters
-    filtros: { periodo, año, trimestre, idEmpresa, idSindicato, idBanco, idObra, tipoVale },
+    filtros: { periodo, año, trimestre, idEmpresa, idSindicato, idBanco, idObra, idMaterial, tipoVale },
     setPeriodo,
     setAño,
     setTrimestre,
@@ -572,6 +583,7 @@ export const useDashboardAnalytics = () => {
     setIdSindicato,
     setIdBanco,
     setIdObra,
+    setIdMaterial,
     setTipoVale,
     resetFiltros,
 
