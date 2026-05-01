@@ -131,51 +131,8 @@ export const useVerificacion = () => {
       if (qrResult.success) {
         console.log("Folio extraído por QR:", qrResult.folio);
 
-        // VALIDACIONES DE ESTRUCTURA (mismo para QR)
-        // Si OCR falló, usar el textoCompleto del ocrResult aunque esté vacío
-        // Normalizar espacios múltiples y saltos de línea a un solo espacio
-        const texto = (ocrResult.textoCompleto || "")
-          .toUpperCase()
-          .replace(/\s+/g, " ")
-          .trim();
-
-        // Si el texto está vacío (OCR falló completamente), solo validar que tenga QR válido
-        if (!texto || texto.length < 50) {
-          console.log("⚠️ OCR no pudo extraer texto, aceptando por QR válido");
-          setExtractedFolio(qrResult.folio);
-          return {
-            success: true,
-            folio: qrResult.folio,
-            method: "QR",
-            textoCompleto: "",
-          };
-        }
-
-        if (texto.includes("COPIA ROJA")) {
-          throw new Error(
-            "No se pueden verificar copias rojas. Solo copias blancas."
-          );
-        }
-
-        const esCopiaBlanca =
-          texto.includes("COPIA BLANCA") || texto.includes("COPIA BLANCO");
-        if (!esCopiaBlanca) {
-          throw new Error(
-            "PDF inválido: debe ser una copia blanca original del vale."
-          );
-        }
-
-        const tieneEstructuraVale =
-          (texto.includes("VALE DE MATERIAL") ||
-            texto.includes("VALE DE RENTA")) &&
-          texto.includes("OPERADOR");
-
-        if (!tieneEstructuraVale) {
-          throw new Error(
-            "PDF inválido: no tiene la estructura completa de un vale."
-          );
-        }
-
+        // QR válido es suficiente validación — confiar en el QR decodificado
+        console.log("✅ QR decodificado exitosamente, aceptando vale");
         setExtractedFolio(qrResult.folio);
         return {
           success: true,

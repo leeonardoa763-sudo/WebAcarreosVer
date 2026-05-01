@@ -135,9 +135,9 @@ export const useDashboardAnalytics = () => {
     (data, filtros) => {
       let filtered = [...data];
 
-      // Excluir automáticamente obra de prueba (ID 14) y empresa de prueba (ID 4)
+      // Excluir automáticamente obra de prueba (ID 14), empresa de prueba (ID 4) y vales cancelados
       filtered = filtered.filter(
-        (v) => Number(v.id_obra) !== 14 && Number(v.id_empresa) !== 4
+        (v) => Number(v.id_obra) !== 14 && Number(v.id_empresa) !== 4 && v.estado !== 'cancelado'
       );
 
       if (filtros.idEmpresa) {
@@ -178,10 +178,10 @@ export const useDashboardAnalytics = () => {
     let valorTotal = 0;
 
     vales.forEach((vale) => {
-      // Material
+      // Material — usar solo volumen_real_m3
       vale.vale_material_detalles?.forEach((detalle) => {
-        const volumen = detalle.volumen_real_m3 || detalle.cantidad_pedida_m3 || 0;
-        totalM3 += parseFloat(volumen) || 0;
+        const volumen = parseFloat(detalle.volumen_real_m3) || 0;
+        totalM3 += volumen;
         valorTotal += parseFloat(detalle.costo_total) || 0;
       });
 
@@ -286,7 +286,7 @@ export const useDashboardAnalytics = () => {
       }
       empresas[nombre].cantidad++;
       v.vale_material_detalles?.forEach((d) => {
-        empresas[nombre].m3Total += parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3 || 0);
+        empresas[nombre].m3Total += parseFloat(d.volumen_real_m3) || 0;
       });
     });
 
@@ -315,10 +315,11 @@ export const useDashboardAnalytics = () => {
 
   const calcularTopMateriales = useCallback((vales) => {
     const materiales = {};
+
     vales.forEach((v) => {
       v.vale_material_detalles?.forEach((d) => {
         const nombre = d.material?.material || "Sin material";
-        const vol = parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3 || 0);
+        const vol = parseFloat(d.volumen_real_m3) || 0;
         materiales[nombre] = (materiales[nombre] || 0) + vol;
       });
     });
@@ -334,7 +335,7 @@ export const useDashboardAnalytics = () => {
     vales.forEach((v) => {
       v.vale_material_detalles?.forEach((d) => {
         const nombre = d.bancos?.banco || "Sin banco";
-        const vol = parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3 || 0);
+        const vol = parseFloat(d.volumen_real_m3) || 0;
         bancos[nombre] = (bancos[nombre] || 0) + vol;
       });
     });
@@ -398,7 +399,7 @@ export const useDashboardAnalytics = () => {
       }
       grupos[label].cantidad++;
       v.vale_material_detalles?.forEach((d) => {
-        grupos[label].m3Total += parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3 || 0);
+        grupos[label].m3Total += parseFloat(d.volumen_real_m3) || 0;
       });
     });
 
