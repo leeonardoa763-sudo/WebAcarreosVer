@@ -119,10 +119,10 @@ export const useDashboardAnalytics = () => {
         return { inicio, fin, prevInicio, prevFin };
       }
       case "año": {
-        const inicio = new Date(añoVal, 0, 1);
-        const fin = new Date(añoVal, 11, 31, 23, 59, 59);
-        const prevInicio = new Date(añoVal - 1, 0, 1);
-        const prevFin = new Date(añoVal - 1, 11, 31, 23, 59, 59);
+        const inicio = new Date(Date.UTC(añoVal, 0, 1, 0, 0, 0));
+        const fin = new Date(Date.UTC(añoVal, 11, 31, 23, 59, 59));
+        const prevInicio = new Date(Date.UTC(añoVal - 1, 0, 1, 0, 0, 0));
+        const prevFin = new Date(Date.UTC(añoVal - 1, 11, 31, 23, 59, 59));
         return { inicio, fin, prevInicio, prevFin };
       }
       default:
@@ -135,9 +135,9 @@ export const useDashboardAnalytics = () => {
     (data, filtros) => {
       let filtered = [...data];
 
-      // Excluir automáticamente obra de prueba (ID 14), empresa de prueba (ID 4) y vales cancelados
+      // Excluir obra de prueba (ID 14) y empresa de prueba (ID 4) — incluir TODOS los estados
       filtered = filtered.filter(
-        (v) => Number(v.id_obra) !== 14 && Number(v.id_empresa) !== 4 && v.estado !== 'cancelado'
+        (v) => Number(v.id_obra) !== 14 && Number(v.id_empresa) !== 4
       );
 
       if (filtros.idEmpresa) {
@@ -178,11 +178,12 @@ export const useDashboardAnalytics = () => {
     let valorTotal = 0;
 
     vales.forEach((vale) => {
-      // Material — usar solo volumen_real_m3
+      // Material — usar volumen_real_m3 si existe, si no cantidad_pedida_m3
       vale.vale_material_detalles?.forEach((detalle) => {
-        const volumen = parseFloat(detalle.volumen_real_m3) || 0;
+        const volumen = parseFloat(detalle.volumen_real_m3 || detalle.cantidad_pedida_m3) || 0;
         totalM3 += volumen;
-        valorTotal += parseFloat(detalle.costo_total) || 0;
+        const costo = parseFloat(detalle.costo_total || 0);
+        if (!isNaN(costo)) valorTotal += costo;
       });
 
       // Renta
@@ -190,7 +191,8 @@ export const useDashboardAnalytics = () => {
         const dias = parseFloat(renta.total_dias) || 0;
         const horas = parseFloat(renta.total_horas) || 0;
         totalHoras += dias > 0 ? dias * 8 : horas;
-        valorTotal += parseFloat(renta.costo_total) || 0;
+        const costo = parseFloat(renta.costo_total || 0);
+        if (!isNaN(costo)) valorTotal += costo;
       });
     });
 
@@ -241,7 +243,14 @@ export const useDashboardAnalytics = () => {
     const estados = {};
     vales.forEach((v) => {
       const estado = v.estado || "sin_estado";
-      estados[estado] = (estados[estado] || 0) + 1;
+      if (!estados[estado]) {
+        estados[estado] = { cantidad: 0, m3Total: 0 };
+      }
+      estados[estado].cantidad++;
+      v.vale_material_detalles?.forEach((d) => {
+        const volumen = parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0;
+        estados[estado].m3Total += volumen;
+      });
     });
 
     const colorMap = {
@@ -255,10 +264,11 @@ export const useDashboardAnalytics = () => {
     };
 
     return Object.entries(estados)
-      .map(([estado, cantidad]) => ({
+      .map(([estado, data]) => ({
         estado,
         label: estado.charAt(0).toUpperCase() + estado.slice(1),
-        cantidad,
+        cantidad: data.cantidad,
+        m3Total: Math.round(data.m3Total * 100) / 100,
         color: colorMap[estado] || "rgba(156, 163, 175, 0.8)",
       }))
       .sort((a, b) => b.cantidad - a.cantidad);
@@ -286,7 +296,8 @@ export const useDashboardAnalytics = () => {
       }
       empresas[nombre].cantidad++;
       v.vale_material_detalles?.forEach((d) => {
-        empresas[nombre].m3Total += parseFloat(d.volumen_real_m3) || 0;
+        const volumen = parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0;
+        empresas[nombre].m3Total += volumen;
       });
     });
 
@@ -319,7 +330,7 @@ export const useDashboardAnalytics = () => {
     vales.forEach((v) => {
       v.vale_material_detalles?.forEach((d) => {
         const nombre = d.material?.material || "Sin material";
-        const vol = parseFloat(d.volumen_real_m3) || 0;
+        const vol = parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0;
         materiales[nombre] = (materiales[nombre] || 0) + vol;
       });
     });
@@ -335,7 +346,7 @@ export const useDashboardAnalytics = () => {
     vales.forEach((v) => {
       v.vale_material_detalles?.forEach((d) => {
         const nombre = d.bancos?.banco || "Sin banco";
-        const vol = parseFloat(d.volumen_real_m3) || 0;
+        const vol = parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0;
         bancos[nombre] = (bancos[nombre] || 0) + vol;
       });
     });
@@ -399,7 +410,8 @@ export const useDashboardAnalytics = () => {
       }
       grupos[label].cantidad++;
       v.vale_material_detalles?.forEach((d) => {
-        grupos[label].m3Total += parseFloat(d.volumen_real_m3) || 0;
+        const volumen = parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0;
+        grupos[label].m3Total += volumen;
       });
     });
 
@@ -468,23 +480,17 @@ export const useDashboardAnalytics = () => {
         vale_renta_detalle (total_horas, total_dias, costo_total)
       `;
 
-      // Fetch current period
-      let queryCurrent = supabase.from("vales").select(baseSelect);
-      if (!canViewAllVales() && userProfile?.id_current_obra) {
-        queryCurrent = queryCurrent.eq("id_obra", userProfile.id_current_obra);
-      }
-      queryCurrent = queryCurrent
+      // Fetch current period (sin límite de 1000 por defecto de PostgREST)
+      let queryCurrent = supabase.from("vales").select(baseSelect)
         .gte("fecha_creacion", rangos.inicio.toISOString())
-        .lte("fecha_creacion", rangos.fin.toISOString());
+        .lte("fecha_creacion", rangos.fin.toISOString())
+        .limit(10000);
 
       // Fetch previous period
-      let queryPrev = supabase.from("vales").select(baseSelect);
-      if (!canViewAllVales() && userProfile?.id_current_obra) {
-        queryPrev = queryPrev.eq("id_obra", userProfile.id_current_obra);
-      }
-      queryPrev = queryPrev
+      let queryPrev = supabase.from("vales").select(baseSelect)
         .gte("fecha_creacion", rangos.prevInicio.toISOString())
-        .lte("fecha_creacion", rangos.prevFin.toISOString());
+        .lte("fecha_creacion", rangos.prevFin.toISOString())
+        .limit(10000);
 
       const [resCurrent, resPrev] = await Promise.all([queryCurrent, queryPrev]);
 
@@ -534,8 +540,6 @@ export const useDashboardAnalytics = () => {
     idObra,
     idMaterial,
     tipoVale,
-    userProfile?.id_current_obra,
-    canViewAllVales,
     calcularRangos,
     applyClientFilters,
     calcularMetricas,

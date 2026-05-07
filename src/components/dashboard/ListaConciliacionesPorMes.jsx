@@ -18,12 +18,25 @@ import { useState } from "react";
 // 2. Icons
 import { ChevronDown, ChevronRight, Calendar } from "lucide-react";
 
-// 3. Utils
+// 3. Config
+import { colors } from "../../config/colors";
+
+// 4. Utils
 import { formatearFechaCorta } from "../../utils/formatters";
 
 const ListaConciliacionesPorMes = ({ meses, onSeleccionar, colorTema }) => {
   const [mesesAbiertos, setMesesAbiertos] = useState({});
   const [semanasAbiertas, setSemanasAbiertas] = useState({});
+
+  const getEstadoConfig = (estado) => {
+    const configMap = {
+      generada: { label: "Generada", bgColor: "#f0f0f0", textColor: "#666" },
+      enviada: { label: "Enviada", bgColor: "#cfe9f3", textColor: "#0066cc" },
+      pagada: { label: "Pagada", bgColor: "#c6f6d5", textColor: "#22863a" },
+      cancelada: { label: "Cancelada", bgColor: "#ffe0e0", textColor: "#cb2431" },
+    };
+    return configMap[estado?.toLowerCase()] || configMap.generada;
+  };
 
   const toggleMes = (keyMes) => {
     setMesesAbiertos((prev) => ({
@@ -135,31 +148,43 @@ const ListaConciliacionesPorMes = ({ meses, onSeleccionar, colorTema }) => {
                       {/* Contenido de la SEMANA: Lista de CONCILIACIONES */}
                       {isSemanaAbierta && (
                         <div className="semana-grupo__content">
-                          {semana.conciliaciones.map((conciliacion) => (
-                            <button
-                              key={conciliacion.id_conciliacion}
-                              className="conciliacion-item"
-                              onClick={() => onSeleccionar(conciliacion)}
-                            >
-                              <div className="conciliacion-item__folio">
-                                {conciliacion.folio}
-                              </div>
-                              <div className="conciliacion-item__info">
-                                <span className="conciliacion-item__obra">
-                                  {conciliacion.obras?.obra}
+                          {semana.conciliaciones.map((conciliacion) => {
+                            const estadoConfig = getEstadoConfig(conciliacion.estado);
+                            return (
+                              <button
+                                key={conciliacion.id_conciliacion}
+                                className="conciliacion-item"
+                                onClick={() => onSeleccionar(conciliacion)}
+                              >
+                                <div className="conciliacion-item__folio">
+                                  {conciliacion.folio}
+                                </div>
+                                <div className="conciliacion-item__info">
+                                  <span className="conciliacion-item__obra">
+                                    {conciliacion.obras?.obra}
+                                  </span>
+                                  <span className="conciliacion-item__total">
+                                    $
+                                    {conciliacion.total_final.toLocaleString(
+                                      "es-MX",
+                                      {
+                                        minimumFractionDigits: 2,
+                                      }
+                                    )}
+                                  </span>
+                                </div>
+                                <span
+                                  className="conciliacion-item__estado"
+                                  style={{
+                                    backgroundColor: estadoConfig.bgColor,
+                                    color: estadoConfig.textColor,
+                                  }}
+                                >
+                                  {estadoConfig.label}
                                 </span>
-                                <span className="conciliacion-item__total">
-                                  $
-                                  {conciliacion.total_final.toLocaleString(
-                                    "es-MX",
-                                    {
-                                      minimumFractionDigits: 2,
-                                    }
-                                  )}
-                                </span>
-                              </div>
-                            </button>
-                          ))}
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </div>

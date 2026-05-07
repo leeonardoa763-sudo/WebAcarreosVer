@@ -20,6 +20,7 @@ import DashboardSkeleton from "../components/dashboard/DashboardSkeleton";
 import KpiCard from "../components/dashboard/KpiCard";
 import GraficaTendencia from "../components/dashboard/GraficaTendencia";
 import GraficaEstados from "../components/dashboard/GraficaEstados";
+import CardEstadosDetallado from "../components/dashboard/CardEstadosDetallado";
 import GraficaTipoVales from "../components/dashboard/GraficaTipoVales";
 import GraficaTopObras from "../components/dashboard/GraficaTopObras";
 import GraficaEmpresas from "../components/dashboard/GraficaEmpresas";
@@ -167,6 +168,11 @@ const Dashboard = () => {
       <div className="dashboard__charts-row">
         <GraficaTendencia data={tendencia} periodo={filtros.periodo} />
         <GraficaEstados data={distribucionEstados} />
+      </div>
+
+      {/* Estados Detallado — Para diagnosticar */}
+      <div className="dashboard__charts-row" style={{ maxWidth: "600px" }}>
+        <CardEstadosDetallado data={distribucionEstados} />
       </div>
 
       {/* Empresas + Tipo + Top Obras */}

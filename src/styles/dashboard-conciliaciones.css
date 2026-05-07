@@ -367,6 +367,16 @@
   color: #1a936f;
 }
 
+.conciliacion-item__estado {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
 /* ========================================
    MODAL OVERLAY
    ======================================== */
@@ -758,6 +768,10 @@
 
   .conciliacion-item__obra {
     max-width: 100%;
+  }
+
+  .conciliacion-item__estado {
+    align-self: flex-start;
   }
 
   .preview-pdf {

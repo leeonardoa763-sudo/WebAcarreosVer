@@ -231,8 +231,10 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
             total: conciliacion.total_final,
             totalViajesTipo1: gruposArr.reduce((s, g) => s + (g.totalesTipo1?.totalViajes || 0), 0),
             totalViajesTipo2: gruposArr.reduce((s, g) => s + (g.totalesTipo2?.totalViajes || 0), 0),
+            totalViajesTipo3: gruposArr.reduce((s, g) => s + (g.totalesTipo3?.totalViajes || 0), 0),
             totalM3Tipo1: gruposArr.reduce((s, g) => s + (g.totalesTipo1?.totalM3 || 0), 0),
             totalM3Tipo2: gruposArr.reduce((s, g) => s + (g.totalesTipo2?.totalM3 || 0), 0),
+            totalM3Tipo3: gruposArr.reduce((s, g) => s + (g.totalesTipo3?.totalM3 || 0), 0),
             totalToneladasTipo1: gruposArr.reduce((s, g) => s + (g.totalesTipo1?.totalToneladas || 0), 0),
             totalToneladasTipo2: gruposArr.reduce((s, g) => s + (g.totalesTipo2?.totalToneladas || 0), 0),
           });
