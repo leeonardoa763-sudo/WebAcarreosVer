@@ -1,7 +1,8 @@
 /**
  * src/components/dashboard/KpiCard.jsx
  *
- * Animated KPI metric card with trend indicator
+ * Animated KPI metric card with trend indicator.
+ * Soporta valores numéricos y monetarios (isCurrency=true).
  * Dependencias: lucide-react, CSS custom properties
  * Usado en: Dashboard.jsx
  */
@@ -9,21 +10,20 @@
 import { useLayoutEffect, useState } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
-const KpiCard = ({ title, value, unit, icon: Icon, color, comparativa }) => {
+const KpiCard = ({ title, value, unit, icon: Icon, color, comparativa, isCurrency = false }) => {
   const [displayValue, setDisplayValue] = useState(0);
 
   useLayoutEffect(() => {
     let animationId;
-    let currentValue = 0;
-    const target = value || 0;
+    const target = parseFloat(value) || 0;
     const duration = 800;
     const startTime = Date.now();
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      currentValue = Math.floor(target * progress);
-      setDisplayValue(currentValue);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayValue(target * eased);
 
       if (progress < 1) {
         animationId = requestAnimationFrame(animate);
@@ -31,9 +31,12 @@ const KpiCard = ({ title, value, unit, icon: Icon, color, comparativa }) => {
     };
 
     animate();
-
     return () => cancelAnimationFrame(animationId);
   }, [value]);
+
+  const formattedValue = isCurrency
+    ? `$${Math.round(displayValue).toLocaleString("es-MX")}`
+    : Math.floor(displayValue).toLocaleString("es-MX");
 
   const hasTrend = comparativa && typeof comparativa.pct === "number";
   const isPositive = comparativa?.sube;
@@ -44,28 +47,20 @@ const KpiCard = ({ title, value, unit, icon: Icon, color, comparativa }) => {
         className="kpi-card__icon-wrap"
         style={{ backgroundColor: `${color}20`, color }}
       >
-        {Icon && <Icon />}
+        {Icon && <Icon size={20} />}
       </div>
 
       <div className="kpi-card__label">{title}</div>
 
-      <div className="kpi-card__value">
-        {displayValue.toLocaleString("es-MX")}
-      </div>
+      <div className="kpi-card__value">{formattedValue}</div>
 
       {unit && <div className="kpi-card__unit">{unit}</div>}
 
       {hasTrend && (
         <div
-          className={`kpi-card__trend kpi-card__trend--${
-            isPositive ? "up" : "down"
-          }`}
+          className={`kpi-card__trend kpi-card__trend--${isPositive ? "up" : "down"}`}
         >
-          {isPositive ? (
-            <TrendingUp size={12} />
-          ) : (
-            <TrendingDown size={12} />
-          )}
+          {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
           <span>{Math.abs(comparativa.pct)}%</span>
         </div>
       )}

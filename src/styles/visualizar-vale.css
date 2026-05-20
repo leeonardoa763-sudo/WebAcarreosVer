@@ -851,6 +851,21 @@ a,
   flex-direction: column;
   gap: 4px;
 }
+
+/* ── Responsive foto-col ── */
+@media (max-width: 480px) {
+  .viaje-item__foto-col { flex: 0 0 80px; }
+  .viaje-item__foto-wrapper { width: 80px; height: 66px; }
+  .viaje-item__foto-placeholder { width: 80px; height: 66px; }
+}
+
+@media (max-width: 360px) {
+  .viaje-item__body { flex-direction: column; }
+  .viaje-item__foto-col { flex: none; width: 100%; }
+  .viaje-item__foto-wrapper { width: 100%; height: 140px; }
+  .viaje-item__foto-placeholder { width: 100%; height: 80px; }
+}
+
 /* ========================================
    VIAJE ITEM - Contenedor y estructura
    ======================================== */

@@ -739,3 +739,230 @@
     font-size: 1.5rem;
   }
 }
+
+/* ── Tab Navigation ── */
+.dashboard__tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: var(--db-gap);
+  background: var(--db-surface);
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius);
+  padding: 6px;
+}
+
+.dashboard__tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px;
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--db-text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.dashboard__tab-btn:hover {
+  color: var(--db-text-primary);
+  background: var(--db-surface-2);
+}
+
+.dashboard__tab-btn--active {
+  background: white;
+  color: var(--db-orange);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  font-weight: 600;
+}
+
+.dashboard__tab-content {
+  animation: tabFadeIn 0.2s ease;
+}
+
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Section Headers ── */
+.dashboard__section-header {
+  margin: 24px 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--db-border);
+}
+
+.dashboard__section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--db-text-primary);
+  letter-spacing: -0.2px;
+  margin: 0;
+}
+
+.dashboard__section-subtitle {
+  font-size: 0.8rem;
+  color: var(--db-text-muted);
+  margin: 3px 0 0;
+}
+
+/* ── KPI Grid Variants ── */
+.dashboard__kpi-grid--5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.dashboard__kpi-grid--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* ── Barra de recarga (período/año cambia, filtros siguen visibles) ── */
+.dashboard__reloading-bar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--db-orange) 0%, var(--db-primary) 50%, var(--db-orange) 100%);
+  background-size: 200% 100%;
+  animation: reloadingSlide 1.2s linear infinite;
+  border-radius: 0 0 2px 2px;
+  margin-bottom: 4px;
+}
+
+@keyframes reloadingSlide {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── MV Loading State ── */
+.dashboard__mv-loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--db-text-muted);
+  font-size: 0.875rem;
+}
+
+/* ── Tabla MV (Materiales / Renta) ── */
+.mv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.mv-table__th {
+  padding: 10px 14px;
+  background: var(--db-surface-2);
+  color: var(--db-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 1px solid var(--db-border);
+  white-space: nowrap;
+  text-align: right;
+  user-select: none;
+}
+
+.mv-table__sortable {
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.mv-table__sortable:hover {
+  color: var(--db-orange);
+}
+
+.mv-table__th-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.mv-table__td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--db-border);
+  color: var(--db-text-primary);
+  vertical-align: middle;
+}
+
+.mv-table__td--name {
+  text-align: left;
+  font-weight: 500;
+}
+
+.mv-table__td--num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mv-table__td--money {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--db-blue);
+  font-weight: 600;
+}
+
+.mv-table__row--even {
+  background: rgba(0, 0, 0, 0.015);
+}
+
+.mv-table__row--empty .mv-table__td {
+  color: var(--db-text-muted);
+  opacity: 0.6;
+}
+
+.mv-table tbody tr:hover {
+  background: var(--db-surface-2);
+}
+
+.mv-table__totals .mv-table__td {
+  background: linear-gradient(135deg, rgba(255, 107, 53, 0.06) 0%, rgba(0, 78, 137, 0.04) 100%);
+  border-top: 2px solid var(--db-border-hover);
+  border-bottom: none;
+  font-weight: 700;
+  color: var(--db-text-primary);
+}
+
+.mv-table__totals .mv-table__td--money {
+  color: var(--db-orange);
+}
+
+/* ── Responsive: nuevas clases ── */
+@media (max-width: 1400px) {
+  .dashboard__kpi-grid--5 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1200px) {
+  .dashboard__kpi-grid--5 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .dashboard__kpi-grid--4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 800px) {
+  .dashboard__tabs {
+    overflow-x: auto;
+    gap: 2px;
+  }
+
+  .dashboard__tab-btn {
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .dashboard__kpi-grid--5 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .dashboard__kpi-grid--5,
+  .dashboard__kpi-grid--4 {
+    grid-template-columns: 1fr;
+  }
+}

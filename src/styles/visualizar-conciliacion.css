@@ -855,6 +855,10 @@
     font-size: 12px;
   }
 
+  .vc-section {
+    padding: 12px 14px;
+  }
+
   .vc-info-row,
   .vc-dato-row {
     font-size: 12px;
@@ -862,6 +866,64 @@
 
   .vc-info-label {
     min-width: 80px;
+  }
+
+  /* Grupo de placas */
+  .vc-grupo-header {
+    padding: 8px 10px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .vc-grupo-header__stats {
+    gap: 8px;
+    font-size: 10px;
+  }
+
+  .vc-grupo-stat {
+    white-space: nowrap;
+  }
+
+  .vc-grupo-vales {
+    padding: 6px;
+  }
+
+  /* Vale card */
+  .vc-vale-body {
+    padding: 10px;
+  }
+
+  .vc-vale-header {
+    padding: 8px 10px;
+  }
+
+  .vc-vale-folio {
+    font-size: 12px;
+  }
+
+  .vc-vale-meta {
+    font-size: 10px;
+  }
+
+  /* Dato rows: apilar label y valor */
+  .vc-dato-row {
+    flex-direction: column;
+    gap: 1px;
+    margin-bottom: 6px;
+  }
+
+  .vc-dato-value {
+    text-align: left;
+  }
+
+  /* Financiero */
+  .vc-financiero {
+    padding: 10px 12px;
+  }
+
+  /* Búsqueda */
+  .vc-busqueda-input {
+    font-size: 13px;
   }
 }
 

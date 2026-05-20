@@ -4,28 +4,33 @@
  * Hook para obtener métricas y analytics del dashboard con filtros completos
  *
  * Funcionalidades:
- * - Filtros: período (hoy/ayer/semana/mes), empresa, sindicato, banco, obra, tipo_vale
+ * - Filtros: período (hoy/ayer/semana/mes/año), empresa, sindicato, banco, obra, tipo_vale
  * - Métricas generales con comparativa vs período anterior (% cambio)
  * - Distribución por estado, tipo, empresa, sindicato
  * - Top obras, materiales, bancos
  * - Eficiencia de viajes por hora del día
  * - Tendencia temporal según el período
  *
+ * Arquitectura de filtros:
+ * - período / año / trimestre → re-query a Supabase (cambia el rango de fechas)
+ * - empresa / sindicato / banco / obra / material / tipoVale → filtrado client-side instantáneo
+ *
  * Dependencias: supabase, useAuth
  * Usado en: Dashboard.jsx
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../config/supabase";
 import { useAuth } from "./useAuth";
 
 export const useDashboardAnalytics = () => {
-  const { userProfile, canViewAllVales } = useAuth();
+  const { userProfile } = useAuth();
 
-  // Filter state
+  // ─── Filter state ───────────────────────────────────────────────────────────
   const [periodo, setPeriodo] = useState("semana");
   const [año, setAño] = useState(new Date().getFullYear());
   const [trimestre, setTrimestre] = useState(null);
+  // Client-side filters (no Supabase re-query)
   const [idEmpresa, setIdEmpresa] = useState(null);
   const [idSindicato, setIdSindicato] = useState(null);
   const [idBanco, setIdBanco] = useState(null);
@@ -33,16 +38,17 @@ export const useDashboardAnalytics = () => {
   const [idMaterial, setIdMaterial] = useState(null);
   const [tipoVale, setTipoVale] = useState(null);
 
-  // Raw data (memoized source of truth)
-  const rawValesRef = useRef([]);
-  const rawValesPrevRef = useRef([]);
+  // ─── Raw data from Supabase (source of truth) ──────────────────────────────
+  const [rawVales, setRawVales] = useState([]);
+  const [rawValesPrev, setRawValesPrev] = useState([]);
 
-  // Computed analytics data
+  // ─── Computed analytics data ────────────────────────────────────────────────
   const [metricas, setMetricas] = useState({
     totalVales: 0,
     totalM3: 0,
     totalHoras: 0,
     valorTotal: 0,
+    valorConIVA: 0,
   });
   const [comparativa, setComparativa] = useState(null);
   const [distribucionEstados, setDistribucionEstados] = useState([]);
@@ -54,7 +60,7 @@ export const useDashboardAnalytics = () => {
   const [eficienciaViajes, setEficienciaViajes] = useState([]);
   const [tendencia, setTendencia] = useState([]);
 
-  // Catalog data for filter dropdowns
+  // ─── Catalog data for filter dropdowns ─────────────────────────────────────
   const [catalogos, setCatalogos] = useState({
     obras: [],
     empresas: [],
@@ -64,12 +70,13 @@ export const useDashboardAnalytics = () => {
   });
   const [loadingCatalogos, setLoadingCatalogos] = useState(true);
 
-  // Request states
+  // ─── Request states ─────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Helper: Calculate date ranges
+  // ─── Helper: Calculate date ranges ─────────────────────────────────────────
   const calcularRangos = useCallback((periodoVal, añoVal, trimestreVal) => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -79,10 +86,8 @@ export const useDashboardAnalytics = () => {
       const mesFin = mesInicio + 2;
       const inicio = new Date(añoVal, mesInicio, 1);
       const fin = new Date(añoVal, mesFin + 1, 0, 23, 59, 59);
-
       const prevInicio = new Date(añoVal - 1, mesInicio, 1);
       const prevFin = new Date(añoVal - 1, mesFin + 1, 0, 23, 59, 59);
-
       return { inicio, fin, prevInicio, prevFin };
     }
 
@@ -130,47 +135,46 @@ export const useDashboardAnalytics = () => {
     }
   }, []);
 
-  // Apply client-side filters
-  const applyClientFilters = useCallback(
-    (data, filtros) => {
-      let filtered = [...data];
+  // ─── Apply client-side filters ───────────────────────────────────────────────
+  const applyClientFilters = useCallback((data, filtros) => {
+    let filtered = [...data];
 
-      // Excluir obra de prueba (ID 14) y empresa de prueba (ID 4) — incluir TODOS los estados
+    // Excluir obra de prueba (ID 14) y empresa de prueba (ID 4)
+    filtered = filtered.filter(
+      (v) => Number(v.id_obra) !== 14 && Number(v.id_empresa) !== 4
+    );
+
+    if (filtros.idEmpresa) {
+      filtered = filtered.filter((v) => Number(v.id_empresa) === Number(filtros.idEmpresa));
+    }
+    if (filtros.idSindicato) {
       filtered = filtered.filter(
-        (v) => Number(v.id_obra) !== 14 && Number(v.id_empresa) !== 4
+        (v) => Number(v.operadores?.id_sindicato) === Number(filtros.idSindicato)
       );
+    }
+    if (filtros.idObra) {
+      filtered = filtered.filter((v) => Number(v.id_obra) === Number(filtros.idObra));
+    }
+    if (filtros.tipoVale) {
+      filtered = filtered.filter((v) => v.tipo_vale === filtros.tipoVale);
+    }
+    if (filtros.idBanco) {
+      filtered = filtered.filter((v) =>
+        v.vale_material_detalles?.some((d) => Number(d.id_banco) === Number(filtros.idBanco))
+      );
+    }
+    if (filtros.idMaterial) {
+      filtered = filtered.filter((v) =>
+        v.vale_material_detalles?.some(
+          (d) => Number(d.material?.id_material) === Number(filtros.idMaterial)
+        )
+      );
+    }
 
-      if (filtros.idEmpresa) {
-        filtered = filtered.filter((v) => Number(v.id_empresa) === Number(filtros.idEmpresa));
-      }
-      if (filtros.idSindicato) {
-        filtered = filtered.filter(
-          (v) => Number(v.operadores?.id_sindicato) === Number(filtros.idSindicato)
-        );
-      }
-      if (filtros.idObra) {
-        filtered = filtered.filter((v) => Number(v.id_obra) === Number(filtros.idObra));
-      }
-      if (filtros.tipoVale) {
-        filtered = filtered.filter((v) => v.tipo_vale === filtros.tipoVale);
-      }
-      if (filtros.idBanco) {
-        filtered = filtered.filter((v) =>
-          v.vale_material_detalles?.some((d) => Number(d.id_banco) === Number(filtros.idBanco))
-        );
-      }
-      if (filtros.idMaterial) {
-        filtered = filtered.filter((v) =>
-          v.vale_material_detalles?.some((d) => Number(d.material?.id_material) === Number(filtros.idMaterial))
-        );
-      }
+    return filtered;
+  }, []);
 
-      return filtered;
-    },
-    []
-  );
-
-  // Calculate metrics from vales
+  // ─── Aggregation functions ───────────────────────────────────────────────────
   const calcularMetricas = useCallback((vales) => {
     const totalVales = vales.length;
     let totalM3 = 0;
@@ -178,7 +182,6 @@ export const useDashboardAnalytics = () => {
     let valorTotal = 0;
 
     vales.forEach((vale) => {
-      // Material — usar volumen_real_m3 si existe, si no cantidad_pedida_m3
       vale.vale_material_detalles?.forEach((detalle) => {
         const volumen = parseFloat(detalle.volumen_real_m3 || detalle.cantidad_pedida_m3) || 0;
         totalM3 += volumen;
@@ -186,7 +189,6 @@ export const useDashboardAnalytics = () => {
         if (!isNaN(costo)) valorTotal += costo;
       });
 
-      // Renta
       vale.vale_renta_detalle?.forEach((renta) => {
         const dias = parseFloat(renta.total_dias) || 0;
         const horas = parseFloat(renta.total_horas) || 0;
@@ -196,63 +198,41 @@ export const useDashboardAnalytics = () => {
       });
     });
 
+    const subtotal = Math.round(valorTotal * 100) / 100;
     return {
       totalVales,
       totalM3: Math.round(totalM3 * 100) / 100,
       totalHoras: Math.round(totalHoras * 100) / 100,
-      valorTotal: Math.round(valorTotal * 100) / 100,
+      valorTotal: subtotal,
+      valorConIVA: Math.round(subtotal * 1.16 * 100) / 100,
     };
   }, []);
 
-  // Calculate comparison
   const calcularComparativa = useCallback((actual, anterior) => {
     if (!anterior || Object.keys(anterior).length === 0) return null;
-
     const calcPct = (a, b) => {
       if (b === 0 || b === null) return a === 0 ? 0 : 100;
-      const pct = ((a - b) / b) * 100;
-      return Math.round(pct);
+      return Math.round(((a - b) / b) * 100);
     };
-
     return {
-      totalVales: {
-        valor: actual.totalVales - anterior.totalVales,
-        pct: calcPct(actual.totalVales, anterior.totalVales),
-        sube: actual.totalVales >= anterior.totalVales,
-      },
-      totalM3: {
-        valor: Math.round((actual.totalM3 - anterior.totalM3) * 100) / 100,
-        pct: calcPct(actual.totalM3, anterior.totalM3),
-        sube: actual.totalM3 >= anterior.totalM3,
-      },
-      totalHoras: {
-        valor: Math.round((actual.totalHoras - anterior.totalHoras) * 100) / 100,
-        pct: calcPct(actual.totalHoras, anterior.totalHoras),
-        sube: actual.totalHoras >= anterior.totalHoras,
-      },
-      valorTotal: {
-        valor: Math.round((actual.valorTotal - anterior.valorTotal) * 100) / 100,
-        pct: calcPct(actual.valorTotal, anterior.valorTotal),
-        sube: actual.valorTotal >= anterior.valorTotal,
-      },
+      totalVales: { valor: actual.totalVales - anterior.totalVales, pct: calcPct(actual.totalVales, anterior.totalVales), sube: actual.totalVales >= anterior.totalVales },
+      totalM3: { valor: Math.round((actual.totalM3 - anterior.totalM3) * 100) / 100, pct: calcPct(actual.totalM3, anterior.totalM3), sube: actual.totalM3 >= anterior.totalM3 },
+      totalHoras: { valor: Math.round((actual.totalHoras - anterior.totalHoras) * 100) / 100, pct: calcPct(actual.totalHoras, anterior.totalHoras), sube: actual.totalHoras >= anterior.totalHoras },
+      valorTotal: { valor: Math.round((actual.valorTotal - anterior.valorTotal) * 100) / 100, pct: calcPct(actual.valorTotal, anterior.valorTotal), sube: actual.valorTotal >= anterior.valorTotal },
+      valorConIVA: { valor: Math.round((actual.valorConIVA - anterior.valorConIVA) * 100) / 100, pct: calcPct(actual.valorConIVA, anterior.valorConIVA), sube: actual.valorConIVA >= anterior.valorConIVA },
     };
   }, []);
 
-  // Aggregations
   const calcularDistribucionEstados = useCallback((vales) => {
     const estados = {};
     vales.forEach((v) => {
       const estado = v.estado || "sin_estado";
-      if (!estados[estado]) {
-        estados[estado] = { cantidad: 0, m3Total: 0 };
-      }
+      if (!estados[estado]) estados[estado] = { cantidad: 0, m3Total: 0 };
       estados[estado].cantidad++;
       v.vale_material_detalles?.forEach((d) => {
-        const volumen = parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0;
-        estados[estado].m3Total += volumen;
+        estados[estado].m3Total += parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0;
       });
     });
-
     const colorMap = {
       emitido: "rgba(59, 130, 246, 0.8)",
       verificado: "rgba(26, 147, 111, 0.8)",
@@ -262,7 +242,6 @@ export const useDashboardAnalytics = () => {
       cancelado: "rgba(239, 68, 68, 0.8)",
       borrador: "rgba(107, 114, 128, 0.8)",
     };
-
     return Object.entries(estados)
       .map(([estado, data]) => ({
         estado,
@@ -291,22 +270,14 @@ export const useDashboardAnalytics = () => {
     const empresas = {};
     vales.forEach((v) => {
       const nombre = v.empresas?.empresa || "Sin empresa";
-      if (!empresas[nombre]) {
-        empresas[nombre] = { cantidad: 0, m3Total: 0 };
-      }
+      if (!empresas[nombre]) empresas[nombre] = { cantidad: 0, m3Total: 0 };
       empresas[nombre].cantidad++;
       v.vale_material_detalles?.forEach((d) => {
-        const volumen = parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0;
-        empresas[nombre].m3Total += volumen;
+        empresas[nombre].m3Total += parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0;
       });
     });
-
     return Object.entries(empresas)
-      .map(([empresa, data]) => ({
-        empresa,
-        cantidad: data.cantidad,
-        m3Total: Math.round(data.m3Total * 100) / 100,
-      }))
+      .map(([empresa, data]) => ({ empresa, cantidad: data.cantidad, m3Total: Math.round(data.m3Total * 100) / 100 }))
       .sort((a, b) => b.cantidad - a.cantidad)
       .slice(0, 6);
   }, []);
@@ -317,7 +288,6 @@ export const useDashboardAnalytics = () => {
       const nombre = v.obras?.obra || "Sin obra";
       obras[nombre] = (obras[nombre] || 0) + 1;
     });
-
     return Object.entries(obras)
       .map(([obra, cantidad]) => ({ obra, cantidad }))
       .sort((a, b) => b.cantidad - a.cantidad)
@@ -326,15 +296,12 @@ export const useDashboardAnalytics = () => {
 
   const calcularTopMateriales = useCallback((vales) => {
     const materiales = {};
-
     vales.forEach((v) => {
       v.vale_material_detalles?.forEach((d) => {
         const nombre = d.material?.material || "Sin material";
-        const vol = parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0;
-        materiales[nombre] = (materiales[nombre] || 0) + vol;
+        materiales[nombre] = (materiales[nombre] || 0) + (parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0);
       });
     });
-
     return Object.entries(materiales)
       .map(([material, m3Total]) => ({ material, m3Total: Math.round(m3Total * 100) / 100 }))
       .sort((a, b) => b.m3Total - a.m3Total)
@@ -346,11 +313,9 @@ export const useDashboardAnalytics = () => {
     vales.forEach((v) => {
       v.vale_material_detalles?.forEach((d) => {
         const nombre = d.bancos?.banco || "Sin banco";
-        const vol = parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0;
-        bancos[nombre] = (bancos[nombre] || 0) + vol;
+        bancos[nombre] = (bancos[nombre] || 0) + (parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0);
       });
     });
-
     return Object.entries(bancos)
       .map(([banco, m3Total]) => ({ banco, m3Total: Math.round(m3Total * 100) / 100 }))
       .sort((a, b) => b.m3Total - a.m3Total)
@@ -359,23 +324,18 @@ export const useDashboardAnalytics = () => {
 
   const calcularEficienciaViajes = useCallback((vales) => {
     const horas = {};
-    for (let h = 0; h < 24; h++) {
-      horas[h] = { viajes: 0, m3Total: 0 };
-    }
-
+    for (let h = 0; h < 24; h++) horas[h] = { viajes: 0, m3Total: 0 };
     vales.forEach((v) => {
       v.vale_material_detalles?.forEach((d) => {
         d.vale_material_viajes?.forEach((viaje) => {
           if (viaje.hora_registro) {
-            const fecha = new Date(viaje.hora_registro);
-            const hora = fecha.getUTCHours();
+            const hora = new Date(viaje.hora_registro).getUTCHours();
             horas[hora].viajes++;
             horas[hora].m3Total += parseFloat(viaje.volumen_m3 || 0);
           }
         });
       });
     });
-
     return Object.entries(horas).map(([h, data]) => ({
       hora: parseInt(h),
       label: `${String(h).padStart(2, "0")}:00`,
@@ -387,49 +347,34 @@ export const useDashboardAnalytics = () => {
 
   const calcularTendencia = useCallback((vales, periodoVal) => {
     const grupos = {};
-
     vales.forEach((v) => {
       const fecha = new Date(v.fecha_creacion);
       let label;
-
       if (periodoVal === "hoy" || periodoVal === "ayer") {
         const h = fecha.getUTCHours();
-        const bloque = Math.floor(h / 6);
-        const labels = ["00-05", "06-11", "12-17", "18-23"];
-        label = labels[bloque];
+        label = ["00-05", "06-11", "12-17", "18-23"][Math.floor(h / 6)];
       } else if (periodoVal === "semana") {
-        const dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-        label = dias[fecha.getUTCDay()];
+        label = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][fecha.getUTCDay()];
       } else {
-        const semana = Math.ceil(fecha.getUTCDate() / 7);
-        label = `S${semana}`;
+        label = `S${Math.ceil(fecha.getUTCDate() / 7)}`;
       }
-
-      if (!grupos[label]) {
-        grupos[label] = { cantidad: 0, m3Total: 0 };
-      }
+      if (!grupos[label]) grupos[label] = { cantidad: 0, m3Total: 0 };
       grupos[label].cantidad++;
       v.vale_material_detalles?.forEach((d) => {
-        const volumen = parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0;
-        grupos[label].m3Total += volumen;
+        grupos[label].m3Total += parseFloat(d.volumen_real_m3 || d.cantidad_pedida_m3) || 0;
       });
     });
-
     const orden = periodoVal === "semana" ? ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"] : null;
     let resultado = Object.entries(grupos).map(([label, data]) => ({
       label,
       cantidad: data.cantidad,
       m3Total: Math.round(data.m3Total * 100) / 100,
     }));
-
-    if (orden) {
-      resultado = resultado.sort((a, b) => orden.indexOf(a.label) - orden.indexOf(b.label));
-    }
-
+    if (orden) resultado = resultado.sort((a, b) => orden.indexOf(a.label) - orden.indexOf(b.label));
     return resultado;
   }, []);
 
-  // Fetch catalogs (once on mount)
+  // ─── Fetch catalogs (once on mount) ─────────────────────────────────────────
   const fetchCatalogos = useCallback(async () => {
     try {
       setLoadingCatalogos(true);
@@ -440,7 +385,6 @@ export const useDashboardAnalytics = () => {
         supabase.from("bancos").select("id_banco, banco").order("banco"),
         supabase.from("material").select("id_material, material").order("material"),
       ]);
-
       setCatalogos({
         obras: obraRes.data || [],
         empresas: empresaRes.data || [],
@@ -455,14 +399,14 @@ export const useDashboardAnalytics = () => {
     }
   }, []);
 
-  // Main fetch for current + previous period
-  const fetchAllData = useCallback(async () => {
+  // ─── Fetch raw data from Supabase (only when date range changes) ─────────────
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
       const rangos = calcularRangos(periodo, año, trimestre);
-      if (!rangos) throw new Error("Invalid period");
+      if (!rangos) throw new Error("Período inválido");
 
       const baseSelect = `
         id_vale, folio, tipo_vale, estado, fecha_creacion,
@@ -480,92 +424,72 @@ export const useDashboardAnalytics = () => {
         vale_renta_detalle (total_horas, total_dias, costo_total)
       `;
 
-      // Fetch current period (sin límite de 1000 por defecto de PostgREST)
-      let queryCurrent = supabase.from("vales").select(baseSelect)
-        .gte("fecha_creacion", rangos.inicio.toISOString())
-        .lte("fecha_creacion", rangos.fin.toISOString())
-        .limit(10000);
-
-      // Fetch previous period
-      let queryPrev = supabase.from("vales").select(baseSelect)
-        .gte("fecha_creacion", rangos.prevInicio.toISOString())
-        .lte("fecha_creacion", rangos.prevFin.toISOString())
-        .limit(10000);
-
-      const [resCurrent, resPrev] = await Promise.all([queryCurrent, queryPrev]);
+      const [resCurrent, resPrev] = await Promise.all([
+        supabase.from("vales").select(baseSelect)
+          .gte("fecha_creacion", rangos.inicio.toISOString())
+          .lte("fecha_creacion", rangos.fin.toISOString())
+          .limit(10000),
+        supabase.from("vales").select(baseSelect)
+          .gte("fecha_creacion", rangos.prevInicio.toISOString())
+          .lte("fecha_creacion", rangos.prevFin.toISOString())
+          .limit(10000),
+      ]);
 
       if (resCurrent.error) throw resCurrent.error;
       if (resPrev.error) throw resPrev.error;
 
-      const valesCurrent = resCurrent.data || [];
-      const valesPrev = resPrev.data || [];
-
-      // Apply client filters
-      const filtros = { idEmpresa, idSindicato, idBanco, idObra, idMaterial, tipoVale };
-      const valesFiltered = applyClientFilters(valesCurrent, filtros);
-      const valesFilteredPrev = applyClientFilters(valesPrev, filtros);
-
-      // Store raw data
-      rawValesRef.current = valesFiltered;
-      rawValesPrevRef.current = valesFilteredPrev;
-
-      // Calculate all metrics
-      const metricasActual = calcularMetricas(valesFiltered);
-      const metricasAnterior = calcularMetricas(valesFilteredPrev);
-
-      setMetricas(metricasActual);
-      setComparativa(calcularComparativa(metricasActual, metricasAnterior));
-      setDistribucionEstados(calcularDistribucionEstados(valesFiltered));
-      setDistribucionTipo(calcularDistribucionTipo(valesFiltered));
-      setDistribucionEmpresas(calcularDistribucionEmpresas(valesFiltered));
-      setTopObras(calcularTopObras(valesFiltered));
-      setTopMateriales(calcularTopMateriales(valesFiltered));
-      setTopBancos(calcularTopBancos(valesFiltered));
-      setEficienciaViajes(calcularEficienciaViajes(valesFiltered));
-      setTendencia(calcularTendencia(valesFiltered, periodo));
+      setRawVales(resCurrent.data || []);
+      setRawValesPrev(resPrev.data || []);
       setLastUpdated(new Date());
+      setHasLoaded(true);
     } catch (err) {
-      console.error("Error en fetchAllData:", err);
+      console.error("Error en fetchData:", err);
       setError(err.message || "Error al cargar datos");
     } finally {
       setLoading(false);
     }
+  }, [periodo, año, trimestre, calcularRangos]);
+
+  // ─── Compute analytics (client-side, instant) ───────────────────────────────
+  // Runs whenever raw data OR client-side filters change
+  useEffect(() => {
+    const filtros = { idEmpresa, idSindicato, idBanco, idObra, idMaterial, tipoVale };
+    const valesFiltered = applyClientFilters(rawVales, filtros);
+    const valesFilteredPrev = applyClientFilters(rawValesPrev, filtros);
+
+    const metricasActual = calcularMetricas(valesFiltered);
+    const metricasAnterior = calcularMetricas(valesFilteredPrev);
+
+    setMetricas(metricasActual);
+    setComparativa(calcularComparativa(metricasActual, metricasAnterior));
+    setDistribucionEstados(calcularDistribucionEstados(valesFiltered));
+    setDistribucionTipo(calcularDistribucionTipo(valesFiltered));
+    setDistribucionEmpresas(calcularDistribucionEmpresas(valesFiltered));
+    setTopObras(calcularTopObras(valesFiltered));
+    setTopMateriales(calcularTopMateriales(valesFiltered));
+    setTopBancos(calcularTopBancos(valesFiltered));
+    setEficienciaViajes(calcularEficienciaViajes(valesFiltered));
+    setTendencia(calcularTendencia(valesFiltered, periodo));
   }, [
+    rawVales, rawValesPrev,
+    idEmpresa, idSindicato, idBanco, idObra, idMaterial, tipoVale,
     periodo,
-    año,
-    trimestre,
-    idEmpresa,
-    idSindicato,
-    idBanco,
-    idObra,
-    idMaterial,
-    tipoVale,
-    calcularRangos,
-    applyClientFilters,
-    calcularMetricas,
-    calcularComparativa,
-    calcularDistribucionEstados,
-    calcularDistribucionTipo,
-    calcularDistribucionEmpresas,
-    calcularTopObras,
-    calcularTopMateriales,
-    calcularTopBancos,
-    calcularEficienciaViajes,
-    calcularTendencia,
+    applyClientFilters, calcularMetricas, calcularComparativa,
+    calcularDistribucionEstados, calcularDistribucionTipo, calcularDistribucionEmpresas,
+    calcularTopObras, calcularTopMateriales, calcularTopBancos,
+    calcularEficienciaViajes, calcularTendencia,
   ]);
 
-  // Load catalogs on mount
+  // ─── Effects ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     fetchCatalogos();
   }, [fetchCatalogos]);
 
-  // Load data when filters change
   useEffect(() => {
-    if (userProfile) {
-      fetchAllData();
-    }
-  }, [userProfile?.id_persona, fetchAllData]);
+    if (userProfile) fetchData();
+  }, [userProfile?.id_persona, fetchData]);
 
+  // ─── Reset ────────────────────────────────────────────────────────────────────
   const resetFiltros = useCallback(() => {
     setPeriodo("semana");
     setAño(new Date().getFullYear());
@@ -579,7 +503,6 @@ export const useDashboardAnalytics = () => {
   }, []);
 
   return {
-    // Filter state + setters
     filtros: { periodo, año, trimestre, idEmpresa, idSindicato, idBanco, idObra, idMaterial, tipoVale },
     setPeriodo,
     setAño,
@@ -592,11 +515,9 @@ export const useDashboardAnalytics = () => {
     setTipoVale,
     resetFiltros,
 
-    // Catalog data
     catalogos,
     loadingCatalogos,
 
-    // Analytics data
     metricas,
     comparativa,
     distribucionEstados,
@@ -608,10 +529,10 @@ export const useDashboardAnalytics = () => {
     eficienciaViajes,
     tendencia,
 
-    // Status
     loading,
+    hasLoaded,
     error,
     lastUpdated,
-    refresh: fetchAllData,
+    refresh: fetchData,
   };
 };

@@ -373,6 +373,35 @@ const GrupoPlacas = ({
 };
 
 // ========================================
+// HELPER: APLANAR VIAJES (igual que VisualizarVale.jsx)
+// Fusiona foto_evidencia_url del viaje con el del detalle padre para
+// garantizar que las fotos muestren sin importar en qué nivel están guardadas.
+// ========================================
+
+const aplanarViajesMaterial = (detalles) =>
+  detalles.flatMap((det) => {
+    const viajes = det.vale_material_viajes || [];
+    if (viajes.length === 0)
+      return [{ ...det, vale_material_viajes: undefined, _esFallback: true, _detallePadre: det }];
+    return viajes.map((v) => ({
+      ...v,
+      material: det.material,
+      capacidad_m3: det.capacidad_m3,
+      distancia_km: v.distancia_km_override ?? det.distancia_km,
+      bancos: v.bancos_override ?? det.bancos,
+      folio_banco: det.folio_banco,
+      notas_adicionales: det.notas_adicionales,
+      foto_evidencia_url: v.foto_evidencia_url || det.foto_evidencia_url,
+      latitud_completado: v.latitud_registro || det.latitud_completado,
+      longitud_completado: v.longitud_registro || det.longitud_completado,
+      distancia_obra_metros: v.distancia_obra_metros ?? det.distancia_obra_metros,
+      volumen_real_m3: v.volumen_m3 ?? det.volumen_real_m3,
+      peso_ton: v.peso_ton ?? det.peso_ton,
+      costo_total: v.costo_viaje ?? det.costo_total,
+    }));
+  });
+
+// ========================================
 // SUBCOMPONENTE: TARJETA ACORDEÓN POR VALE
 // ========================================
 
@@ -456,7 +485,7 @@ const ValeCard = ({
           {/* Viajes material */}
           {vale.tipo_vale === "material" && vale.vale_material_detalles?.length > 0 && (
             <ListaViajesMaterial
-              detalles={vale.vale_material_detalles}
+              detalles={aplanarViajesMaterial(vale.vale_material_detalles)}
               mostrarPrecios={true}
               vehiculoCapacidad={vale.vehiculos?.capacidad_m3}
             />
