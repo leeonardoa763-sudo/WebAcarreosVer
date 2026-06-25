@@ -19,6 +19,7 @@ import {
   Truck,
   History,
   BookOpen,
+  LayoutList,
 } from "lucide-react";
 
 // 3. Hooks personalizados
@@ -49,19 +50,32 @@ const Sidebar = () => {
           </NavLink>
         )}
 
-        {/* Vales - todos los roles */}
+        {/* Dashboard Unificado - todos los roles */}
         <NavLink
-          to="/vales"
+          to="/dashboard-unificado"
           className={({ isActive }) =>
             isActive ? "sidebar__link sidebar__link--active" : "sidebar__link"
           }
         >
-          <FileText className="sidebar__icon" size={20} />
+          <LayoutList className="sidebar__icon" size={20} />
           <span className="sidebar__text">Vales</span>
         </NavLink>
 
-        {/* Operadores - solo Administrador */}
-        {(esAdministrador || esSindicato) && (
+        {/* Vales (legacy) - OCULTO, ruta sigue activa */}
+        {false && (
+          <NavLink
+            to="/vales"
+            className={({ isActive }) =>
+              isActive ? "sidebar__link sidebar__link--active" : "sidebar__link"
+            }
+          >
+            <FileText className="sidebar__icon" size={20} />
+            <span className="sidebar__text">Vales</span>
+          </NavLink>
+        )}
+
+        {/* Operadores (legacy) - OCULTO, ruta sigue activa */}
+        {false && (esAdministrador || esSindicato) && (
           <NavLink
             to="/operadores"
             className={({ isActive }) =>

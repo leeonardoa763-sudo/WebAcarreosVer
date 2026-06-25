@@ -57,7 +57,8 @@ export const useValesQueries = () => {
         ),
         vehiculos:id_vehiculo (
           id_vehiculo,
-          placas
+          placas,
+          capacidad_m3
         ),
         persona:id_persona_creador (
           nombre,
@@ -232,7 +233,8 @@ export const useValesQueries = () => {
           ),
           vehiculos:id_vehiculo (
             id_vehiculo,
-            placas
+            placas,
+            capacidad_m3
           ),
           persona:id_persona_creador (
             nombre,
@@ -379,7 +381,8 @@ export const useValesQueries = () => {
           ),
           vehiculos:id_vehiculo (
             id_vehiculo,
-            placas
+            placas,
+            capacidad_m3
           ),
           tickets_material (
             id_ticket,

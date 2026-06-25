@@ -21,6 +21,7 @@ import Layout from "./components/layout/Layout";
 // 4. Pages
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import DashboardUnificado from "./pages/DashboardUnificado";
 import Vales from "./pages/Vales";
 import Conciliaciones from "./pages/Conciliaciones";
 import Contabilidad from "./pages/Contabilidad";
@@ -41,10 +42,22 @@ const App = () => {
           {/* Ruta pública - Login */}
           <Route path="/login" element={<Login />} />
 
-          {/* Ruta raíz - Redirige a vales (accesible por todos los roles) */}
-          <Route path="/" element={<Navigate to="/vales" replace />} />
+          {/* Ruta raíz - Redirige a dashboard unificado */}
+          <Route path="/" element={<Navigate to="/dashboard-unificado" replace />} />
 
-          {/* Dashboard - solo Administrador */}
+          {/* Dashboard Unificado - todos los roles autenticados */}
+          <Route
+            path="/dashboard-unificado"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <DashboardUnificado />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Dashboard (analytics) - solo Administrador */}
           <Route
             path="/dashboard"
             element={
@@ -134,8 +147,8 @@ const App = () => {
           {/* RUTA PÚBLICA - Soporte de conciliación sin autenticación */}
           <Route path="/conciliacion/:folio" element={<VisualizarConciliacion />} />
 
-          {/* Ruta 404 - Redirige a vales */}
-          <Route path="*" element={<Navigate to="/vales" replace />} />
+          {/* Ruta 404 - Redirige a dashboard unificado */}
+          <Route path="*" element={<Navigate to="/dashboard-unificado" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

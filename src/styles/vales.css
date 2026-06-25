@@ -1699,6 +1699,27 @@
   color: #1e293b;
 }
 
+.vdm__btn-soporte {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 7px;
+  color: #0369a1;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  text-decoration: none;
+}
+
+.vdm__btn-soporte:hover {
+  background: #e0f2fe;
+  color: #0c4a6e;
+}
+
 .vdm__btn-cancelar {
   display: flex;
   align-items: center;
@@ -1952,6 +1973,23 @@
   margin-top: 4px;
 }
 
+.vdm__viajes-cargando {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary, #7f8c8d);
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.vdm__spin-sm {
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
 .vdm__viajes-title {
   display: flex;
   align-items: center;
@@ -1979,7 +2017,7 @@
 }
 
 .vdm__viajes-tabla-header--tipo3 {
-  grid-template-columns: 80px 1fr 55px 55px 75px 75px;
+  grid-template-columns: 80px 55px 1fr 55px 55px 75px 75px;
 }
 
 .vdm__viajes-lista {
@@ -2017,7 +2055,7 @@
 }
 
 .vdm__viaje-row--tipo3 {
-  grid-template-columns: 80px 1fr 55px 55px 75px 75px;
+  grid-template-columns: 80px 55px 1fr 55px 55px 75px 75px;
 }
 
 .vdm__viaje-row--renta {

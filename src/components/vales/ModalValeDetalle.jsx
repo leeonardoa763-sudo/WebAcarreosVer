@@ -28,6 +28,8 @@ import {
   XCircle,
   Pencil,
   RotateCcw,
+  RefreshCw,
+  ExternalLink,
 } from "lucide-react";
 
 // 3. Utils
@@ -44,7 +46,8 @@ import {
   formatearDuracion,
 } from "../../utils/formatters";
 
-// 4. Hooks
+// 4. Config / Hooks
+import { supabase } from "../../config/supabase";
 import { useAuth } from "../../hooks/useAuth";
 
 // 5. Componentes
@@ -171,7 +174,7 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
                 )}
                 <div className="vdm__detalle-cell">
                   <span className="vdm__cell-label">Capacidad:</span>
-                  <span className="vdm__cell-value">{formatearVolumen(detalle.capacidad_m3 || 0)}</span>
+                  <span className="vdm__cell-value">{vale.vehiculos?.capacidad_m3 > 0 ? formatearVolumen(vale.vehiculos.capacidad_m3) : "—"}</span>
                 </div>
                 <div className="vdm__detalle-cell">
                   <span className="vdm__cell-label">Distancia:</span>
@@ -228,7 +231,7 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
                     Registro de Viajes ({viajesDetalle.length})
                   </h5>
                   <div className="vdm__viajes-tabla-header vdm__viajes-tabla-header--tipo3">
-                    <span>Viaje</span><span>Banco</span><span>Dist.</span>
+                    <span>Viaje</span><span>Hora</span><span>Banco</span><span>Dist.</span>
                     <span>M³</span><span>Precio/m³</span><span>Costo</span>
                   </div>
                   <div className="vdm__viajes-lista">
@@ -246,6 +249,7 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
                             {tieneOverride && <span className="vdm__override-dot" title="Banco o distancia diferente al detalle">*</span>}
                             {registrador && <span className="vdm__viaje-reg" title={`Registrado por ${registrador}`}>{registrador}</span>}
                           </span>
+                          <span>{viaje.hora_registro ? formatearHora(viaje.hora_registro) : "—"}</span>
                           <span>{bancoNombre}</span>
                           <span>{distancia != null ? `${Number(distancia).toFixed(1)} km` : "—"}</span>
                           <span>{viaje.volumen_m3 ? formatearVolumen(Number(viaje.volumen_m3)) : "—"}</span>
@@ -378,7 +382,7 @@ const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
               <div className="vdm__detalle-grid">
                 <div className="vdm__detalle-cell">
                   <span className="vdm__cell-label">Capacidad:</span>
-                  <span className="vdm__cell-value">{formatearVolumen(detalle.capacidad_m3 || 0)}</span>
+                  <span className="vdm__cell-value">{vale.vehiculos?.capacidad_m3 > 0 ? formatearVolumen(vale.vehiculos.capacidad_m3) : "—"}</span>
                 </div>
                 <div className="vdm__detalle-cell">
                   <span className="vdm__cell-label">Núm. Viajes:</span>
@@ -477,8 +481,6 @@ const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
-  console.log("📋 ModalValeDetalle renderizado con vale:", vale?.folio);
-  console.log("📍 solicitudes_desverificacion:", vale?.solicitudes_desverificacion);
   const { userProfile } = useAuth();
   const esAdministrador = userProfile?.roles?.role === "Administrador";
   const esSindicato = userProfile?.roles?.role === "Sindicato";
@@ -517,6 +519,101 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
     esSindicato &&
     !!solicitudPendiente &&
     Number(solicitudPendiente.id_sindicato_requerido) === Number(idSindicatoUsuario);
+
+  // Viajes — carga diferida (el vale llega sin viajes desde el dashboard)
+  const [valeConViajes, setValeConViajes] = useState(vale);
+  const [loadingViajes, setLoadingViajes] = useState(false);
+
+  useEffect(() => {
+    // Si los viajes ya vienen cargados (otros contextos que no son el dashboard),
+    // no re-fetchar.
+    const yaCargaronMat = vale.vale_material_detalles?.some(
+      (d) => d.vale_material_viajes !== undefined,
+    );
+    const yaCargaronRent = vale.vale_renta_detalle?.some(
+      (d) => d.vale_renta_viajes !== undefined,
+    );
+    if (yaCargaronMat || yaCargaronRent) {
+      setValeConViajes(vale);
+      return;
+    }
+
+    const cargarViajes = async () => {
+      setLoadingViajes(true);
+      try {
+        if (vale.tipo_vale === "material") {
+          const ids = (vale.vale_material_detalles ?? []).map(
+            (d) => d.id_detalle_material,
+          );
+          if (ids.length === 0) return;
+
+          const { data, error } = await supabase
+            .from("vale_material_viajes")
+            .select(`
+              id_viaje, id_detalle_material, numero_viaje, hora_registro,
+              peso_ton, volumen_m3, precio_m3, costo_viaje, folio_vale_fisico,
+              tarifa_primer_km, tarifa_subsecuente,
+              id_banco_override, distancia_km_override,
+              precio_m3_override, costo_viaje_override,
+              bancos_override:id_banco_override (id_banco, banco),
+              persona_registro:id_persona_registro (nombre, primer_apellido)
+            `)
+            .in("id_detalle_material", ids);
+
+          if (error) throw error;
+
+          const porDetalle = new Map();
+          (data ?? []).forEach((v) => {
+            if (!porDetalle.has(v.id_detalle_material))
+              porDetalle.set(v.id_detalle_material, []);
+            porDetalle.get(v.id_detalle_material).push(v);
+          });
+
+          setValeConViajes({
+            ...vale,
+            vale_material_detalles: vale.vale_material_detalles?.map((det) => ({
+              ...det,
+              vale_material_viajes: porDetalle.get(det.id_detalle_material) ?? [],
+            })),
+          });
+        } else {
+          const ids = (vale.vale_renta_detalle ?? []).map(
+            (d) => d.id_vale_renta_detalle,
+          );
+          if (ids.length === 0) return;
+
+          const { data, error } = await supabase
+            .from("vale_renta_viajes")
+            .select("id_viaje, id_vale_renta_detalle, numero_viaje, hora_registro")
+            .in("id_vale_renta_detalle", ids);
+
+          if (error) throw error;
+
+          const porDetalle = new Map();
+          (data ?? []).forEach((v) => {
+            if (!porDetalle.has(v.id_vale_renta_detalle))
+              porDetalle.set(v.id_vale_renta_detalle, []);
+            porDetalle.get(v.id_vale_renta_detalle).push(v);
+          });
+
+          setValeConViajes({
+            ...vale,
+            vale_renta_detalle: vale.vale_renta_detalle?.map((det) => ({
+              ...det,
+              vale_renta_viajes: porDetalle.get(det.id_vale_renta_detalle) ?? [],
+            })),
+          });
+        }
+      } catch (err) {
+        console.error("Error cargando viajes:", err);
+        setValeConViajes(vale);
+      } finally {
+        setLoadingViajes(false);
+      }
+    };
+
+    cargarViajes();
+  }, [vale.id_vale]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Modales anidados
   const [modalEditar, setModalEditar] = useState({ abierto: false, idDetalle: null });
@@ -576,6 +673,15 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
             </span>
           </div>
           <div className="vdm__header-acciones">
+            <button
+              type="button"
+              className="vdm__btn-soporte"
+              onClick={() => window.open(`/vale/${vale.folio}`, "_blank", "noopener,noreferrer")}
+              title="Ver soporte de fotos"
+            >
+              <ExternalLink size={13} />
+              Soporte
+            </button>
             {puedeCrearSolicitud && (
               <button
                 type="button"
@@ -691,10 +797,16 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
           )}
 
           {/* Detalles según tipo */}
-          {vale.tipo_vale === "material" ? (
-            <DetalleMaterial vale={vale} valeEditable={valeEditable} onAbrirEditar={abrirEditar} />
+          {loadingViajes && (
+            <div className="vdm__viajes-cargando">
+              <RefreshCw size={13} className="vdm__spin-sm" />
+              Cargando viajes…
+            </div>
+          )}
+          {valeConViajes.tipo_vale === "material" ? (
+            <DetalleMaterial vale={valeConViajes} valeEditable={valeEditable} onAbrirEditar={abrirEditar} />
           ) : (
-            <DetalleRenta vale={vale} valeEditable={valeEditable} onAbrirEditar={abrirEditar} />
+            <DetalleRenta vale={valeConViajes} valeEditable={valeEditable} onAbrirEditar={abrirEditar} />
           )}
         </div>
       </div>

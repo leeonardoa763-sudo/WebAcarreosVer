@@ -186,7 +186,8 @@ export const useVerificacion = () => {
           ),
           vehiculos:id_vehiculo (
             id_vehiculo,
-            placas
+            placas,
+            capacidad_m3
           ),
           persona:id_persona_creador (
             nombre,
