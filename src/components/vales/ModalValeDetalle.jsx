@@ -112,10 +112,14 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
     vale.vale_material_detalles.reduce((sum, detalle) => {
       const idTipo = detalle.material?.tipo_de_material?.id_tipo_de_material;
       if (idTipo === 3) {
-        return sum + (detalle.vale_material_viajes || []).reduce(
+        const sumViajes = (detalle.vale_material_viajes || []).reduce(
           (s, v) => s + Number(v.costo_viaje_override ?? v.costo_viaje ?? 0),
           0,
         );
+        if (sumViajes > 0) return sum + sumViajes;
+        const costoDetalle = Number(detalle.costo_total || 0);
+        if (costoDetalle > 0) return sum + costoDetalle;
+        return sum + Number(detalle.volumen_real_m3 || 0) * Number(detalle.precio_m3 || 0);
       }
       return sum + Number(detalle.costo_total || 0);
     }, 0);
@@ -138,7 +142,13 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
           const viajesDetalle = detalle.vale_material_viajes || [];
           const pesoTon = esTipo3 ? 0 : Number(detalle.peso_ton || 0);
           const costoTotal = esTipo3
-            ? viajesDetalle.reduce((sum, v) => sum + Number(v.costo_viaje_override ?? v.costo_viaje ?? 0), 0)
+            ? (() => {
+                const sumViajes = viajesDetalle.reduce((s, v) => s + Number(v.costo_viaje_override ?? v.costo_viaje ?? 0), 0);
+                if (sumViajes > 0) return sumViajes;
+                const costoDetalle = Number(detalle.costo_total || 0);
+                if (costoDetalle > 0) return costoDetalle;
+                return volumen * precioM3;
+              })()
             : Number(detalle.costo_total || 0);
 
           return (
@@ -239,8 +249,10 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
                       const tieneOverride = viaje.id_banco_override || viaje.distancia_km_override;
                       const bancoNombre = viaje.bancos_override?.banco || detalle.bancos?.banco || "—";
                       const distancia = viaje.distancia_km_override ?? detalle.distancia_km;
-                      const costoEfectivo = getCostoEfectivo(viaje);
-                      const precioEfectivo = viaje.precio_m3_override ?? viaje.precio_m3;
+                      // Para tipo 3: precio y volumen por viaje vienen del override o del detalle padre
+                      const precioEfectivo = viaje.precio_m3_override ?? viaje.precio_m3 ?? detalle.precio_m3;
+                      const volumenEfectivo = viaje.volumen_m3 != null ? Number(viaje.volumen_m3) : Number(detalle.capacidad_m3 || 0);
+                      const costoEfectivo = getCostoEfectivo(viaje) || (volumenEfectivo > 0 && precioEfectivo > 0 ? volumenEfectivo * Number(precioEfectivo) : 0);
                       const registrador = fmtRegistrador(viaje.persona_registro);
                       return (
                         <div key={viaje.id_viaje} className={`vdm__viaje-row vdm__viaje-row--tipo3 ${tieneOverride ? "vdm__viaje-row--override" : ""}`}>
@@ -252,7 +264,7 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
                           <span>{viaje.hora_registro ? formatearHora(viaje.hora_registro) : "—"}</span>
                           <span>{bancoNombre}</span>
                           <span>{distancia != null ? `${Number(distancia).toFixed(1)} km` : "—"}</span>
-                          <span>{viaje.volumen_m3 ? formatearVolumen(Number(viaje.volumen_m3)) : "—"}</span>
+                          <span>{volumenEfectivo > 0 ? formatearVolumen(volumenEfectivo) : "—"}</span>
                           <span title={fmtTarifaTooltip(viaje)}>{precioEfectivo != null ? formatearMoneda(Number(precioEfectivo)) : "—"}</span>
                           <span>{costoEfectivo > 0 ? formatearMoneda(costoEfectivo) : "—"}</span>
                         </div>
@@ -261,9 +273,15 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
                   </div>
                   <div className="vdm__viajes-totales">
                     <span className="vdm__viajes-totales-label">Subtotal viajes:</span>
-                    <span>{viajesDetalle.reduce((s, v) => s + Number(v.volumen_m3 || 0), 0).toFixed(3)} m³</span>
+                    <span>{viajesDetalle.reduce((s, v) => s + (v.volumen_m3 != null ? Number(v.volumen_m3) : Number(detalle.capacidad_m3 || 0)), 0).toFixed(3)} m³</span>
                     <span className="vdm__viajes-totales-costo">
-                      {formatearMoneda(viajesDetalle.reduce((s, v) => s + getCostoEfectivo(v), 0))}
+                      {formatearMoneda(viajesDetalle.reduce((s, v) => {
+                        const c = getCostoEfectivo(v);
+                        if (c > 0) return s + c;
+                        const vol = v.volumen_m3 != null ? Number(v.volumen_m3) : Number(detalle.capacidad_m3 || 0);
+                        const precio = v.precio_m3_override ?? v.precio_m3 ?? detalle.precio_m3;
+                        return s + vol * Number(precio || 0);
+                      }, 0))}
                     </span>
                   </div>
                 </div>
@@ -525,11 +543,13 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
   const [loadingViajes, setLoadingViajes] = useState(false);
 
   useEffect(() => {
-    // Si los viajes ya vienen cargados (otros contextos que no son el dashboard),
-    // no re-fetchar.
-    const yaCargaronMat = vale.vale_material_detalles?.some(
-      (d) => d.vale_material_viajes !== undefined,
-    );
+    // Solo omitir el fetch si los viajes ya vienen con los campos completos
+    // (el Dashboard solo pide folio_vale_fisico, no volumen_m3 ni costo_viaje).
+    const yaCargaronMat = vale.vale_material_detalles?.some((d) => {
+      const viajes = d.vale_material_viajes;
+      return Array.isArray(viajes) &&
+        (viajes.length === 0 || "volumen_m3" in viajes[0]);
+    });
     const yaCargaronRent = vale.vale_renta_detalle?.some(
       (d) => d.vale_renta_viajes !== undefined,
     );

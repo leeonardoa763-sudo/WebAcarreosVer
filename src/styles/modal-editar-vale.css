@@ -537,6 +537,13 @@
 .tev__th--angosto {
   width: 80px;
 }
+.tev__th--hora {
+  width: 90px;
+}
+.tev__input--hora {
+  width: 88px;
+  padding: 4px 6px;
+}
 .tev__th--calculado {
   background: #f8fafc;
 }

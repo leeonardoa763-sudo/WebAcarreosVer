@@ -115,6 +115,17 @@ const ValeCardRenta = ({ vale, empresaColor, onValeActualizado }) => {
           )}
         </div>
 
+        {/* Material(es) rentado(s) */}
+        {vale.vale_renta_detalle?.length > 0 && (
+          <div className="vale-card-compact__materiales-renta">
+            {[...new Set(
+              vale.vale_renta_detalle
+                .map((d) => d.material?.material)
+                .filter(Boolean)
+            )].join(" · ")}
+          </div>
+        )}
+
       </div>
 
       {modalAbierto && (

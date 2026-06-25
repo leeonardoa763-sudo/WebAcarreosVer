@@ -704,6 +704,15 @@
   flex-shrink: 0;
 }
 
+.vale-card-compact__materiales-renta {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* separadores visuales entre items meta */
 .vale-card-compact__meta > span + span::before {
   content: "·";

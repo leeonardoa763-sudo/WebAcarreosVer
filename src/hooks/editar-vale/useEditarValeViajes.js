@@ -713,6 +713,7 @@ export const useEditarValeViajes = () => {
 
           // Campos comunes a todos los tipos
           const camposUpdate = {
+            hora_registro: viaje.hora_registro || null,
             folio_vale_fisico: viaje.folio_vale_fisico || null,
             volumen_m3: Number(viaje.volumen_m3) || null,
           };
@@ -771,6 +772,7 @@ export const useEditarValeViajes = () => {
 
             camposInsert = {
               ...camposInsert,
+              hora_registro: viaje.hora_registro || null,
               volumen_m3: volumen || null,
               precio_m3: precio || null,
               costo_viaje: costo || null,
@@ -800,6 +802,7 @@ export const useEditarValeViajes = () => {
 
             camposInsert = {
               ...camposInsert,
+              hora_registro: viaje.hora_registro || null,
               peso_ton: pesoNum || null,
               volumen_m3: volumen || null,
               precio_m3: precioM3 || null,

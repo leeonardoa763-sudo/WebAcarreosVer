@@ -54,6 +54,26 @@ const fmtMoneda = (n) => {
   }).format(Number(n));
 };
 
+const getHoraInputValue = (horaISO) => {
+  if (!horaISO) return "";
+  return new Date(horaISO)
+    .toLocaleTimeString("en-GB", {
+      timeZone: "America/Mexico_City",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+    .slice(0, 5);
+};
+
+const horaInputToISO = (timeValue, existingISO) => {
+  if (!timeValue) return null;
+  const dateStr = existingISO
+    ? new Date(existingISO).toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" })
+    : new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+  return `${dateStr}T${timeValue}:00`;
+};
+
 // ─── Sub-componente: fila tipo 1 y 2 ─────────────────────────────────────────
 
 const FilaViajeT1T2 = ({
@@ -92,6 +112,19 @@ const FilaViajeT1T2 = ({
         {marcadoEliminar && (
           <span className="tev__badge tev__badge--eliminar">Por eliminar</span>
         )}
+      </td>
+
+      {/* Hora de registro — siempre editable */}
+      <td className="tev__td">
+        <input
+          type="time"
+          className="tev__input tev__input--hora"
+          value={getHoraInputValue(viaje.hora_registro)}
+          onChange={(e) =>
+            onEditarCampo(viaje.id_viaje, "hora_registro", horaInputToISO(e.target.value, viaje.hora_registro))
+          }
+          disabled={estaDeshabilitado}
+        />
       </td>
 
       {/* Folio físico — siempre editable */}
@@ -261,6 +294,19 @@ const FilaViajeT3 = ({
             Override
           </span>
         )}
+      </td>
+
+      {/* Hora de registro — siempre editable */}
+      <td className="tev__td">
+        <input
+          type="time"
+          className="tev__input tev__input--hora"
+          value={getHoraInputValue(viaje.hora_registro)}
+          onChange={(e) =>
+            onEditarCampo(viaje.id_viaje, "hora_registro", horaInputToISO(e.target.value, viaje.hora_registro))
+          }
+          disabled={estaDeshabilitado}
+        />
       </td>
 
       {/* Volumen m3 — editable directo para tipo 3 */}
@@ -615,6 +661,7 @@ const TablaEditarViajes = ({
             {esTipo3 ? (
               <tr className="tev__thead-fila">
                 <th className="tev__th tev__th--angosto">Viaje</th>
+                <th className="tev__th tev__th--hora">Hora</th>
                 <th className="tev__th">Volumen m³</th>
                 <th className="tev__th">Banco</th>
                 <th className="tev__th">Distancia</th>
@@ -628,6 +675,7 @@ const TablaEditarViajes = ({
             ) : (
               <tr className="tev__thead-fila">
                 <th className="tev__th tev__th--angosto">Viaje</th>
+                <th className="tev__th tev__th--hora">Hora</th>
                 <th className="tev__th">Folio Físico</th>
                 <th className="tev__th">Toneladas</th>
                 <th className="tev__th tev__th--calculado">
@@ -646,7 +694,7 @@ const TablaEditarViajes = ({
           <tbody>
             {viajesVisibles.length === 0 ? (
               <tr>
-                <td colSpan={7} className="tev__sin-viajes">
+                <td colSpan={8} className="tev__sin-viajes">
                   <AlertTriangle size={18} />
                   <span>
                     No hay viajes registrados. Agrega uno con el botón de abajo.
@@ -698,16 +746,18 @@ const TablaEditarViajes = ({
                 </td>
                 {esTipo3 ? (
                   <>
-                    {/* Tipo 3: mostrar volumen total, sin peso */}
+                    {/* Tipo 3: col Volumen m³, Banco, Distancia, Precio/m³ */}
                     <td className="tev__totales-valor">
                       {fmt3(totales.volumen_real_m3)} m³
                     </td>
                     <td />
                     <td />
+                    <td />
                   </>
                 ) : (
                   <>
-                    {/* Tipo 1 y 2: mostrar peso y volumen */}
+                    {/* Tipo 1 y 2: col Folio, Toneladas, Volumen m³, Precio/m³ */}
+                    <td />
                     <td className="tev__totales-valor">
                       {fmt2(totales.peso_ton)} ton
                     </td>
