@@ -102,11 +102,22 @@ const getMonthValue = () => {
 
 // ─── Subcomponentes ──────────────────────────────────────────────────────────
 
-const KpiCard = ({ icono: Icono, titulo, valor, subtitulo, gradiente }) => (
+const KpiCard = ({ icono: Icono, titulo, valor, subtitulo, gradiente, desglose }) => (
   <div className="du__kpi-card" style={{ background: gradiente }}>
     <span className="du__kpi-titulo">{titulo}</span>
     <span className="du__kpi-valor">{valor}</span>
-    {subtitulo && <span className="du__kpi-sub">{subtitulo}</span>}
+    {desglose ? (
+      <div className="du__kpi-desglose">
+        {desglose.map(({ label, valor: v }) => (
+          <span key={label} className="du__kpi-desglose-item">
+            <span className="du__kpi-desglose-label">{label}</span>
+            <span className="du__kpi-desglose-valor">{v}</span>
+          </span>
+        ))}
+      </div>
+    ) : (
+      subtitulo && <span className="du__kpi-sub">{subtitulo}</span>
+    )}
     <Icono size={64} className="du__kpi-deco" />
   </div>
 );
@@ -512,8 +523,11 @@ const DashboardUnificado = () => {
             icono={Layers}
             titulo="m³ material"
             valor={kpis.totalM3.toFixed(1)}
-            subtitulo="volumen real"
             gradiente="linear-gradient(135deg, #0d9488 0%, #2dd4bf 100%)"
+            desglose={kpis.m3PorMaterial.map(({ material, m3 }) => ({
+              label: material,
+              valor: m3.toFixed(1),
+            }))}
           />
           <KpiCard
             icono={TruckIcon}

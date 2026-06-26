@@ -67,6 +67,7 @@ const getMaterialVale = (vale) => {
 const calcularKpisDeVales = (lista) => {
   let totalRenta = 0, totalM3 = 0, totalViajes = 0, importeTotal = 0;
   let totalHoras = 0, totalDias = 0, pendientes = 0;
+  const m3PorMaterial = {};
 
   for (const vale of lista) {
     if (vale._tipo === "renta") {
@@ -79,9 +80,12 @@ const calcularKpisDeVales = (lista) => {
       }
     } else {
       for (const det of vale.vale_material_detalles ?? []) {
-        totalM3      += Number(det.volumen_real_m3 || 0);
-        importeTotal += Number(det.costo_total     || 0);
+        const vol     = Number(det.volumen_real_m3 || 0);
+        totalM3      += vol;
+        importeTotal += Number(det.costo_total || 0);
         totalViajes  += det.vale_material_viajes?.length ?? 0;
+        const nombre = det.material?.material ?? "Sin material";
+        m3PorMaterial[nombre] = (m3PorMaterial[nombre] || 0) + vol;
       }
     }
     if (vale.estado === "emitido") pendientes++;
@@ -91,10 +95,15 @@ const calcularKpisDeVales = (lista) => {
   if (totalDias  > 0) partes.push(`${totalDias}d`);
   if (totalHoras > 0) partes.push(`${Number(totalHoras).toFixed(1)}h`);
 
+  const m3PorMaterialOrdenado = Object.entries(m3PorMaterial)
+    .map(([material, m3]) => ({ material, m3 }))
+    .sort((a, b) => b.m3 - a.m3);
+
   return {
     totalVales:  lista.length,
     totalRenta,
     totalM3,
+    m3PorMaterial: m3PorMaterialOrdenado,
     totalViajes,
     importeTotal,
     tiempoRenta: partes.length > 0 ? partes.join(" · ") : "—",
