@@ -43,9 +43,11 @@ const getCantidadVale = (vale) => {
   if (vale.tipo_vale === "renta") {
     const d = vale.vale_renta_detalle?.[0];
     if (!d) return null;
-    return d.es_renta_por_dia
-      ? { valor: d.total_dias, unidad: "días" }
-      : { valor: d.total_horas, unidad: "hrs" };
+    // Muestra días si el flag está activo O si total_dias > 0 (cubre medio día con flag incorrecto)
+    if (d.es_renta_por_dia || Number(d.total_dias) > 0) {
+      return { valor: d.total_dias, unidad: "días" };
+    }
+    return { valor: d.total_horas, unidad: "hrs" };
   }
   const m3 = vale.vale_material_detalles?.reduce(
     (sum, det) => sum + (det.volumen_real_m3 || 0),
@@ -348,6 +350,12 @@ export const useDashboardUnificado = () => {
 
     if (periodo === "hoy") {
       const f = formatDate(ahora);
+      setFechaInicio(f);
+      setFechaFin(f);
+    } else if (periodo === "ayer") {
+      const ayer = new Date(ahora);
+      ayer.setDate(ahora.getDate() - 1);
+      const f = formatDate(ayer);
       setFechaInicio(f);
       setFechaFin(f);
     } else if (periodo === "semana") {

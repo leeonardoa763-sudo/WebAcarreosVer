@@ -52,6 +52,7 @@ import "../styles/dashboard-unificado.css";
 
 const PERIODOS = [
   { id: "hoy", label: "Hoy" },
+  { id: "ayer", label: "Ayer" },
   { id: "semana", label: "Esta semana" },
   { id: "mes", label: "Este mes" },
 ];
@@ -321,7 +322,7 @@ const DashboardUnificado = () => {
   // 4. Handlers
   const handlePeriodo = (periodo) => {
     cambiarPeriodo(periodo);
-    if (periodo === "hoy") {
+    if (periodo === "hoy" || periodo === "ayer") {
       setSemanaValue("");
       setMesValue("");
     } else if (periodo === "semana") {
@@ -418,6 +419,8 @@ const DashboardUnificado = () => {
   const periodoLabel =
     filtros.periodoActivo === "hoy"
       ? "Hoy"
+      : filtros.periodoActivo === "ayer"
+      ? "Ayer"
       : filtros.periodoActivo === "semana"
       ? "Esta semana"
       : filtros.periodoActivo === "mes"

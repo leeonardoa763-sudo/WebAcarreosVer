@@ -1729,6 +1729,26 @@
   color: #0c4a6e;
 }
 
+.vdm__btn-conciliacion {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 7px;
+  color: #065f46;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.vdm__btn-conciliacion:hover {
+  background: #dcfce7;
+  color: #022c22;
+}
+
 .vdm__btn-cancelar {
   display: flex;
   align-items: center;
@@ -2068,7 +2088,17 @@
 }
 
 .vdm__viaje-row--renta {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 32px 80px 1fr 1fr;
+}
+
+.vdm__viaje-row--header {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #f1f5f9 !important;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .vdm__viaje-row--override {

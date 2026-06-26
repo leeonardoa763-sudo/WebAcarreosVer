@@ -151,6 +151,10 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
               })()
             : Number(detalle.costo_total || 0);
 
+          const primerViaje = viajesDetalle[0];
+          const tarifaPrimerKm = primerViaje?.tarifa_primer_km != null ? Number(primerViaje.tarifa_primer_km) : null;
+          const tarifaSubsec = primerViaje?.tarifa_subsecuente != null ? Number(primerViaje.tarifa_subsecuente) : null;
+
           return (
             <div key={detalle.id_detalle_material} className="vdm__detalle-item">
               <div className="vdm__detalle-header">
@@ -190,6 +194,18 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
                   <span className="vdm__cell-label">Distancia:</span>
                   <span className="vdm__cell-value">{formatearDistancia(detalle.distancia_km || 0)}</span>
                 </div>
+                {tarifaPrimerKm != null && (
+                  <div className="vdm__detalle-cell">
+                    <span className="vdm__cell-label">Tarifa 1er km:</span>
+                    <span className="vdm__cell-value">{formatearMoneda(tarifaPrimerKm)}/m³</span>
+                  </div>
+                )}
+                {tarifaSubsec != null && (
+                  <div className="vdm__detalle-cell">
+                    <span className="vdm__cell-label">Tarifa subsec.:</span>
+                    <span className="vdm__cell-value">{formatearMoneda(tarifaSubsec)}/m³</span>
+                  </div>
+                )}
                 {viajesDetalle.length > 0 && (
                   <div className="vdm__detalle-cell">
                     <span className="vdm__cell-label">Viajes:</span>
@@ -465,12 +481,26 @@ const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
                     Registro de Viajes
                   </h5>
                   <div className="vdm__viajes-lista vdm__viajes-lista--renta">
-                    {viajesOrdenados.map((viaje) => (
-                      <div key={viaje.id_viaje} className="vdm__viaje-row vdm__viaje-row--renta">
-                        <span>Viaje {viaje.numero_viaje}</span>
-                        <span>{formatHora(viaje.hora_registro)}</span>
-                      </div>
-                    ))}
+                    <div className="vdm__viaje-row vdm__viaje-row--renta vdm__viaje-row--header">
+                      <span>#</span>
+                      <span>Hora</span>
+                      <span>Material movido</span>
+                      <span>Registrado por</span>
+                    </div>
+                    {viajesOrdenados.map((viaje) => {
+                      const persona = viaje.persona_registro;
+                      const nombrePersona = persona
+                        ? `${persona.nombre} ${persona.primer_apellido}`
+                        : "—";
+                      return (
+                        <div key={viaje.id_viaje} className="vdm__viaje-row vdm__viaje-row--renta">
+                          <span>{viaje.numero_viaje}</span>
+                          <span>{formatHora(viaje.hora_registro)}</span>
+                          <span>{detalle.material?.material || "—"}</span>
+                          <span>{nombrePersona}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -538,6 +568,28 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
     !!solicitudPendiente &&
     Number(solicitudPendiente.id_sindicato_requerido) === Number(idSindicatoUsuario);
 
+  // Conciliación — carga diferida solo cuando el vale está conciliado
+  const [datosConciliacion, setDatosConciliacion] = useState(null);
+
+  useEffect(() => {
+    if (vale.estado !== "conciliado") return;
+    const fetchConciliacion = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("conciliacion_vales")
+          .select("conciliaciones:id_conciliacion (folio, fecha_generacion)")
+          .eq("id_vale", vale.id_vale)
+          .limit(1)
+          .single();
+        if (error) return;
+        if (data?.conciliaciones) setDatosConciliacion(data.conciliaciones);
+      } catch {
+        // No bloquear el render si falla
+      }
+    };
+    fetchConciliacion();
+  }, [vale.id_vale, vale.estado]);
+
   // Viajes — carga diferida (el vale llega sin viajes desde el dashboard)
   const [valeConViajes, setValeConViajes] = useState(vale);
   const [loadingViajes, setLoadingViajes] = useState(false);
@@ -604,7 +656,10 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
 
           const { data, error } = await supabase
             .from("vale_renta_viajes")
-            .select("id_viaje, id_vale_renta_detalle, numero_viaje, hora_registro")
+            .select(`
+              id_viaje, id_vale_renta_detalle, numero_viaje, hora_registro,
+              persona_registro:id_persona_registro (nombre, primer_apellido)
+            `)
             .in("id_vale_renta_detalle", ids);
 
           if (error) throw error;
@@ -702,6 +757,17 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
               <ExternalLink size={13} />
               Soporte
             </button>
+            {vale.estado === "conciliado" && datosConciliacion?.folio && (
+              <button
+                type="button"
+                className="vdm__btn-conciliacion"
+                onClick={() => window.open(`/conciliacion/${datosConciliacion.folio}`, "_blank", "noopener,noreferrer")}
+                title={`Ver conciliación ${datosConciliacion.folio}`}
+              >
+                <ExternalLink size={13} />
+                Ver conciliación
+              </button>
+            )}
             {puedeCrearSolicitud && (
               <button
                 type="button"
@@ -754,14 +820,9 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
         <div className="vdm__body">
           {/* Info general */}
           <div className="vdm__info-general">
+            {/* ── Quién / dónde ── */}
             <InfoRow icon={Building2} label="Obra" value={vale.obras?.obra || "N/A"}
               subValue={`CC: ${vale.obras?.cc || "N/A"} | ${vale.obras?.empresas?.empresa || "N/A"}`} />
-            <InfoRow icon={Calendar} label="Fecha de Creación" value={`${fecha} a las ${hora}`} />
-            {tieneFechaProgramada && (
-              <InfoRow icon={Calendar} label="Fecha de Emisión"
-                value={formatearFechaCorta(vale.fecha_programada)}
-                subValue="Vale planeado con anticipación" color="#8B5CF6" />
-            )}
             <InfoRow icon={UserCheck} label="Residente" value={getNombreCompleto(vale.persona)} />
             {vale.operadores && (
               <InfoRow icon={User} label="Operador" value={vale.operadores.nombre_completo}
@@ -770,15 +831,29 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
             {vale.vehiculos && (
               <InfoRow icon={Truck} label="Placas" value={vale.vehiculos.placas} />
             )}
-            {vale.fecha_verificacion && (
-              <InfoRow icon={Calendar} label="Fecha de Verificación"
-                value={`${formatearFechaHora(vale.fecha_verificacion).fecha} a las ${formatearFechaHora(vale.fecha_verificacion).hora}`}
-                color="#004E89" />
+
+            {/* ── Timeline operacional ── */}
+            <InfoRow icon={Calendar} label="Fecha de Creación" value={`${fecha} a las ${hora}`} />
+            {tieneFechaProgramada && (
+              <InfoRow icon={Calendar} label="Fecha de Emisión"
+                value={formatearFechaCorta(vale.fecha_programada)}
+                subValue="Vale planeado con anticipación" color="#8B5CF6" />
             )}
             {vale.fecha_completado && (
               <InfoRow icon={Calendar} label="Fecha de Completado"
                 value={`${formatearFechaHora(vale.fecha_completado).fecha} a las ${formatearFechaHora(vale.fecha_completado).hora}`}
                 color="#10B981" />
+            )}
+            {vale.fecha_verificacion && (
+              <InfoRow icon={Calendar} label="Fecha de Verificación"
+                value={`${formatearFechaHora(vale.fecha_verificacion).fecha} a las ${formatearFechaHora(vale.fecha_verificacion).hora}`}
+                color="#004E89" />
+            )}
+            {datosConciliacion?.fecha_generacion && (
+              <InfoRow icon={Receipt} label="Fecha de Conciliación"
+                value={`${formatearFechaHora(datosConciliacion.fecha_generacion).fecha} a las ${formatearFechaHora(datosConciliacion.fecha_generacion).hora}`}
+                subValue={datosConciliacion.folio}
+                color="#065f46" />
             )}
             {vale.fecha_cancelacion && (
               <InfoRow icon={XCircle} label="Fecha de Cancelación"
