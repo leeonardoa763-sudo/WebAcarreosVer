@@ -9,14 +9,13 @@
 | `global.css` | `main.jsx` — reset, variables globales, utilidades base |
 | `auth.css` | `Login.jsx` |
 | `layout.css` | `Layout.jsx` / `Navbar.jsx` / `Sidebar.jsx` |
-| `vales.css` | `Vales.jsx` / `ValesList.jsx` / `ValeCard*.jsx` |
+| `modal-vale-detalle.css` | `ModalValeDetalle.jsx` — prefijo `vdm__` |
 | `modal-editar-vale.css` | `ModalEditarVale.jsx` / `ModalEditarValeRenta.jsx` / `TablaEditarViajes.jsx` |
 | `verificacion.css` | `VerificarVales.jsx` + componentes de `verificacion/` |
 | `conciliaciones.css` | `Conciliaciones.jsx` + componentes de `conciliaciones/` |
 | `dashboard.css` | `Dashboard.jsx` + componentes de `dashboard/` |
 | `dashboard-unificado.css` | `DashboardUnificado.jsx` |
 | `dashboard-conciliaciones.css` | `SeccionConciliaciones.jsx` |
-| `operadores.css` | `Operadores.jsx` + componentes de `operadores/` |
 | `contabilidad.css` | `Contabilidad.jsx` / `TablaContabilidad.jsx` |
 | `visualizar-vale.css` | `VisualizarVale.jsx` (también importado en `VisualizarConciliacion.jsx`) |
 | `visualizar-conciliacion.css` | `VisualizarConciliacion.jsx` |

@@ -9,11 +9,9 @@
 | `Login.jsx` | `/login` | Público | `useAuth` | `auth.css` |
 | `DashboardUnificado.jsx` | `/dashboard-unificado` | Todos autenticados | `useDashboardUnificado` | `dashboard-unificado.css` |
 | `Dashboard.jsx` | `/dashboard` | Solo Administrador | `useDashboardAnalytics`, `useMvStats` | `dashboard.css` |
-| `Vales.jsx` | `/vales` | Todos autenticados | `useVales` | `vales.css` |
 | `VerificarVales.jsx` | `/verificar-vales` | Todos autenticados | `useVerificacion` | `verificacion.css` |
 | `Conciliaciones.jsx` | `/conciliaciones` | Todos autenticados | `useConciliaciones` + `useConciliacionesMaterial` | `conciliaciones.css` |
 | `HistorialConciliaciones.jsx` | `/historial-conciliaciones` | Admin, Sindicato | — (wrapper de `SeccionConciliaciones`) | — |
-| `Operadores.jsx` | `/operadores` | Admin, Sindicato | `useOperadores` | `operadores.css` |
 | `Contabilidad.jsx` | `/contabilidad` | Admin, Finanzas | — (wrapper de `TablaContabilidad`) | `contabilidad.css` |
 | `VisualizarVale.jsx` | `/vale/:folio` | **Público sin auth** | `useAuth` (opcional) | `visualizar-vale.css` |
 | `VisualizarConciliacion.jsx` | `/conciliacion/:folio` | **Público sin auth** | — | `visualizar-conciliacion.css` |

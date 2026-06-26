@@ -17,7 +17,7 @@
 import { useEffect, useState } from "react";
 
 // 2. Icons
-import { X, Loader2, FileDown, Printer } from "lucide-react";
+import { X, Loader2, FileDown, Printer, QrCode } from "lucide-react";
 
 // 3. Config
 import { supabase } from "../../config/supabase";
@@ -166,7 +166,8 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                 )
               ),
               vehiculos:id_vehiculo (
-                placas
+                placas,
+                capacidad_m3
               ),
               operadores:id_operador (
                 nombre_completo,
@@ -348,7 +349,7 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
         } else if (idTipo === 3) {
           grupos[placas].totalesTipo3.totalViajes += numViajes;
           grupos[placas].totalesTipo3.totalM3 += Number(
-            detalle.cantidad_pedida_m3 || detalle.volumen_real_m3 || 0,
+            detalle.volumen_real_m3 || 0,
           );
         }
       });
@@ -432,6 +433,24 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                 customClassName="modal-preview__btn-export modal-preview__btn-export--reimprimir"
                 onPdfGenerado={() => {}}
               />
+            )}
+
+            {/* Botón ver soporte de vales — ruta pública /conciliacion/:folio */}
+            {!loading && !error && (
+              <button
+                className="modal-preview__btn-export"
+                onClick={() =>
+                  window.open(
+                    `${window.location.origin}/conciliacion/${conciliacion.folio}`,
+                    "_blank",
+                  )
+                }
+                title="Ver soporte de vales en página pública"
+                style={{ backgroundColor: colors.primary }}
+              >
+                <QrCode size={16} />
+                <span>Ver Soporte</span>
+              </button>
             )}
 
             {/* Botón exportar vales PDF — solo visible para conciliaciones de renta */}

@@ -22,13 +22,11 @@ import Layout from "./components/layout/Layout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import DashboardUnificado from "./pages/DashboardUnificado";
-import Vales from "./pages/Vales";
 import Conciliaciones from "./pages/Conciliaciones";
 import Contabilidad from "./pages/Contabilidad";
 import VerificarVales from "./pages/VerificarVales";
 import VisualizarVale from "./pages/VisualizarVale";
 import VisualizarConciliacion from "./pages/VisualizarConciliacion";
-import Operadores from "./pages/Operadores";
 import HistorialConciliaciones from "./pages/HistorialConciliaciones";
 
 // 5. Estilos
@@ -69,29 +67,6 @@ const App = () => {
             }
           />
 
-          {/* Operadores - Administrador y Sindicato */}
-          <Route
-            path="/operadores"
-            element={
-              <ProtectedRoute requiredRole={["Administrador", "Sindicato"]}>
-                <Layout>
-                  <Operadores />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Vales - todos los roles autenticados */}
-          <Route
-            path="/vales"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Vales />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
 
           {/* Verificar Vales - todos los roles autenticados */}
           <Route

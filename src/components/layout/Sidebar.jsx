@@ -13,10 +13,8 @@ import { NavLink } from "react-router-dom";
 // 2. Icons
 import {
   LayoutDashboard,
-  FileText,
   FileSpreadsheet,
   FileCheck,
-  Truck,
   History,
   BookOpen,
   LayoutList,
@@ -61,31 +59,6 @@ const Sidebar = () => {
           <span className="sidebar__text">Vales</span>
         </NavLink>
 
-        {/* Vales (legacy) - OCULTO, ruta sigue activa */}
-        {false && (
-          <NavLink
-            to="/vales"
-            className={({ isActive }) =>
-              isActive ? "sidebar__link sidebar__link--active" : "sidebar__link"
-            }
-          >
-            <FileText className="sidebar__icon" size={20} />
-            <span className="sidebar__text">Vales</span>
-          </NavLink>
-        )}
-
-        {/* Operadores (legacy) - OCULTO, ruta sigue activa */}
-        {false && (esAdministrador || esSindicato) && (
-          <NavLink
-            to="/operadores"
-            className={({ isActive }) =>
-              isActive ? "sidebar__link sidebar__link--active" : "sidebar__link"
-            }
-          >
-            <Truck className="sidebar__icon" size={20} />
-            <span className="sidebar__text">Operadores</span>
-          </NavLink>
-        )}
 
         {/* Verificar Vales - Administrador y Sindicato */}
         {(esAdministrador || esSindicato) && (

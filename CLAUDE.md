@@ -376,12 +376,10 @@ color: var(--color-primary);        // En CSS
 | Ruta                        | Página                      | Roles                    |
 | --------------------------- | --------------------------- | ------------------------ |
 | `/login`                    | Login.jsx                   | Público                  |
-| `/vales`                    | Vales.jsx                   | Todos autenticados       |
 | `/verificar-vales`          | VerificarVales.jsx          | Todos autenticados       |
 | `/conciliaciones`           | Conciliaciones.jsx          | Todos autenticados       |
 | `/historial-conciliaciones` | HistorialConciliaciones.jsx | Todos autenticados       |
 | `/dashboard`                | Dashboard.jsx               | Solo Administrador       |
-| `/operadores`               | Operadores.jsx              | Administrador, Sindicato |
 | `/vale/:folio`              | VisualizarVale.jsx          | **Público** (sin auth)   |
 
 ---

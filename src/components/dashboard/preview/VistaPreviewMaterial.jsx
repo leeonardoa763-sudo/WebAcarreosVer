@@ -409,7 +409,7 @@ const TablaMaterialCorte = ({ valesAgrupados }) => {
                     if (idTipo !== 3) return null;
 
                     viajesGrupo += 1;
-                    m3Grupo += Number(detalle.cantidad_pedida_m3 || 0);
+                    m3Grupo += Number(detalle.volumen_real_m3 || 0);
 
                     return (
                       <tr key={`${vale.id_vale}-${idx}`}>
@@ -427,10 +427,14 @@ const TablaMaterialCorte = ({ valesAgrupados }) => {
                         </td>
                         <td className="text-center">1</td>
                         <td className="text-right">
-                          {Number(detalle.capacidad_m3).toFixed(2)}
+                          {Number(
+                            detalle.capacidad_m3 ??
+                              vale.vehiculos?.capacidad_m3 ??
+                              0,
+                          ).toFixed(2)}
                         </td>
                         <td className="text-right">
-                          {Number(detalle.cantidad_pedida_m3).toFixed(2)}
+                          {Number(detalle.volumen_real_m3 || 0).toFixed(2)}
                         </td>
                         <td className="text-right">
                           {formatearMoneda(detalle.costo_total || 0)}

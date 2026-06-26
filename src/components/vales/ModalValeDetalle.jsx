@@ -57,6 +57,7 @@ import ModalCancelarVale from "./ModalCancelarVale";
 import ModalSolicitudDesver from "./ModalSolicitudDesver";
 
 // 7. Estilos
+import "../../styles/modal-vale-detalle.css";
 import "../../styles/ModalSolicitudDesver.css";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
