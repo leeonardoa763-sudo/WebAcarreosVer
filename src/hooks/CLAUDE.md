@@ -20,6 +20,7 @@ hooks/
 ├── useOperadores.js         ← orquestador
 │   └── operadores/{State, Queries, Helpers}
 ├── useDashboardAnalytics.js ← autónomo
+├── useEstadisticasGlobales.js ← autónomo
 ├── useDashboardUnificado.js ← autónomo
 ├── useMvStats.js            ← autónomo
 ├── useNotifications.js      ← autónomo
@@ -38,6 +39,7 @@ hooks/
 | `useConciliacionesMaterial.js` | `Conciliaciones.jsx` (tab material) | Generación de conciliaciones de material |
 | `useOperadores.js` | `Operadores.jsx` | Vales agrupados por empresa → placas → estado |
 | `useDashboardAnalytics.js` | `Dashboard.jsx` | Métricas con comparativa periodo anterior |
+| `useEstadisticasGlobales.js` | `EstadisticasGlobales.jsx` | KPIs desde conciliaciones; desglose por material con m³, viajes, importe |
 | `useDashboardUnificado.js` | `DashboardUnificado.jsx` | Vista unificada con paginación y KPIs |
 | `useMvStats.js` | `Dashboard.jsx` | Vistas materializadas históricas (mv_stats_*) |
 | `useNotifications.js` | `NotificationBell.jsx` | Realtime: vales nuevos vía Supabase Realtime |

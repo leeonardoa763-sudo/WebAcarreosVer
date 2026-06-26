@@ -1,18 +1,18 @@
 /**
  * src/components/visualizar-vale/DetallesRenta.jsx
  *
- * Muestra los datos del detalle de un vale de renta en la página pública
- * Incluye horas, días, precios (si tiene permiso) y registro de viajes
+ * Muestra los datos del detalle de un vale de renta en la página pública.
+ * Incluye foto de evidencia (full-width), horas/días, precios y tabla de viajes.
  *
- * Dependencias: formatters, lucide-react
+ * Dependencias: formatters, lucide-react, visualizar-vale.css
  * Usado en: VisualizarVale.jsx
  */
 
 // 1. React
-import React from "react";
+import { useState } from "react";
 
 // 2. Icons
-import { Clock } from "lucide-react";
+import { Clock, MapPin, Expand, ImageOff, X } from "lucide-react";
 
 // 3. Utils
 import {
@@ -22,11 +22,23 @@ import {
 } from "../../utils/formatters";
 
 const DetallesRenta = ({ detalle, mostrarPrecios }) => {
-  // Detectar renta por día si total_dias > 0
+  const [fotoModal, setFotoModal] = useState(false);
+
   const totalDias = Number(detalle.total_dias || 0);
   const esRentaPorDia = totalDias > 0;
 
-  // Viajes ordenados por numero_viaje
+  const tieneFoto = Boolean(detalle.foto_evidencia_url);
+  const tieneGeo = detalle.latitud_completado && detalle.longitud_completado;
+
+  const getDistanciaBadge = (metros) => {
+    if (metros === null || metros === undefined) return null;
+    if (metros <= 500) return { label: `${metros} m de la obra`, clase: "distancia-badge--cerca" };
+    if (metros <= 2000) return { label: `${(metros / 1000).toFixed(1)} km de la obra`, clase: "distancia-badge--media" };
+    return { label: `${(metros / 1000).toFixed(1)} km de la obra`, clase: "distancia-badge--lejos" };
+  };
+
+  const distanciaBadge = getDistanciaBadge(detalle.distancia_obra_metros);
+
   const viajesOrdenados = [...(detalle.vale_renta_viajes || [])].sort(
     (a, b) => a.numero_viaje - b.numero_viaje,
   );
@@ -35,6 +47,67 @@ const DetallesRenta = ({ detalle, mostrarPrecios }) => {
     <div className="vale-section">
       <h3 className="section-title">SERVICIO DE RENTA</h3>
 
+      {/* Foto de evidencia full-width */}
+      {tieneFoto ? (
+        <div
+          className="viaje-item__foto-full"
+          style={{ marginBottom: 12, borderRadius: 8 }}
+          onClick={() => setFotoModal(true)}
+        >
+          <img
+            src={detalle.foto_evidencia_url}
+            alt="Evidencia de renta"
+            className="viaje-item__foto-img"
+          />
+          <button
+            className="viaje-item__foto-btn"
+            onClick={(e) => { e.stopPropagation(); setFotoModal(true); }}
+            aria-label="Ver foto completa"
+          >
+            <Expand size={13} />
+            Ampliar
+          </button>
+          {tieneGeo && (
+            <a
+              href={`https://www.google.com/maps?q=${detalle.latitud_completado},${detalle.longitud_completado}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="viaje-item__foto-geo"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MapPin size={12} />
+              Ver en mapa
+            </a>
+          )}
+          {distanciaBadge && (
+            <span
+              className={`distancia-badge ${distanciaBadge.clase}`}
+              style={{ position: "absolute", top: 8, right: 8 }}
+            >
+              <MapPin size={10} />
+              {distanciaBadge.label}
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className="viaje-item__foto-empty" style={{ marginBottom: 12, borderRadius: 8 }}>
+          <ImageOff size={20} />
+          <span>Sin foto de evidencia</span>
+          {tieneGeo && (
+            <a
+              href={`https://www.google.com/maps?q=${detalle.latitud_completado},${detalle.longitud_completado}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="viaje-item__mapa-link"
+            >
+              <MapPin size={12} />
+              Ver ubicación
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* Datos del servicio */}
       <div className="info-full">
         <span className="info-label">Material Movido:</span>
         <span className="info-value">
@@ -133,7 +206,7 @@ const DetallesRenta = ({ detalle, mostrarPrecios }) => {
         </div>
       )}
 
-      {/* Registro de viajes individuales */}
+      {/* Tabla de viajes */}
       {viajesOrdenados.length > 0 && (
         <div className="viajes-renta">
           <div className="viajes-renta__header">
@@ -145,14 +218,12 @@ const DetallesRenta = ({ detalle, mostrarPrecios }) => {
           </div>
 
           <div className="viajes-renta__tabla">
-            {/* Encabezados */}
             <div className="viajes-renta__fila viajes-renta__fila--header">
               <span>#</span>
               <span>Hora de registro</span>
               <span>Registrado por</span>
             </div>
 
-            {/* Filas */}
             {viajesOrdenados.map((viaje) => {
               const registrador = viaje.persona_registro;
               const nombreRegistrador = registrador
@@ -173,6 +244,39 @@ const DetallesRenta = ({ detalle, mostrarPrecios }) => {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Modal foto ampliada */}
+      {fotoModal && (
+        <div
+          className="foto-modal-overlay"
+          onClick={() => setFotoModal(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Foto de evidencia ampliada"
+        >
+          <div className="foto-modal-contenido" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="foto-modal-cerrar"
+              onClick={() => setFotoModal(false)}
+              aria-label="Cerrar foto"
+            >
+              <X size={20} />
+            </button>
+            <div className="foto-modal-titulo">Evidencia de renta</div>
+            <img
+              src={detalle.foto_evidencia_url}
+              alt="Evidencia de renta"
+              className="foto-modal-imagen"
+            />
+            {distanciaBadge && (
+              <div className={`foto-modal-distancia ${distanciaBadge.clase}`}>
+                <MapPin size={14} />
+                {distanciaBadge.label}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -2,7 +2,8 @@
  * src/hooks/useDashboardUnificado.js
  *
  * Hook de datos para el Dashboard Unificado de vales.
- * Fetch con filtro de fecha server-side (hasta 5000 filas).
+ * Fetch server-side por rango de fechas (hasta 5000 filas).
+ * KPIs derivados de los datos cargados — sin vistas materializadas.
  * Filtros client-side: tipo, CC (multi), sindicato (multi), búsqueda.
  *
  * Dependencias: supabase, dateUtils
@@ -63,10 +64,8 @@ const getMaterialVale = (vale) => {
   return vale.vale_material_detalles?.[0]?.material?.material ?? "—";
 };
 
-// Calcula KPIs desde una lista de vales ya enriquecidos (client-side).
-// Nota: totalViajes no está disponible porque los viajes no se cargan en el fetch principal.
 const calcularKpisDeVales = (lista) => {
-  let totalRenta = 0, totalM3 = 0, importeTotal = 0;
+  let totalRenta = 0, totalM3 = 0, totalViajes = 0, importeTotal = 0;
   let totalHoras = 0, totalDias = 0, pendientes = 0;
 
   for (const vale of lista) {
@@ -82,6 +81,7 @@ const calcularKpisDeVales = (lista) => {
       for (const det of vale.vale_material_detalles ?? []) {
         totalM3      += Number(det.volumen_real_m3 || 0);
         importeTotal += Number(det.costo_total     || 0);
+        totalViajes  += det.vale_material_viajes?.length ?? 0;
       }
     }
     if (vale.estado === "emitido") pendientes++;
@@ -95,7 +95,7 @@ const calcularKpisDeVales = (lista) => {
     totalVales:  lista.length,
     totalRenta,
     totalM3,
-    totalViajes: "—",
+    totalViajes,
     importeTotal,
     tiempoRenta: partes.length > 0 ? partes.join(" · ") : "—",
     pendientes,
@@ -116,17 +116,13 @@ export const useDashboardUnificado = () => {
   const [periodoActivo, setPeriodoActivo] = useState("hoy");
   const [mostrarCancelados, setMostrarCancelados] = useState(false);
 
-  const [kpisGlobales, setKpisGlobales] = useState({
-    totalVales: 0, totalRenta: 0, totalM3: 0,
-    totalViajes: 0, importeTotal: 0, tiempoRenta: "—", pendientes: 0,
-  });
-
   // Filtros client-side
   const [tipoActivo, setTipoActivo] = useState("todos");
   const [busqueda, setBusqueda] = useState("");
   const [filtroCCs, setFiltroCCs] = useState([]);
   const [filtroSindicatos, setFiltroSindicatos] = useState([]);
   const [filtroEstados, setFiltroEstados] = useState([]);
+  const [filtroMateriales, setFiltroMateriales] = useState([]);
 
   const [usarKpisLocales, setUsarKpisLocales] = useState(false);
 
@@ -165,7 +161,7 @@ export const useDashboardUnificado = () => {
               tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)
             ),
             bancos:id_banco (id_banco, banco),
-            vale_material_viajes (folio_vale_fisico)
+            vale_material_viajes (id_viaje, folio_vale_fisico)
           ),
           vale_renta_detalle (
             id_vale_renta_detalle, capacidad_m3, hora_inicio, hora_fin,
@@ -190,8 +186,9 @@ export const useDashboardUnificado = () => {
         .range(0, 4999);
 
       if (err) throw err;
-      setHasMasDatos((count ?? 0) > (data?.length ?? 0));
-      setTodosLosVales(data ?? []);
+      const payload = data ?? [];
+      setHasMasDatos((count ?? 0) > payload.length);
+      setTodosLosVales(payload);
     } catch (err) {
       console.error("Error en useDashboardUnificado:", err);
       setError(err.message);
@@ -200,75 +197,9 @@ export const useDashboardUnificado = () => {
     }
   }, []);
 
-  const fetchKpisGlobales = useCallback(async (inicio, fin) => {
-    // Las MVs agrupan por mes — convertimos el rango a primeros días de mes
-    const mesInicio = inicio.substring(0, 7) + "-01";
-    const mesFin = fin.substring(0, 7) + "-01";
-
-    try {
-      const [
-        { data: matStats },
-        { data: rentStats },
-        { count: cntMat },
-        { count: cntRent },
-        { count: cntPend },
-      ] = await Promise.all([
-        supabase.from("mv_stats_material")
-          .select("m3_total, costo_total, total_viajes")
-          .gte("mes", mesInicio).lte("mes", mesFin),
-        supabase.from("mv_stats_renta")
-          .select("total_horas, total_dias, costo_total")
-          .gte("mes", mesInicio).lte("mes", mesFin),
-        supabase.from("vales").select("id_vale", { count: "exact", head: true })
-          .eq("tipo_vale", "material").neq("estado", "cancelado")
-          .gte("fecha_creacion", inicio + "T00:00:00")
-          .lte("fecha_creacion", fin + "T23:59:59"),
-        supabase.from("vales").select("id_vale", { count: "exact", head: true })
-          .eq("tipo_vale", "renta").neq("estado", "cancelado")
-          .gte("fecha_creacion", inicio + "T00:00:00")
-          .lte("fecha_creacion", fin + "T23:59:59"),
-        supabase.from("vales").select("id_vale", { count: "exact", head: true })
-          .eq("estado", "emitido")
-          .gte("fecha_creacion", inicio + "T00:00:00")
-          .lte("fecha_creacion", fin + "T23:59:59"),
-      ]);
-
-      const totalM3      = (matStats  ?? []).reduce((s, r) => s + Number(r.m3_total    || 0), 0);
-      const totalViajes  = (matStats  ?? []).reduce((s, r) => s + Number(r.total_viajes || 0), 0);
-      const importeMat   = (matStats  ?? []).reduce((s, r) => s + Number(r.costo_total  || 0), 0);
-      const importeRent  = (rentStats ?? []).reduce((s, r) => s + Number(r.costo_total  || 0), 0);
-      const totalHoras   = (rentStats ?? []).reduce((s, r) => s + Number(r.total_horas  || 0), 0);
-      const totalDias    = (rentStats ?? []).reduce((s, r) => s + Number(r.total_dias   || 0), 0);
-
-      const partes = [];
-      if (totalDias  > 0) partes.push(`${totalDias}d`);
-      if (totalHoras > 0) partes.push(`${Number(totalHoras).toFixed(1)}h`);
-
-      setKpisGlobales({
-        totalVales:   (cntMat ?? 0) + (cntRent ?? 0),
-        totalRenta:   cntRent ?? 0,
-        totalM3,
-        totalViajes,
-        importeTotal: importeMat + importeRent,
-        tiempoRenta:  partes.length > 0 ? partes.join(" · ") : "—",
-        pendientes:   cntPend ?? 0,
-      });
-    } catch (err) {
-      console.error("Error en fetchKpisGlobales:", err);
-    }
-  }, []);
-
   useEffect(() => {
     fetchVales(fechaInicio, fechaFin, mostrarCancelados);
-    if (!mostrarCancelados) {
-      fetchKpisGlobales(fechaInicio, fechaFin);
-    } else {
-      setKpisGlobales({
-        totalVales: 0, totalRenta: 0, totalM3: 0,
-        totalViajes: 0, importeTotal: 0, tiempoRenta: "—", pendientes: 0,
-      });
-    }
-  }, [fechaInicio, fechaFin, mostrarCancelados, fetchVales, fetchKpisGlobales]);
+  }, [fechaInicio, fechaFin, mostrarCancelados, fetchVales]);
 
   const valesEnriquecidos = useMemo(
     () =>
@@ -288,7 +219,10 @@ export const useDashboardUnificado = () => {
       lista = lista.filter((v) => v._tipo === tipoActivo);
     }
     if (filtroCCs.length > 0) {
-      lista = lista.filter((v) => filtroCCs.includes(v.obras?.cc));
+      lista = lista.filter((v) => {
+        const key = v.obras ? `${v.obras.cc} · ${v.obras.obra}` : null;
+        return key && filtroCCs.includes(key);
+      });
     }
     if (filtroSindicatos.length > 0) {
       lista = lista.filter((v) =>
@@ -297,6 +231,9 @@ export const useDashboardUnificado = () => {
     }
     if (filtroEstados.length > 0) {
       lista = lista.filter((v) => filtroEstados.includes(v.estado));
+    }
+    if (filtroMateriales.length > 0) {
+      lista = lista.filter((v) => filtroMateriales.includes(v._material));
     }
     if (busqueda.trim()) {
       const term = busqueda.toLowerCase();
@@ -311,7 +248,12 @@ export const useDashboardUnificado = () => {
     }
 
     return lista;
-  }, [valesEnriquecidos, tipoActivo, filtroCCs, filtroSindicatos, filtroEstados, busqueda]);
+  }, [valesEnriquecidos, tipoActivo, filtroCCs, filtroSindicatos, filtroEstados, filtroMateriales, busqueda]);
+
+  const kpisGlobales = useMemo(
+    () => calcularKpisDeVales(valesEnriquecidos),
+    [valesEnriquecidos],
+  );
 
   const kpisLocales = useMemo(
     () => calcularKpisDeVales(valesFiltrados),
@@ -327,7 +269,11 @@ export const useDashboardUnificado = () => {
   // Opciones únicas para los dropdowns, derivadas de todos los vales cargados
   const opciones = useMemo(() => {
     const ccs = [
-      ...new Set(valesEnriquecidos.map((v) => v.obras?.cc).filter(Boolean)),
+      ...new Set(
+        valesEnriquecidos
+          .map((v) => v.obras ? `${v.obras.cc} · ${v.obras.obra}` : null)
+          .filter(Boolean),
+      ),
     ].sort();
     const sindicatos = [
       ...new Set(
@@ -336,7 +282,14 @@ export const useDashboardUnificado = () => {
           .filter(Boolean),
       ),
     ].sort();
-    return { ccs, sindicatos };
+    const materiales = [
+      ...new Set(
+        valesEnriquecidos
+          .map((v) => v._material)
+          .filter((m) => m && m !== "—"),
+      ),
+    ].sort();
+    return { ccs, sindicatos, materiales };
   }, [valesEnriquecidos]);
 
 
@@ -447,6 +400,11 @@ export const useDashboardUnificado = () => {
     setPagina(1);
   }, []);
 
+  const cambiarMateriales = useCallback((arr) => {
+    setFiltroMateriales(arr);
+    setPagina(1);
+  }, []);
+
   const aplicarKpis = useCallback(() => {
     setUsarKpisLocales(true);
   }, []);
@@ -471,6 +429,7 @@ export const useDashboardUnificado = () => {
       filtroCCs,
       filtroSindicatos,
       filtroEstados,
+      filtroMateriales,
     },
     opciones,
     pagina,
@@ -484,11 +443,11 @@ export const useDashboardUnificado = () => {
     cambiarCCs,
     cambiarSindicatos,
     cambiarEstados,
+    cambiarMateriales,
     cambiarSemana,
     cambiarMes,
     refetch: () => {
       fetchVales(fechaInicio, fechaFin, mostrarCancelados);
-      if (!mostrarCancelados) fetchKpisGlobales(fechaInicio, fechaFin);
       setUsarKpisLocales(false);
     },
     mostrarCancelados,

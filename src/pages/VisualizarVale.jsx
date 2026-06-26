@@ -218,6 +218,10 @@ const VisualizarVale = () => {
               numero_viajes,
               notas_adicionales,
               es_renta_por_dia,
+              foto_evidencia_url,
+              latitud_completado,
+              longitud_completado,
+              distancia_obra_metros,
               material:id_material (
                 material
               ),
@@ -371,42 +375,6 @@ const VisualizarVale = () => {
     }
   };
 
-  /**
-   * Aplanar viajes: un objeto por cada vale_material_viaje con contexto del detalle padre.
-   * foto y coordenadas viven en vale_material_detalles, no en vale_material_viajes.
-   */
-  const aplanarViajesMaterial = (detalles) => {
-    return detalles.flatMap((det) => {
-      const viajes = det.vale_material_viajes || [];
-
-      if (viajes.length === 0) {
-        return [{ ...det, _esDetalleFallback: true }];
-      }
-
-      return viajes.map((viaje) => ({
-        ...viaje,
-        // Contexto del detalle padre
-        material: det.material,
-        capacidad_m3: det.capacidad_m3,
-        cantidad_pedida_m3: det.cantidad_pedida_m3,
-        notas_adicionales: det.notas_adicionales,
-        folio_banco: det.folio_banco,
-        // Foto y geolocalización: usar del viaje si existe, sino del detalle padre
-        foto_evidencia_url: viaje.foto_evidencia_url || det.foto_evidencia_url,
-        latitud_completado: viaje.latitud_registro || det.latitud_completado,
-        longitud_completado: viaje.longitud_registro || det.longitud_completado,
-        distancia_obra_metros: viaje.distancia_obra_metros ?? det.distancia_obra_metros,
-        // Banco y distancia: usar override del viaje si existe
-        bancos: viaje.bancos_override ?? det.bancos,
-        distancia_km: viaje.distancia_km_override ?? det.distancia_km,
-        // Volumen, peso y costo del viaje individual
-        volumen_real_m3: viaje.volumen_m3 ?? det.volumen_real_m3,
-        peso_ton: viaje.peso_ton ?? det.peso_ton,
-        costo_total: viaje.costo_viaje ?? det.costo_total,
-      }));
-    });
-  };
-
   // ========================================
   // ESTADOS DE CARGA Y ERROR
   // ========================================
@@ -447,10 +415,6 @@ const VisualizarVale = () => {
   const detalleRenta = vale.vale_renta_detalle?.[0];
   const badgeEstado = getBadgeEstado(vale.estado);
   const badgeTipo = getBadgeTipo(vale.tipo_vale);
-  const viajesAplanados =
-    vale.tipo_vale === "material" && vale.vale_material_detalles?.length > 0
-      ? aplanarViajesMaterial(vale.vale_material_detalles)
-      : [];
 
   return (
     <div className={`visualizar-vale-page ${getBackgroundClass(vale.estado)}`}>
@@ -619,9 +583,9 @@ const VisualizarVale = () => {
         )}
 
         {/* LISTA DE VIAJES - MATERIAL */}
-        {viajesAplanados.length > 0 && (
+        {vale.tipo_vale === "material" && vale.vale_material_detalles?.length > 0 && (
           <ListaViajesMaterial
-            detalles={viajesAplanados}
+            detalles={vale.vale_material_detalles}
             mostrarPrecios={mostrarPrecios}
           />
         )}

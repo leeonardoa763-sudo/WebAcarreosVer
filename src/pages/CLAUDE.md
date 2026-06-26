@@ -9,6 +9,7 @@
 | `Login.jsx` | `/login` | Público | `useAuth` | `auth.css` |
 | `DashboardUnificado.jsx` | `/dashboard-unificado` | Todos autenticados | `useDashboardUnificado` | `dashboard-unificado.css` |
 | `Dashboard.jsx` | `/dashboard` | Solo Administrador | `useDashboardAnalytics`, `useMvStats` | `dashboard.css` |
+| `EstadisticasGlobales.jsx` | `/estadisticas` | Administrador, Finanzas | `useEstadisticasGlobales` | `estadisticas-globales.css` |
 | `VerificarVales.jsx` | `/verificar-vales` | Todos autenticados | `useVerificacion` | `verificacion.css` |
 | `Conciliaciones.jsx` | `/conciliaciones` | Todos autenticados | `useConciliaciones` + `useConciliacionesMaterial` | `conciliaciones.css` |
 | `HistorialConciliaciones.jsx` | `/historial-conciliaciones` | Admin, Sindicato | — (wrapper de `SeccionConciliaciones`) | — |

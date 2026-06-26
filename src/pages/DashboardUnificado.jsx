@@ -308,6 +308,7 @@ const DashboardUnificado = () => {
     cambiarCCs,
     cambiarSindicatos,
     cambiarEstados,
+    cambiarMateriales,
     cambiarSemana,
     cambiarMes,
     refetch,
@@ -430,12 +431,14 @@ const DashboardUnificado = () => {
   const hayFiltrosExtra =
     filtros.filtroCCs.length > 0 ||
     filtros.filtroSindicatos.length > 0 ||
-    filtros.filtroEstados.length > 0;
+    filtros.filtroEstados.length > 0 ||
+    filtros.filtroMateriales.length > 0;
 
   const handleLimpiarFiltros = () => {
     cambiarCCs([]);
     cambiarSindicatos([]);
     cambiarEstados([]);
+    cambiarMateriales([]);
   };
 
   // 5. Render
@@ -488,7 +491,6 @@ const DashboardUnificado = () => {
           <span>
             KPIs calculados desde {totalFiltrados.toLocaleString()} vales filtrados
             {hasMasDatos ? " · datos parciales (hay más en la BD)" : " · datos completos"}
-            {" · "}Viajes no disponible con filtros
           </span>
           <button className="du__btn-resetear-kpis" onClick={resetearKpis} type="button">
             Ver KPIs globales
@@ -538,7 +540,7 @@ const DashboardUnificado = () => {
             icono={Route}
             titulo="Viajes"
             valor={kpis.totalViajes}
-            subtitulo={kpisDesdeLocales ? "no disp. con filtros" : "registros de viaje"}
+            subtitulo="registros de viaje"
             gradiente="linear-gradient(135deg, #0369a1 0%, #38bdf8 100%)"
           />
           <KpiCard
@@ -618,7 +620,7 @@ const DashboardUnificado = () => {
         {/* Fila 2: CC, Sindicato, Estado + Calcular KPIs */}
         <div className="du__filtros-grupo du__filtros-grupo--checks">
           <CheckboxDropdown
-            label="CC"
+            label="Obra"
             opciones={opciones.ccs}
             seleccionados={filtros.filtroCCs}
             onChange={cambiarCCs}
@@ -635,6 +637,12 @@ const DashboardUnificado = () => {
             seleccionados={filtros.filtroEstados}
             onChange={cambiarEstados}
             labelsMap={ESTADOS_LABELS}
+          />
+          <CheckboxDropdown
+            label="Material"
+            opciones={opciones.materiales}
+            seleccionados={filtros.filtroMateriales}
+            onChange={cambiarMateriales}
           />
           {hayFiltrosExtra && (
             <button

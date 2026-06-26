@@ -20,7 +20,6 @@ import Layout from "./components/layout/Layout";
 
 // 4. Pages
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
 import DashboardUnificado from "./pages/DashboardUnificado";
 import Conciliaciones from "./pages/Conciliaciones";
 import Contabilidad from "./pages/Contabilidad";
@@ -28,6 +27,7 @@ import VerificarVales from "./pages/VerificarVales";
 import VisualizarVale from "./pages/VisualizarVale";
 import VisualizarConciliacion from "./pages/VisualizarConciliacion";
 import HistorialConciliaciones from "./pages/HistorialConciliaciones";
+import EstadisticasGlobales from "./pages/EstadisticasGlobales";
 
 // 5. Estilos
 import "./styles/global.css";
@@ -54,19 +54,6 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-
-          {/* Dashboard (analytics) - solo Administrador */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute requiredRole="Administrador">
-                <Layout>
-                  <Dashboard />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-
 
           {/* Verificar Vales - todos los roles autenticados */}
           <Route
@@ -99,6 +86,18 @@ const App = () => {
               <ProtectedRoute>
                 <Layout>
                   <HistorialConciliaciones />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Estadísticas Globales - solo Administrador */}
+          <Route
+            path="/estadisticas"
+            element={
+              <ProtectedRoute requiredRole="Administrador">
+                <Layout>
+                  <EstadisticasGlobales />
                 </Layout>
               </ProtectedRoute>
             }

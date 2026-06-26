@@ -12,12 +12,12 @@ import { NavLink } from "react-router-dom";
 
 // 2. Icons
 import {
-  LayoutDashboard,
   FileSpreadsheet,
   FileCheck,
   History,
   BookOpen,
   LayoutList,
+  BarChart3,
 } from "lucide-react";
 
 // 3. Hooks personalizados
@@ -35,16 +35,16 @@ const Sidebar = () => {
   return (
     <aside className="sidebar">
       <nav className="sidebar__nav">
-        {/* Dashboard - solo Administrador */}
+        {/* Estadísticas Globales - solo Administrador */}
         {esAdministrador && (
           <NavLink
-            to="/dashboard"
+            to="/estadisticas"
             className={({ isActive }) =>
               isActive ? "sidebar__link sidebar__link--active" : "sidebar__link"
             }
           >
-            <LayoutDashboard className="sidebar__icon" size={20} />
-            <span className="sidebar__text">Dashboard</span>
+            <BarChart3 className="sidebar__icon" size={20} />
+            <span className="sidebar__text">Estadísticas</span>
           </NavLink>
         )}
 
