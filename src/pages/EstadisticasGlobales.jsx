@@ -9,7 +9,7 @@
  */
 
 // 1. React
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useState, useRef, Fragment } from "react";
 
 // 2. Iconos
 import {
@@ -30,6 +30,9 @@ import {
   TrendingUp,
   Award,
   ChevronRight,
+  Package,
+  Target,
+  AlertTriangle,
 } from "lucide-react";
 
 // 3. Recharts
@@ -100,6 +103,17 @@ const formatFecha = (ts) => {
     year: "numeric",
     timeZone: "America/Mexico_City",
   });
+};
+
+const getSemaforo = (consumido, presupuestado) => {
+  if (!presupuestado || Number(presupuestado) === 0)
+    return { pct: 0, pctLabel: "0%", color: "green" };
+  const pct = Number(consumido) / Number(presupuestado);
+  return {
+    pct,
+    pctLabel: `${Math.round(pct * 100)}%`,
+    color: pct > 1 ? "red" : pct >= 0.8 ? "yellow" : "green",
+  };
 };
 
 const formatMesChip = (mesKey) => {
@@ -410,6 +424,146 @@ const TopTable = ({ rows, cols, emptyMsg }) => (
 );
 
 // ── Sección Análisis Avanzado ──────────────────────────────────────
+const SeccionPresupuestos = ({ materialRows, rentaRows, hayAlerta, loading }) => {
+  const obrasMaterial = useMemo(() => {
+    const map = {};
+    materialRows.forEach((p) => {
+      const obraId = p.id_obra;
+      const obraNombre = p.obras?.obra || "Sin obra";
+      if (!map[obraId]) map[obraId] = { obra: obraNombre, items: [] };
+      map[obraId].items.push(p);
+    });
+    return Object.values(map).sort((a, b) => a.obra.localeCompare(b.obra));
+  }, [materialRows]);
+
+  const tieneData = materialRows.length > 0 || rentaRows.length > 0;
+
+  if (loading) {
+    return (
+      <div className="eg__presup-section">
+        <div className="eg__presup-skeleton" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="eg__presup-section">
+      {hayAlerta && (
+        <div className="eg__presup-alerta">
+          <AlertTriangle size={16} className="eg__presup-alerta__icon" />
+          <span className="eg__presup-alerta__msg">
+            Uno o más conceptos han superado el presupuesto asignado.
+          </span>
+        </div>
+      )}
+
+      <div className="eg__presup-header">
+        <div className="eg__presup-eyebrow">
+          <Target size={13} />
+          Control de Presupuesto
+        </div>
+        <h2 className="eg__presup-title">Presupuestos</h2>
+        <p className="eg__presup-sub">
+          Consumo acumulado vs. presupuesto asignado por obra
+        </p>
+      </div>
+
+      {!tieneData ? (
+        <div className="eg__presup-empty">
+          Sin presupuestos configurados para las obras seleccionadas.
+        </div>
+      ) : (
+        <div className="eg__presup-body">
+          {obrasMaterial.length > 0 && (
+            <div className="eg__presup-bloque">
+              <div className="eg__presup-bloque__label">
+                <Truck size={12} />
+                Material
+              </div>
+              {obrasMaterial.map(({ obra, items }) => (
+                <div key={obra} className="eg__presup-obra-grupo">
+                  <div className="eg__presup-obra-nombre">{obra}</div>
+                  <div className="eg__presup-items">
+                    {items.map((p) => {
+                      const sem = getSemaforo(p.m3_consumidos, p.m3_presupuestados);
+                      const barWidth = Math.min(sem.pct, 1) * 100;
+                      return (
+                        <div
+                          key={p.id}
+                          className={`eg__presup-item eg__presup-item--${sem.color}`}
+                        >
+                          <div className="eg__presup-item__top">
+                            <span className="eg__presup-item__nombre">
+                              {p.material?.material || "—"}
+                            </span>
+                            <span className={`eg__presup-item__pct eg__presup-item__pct--${sem.color}`}>
+                              {sem.pctLabel}
+                            </span>
+                          </div>
+                          <div className="eg__presup-item__bar-track">
+                            <div
+                              className={`eg__presup-item__bar-fill eg__presup-item__bar-fill--${sem.color}`}
+                              style={{ width: `${barWidth}%` }}
+                            />
+                          </div>
+                          <div className="eg__presup-item__nums">
+                            <span>{formatNum(p.m3_consumidos, 2)} m³ consumidos</span>
+                            <span>de {formatNum(p.m3_presupuestados, 2)} m³</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {rentaRows.length > 0 && (
+            <div className="eg__presup-bloque eg__presup-bloque--renta">
+              <div className="eg__presup-bloque__label">
+                <Clock size={12} />
+                Renta de Equipo
+              </div>
+              <div className="eg__presup-items">
+                {rentaRows.map((p) => {
+                  const sem = getSemaforo(p.monto_consumido, p.monto_presupuestado);
+                  const barWidth = Math.min(sem.pct, 1) * 100;
+                  return (
+                    <div
+                      key={p.id}
+                      className={`eg__presup-item eg__presup-item--${sem.color}`}
+                    >
+                      <div className="eg__presup-item__top">
+                        <span className="eg__presup-item__nombre">
+                          {p.obras?.obra || "—"}
+                        </span>
+                        <span className={`eg__presup-item__pct eg__presup-item__pct--${sem.color}`}>
+                          {sem.pctLabel}
+                        </span>
+                      </div>
+                      <div className="eg__presup-item__bar-track">
+                        <div
+                          className={`eg__presup-item__bar-fill eg__presup-item__bar-fill--${sem.color}`}
+                          style={{ width: `${barWidth}%` }}
+                        />
+                      </div>
+                      <div className="eg__presup-item__nums">
+                        <span>{formatMXN(p.monto_consumido)} consumido</span>
+                        <span>de {formatMXN(p.monto_presupuestado)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SeccionAnalisisAvanzado = ({
   horasPico, viajesPorVale, topResidentes, topChecadores, topPlacas, rendimientoPorMaterial,
 }) => {
@@ -569,6 +723,12 @@ const EstadisticasGlobales = () => {
     horasPico,
     viajesPorVale,
     rendimientoPorMaterial,
+    tablaObraMaterial,
+    tablaRentaPorObra,
+    loadingPresupuestos,
+    presupuestosMaterialFiltrados,
+    presupuestosRentaFiltrados,
+    hayAlertaPresupuesto,
   } = useEstadisticasGlobales();
 
   // 2. Categoría abierta en el panel de filtros
@@ -577,7 +737,7 @@ const EstadisticasGlobales = () => {
   const toggleCategoria = (key) =>
     setCategoriaAbierta((prev) => (prev === key ? null : key));
 
-  // 3. Totales de tabla
+  // 3. Totales de tablas
   const totalesTabla = useMemo(
     () =>
       tablaMaterial.reduce(
@@ -590,6 +750,34 @@ const EstadisticasGlobales = () => {
         { m3Total: 0, valesCount: 0, totalViajes: 0, importeIVA: 0 }
       ),
     [tablaMaterial]
+  );
+
+  const totalesTablaObra = useMemo(
+    () =>
+      tablaObraMaterial.reduce(
+        (acc, obraRow) => ({
+          m3Total:     acc.m3Total     + obraRow.subtotal.m3Total,
+          valesCount:  acc.valesCount  + obraRow.subtotal.valesCount,
+          totalViajes: acc.totalViajes + obraRow.subtotal.totalViajes,
+          importeIVA:  acc.importeIVA  + obraRow.subtotal.importeIVA,
+        }),
+        { m3Total: 0, valesCount: 0, totalViajes: 0, importeIVA: 0 }
+      ),
+    [tablaObraMaterial]
+  );
+
+  const totalesRenta = useMemo(
+    () =>
+      tablaRentaPorObra.reduce(
+        (acc, row) => ({
+          conciliaciones: acc.conciliaciones + row.conciliaciones,
+          totalDias:      acc.totalDias      + row.totalDias,
+          totalHoras:     acc.totalHoras     + row.totalHoras,
+          importeTotal:   acc.importeTotal   + row.importeTotal,
+        }),
+        { conciliaciones: 0, totalDias: 0, totalHoras: 0, importeTotal: 0 }
+      ),
+    [tablaRentaPorObra]
   );
 
   // 4. Config de categorías de filtros
@@ -809,24 +997,26 @@ const EstadisticasGlobales = () => {
         </div>
       )}
 
-      {/* ── Gráfica Material vs Tiempo ─────────────────────────── */}
-      {!error && (
-        <GraficaTiempo seriesTiempo={seriesTiempo} loading={loading} />
-      )}
-
-      {/* ── Tabla por material ─────────────────────────────────── */}
+      {/* ── Tabla por obra (material + renta) ─────────────────── */}
       {!error && (
         <div className="eg__tabla-section">
           <div className="eg__tabla-header">
-            <h2 className="eg__tabla-title">Resumen por Material</h2>
+            <h2 className="eg__tabla-title">Desglose por Obra</h2>
             {!loading && (
               <span className="eg__tabla-badge">
-                {tablaMaterial.length}{" "}
-                {tablaMaterial.length === 1 ? "material" : "materiales"}
+                {tablaObraMaterial.length}{" "}
+                {tablaObraMaterial.length === 1 ? "obra" : "obras"}
               </span>
             )}
           </div>
 
+          {/* ─ Sub-sección material ─ */}
+          <div className="eg__tabla-subseccion">
+            <span className="eg__tabla-subseccion__label">
+              <Truck size={12} />
+              Material
+            </span>
+          </div>
           <div className="eg__tabla-wrap">
             <table className="eg__tabla">
               <thead>
@@ -838,11 +1028,10 @@ const EstadisticasGlobales = () => {
                   <th>Importe + IVA</th>
                 </tr>
               </thead>
-
               <tbody>
                 {loading ? (
                   renderSkeletonRows()
-                ) : tablaMaterial.length === 0 ? (
+                ) : tablaObraMaterial.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="eg__empty">
                       {hayFiltrosActivos
@@ -851,42 +1040,139 @@ const EstadisticasGlobales = () => {
                     </td>
                   </tr>
                 ) : (
-                  tablaMaterial.map((row, i) => (
-                    <tr key={row.material}>
-                      <td>
-                        <div className="eg__material-name">
-                          <span
-                            className="eg__material-dot"
-                            style={{ background: DOT_COLORS[i % DOT_COLORS.length] }}
-                          />
-                          {row.material}
-                        </div>
-                      </td>
-                      <td>{formatNum(row.m3Total, 2)} m³</td>
-                      <td>{formatNum(row.valesCount)}</td>
-                      <td>{formatNum(row.totalViajes)}</td>
-                      <td className="eg__importe-cell">{formatMXN(row.importeIVA)}</td>
-                    </tr>
+                  tablaObraMaterial.map((obraRow) => (
+                    <Fragment key={obraRow.obra}>
+                      <tr className="eg__tabla-obra-header">
+                        <td colSpan={5}>
+                          <span className="eg__tabla-obra-label">{obraRow.obra}</span>
+                        </td>
+                      </tr>
+                      {obraRow.materiales.map((mat, matIdx) => (
+                        <tr key={mat.material}>
+                          <td>
+                            <div className="eg__material-name eg__material-name--sub">
+                              <span
+                                className="eg__material-dot"
+                                style={{ background: DOT_COLORS[matIdx % DOT_COLORS.length] }}
+                              />
+                              {mat.material}
+                            </div>
+                          </td>
+                          <td>{formatNum(mat.m3Total, 2)} m³</td>
+                          <td>{formatNum(mat.valesCount)}</td>
+                          <td>{formatNum(mat.totalViajes)}</td>
+                          <td className="eg__importe-cell">{formatMXN(mat.importeIVA)}</td>
+                        </tr>
+                      ))}
+                      {obraRow.materiales.length > 1 && (
+                        <tr className="eg__tabla-subtotal">
+                          <td>Subtotal</td>
+                          <td>{formatNum(obraRow.subtotal.m3Total, 2)} m³</td>
+                          <td>{formatNum(obraRow.subtotal.valesCount)}</td>
+                          <td>{formatNum(obraRow.subtotal.totalViajes)}</td>
+                          <td className="eg__importe-cell">{formatMXN(obraRow.subtotal.importeIVA)}</td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))
                 )}
               </tbody>
-
-              {!loading && tablaMaterial.length > 0 && (
+              {!loading && tablaObraMaterial.length > 0 && (
                 <tfoot>
                   <tr>
                     <td>Total</td>
-                    <td>{formatNum(totalesTabla.m3Total, 2)} m³</td>
-                    <td>{formatNum(totalesTabla.valesCount)}</td>
-                    <td>{formatNum(totalesTabla.totalViajes)}</td>
+                    <td>{formatNum(totalesTablaObra.m3Total, 2)} m³</td>
+                    <td>{formatNum(totalesTablaObra.valesCount)}</td>
+                    <td>{formatNum(totalesTablaObra.totalViajes)}</td>
                     <td className="eg__importe-cell">
-                      {formatMXN(totalesTabla.importeIVA)}
+                      {formatMXN(totalesTablaObra.importeIVA)}
                     </td>
                   </tr>
                 </tfoot>
               )}
             </table>
           </div>
+
+          {/* ─ Sub-sección renta ─ */}
+          {!loading && (
+            <>
+              <div className="eg__tabla-subseccion eg__tabla-subseccion--renta">
+                <span className="eg__tabla-subseccion__label">
+                  <Clock size={12} />
+                  Renta de Equipo
+                </span>
+                {tablaRentaPorObra.length > 0 && (
+                  <span className="eg__tabla-badge eg__tabla-badge--green">
+                    {tablaRentaPorObra.length}{" "}
+                    {tablaRentaPorObra.length === 1 ? "obra" : "obras"}
+                  </span>
+                )}
+              </div>
+              <div className="eg__tabla-wrap">
+                <table className="eg__tabla">
+                  <thead>
+                    <tr>
+                      <th>Obra</th>
+                      <th>Conciliaciones</th>
+                      <th>Días</th>
+                      <th>Horas</th>
+                      <th>Importe</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tablaRentaPorObra.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="eg__empty">
+                          {hayFiltrosActivos
+                            ? "Sin renta para los filtros seleccionados."
+                            : "Sin conciliaciones de renta."}
+                        </td>
+                      </tr>
+                    ) : (
+                      tablaRentaPorObra.map((row) => (
+                        <tr key={row.obra}>
+                          <td>{row.obra}</td>
+                          <td>{formatNum(row.conciliaciones)}</td>
+                          <td>{formatNum(row.totalDias, 1)}</td>
+                          <td>{formatNum(row.totalHoras, 1)}</td>
+                          <td className="eg__importe-cell">{formatMXN(row.importeTotal)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {tablaRentaPorObra.length > 0 && (
+                    <tfoot>
+                      <tr>
+                        <td>Total</td>
+                        <td>{formatNum(totalesRenta.conciliaciones)}</td>
+                        <td>{formatNum(totalesRenta.totalDias, 1)}</td>
+                        <td>{formatNum(totalesRenta.totalHoras, 1)}</td>
+                        <td className="eg__importe-cell">
+                          {formatMXN(totalesRenta.importeTotal)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </>
+          )}
         </div>
+      )}
+
+      {/* ── Presupuestos ──────────────────────────────────────── */}
+      {!error && (
+        <SeccionPresupuestos
+          materialRows={presupuestosMaterialFiltrados}
+          rentaRows={presupuestosRentaFiltrados}
+          hayAlerta={hayAlertaPresupuesto}
+          loading={loadingPresupuestos}
+        />
+      )}
+
+      {/* ── Gráfica Material vs Tiempo ─────────────────────────── */}
+      {!error && (
+        <GraficaTiempo seriesTiempo={seriesTiempo} loading={loading} />
       )}
 
       {/* ── Análisis Avanzado ─────────────────────────────────── */}

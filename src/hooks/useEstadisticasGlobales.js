@@ -33,6 +33,11 @@ export const useEstadisticasGlobales = () => {
   const [rawVales, setRawVales] = useState([]);
   const [valeAConciliacion, setValeAConciliacion] = useState({});
 
+  // Estados de presupuesto
+  const [presupuestosMaterial, setPresupuestosMaterial] = useState([]);
+  const [presupuestosRenta,    setPresupuestosRenta]    = useState([]);
+  const [loadingPresupuestos,  setLoadingPresupuestos]  = useState(true);
+
   // 2. Estado de filtros
   const [filtros, setFiltrosState] = useState({
     mes: null,
@@ -54,7 +59,7 @@ export const useEstadisticasGlobales = () => {
       const { data: conciliaciones, error: errorConc } = await supabase
         .from("conciliaciones")
         .select(
-          "id_conciliacion, tipo_conciliacion, total_final, total_horas, total_dias, fecha_generacion, folio"
+          "id_conciliacion, tipo_conciliacion, total_final, total_horas, total_dias, fecha_generacion, folio, id_obra, id_empresa, id_sindicato, obras:id_obra (id_obra, obra)"
         );
 
       if (errorConc) throw errorConc;
@@ -191,6 +196,43 @@ export const useEstadisticasGlobales = () => {
 
   // 4. Effect inicial
   useEffect(() => { fetchEstadisticas(); }, []);
+
+  // 5. Fetch presupuestos (independiente de conciliaciones)
+  const fetchPresupuestos = useCallback(async () => {
+    try {
+      setLoadingPresupuestos(true);
+      const [{ data: pMat, error: eMat }, { data: pRenta, error: eRenta }] =
+        await Promise.all([
+          supabase
+            .from("presupuesto_material_obra")
+            .select(`
+              id, id_obra, id_material, m3_presupuestados, m3_consumidos,
+              obras:id_obra (id_obra, obra),
+              material:id_material (id_material, material)
+            `)
+            .eq("activo", true)
+            .neq("id_obra", 8),
+          supabase
+            .from("presupuesto_renta_obra")
+            .select(`
+              id, id_obra, monto_presupuestado, monto_consumido,
+              obras:id_obra (id_obra, obra)
+            `)
+            .eq("activo", true)
+            .neq("id_obra", 8),
+        ]);
+      if (eMat) throw eMat;
+      if (eRenta) throw eRenta;
+      setPresupuestosMaterial(pMat || []);
+      setPresupuestosRenta(pRenta || []);
+    } catch (err) {
+      console.error("Error en fetchPresupuestos:", err);
+    } finally {
+      setLoadingPresupuestos(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchPresupuestos(); }, []);
 
   // ── Opciones de filtros (derivadas) ────────────────────────────────
   const opcionesMeses = useMemo(() => {
@@ -543,6 +585,143 @@ export const useEstadisticasGlobales = () => {
       .sort((a, b) => b.m3PorViaje - a.m3PorViaje);
   }, [tablaMaterial]);
 
+  // ── Tabla material agrupada por obra → materiales ──────────────────
+  const tablaObraMaterial = useMemo(() => {
+    const obraMap = {};
+
+    valesFiltrados.forEach((vale) => {
+      const obraId = vale.obras?.id_obra;
+      if (!obraId) return;
+      const obraNombre = vale.obras?.obra || "Sin obra";
+
+      if (!obraMap[obraId]) {
+        obraMap[obraId] = { obra: obraNombre, matMap: {} };
+      }
+
+      (vale.vale_material_detalles || []).forEach((det) => {
+        const nombreMat = det.material?.material || "Sin clasificar";
+        const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
+
+        if (filtros.material && nombreMat !== filtros.material) return;
+        if (filtros.idBanco && String(det.id_banco) !== String(filtros.idBanco)) return;
+
+        if (!obraMap[obraId].matMap[nombreMat]) {
+          obraMap[obraId].matMap[nombreMat] = {
+            material: nombreMat, m3Total: 0, valesIds: new Set(), totalViajes: 0, importeIVA: 0,
+          };
+        }
+        const s = obraMap[obraId].matMap[nombreMat];
+        s.valesIds.add(vale.id_vale);
+        s.importeIVA += Number(det.costo_total || 0) * 1.16;
+
+        if (tipoId === 3) {
+          s.m3Total  += Number(det.volumen_real_m3 || 0);
+          s.totalViajes += vale.tickets_material?.length || 0;
+        } else {
+          (det.vale_material_viajes || []).forEach((v) => { s.m3Total += Number(v.volumen_m3 || 0); });
+          s.totalViajes += det.vale_material_viajes?.length || 0;
+        }
+      });
+    });
+
+    return Object.entries(obraMap)
+      .map(([, { obra, matMap }]) => {
+        const materiales = Object.values(matMap)
+          .map((s) => ({ ...s, valesCount: s.valesIds.size }))
+          .sort((a, b) => b.m3Total - a.m3Total);
+
+        const subtotal = materiales.reduce(
+          (acc, m) => ({
+            m3Total:     acc.m3Total     + m.m3Total,
+            valesCount:  acc.valesCount  + m.valesCount,
+            totalViajes: acc.totalViajes + m.totalViajes,
+            importeIVA:  acc.importeIVA  + m.importeIVA,
+          }),
+          { m3Total: 0, valesCount: 0, totalViajes: 0, importeIVA: 0 }
+        );
+
+        return { obra, materiales, subtotal };
+      })
+      .sort((a, b) => b.subtotal.m3Total - a.subtotal.m3Total);
+  }, [valesFiltrados, filtros.material, filtros.idBanco]);
+
+  // ── Tabla renta agrupada por obra ───────────────────────────────────
+  const tablaRentaPorObra = useMemo(() => {
+    let concsFiltradas = rawConciliaciones.filter(
+      (c) => c.tipo_conciliacion === "renta" && c.id_obra !== 8
+    );
+    if (filtros.mes) {
+      concsFiltradas = concsFiltradas.filter(
+        (c) => c.fecha_generacion?.substring(0, 7) === filtros.mes
+      );
+    }
+    if (filtros.semana) {
+      concsFiltradas = concsFiltradas.filter(
+        (c) => getWeekKey(c.fecha_generacion) === filtros.semana
+      );
+    }
+    if (filtros.idObra) {
+      concsFiltradas = concsFiltradas.filter(
+        (c) => String(c.id_obra) === String(filtros.idObra)
+      );
+    }
+    if (filtros.idEmpresa) {
+      concsFiltradas = concsFiltradas.filter(
+        (c) => String(c.id_empresa) === String(filtros.idEmpresa)
+      );
+    }
+    if (filtros.idSindicato) {
+      concsFiltradas = concsFiltradas.filter(
+        (c) => String(c.id_sindicato) === String(filtros.idSindicato)
+      );
+    }
+
+    const map = {};
+    concsFiltradas.forEach((c) => {
+      const obraId = c.id_obra;
+      const obraNombre = c.obras?.obra || "Sin obra";
+      if (!map[obraId]) {
+        map[obraId] = { obra: obraNombre, conciliaciones: 0, totalDias: 0, totalHoras: 0, importeTotal: 0 };
+      }
+      map[obraId].conciliaciones += 1;
+      map[obraId].totalDias  += Number(c.total_dias  || 0);
+      map[obraId].totalHoras += Number(c.total_horas || 0);
+      map[obraId].importeTotal += Number(c.total_final || 0);
+    });
+
+    return Object.values(map).sort((a, b) => b.importeTotal - a.importeTotal);
+  }, [rawConciliaciones, filtros]);
+
+  // ── Presupuestos filtrados ─────────────────────────────────────────
+  const presupuestosMaterialFiltrados = useMemo(() => {
+    if (!filtros.idObra) return presupuestosMaterial;
+    return presupuestosMaterial.filter(
+      (p) => String(p.id_obra) === String(filtros.idObra)
+    );
+  }, [presupuestosMaterial, filtros.idObra]);
+
+  const presupuestosRentaFiltrados = useMemo(() => {
+    if (!filtros.idObra) return presupuestosRenta;
+    return presupuestosRenta.filter(
+      (p) => String(p.id_obra) === String(filtros.idObra)
+    );
+  }, [presupuestosRenta, filtros.idObra]);
+
+  const hayAlertaPresupuesto = useMemo(
+    () =>
+      presupuestosMaterialFiltrados.some(
+        (p) =>
+          p.m3_presupuestados > 0 &&
+          Number(p.m3_consumidos) / Number(p.m3_presupuestados) > 1
+      ) ||
+      presupuestosRentaFiltrados.some(
+        (p) =>
+          p.monto_presupuestado > 0 &&
+          Number(p.monto_consumido) / Number(p.monto_presupuestado) > 1
+      ),
+    [presupuestosMaterialFiltrados, presupuestosRentaFiltrados]
+  );
+
   // ── Acciones de filtros ─────────────────────────────────────────────
   const setFiltro = useCallback((key, value) => {
     setFiltrosState((prev) => ({ ...prev, [key]: prev[key] === value ? null : value }));
@@ -585,5 +764,14 @@ export const useEstadisticasGlobales = () => {
     horasPico,
     viajesPorVale,
     rendimientoPorMaterial,
+    // Tablas agrupadas por obra
+    tablaObraMaterial,
+    tablaRentaPorObra,
+    // Presupuestos
+    loadingPresupuestos,
+    presupuestosMaterialFiltrados,
+    presupuestosRentaFiltrados,
+    hayAlertaPresupuesto,
+    fetchPresupuestos,
   };
 };
