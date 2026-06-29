@@ -33,6 +33,8 @@ import {
   Package,
   Target,
   AlertTriangle,
+  ExternalLink,
+  FileText,
 } from "lucide-react";
 
 // 3. Recharts
@@ -290,6 +292,157 @@ const tooltipStyle = {
   fontSize: 12,
   fontFamily: "Outfit, system-ui, sans-serif",
   boxShadow: "0 8px 28px rgba(0,78,137,0.11)",
+};
+
+// ── Gráfica Viajes de Renta ────────────────────────────────────────
+const GraficaViajesRenta = ({ seriesTiempoRenta, tablaViajesRentaPorEquipo, loading }) => {
+  const { data, equipos } = seriesTiempoRenta;
+
+  if (loading) {
+    return (
+      <div className="eg__chart-section">
+        <div className="eg__chart-skeleton" />
+      </div>
+    );
+  }
+
+  if (!data || data.length === 0) return null;
+
+  const totales = tablaViajesRentaPorEquipo.reduce(
+    (acc, obraRow) => ({
+      viajes:     acc.viajes     + obraRow.subtotal.viajes,
+      totalDias:  acc.totalDias  + obraRow.subtotal.totalDias,
+      totalHoras: acc.totalHoras + obraRow.subtotal.totalHoras,
+    }),
+    { viajes: 0, totalDias: 0, totalHoras: 0 }
+  );
+
+  return (
+    <div className="eg__chart-section">
+      <div className="eg__chart-header">
+        <div className="eg__chart-header-left">
+          <div className="eg__chart-eyebrow">
+            <Clock size={13} />
+            Equipo rentado en obra
+          </div>
+          <h2 className="eg__chart-title">Viajes de Renta por Tipo de Equipo</h2>
+        </div>
+        <span className="eg__chart-subtitle">
+          Viajes registrados por mes · Top {equipos.length} tipos de equipo
+        </span>
+      </div>
+
+      <div className="eg__chart-wrap">
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={data} margin={{ top: 12, right: 28, left: -8, bottom: 0 }} barCategoryGap="30%">
+            <CartesianGrid strokeDasharray="3 4" stroke="rgba(0,78,137,0.07)" vertical={false} />
+            <XAxis
+              dataKey="mes"
+              tickFormatter={formatMesEjeX}
+              tick={{ fontSize: 10.5, fontFamily: "Outfit, system-ui, sans-serif", fill: "#64748B" }}
+              axisLine={false}
+              tickLine={false}
+              dy={6}
+            />
+            <YAxis
+              tick={{ fontSize: 10.5, fontFamily: "Outfit, system-ui, sans-serif", fill: "#64748B" }}
+              axisLine={false}
+              tickLine={false}
+              width={32}
+              allowDecimals={false}
+            />
+            <Tooltip
+              formatter={(v, name) => [`${Number(v).toLocaleString("es-MX")} viajes`, name]}
+              labelFormatter={formatMesToolTip}
+              contentStyle={tooltipStyle}
+              itemStyle={{ fontFamily: "Barlow Condensed, system-ui, sans-serif", fontSize: 13 }}
+              labelStyle={{ fontWeight: 700, color: "#1A2332", marginBottom: 4 }}
+              cursor={{ fill: "rgba(0,78,137,0.04)" }}
+            />
+            <Legend
+              wrapperStyle={{ fontSize: 11.5, fontFamily: "Outfit, system-ui, sans-serif", paddingTop: 16 }}
+              iconType="square"
+              iconSize={8}
+            />
+            {equipos.map((equipo, i) => (
+              <Bar
+                key={equipo}
+                dataKey={equipo}
+                stackId="stack"
+                fill={DOT_COLORS[i % DOT_COLORS.length]}
+                radius={i === equipos.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {tablaViajesRentaPorEquipo.length > 0 && (
+        <div className="eg__tabla-wrap">
+          <table className="eg__tabla">
+            <thead>
+              <tr>
+                <th>Tipo de Equipo</th>
+                <th>Viajes</th>
+                <th>Días</th>
+                <th>Horas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tablaViajesRentaPorEquipo.map((obraRow) => (
+                <Fragment key={obraRow.obra}>
+                  <tr className="eg__tabla-obra-header">
+                    <td colSpan={4}>
+                      <span className="eg__tabla-obra-label">
+                        {obraRow.cc != null && (
+                          <span className="eg__tabla-obra-cc">CC {obraRow.cc}</span>
+                        )}
+                        {obraRow.obra}
+                      </span>
+                    </td>
+                  </tr>
+                  {obraRow.equipos.map((eq, i) => (
+                    <tr key={eq.equipo}>
+                      <td>
+                        <div className="eg__material-name eg__material-name--sub">
+                          <span
+                            className="eg__material-dot"
+                            style={{ background: DOT_COLORS[i % DOT_COLORS.length] }}
+                          />
+                          {eq.equipo}
+                        </div>
+                      </td>
+                      <td>{formatNum(eq.viajes)}</td>
+                      <td>{formatNum(eq.totalDias, 1)}</td>
+                      <td>{formatNum(eq.totalHoras, 1)}</td>
+                    </tr>
+                  ))}
+                  {obraRow.equipos.length > 1 && (
+                    <tr className="eg__tabla-subtotal">
+                      <td>Subtotal</td>
+                      <td>{formatNum(obraRow.subtotal.viajes)}</td>
+                      <td>{formatNum(obraRow.subtotal.totalDias, 1)}</td>
+                      <td>{formatNum(obraRow.subtotal.totalHoras, 1)}</td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+            {tablaViajesRentaPorEquipo.length > 1 && (
+              <tfoot>
+                <tr>
+                  <td>Total</td>
+                  <td>{formatNum(totales.viajes)}</td>
+                  <td>{formatNum(totales.totalDias, 1)}</td>
+                  <td>{formatNum(totales.totalHoras, 1)}</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // ── Gráfica Horas Pico ─────────────────────────────────────────────
@@ -695,6 +848,80 @@ const SeccionAnalisisAvanzado = ({
   );
 };
 
+// ── Modal: conciliaciones por material ─────────────────────────────
+const ModalConciliacionesMaterial = ({ obraNombre, materialNombre, conciliaciones, onClose }) => {
+  const handleOverlayClick = (e) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  return (
+    <div className="eg__cm-overlay" onClick={handleOverlayClick} role="dialog" aria-modal="true">
+      <div className="eg__cm-modal">
+        {/* Header */}
+        <div className="eg__cm-header">
+          <div className="eg__cm-header-left">
+            <div className="eg__cm-header-eyebrow">
+              <FileText size={13} />
+              {obraNombre}
+            </div>
+            <h2 className="eg__cm-header-title">Conciliaciones de {materialNombre}</h2>
+            <span className="eg__cm-header-count">
+              {conciliaciones.length} {conciliaciones.length === 1 ? "conciliación" : "conciliaciones"}
+            </span>
+          </div>
+          <button className="eg__cm-close" onClick={onClose} aria-label="Cerrar">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Lista */}
+        <div className="eg__cm-list">
+          {conciliaciones.length === 0 ? (
+            <div className="eg__cm-empty">
+              Sin conciliaciones registradas para este material.
+            </div>
+          ) : (
+            conciliaciones.map((conc) => (
+              <div key={conc.id_conciliacion} className="eg__cm-item">
+                <div className="eg__cm-item-info">
+                  <span className="eg__cm-item-folio">{conc.folio}</span>
+                  <span className="eg__cm-item-meta">
+                    {conc.fecha_generacion
+                      ? new Date(conc.fecha_generacion).toLocaleDateString("es-MX", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          timeZone: "America/Mexico_City",
+                        })
+                      : "—"}
+                    {conc.sindicatos?.sindicato && (
+                      <> · {conc.sindicatos.sindicato}</>
+                    )}
+                  </span>
+                </div>
+                <div className="eg__cm-item-right">
+                  <span className="eg__cm-item-monto">
+                    {formatMXN(Number(conc.total_final || 0))}
+                  </span>
+                  <a
+                    href={`/conciliacion/${conc.folio}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="eg__cm-btn-ver"
+                  >
+                    Ver soporte
+                    <ExternalLink size={13} />
+                  </a>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Componente principal ────────────────────────────────────────────
 const EstadisticasGlobales = () => {
   // 1. Hook principal
@@ -705,6 +932,7 @@ const EstadisticasGlobales = () => {
     tablaMaterial,
     ultimaConciliacion,
     fetchEstadisticas,
+    valeAConciliacion,
     filtros,
     setFiltro,
     resetFiltros,
@@ -717,6 +945,8 @@ const EstadisticasGlobales = () => {
     opcionesMateriales,
     opcionesBancos,
     seriesTiempo,
+    seriesTiempoRenta,
+    tablaViajesRentaPorEquipo,
     topResidentes,
     topChecadores,
     topPlacas,
@@ -733,6 +963,21 @@ const EstadisticasGlobales = () => {
 
   // 2. Categoría abierta en el panel de filtros
   const [categoriaAbierta, setCategoriaAbierta] = useState(null);
+
+  // 3. Modal de conciliaciones por material
+  const [modalMaterial, setModalMaterial] = useState(null);
+
+  const handleMaterialClick = (obraNombre, mat) => {
+    const concMap = {};
+    [...(mat.valesIds || [])].forEach((id) => {
+      const c = valeAConciliacion[id];
+      if (c) concMap[c.id_conciliacion] = c;
+    });
+    const concArr = Object.values(concMap).sort(
+      (a, b) => new Date(b.fecha_generacion) - new Date(a.fecha_generacion)
+    );
+    setModalMaterial({ obraNombre, materialNombre: mat.material, conciliaciones: concArr });
+  };
 
   const toggleCategoria = (key) =>
     setCategoriaAbierta((prev) => (prev === key ? null : key));
@@ -1048,7 +1293,12 @@ const EstadisticasGlobales = () => {
                         </td>
                       </tr>
                       {obraRow.materiales.map((mat, matIdx) => (
-                        <tr key={mat.material}>
+                        <tr
+                          key={mat.material}
+                          className="eg__tabla-row--clickable"
+                          onClick={() => handleMaterialClick(obraRow.obra, mat)}
+                          title="Ver conciliaciones de este material"
+                        >
                           <td>
                             <div className="eg__material-name eg__material-name--sub">
                               <span
@@ -1175,6 +1425,15 @@ const EstadisticasGlobales = () => {
         <GraficaTiempo seriesTiempo={seriesTiempo} loading={loading} />
       )}
 
+      {/* ── Viajes de Renta por Tipo de Equipo ───────────────── */}
+      {!error && (
+        <GraficaViajesRenta
+          seriesTiempoRenta={seriesTiempoRenta}
+          tablaViajesRentaPorEquipo={tablaViajesRentaPorEquipo}
+          loading={loading}
+        />
+      )}
+
       {/* ── Análisis Avanzado ─────────────────────────────────── */}
       {!error && !loading && (
         <SeccionAnalisisAvanzado
@@ -1184,6 +1443,16 @@ const EstadisticasGlobales = () => {
           topChecadores={topChecadores}
           topPlacas={topPlacas}
           rendimientoPorMaterial={rendimientoPorMaterial}
+        />
+      )}
+
+      {/* ── Modal conciliaciones por material ──────────────────── */}
+      {modalMaterial && (
+        <ModalConciliacionesMaterial
+          obraNombre={modalMaterial.obraNombre}
+          materialNombre={modalMaterial.materialNombre}
+          conciliaciones={modalMaterial.conciliaciones}
+          onClose={() => setModalMaterial(null)}
         />
       )}
 

@@ -32,6 +32,8 @@ export const useEstadisticasGlobales = () => {
   const [rawConciliaciones, setRawConciliaciones] = useState([]);
   const [rawVales, setRawVales] = useState([]);
   const [valeAConciliacion, setValeAConciliacion] = useState({});
+  const [rawValesRenta, setRawValesRenta] = useState([]);
+  const [valeRentaAConciliacion, setValeRentaAConciliacion] = useState({});
 
   // Estados de presupuesto
   const [presupuestosMaterial, setPresupuestosMaterial] = useState([]);
@@ -59,132 +61,142 @@ export const useEstadisticasGlobales = () => {
       const { data: conciliaciones, error: errorConc } = await supabase
         .from("conciliaciones")
         .select(
-          "id_conciliacion, tipo_conciliacion, total_final, total_horas, total_dias, fecha_generacion, folio, id_obra, id_empresa, id_sindicato, obras:id_obra (id_obra, obra)"
+          "id_conciliacion, tipo_conciliacion, total_final, total_horas, total_dias, fecha_generacion, folio, id_obra, id_empresa, id_sindicato, obras:id_obra (id_obra, obra), sindicatos:id_sindicato (sindicato), empresas:id_empresa (empresa)"
         );
 
       if (errorConc) throw errorConc;
       setRawConciliaciones(conciliaciones || []);
 
-      // Solo procesar conciliaciones de material para la tabla
+      // Mapa conciliación completa (compartido por material y renta)
+      const concMap = {};
+      (conciliaciones || []).forEach((c) => { concMap[c.id_conciliacion] = c; });
+
+      // ── Vales de material ────────────────────────────────────────────
       const concMaterialIds = (conciliaciones || [])
         .filter((c) => c.tipo_conciliacion === "material")
         .map((c) => c.id_conciliacion);
 
-      if (concMaterialIds.length === 0) {
+      if (concMaterialIds.length > 0) {
+        // Query B: vales ligados a conciliaciones de material
+        const { data: cvData, error: errorCv } = await supabase
+          .from("conciliacion_vales")
+          .select("id_vale, id_conciliacion")
+          .in("id_conciliacion", concMaterialIds);
+
+        if (errorCv) throw errorCv;
+
+        const valeConc = {};
+        (cvData || []).forEach((cv) => { valeConc[cv.id_vale] = concMap[cv.id_conciliacion]; });
+        setValeAConciliacion(valeConc);
+
+        const valeIds = [...new Set((cvData || []).map((cv) => cv.id_vale))];
+
+        if (valeIds.length > 0) {
+          // Query C: vales con todos los campos para filtros y agregación
+          const { data: vales, error: errorVales } = await supabase
+            .from("vales")
+            .select(`
+              id_vale, id_obra, id_operador, id_persona_creador, id_persona_verificador, id_vehiculo,
+              obras:id_obra (id_obra, obra, empresas:id_empresa (id_empresa, empresa)),
+              operadores:id_operador (id_operador, id_sindicato, nombre_completo, sindicatos:id_sindicato (id_sindicato, sindicato)),
+              vehiculos:id_vehiculo (id_vehiculo, placas),
+              persona_creador:id_persona_creador (nombre, primer_apellido),
+              persona_verificador:id_persona_verificador (nombre, primer_apellido),
+              vale_material_detalles (
+                id_detalle_material, volumen_real_m3, costo_total, id_banco,
+                bancos:id_banco (id_banco, banco),
+                material:id_material (
+                  id_material, material,
+                  tipo_de_material:id_tipo_de_material (id_tipo_de_material)
+                ),
+                vale_material_viajes (
+                  id_viaje, volumen_m3, hora_registro, id_persona_registro,
+                  persona_registro:id_persona_registro (nombre, primer_apellido)
+                )
+              ),
+              tickets_material (id_ticket)
+            `)
+            .in("id_vale", valeIds)
+            .neq("id_obra", 8);
+
+          if (errorVales) throw errorVales;
+          setRawVales(vales || []);
+
+          const logStats = {};
+          (vales || []).forEach((vale) => {
+            (vale.vale_material_detalles || []).forEach((det) => {
+              const nombre = det.material?.material || "Sin clasificar";
+              const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
+              if (!logStats[nombre]) logStats[nombre] = { material: nombre, tipoId, m3: 0, valesIds: new Set(), importeIVA: 0 };
+              const s = logStats[nombre];
+              s.valesIds.add(vale.id_vale);
+              s.importeIVA += Number(det.costo_total || 0) * 1.16;
+              if (tipoId === 3) {
+                s.m3 += Number(det.volumen_real_m3 || 0);
+              } else {
+                (det.vale_material_viajes || []).forEach((v) => { s.m3 += Number(v.volumen_m3 || 0); });
+              }
+            });
+          });
+          const logTable = Object.values(logStats)
+            .map((s) => ({ material: s.material, tipo: s.tipoId, m3_total: Math.round(s.m3 * 100) / 100, vales_count: s.valesIds.size, importe_iva: Math.round(s.importeIVA * 100) / 100 }))
+            .sort((a, b) => b.m3_total - a.m3_total);
+          console.group("[EstadisticasGlobales] Verificación de datos");
+          console.log(`Conciliaciones: ${(conciliaciones || []).length} total`);
+          console.log(`Vales con material conciliado: ${(vales || []).length}`);
+          console.table(logTable);
+          console.groupEnd();
+        } else {
+          setRawVales([]);
+        }
+      } else {
         setRawVales([]);
         setValeAConciliacion({});
-        return;
       }
 
-      // Query B: vales ligados a conciliaciones de material
-      const { data: cvData, error: errorCv } = await supabase
-        .from("conciliacion_vales")
-        .select("id_vale, id_conciliacion")
-        .in("id_conciliacion", concMaterialIds);
+      // ── Vales de renta ─────────────────────────────────────────────────
+      const concRentaIds = (conciliaciones || [])
+        .filter((c) => c.tipo_conciliacion === "renta")
+        .map((c) => c.id_conciliacion);
 
-      if (errorCv) throw errorCv;
+      if (concRentaIds.length > 0) {
+        const { data: cvRentaData, error: errorCvRenta } = await supabase
+          .from("conciliacion_vales")
+          .select("id_vale, id_conciliacion")
+          .in("id_conciliacion", concRentaIds);
 
-      // Mapa valeId → conciliación completa
-      const concMap = {};
-      (conciliaciones || []).forEach((c) => { concMap[c.id_conciliacion] = c; });
+        if (errorCvRenta) throw errorCvRenta;
 
-      const valeConc = {};
-      (cvData || []).forEach((cv) => { valeConc[cv.id_vale] = concMap[cv.id_conciliacion]; });
-      setValeAConciliacion(valeConc);
+        const rentaConc = {};
+        (cvRentaData || []).forEach((cv) => { rentaConc[cv.id_vale] = concMap[cv.id_conciliacion]; });
+        setValeRentaAConciliacion(rentaConc);
 
-      const valeIds = [...new Set((cvData || []).map((cv) => cv.id_vale))];
-      if (valeIds.length === 0) { setRawVales([]); return; }
+        const rentaValeIds = [...new Set((cvRentaData || []).map((cv) => cv.id_vale))];
 
-      // Query C: vales con todos los campos para filtros y agregación
-      const { data: vales, error: errorVales } = await supabase
-        .from("vales")
-        .select(
-          `
-          id_vale, id_obra, id_operador, id_persona_creador, id_persona_verificador, id_vehiculo,
-          obras:id_obra (id_obra, obra, empresas:id_empresa (id_empresa, empresa)),
-          operadores:id_operador (id_operador, id_sindicato, nombre_completo, sindicatos:id_sindicato (id_sindicato, sindicato)),
-          vehiculos:id_vehiculo (id_vehiculo, placas),
-          persona_creador:id_persona_creador (nombre, primer_apellido),
-          persona_verificador:id_persona_verificador (nombre, primer_apellido),
-          vale_material_detalles (
-            id_detalle_material, volumen_real_m3, costo_total, id_banco,
-            bancos:id_banco (id_banco, banco),
-            material:id_material (
-              id_material, material,
-              tipo_de_material:id_tipo_de_material (id_tipo_de_material)
-            ),
-            vale_material_viajes (
-              id_viaje, volumen_m3, hora_registro, id_persona_registro,
-              persona_registro:id_persona_registro (nombre, primer_apellido)
-            )
-          ),
-          tickets_material (id_ticket)
-        `
-        )
-        .in("id_vale", valeIds)
-        .neq("id_obra", 8);
+        if (rentaValeIds.length > 0) {
+          const { data: rentaVales, error: errorRentaVales } = await supabase
+            .from("vales")
+            .select(`
+              id_vale, id_obra,
+              obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa)),
+              vale_renta_detalle (
+                id_vale_renta_detalle, hora_inicio, total_horas, total_dias, numero_viajes, costo_total,
+                material:id_material (id_material, material),
+                vale_renta_viajes (id_viaje, hora_registro)
+              )
+            `)
+            .in("id_vale", rentaValeIds)
+            .neq("id_obra", 8);
 
-      if (errorVales) throw errorVales;
-      setRawVales(vales || []);
-
-      // ── LOG DE VERIFICACIÓN ──────────────────────────────────────────
-      // Compara estos totales contra la query en Supabase SQL Editor:
-      //
-      // SELECT
-      //   m.material,
-      //   tdm.id_tipo_de_material,
-      //   SUM(CASE WHEN tdm.id_tipo_de_material = 3 THEN vmd.volumen_real_m3
-      //            ELSE vmv_totales.m3 END)         AS m3_total,
-      //   COUNT(DISTINCT v.id_vale)                  AS vales_count,
-      //   SUM(vmd.costo_total) * 1.16                AS importe_iva
-      // FROM vales v
-      // JOIN conciliacion_vales cv ON v.id_vale = cv.id_vale
-      // JOIN conciliaciones c      ON cv.id_conciliacion = c.id_conciliacion
-      //                           AND c.tipo_conciliacion = 'material'
-      // JOIN vale_material_detalles vmd ON v.id_vale = vmd.id_vale
-      // JOIN material m              ON vmd.id_material = m.id_material
-      // JOIN tipo_de_material tdm    ON m.id_tipo_de_material = tdm.id_tipo_de_material
-      // LEFT JOIN LATERAL (
-      //   SELECT SUM(volumen_m3) AS m3
-      //   FROM vale_material_viajes
-      //   WHERE id_detalle_material = vmd.id_detalle_material
-      // ) vmv_totales ON true
-      // GROUP BY m.material, tdm.id_tipo_de_material
-      // ORDER BY m3_total DESC;
-
-      const logStats = {};
-      (vales || []).forEach((vale) => {
-        (vale.vale_material_detalles || []).forEach((det) => {
-          const nombre = det.material?.material || "Sin clasificar";
-          const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
-          if (!logStats[nombre]) logStats[nombre] = { material: nombre, tipoId, m3: 0, valesIds: new Set(), importeIVA: 0 };
-          const s = logStats[nombre];
-          s.valesIds.add(vale.id_vale);
-          s.importeIVA += Number(det.costo_total || 0) * 1.16;
-          if (tipoId === 3) {
-            s.m3 += Number(det.volumen_real_m3 || 0);
-          } else {
-            (det.vale_material_viajes || []).forEach((v) => { s.m3 += Number(v.volumen_m3 || 0); });
-          }
-        });
-      });
-
-      const logTable = Object.values(logStats)
-        .map((s) => ({
-          material: s.material,
-          tipo: s.tipoId,
-          m3_total: Math.round(s.m3 * 100) / 100,
-          vales_count: s.valesIds.size,
-          importe_iva: Math.round(s.importeIVA * 100) / 100,
-        }))
-        .sort((a, b) => b.m3_total - a.m3_total);
-
-      console.group("[EstadisticasGlobales] Verificación de datos");
-      console.log(`Conciliaciones: ${(conciliaciones || []).length} total`);
-      console.log(`Vales con material conciliado: ${(vales || []).length}`);
-      console.table(logTable);
-      console.groupEnd();
-      // ────────────────────────────────────────────────────────────────
+          if (errorRentaVales) throw errorRentaVales;
+          setRawValesRenta(rentaVales || []);
+        } else {
+          setRawValesRenta([]);
+        }
+      } else {
+        setRawValesRenta([]);
+        setValeRentaAConciliacion({});
+      }
 
     } catch (err) {
       console.error("Error en fetchEstadisticas:", err);
@@ -722,6 +734,97 @@ export const useEstadisticasGlobales = () => {
     [presupuestosMaterialFiltrados, presupuestosRentaFiltrados]
   );
 
+  // ── Series tiempo renta (viajes por mes × tipo de equipo) ─────────────
+  // Ignora filtro mes/semana para mostrar la evolución histórica completa
+  const seriesTiempoRenta = useMemo(() => {
+    const valesFilt = rawValesRenta.filter((vale) => {
+      if (filtros.idObra && String(vale.id_obra) !== String(filtros.idObra)) return false;
+      if (filtros.idEmpresa && String(vale.obras?.empresas?.id_empresa) !== String(filtros.idEmpresa)) return false;
+      return true;
+    });
+
+    const byMesMat = {};
+    const totalPorMat = {};
+
+    valesFilt.forEach((vale) => {
+      const conc = valeRentaAConciliacion[vale.id_vale];
+      if (!conc?.fecha_generacion) return;
+      const mes = conc.fecha_generacion.substring(0, 7);
+
+      (vale.vale_renta_detalle || []).forEach((det) => {
+        const equipo = det.material?.material || "Sin clasificar";
+        const numViajes = det.vale_renta_viajes?.length > 0
+          ? det.vale_renta_viajes.length
+          : (det.numero_viajes || 1);
+
+        if (!byMesMat[mes]) byMesMat[mes] = {};
+        byMesMat[mes][equipo] = (byMesMat[mes][equipo] || 0) + numViajes;
+        totalPorMat[equipo] = (totalPorMat[equipo] || 0) + numViajes;
+      });
+    });
+
+    const meses = Object.keys(byMesMat).sort();
+    const equipos = Object.entries(totalPorMat)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([eq]) => eq);
+
+    const data = meses.map((mes) => {
+      const row = { mes };
+      equipos.forEach((eq) => { row[eq] = byMesMat[mes]?.[eq] || 0; });
+      return row;
+    });
+
+    return { data, equipos };
+  }, [rawValesRenta, valeRentaAConciliacion, filtros.idObra, filtros.idEmpresa]);
+
+  // ── Tabla viajes de renta agrupada por obra → equipo (respeta todos los filtros) ──
+  const tablaViajesRentaPorEquipo = useMemo(() => {
+    const valesFilt = rawValesRenta.filter((vale) => {
+      if (vale.id_obra === 8) return false;
+      const conc = valeRentaAConciliacion[vale.id_vale];
+      if (filtros.mes && conc?.fecha_generacion?.substring(0, 7) !== filtros.mes) return false;
+      if (filtros.semana && getWeekKey(conc?.fecha_generacion) !== filtros.semana) return false;
+      if (filtros.idObra && String(vale.id_obra) !== String(filtros.idObra)) return false;
+      if (filtros.idEmpresa && String(vale.obras?.empresas?.id_empresa) !== String(filtros.idEmpresa)) return false;
+      return true;
+    });
+
+    // obraId → { obra, cc, equipos: { equipoNombre → stats } }
+    const obraMap = {};
+    valesFilt.forEach((vale) => {
+      const obraId  = vale.id_obra;
+      const obraNombre = vale.obras?.obra || "Sin obra";
+      const cc      = vale.obras?.cc ?? null;
+
+      if (!obraMap[obraId]) obraMap[obraId] = { obra: obraNombre, cc, equipos: {} };
+
+      (vale.vale_renta_detalle || []).forEach((det) => {
+        const equipo = det.material?.material || "Sin clasificar";
+        if (!obraMap[obraId].equipos[equipo]) {
+          obraMap[obraId].equipos[equipo] = { equipo, viajes: 0, totalDias: 0, totalHoras: 0 };
+        }
+        const s = obraMap[obraId].equipos[equipo];
+        s.viajes += det.vale_renta_viajes?.length > 0
+          ? det.vale_renta_viajes.length
+          : (det.numero_viajes || 1);
+        s.totalDias  += Number(det.total_dias  || 0);
+        s.totalHoras += Number(det.total_horas || 0);
+      });
+    });
+
+    return Object.values(obraMap)
+      .map(({ obra, cc, equipos }) => {
+        const equiposList = Object.values(equipos).sort((a, b) => b.viajes - a.viajes);
+        const subtotal = equiposList.reduce(
+          (acc, e) => ({ viajes: acc.viajes + e.viajes, totalDias: acc.totalDias + e.totalDias, totalHoras: acc.totalHoras + e.totalHoras }),
+          { viajes: 0, totalDias: 0, totalHoras: 0 }
+        );
+        return { obra, cc, equipos: equiposList, subtotal };
+      })
+      .sort((a, b) => b.subtotal.viajes - a.subtotal.viajes);
+  }, [rawValesRenta, valeRentaAConciliacion, filtros]);
+
   // ── Acciones de filtros ─────────────────────────────────────────────
   const setFiltro = useCallback((key, value) => {
     setFiltrosState((prev) => ({ ...prev, [key]: prev[key] === value ? null : value }));
@@ -743,6 +846,7 @@ export const useEstadisticasGlobales = () => {
     tablaMaterial,
     ultimaConciliacion,
     fetchEstadisticas,
+    valeAConciliacion,
     // Filtros
     filtros,
     setFiltro,
@@ -755,8 +859,10 @@ export const useEstadisticasGlobales = () => {
     opcionesSindicatos,
     opcionesMateriales,
     opcionesBancos,
-    // Gráfica
+    // Gráficas
     seriesTiempo,
+    seriesTiempoRenta,
+    tablaViajesRentaPorEquipo,
     // Análisis avanzado
     topResidentes,
     topChecadores,
