@@ -21,6 +21,56 @@ import { calcularSemanaISO } from "../utils/dateUtils";
 
 const POR_PAGINA = 25;
 
+// Select mínimo para calcular KPIs del período anterior (sin datos de display)
+const PREVIO_SELECT = `
+  *,
+  vehiculos:id_vehiculo (capacidad_m3),
+  vale_material_detalles (
+    volumen_real_m3, costo_total,
+    material:id_material (
+      id_material, material,
+      tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)
+    ),
+    vale_material_viajes (id_viaje, hora_registro)
+  ),
+  vale_renta_detalle (
+    id_vale_renta_detalle, total_horas, total_dias, costo_total,
+    numero_viajes, es_renta_por_dia,
+    material:id_material (id_material, material)
+  )
+`;
+
+const calcularPeriodoPrevio = (inicio, fin, periodoActivo) => {
+  const d1 = new Date(inicio + "T12:00:00");
+  const d2 = new Date(fin + "T12:00:00");
+
+  if (periodoActivo === "hoy") {
+    const f = formatDate(new Date(d1.getTime() - 86400000));
+    return { inicio: f, fin: f, label: "ayer" };
+  }
+  if (periodoActivo === "ayer") {
+    const f = formatDate(new Date(d1.getTime() - 86400000));
+    return { inicio: f, fin: f, label: "anteayer" };
+  }
+  if (periodoActivo === "semana" || periodoActivo === "semana-custom") {
+    return {
+      inicio: formatDate(new Date(d1.getTime() - 7 * 86400000)),
+      fin:    formatDate(new Date(d2.getTime() - 7 * 86400000)),
+      label:  "sem. ant.",
+    };
+  }
+  if (periodoActivo === "mes" || periodoActivo === "mes-custom") {
+    const prevInicio = new Date(d1.getFullYear(), d1.getMonth() - 1, 1);
+    const prevFin    = new Date(d1.getFullYear(), d1.getMonth(), 0);
+    return { inicio: formatDate(prevInicio), fin: formatDate(prevFin), label: "mes ant." };
+  }
+  // Rango libre: mismo intervalo desplazado hacia atrás
+  const dias    = Math.round((d2 - d1) / 86400000) + 1;
+  const prevFin = new Date(d1.getTime() - 86400000);
+  const prevIni = new Date(prevFin.getTime() - (dias - 1) * 86400000);
+  return { inicio: formatDate(prevIni), fin: formatDate(prevFin), label: "período ant." };
+};
+
 const formatDate = (date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -64,10 +114,27 @@ const getMaterialVale = (vale) => {
   return vale.vale_material_detalles?.[0]?.material?.material ?? "—";
 };
 
+const getViajesVale = (vale) => {
+  if (vale.tipo_vale === "renta") {
+    return Number(vale.vale_renta_detalle?.[0]?.numero_viajes ?? 0);
+  }
+  return (vale.vale_material_detalles ?? []).reduce(
+    (sum, det) => sum + (det.vale_material_viajes?.length ?? 0),
+    0,
+  );
+};
+
 const calcularKpisDeVales = (lista) => {
   let totalRenta = 0, totalM3 = 0, totalViajes = 0, importeTotal = 0;
-  let totalHoras = 0, totalDias = 0, pendientes = 0;
+  let totalHoras = 0, totalDias = 0, enProceso = 0;
+  let capacidadSuma = 0, capacidadCount = 0, m3RentaEstimado = 0;
+  let rentaHrsXViajeSuma = 0, rentaHrsXViajeCount = 0;
+  let materialMinXViajeSuma = 0, materialMinXViajeCount = 0;
+  const camionesXDia = {};
+  const viajesXDia = {};
   const m3PorMaterial = {};
+  const viajesPorMaterial = {};
+  let viajesRenta = 0;
 
   for (const vale of lista) {
     if (vale._tipo === "renta") {
@@ -77,18 +144,52 @@ const calcularKpisDeVales = (lista) => {
         totalHoras   += Number(d.total_horas || 0);
         totalDias    += Number(d.total_dias  || 0);
         importeTotal += Number(d.costo_total || 0);
+        totalViajes  += Number(d.numero_viajes || 0);
+        viajesRenta  += Number(d.numero_viajes || 0);
+        // Estimado: capacidad del camión × número de viajes
+        const capRenta = Number(vale.vehiculos?.capacidad_m3 ?? 0);
+        m3RentaEstimado += capRenta * Number(d.numero_viajes || 0);
+        // Eficiencia: horas por viaje (solo vales con ambos datos)
+        const horas = Number(d.total_horas || 0);
+        const viajes = Number(d.numero_viajes || 0);
+        if (horas > 0 && viajes > 0) {
+          rentaHrsXViajeSuma += horas / viajes;
+          rentaHrsXViajeCount++;
+        }
       }
     } else {
+      // Eficiencia material: tiempo promedio entre viajes consecutivos del vale
+      const marcas = [];
       for (const det of vale.vale_material_detalles ?? []) {
         const vol     = Number(det.volumen_real_m3 || 0);
         totalM3      += vol;
         importeTotal += Number(det.costo_total || 0);
         totalViajes  += det.vale_material_viajes?.length ?? 0;
         const nombre = det.material?.material ?? "Sin material";
-        m3PorMaterial[nombre] = (m3PorMaterial[nombre] || 0) + vol;
+        m3PorMaterial[nombre]     = (m3PorMaterial[nombre]     || 0) + vol;
+        viajesPorMaterial[nombre] = (viajesPorMaterial[nombre] || 0) + (det.vale_material_viajes?.length ?? 0);
+        for (const viaje of det.vale_material_viajes ?? []) {
+          if (viaje.hora_registro) marcas.push(new Date(viaje.hora_registro).getTime());
+        }
+      }
+      if (marcas.length >= 2) {
+        marcas.sort((a, b) => a - b);
+        let difTotal = 0;
+        for (let i = 1; i < marcas.length; i++) difTotal += marcas[i] - marcas[i - 1];
+        materialMinXViajeSuma += difTotal / (marcas.length - 1) / 60000; // ms → min
+        materialMinXViajeCount++;
       }
     }
-    if (vale.estado === "emitido") pendientes++;
+    const cap = Number(vale.vehiculos?.capacidad_m3 ?? 0);
+    if (cap > 0) { capacidadSuma += cap; capacidadCount++; }
+    const fechaDia = vale.fecha_programada ?? vale.fecha_creacion?.substring(0, 10);
+    if (fechaDia) {
+      camionesXDia[fechaDia] = (camionesXDia[fechaDia] || 0) + 1;
+      if (vale._viajes > 0) {
+        viajesXDia[fechaDia] = (viajesXDia[fechaDia] || 0) + vale._viajes;
+      }
+    }
+    if (vale.estado === "en_proceso") enProceso++;
   }
 
   const partes = [];
@@ -99,15 +200,37 @@ const calcularKpisDeVales = (lista) => {
     .map(([material, m3]) => ({ material, m3 }))
     .sort((a, b) => b.m3 - a.m3);
 
+  const viajesPorMaterialOrdenado = Object.entries(viajesPorMaterial)
+    .map(([material, viajes]) => ({ material, viajes }))
+    .sort((a, b) => b.viajes - a.viajes);
+
   return {
     totalVales:  lista.length,
     totalRenta,
     totalM3,
     m3PorMaterial: m3PorMaterialOrdenado,
     totalViajes,
+    viajesPorMaterial: viajesPorMaterialOrdenado,
+    viajesRenta,
     importeTotal,
     tiempoRenta: partes.length > 0 ? partes.join(" · ") : "—",
-    pendientes,
+    enProceso,
+    capacidadPromedio: capacidadCount > 0 ? capacidadSuma / capacidadCount : 0,
+    m3RentaEstimado,
+    eficienciaRenta: rentaHrsXViajeCount > 0
+      ? rentaHrsXViajeSuma / rentaHrsXViajeCount
+      : 0,
+    eficienciaMaterial: materialMinXViajeCount > 0
+      ? materialMinXViajeSuma / materialMinXViajeCount
+      : 0,
+    camionesPromedioDia: (() => {
+      const dias = Object.values(camionesXDia);
+      return dias.length > 0 ? dias.reduce((s, v) => s + v, 0) / dias.length : 0;
+    })(),
+    viajesPromedioDia: (() => {
+      const dias = Object.values(viajesXDia);
+      return dias.length > 0 ? dias.reduce((s, v) => s + v, 0) / dias.length : 0;
+    })(),
   };
 };
 
@@ -136,6 +259,9 @@ export const useDashboardUnificado = () => {
   const [usarKpisLocales, setUsarKpisLocales] = useState(false);
 
   const [pagina, setPagina] = useState(1);
+
+  const [valesPrevio, setValesPrevio] = useState([]);
+  const [labelPeriodoPrevio, setLabelPeriodoPrevio] = useState("");
 
   const fetchVales = useCallback(async (inicio, fin, cancelados = false) => {
     try {
@@ -170,7 +296,7 @@ export const useDashboardUnificado = () => {
               tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)
             ),
             bancos:id_banco (id_banco, banco),
-            vale_material_viajes (id_viaje, folio_vale_fisico)
+            vale_material_viajes (id_viaje, folio_vale_fisico, hora_registro)
           ),
           vale_renta_detalle (
             id_vale_renta_detalle, capacidad_m3, hora_inicio, hora_fin,
@@ -178,6 +304,9 @@ export const useDashboardUnificado = () => {
             notas_adicionales, es_renta_por_dia,
             material:id_material (id_material, material),
             precios_renta:id_precios_renta (costo_hr, costo_dia)
+          ),
+          conciliacion_vales (
+            conciliaciones:id_conciliacion (folio)
           ),
           solicitudes_desverificacion (
             id_solicitud, estado, motivo_solicitud, motivo_respuesta,
@@ -210,6 +339,34 @@ export const useDashboardUnificado = () => {
     fetchVales(fechaInicio, fechaFin, mostrarCancelados);
   }, [fechaInicio, fechaFin, mostrarCancelados, fetchVales]);
 
+  const fetchValesPrevio = useCallback(async (inicio, fin) => {
+    try {
+      const { data, error: err } = await supabase
+        .from("vales")
+        .select(PREVIO_SELECT)
+        .gte("fecha_creacion", inicio + "T00:00:00")
+        .lte("fecha_creacion", fin + "T23:59:59")
+        .neq("estado", "cancelado")
+        .range(0, 4999);
+      if (err) throw err;
+      setValesPrevio(data ?? []);
+    } catch (err) {
+      console.error("Error en fetchValesPrevio:", err);
+      setValesPrevio([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mostrarCancelados) {
+      setValesPrevio([]);
+      setLabelPeriodoPrevio("");
+      return;
+    }
+    const prev = calcularPeriodoPrevio(fechaInicio, fechaFin, periodoActivo);
+    setLabelPeriodoPrevio(prev.label);
+    fetchValesPrevio(prev.inicio, prev.fin);
+  }, [fechaInicio, fechaFin, periodoActivo, mostrarCancelados, fetchValesPrevio]);
+
   const valesEnriquecidos = useMemo(
     () =>
       todosLosVales.map((v) => ({
@@ -217,6 +374,7 @@ export const useDashboardUnificado = () => {
         _tipo: getTipoVale(v),
         _cantidad: getCantidadVale(v),
         _material: getMaterialVale(v),
+        _viajes: getViajesVale(v),
       })),
     [todosLosVales],
   );
@@ -267,6 +425,21 @@ export const useDashboardUnificado = () => {
   const kpisLocales = useMemo(
     () => calcularKpisDeVales(valesFiltrados),
     [valesFiltrados],
+  );
+
+  const valesPrevioEnriquecidos = useMemo(
+    () =>
+      valesPrevio.map((v) => ({
+        ...v,
+        _tipo:    getTipoVale(v),
+        _viajes:  getViajesVale(v),
+      })),
+    [valesPrevio],
+  );
+
+  const kpisGlobalesPrevio = useMemo(
+    () => calcularKpisDeVales(valesPrevioEnriquecidos),
+    [valesPrevioEnriquecidos],
   );
 
   const totalPaginas = Math.max(1, Math.ceil(valesFiltrados.length / POR_PAGINA));
@@ -462,6 +635,8 @@ export const useDashboardUnificado = () => {
     mostrarCancelados,
     toggleCancelados,
     kpis: usarKpisLocales ? kpisLocales : kpisGlobales,
+    kpisPrevio: kpisGlobalesPrevio,
+    labelPeriodoPrevio,
     kpisDesdeLocales: usarKpisLocales,
     aplicarKpis,
     resetearKpis,

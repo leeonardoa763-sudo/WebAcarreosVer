@@ -31,6 +31,9 @@ import {
   DollarSign,
   Ban,
   Download,
+  Gauge,
+  Timer,
+  Activity,
 } from "lucide-react";
 
 // 3. Config
@@ -102,7 +105,34 @@ const getMonthValue = () => {
 
 // ─── Subcomponentes ──────────────────────────────────────────────────────────
 
-const KpiCard = ({ icono: Icono, titulo, valor, subtitulo, gradiente, desglose }) => (
+const DeltaIndicador = ({ actual, previo, labelPrevio }) => {
+  if (!labelPrevio || !previo || previo === 0) return null;
+  const pct = ((actual - previo) / previo) * 100;
+  if (Math.abs(pct) < 0.5) {
+    return (
+      <span className="du__delta du__delta--igual">= vs {labelPrevio}</span>
+    );
+  }
+  const sube = pct > 0;
+  return (
+    <span
+      className={`du__delta ${sube ? "du__delta--sube" : "du__delta--baja"}`}
+    >
+      {sube ? "▲" : "▼"} {Math.abs(pct).toFixed(0)}% vs {labelPrevio}
+    </span>
+  );
+};
+
+const HeroCard = ({
+  icono: Icono,
+  titulo,
+  valor,
+  gradiente,
+  desglose,
+  deltaActual,
+  deltaPrevio,
+  labelPrevio,
+}) => (
   <div className="du__kpi-card" style={{ background: gradiente }}>
     <span className="du__kpi-titulo">{titulo}</span>
     <span className="du__kpi-valor">{valor}</span>
@@ -115,10 +145,21 @@ const KpiCard = ({ icono: Icono, titulo, valor, subtitulo, gradiente, desglose }
           </span>
         ))}
       </div>
-    ) : (
-      subtitulo && <span className="du__kpi-sub">{subtitulo}</span>
-    )}
+    ) : null}
+    <DeltaIndicador
+      actual={deltaActual}
+      previo={deltaPrevio}
+      labelPrevio={labelPrevio}
+    />
     <Icono size={64} className="du__kpi-deco" />
+  </div>
+);
+
+const MetricaItem = ({ label, valor, icono: Icono }) => (
+  <div className="du__metrica-item">
+    {Icono && <Icono size={12} className="du__metrica-icono" />}
+    <span className="du__metrica-label">{label}</span>
+    <span className="du__metrica-valor">{valor}</span>
   </div>
 );
 
@@ -126,7 +167,13 @@ const KpiCard = ({ icono: Icono, titulo, valor, subtitulo, gradiente, desglose }
  * Dropdown con checkboxes para selección múltiple.
  * seleccionados: string[], opciones: string[], onChange: (string[]) => void
  */
-const CheckboxDropdown = ({ label, opciones, seleccionados, onChange, labelsMap }) => {
+const CheckboxDropdown = ({
+  label,
+  opciones,
+  seleccionados,
+  onChange,
+  labelsMap,
+}) => {
   const [abierto, setAbierto] = useState(false);
   const ref = useRef(null);
 
@@ -157,8 +204,13 @@ const CheckboxDropdown = ({ label, opciones, seleccionados, onChange, labelsMap 
         type="button"
       >
         {label}
-        {activo && <span className="du__chk-badge">{seleccionados.length}</span>}
-        <ChevronDown size={12} className={`du__chk-chevron ${abierto ? "du__chk-chevron--abierto" : ""}`} />
+        {activo && (
+          <span className="du__chk-badge">{seleccionados.length}</span>
+        )}
+        <ChevronDown
+          size={12}
+          className={`du__chk-chevron ${abierto ? "du__chk-chevron--abierto" : ""}`}
+        />
       </button>
 
       {abierto && (
@@ -266,6 +318,9 @@ const FilaVale = ({ vale, onClick, mostrarCancelados }) => {
       </td>
       <td className="du__celda du__celda--material">{vale._material}</td>
       <td className="du__celda du__celda--numero">{cantidadTexto}</td>
+      <td className="du__celda du__celda--numero">
+        {vale._viajes > 0 ? vale._viajes : "—"}
+      </td>
       <td className="du__celda">
         <span className={`du__badge-estado ${estadoInfo.clase}`}>
           {estadoInfo.label}
@@ -274,8 +329,19 @@ const FilaVale = ({ vale, onClick, mostrarCancelados }) => {
       <td className="du__celda du__celda--fecha">{fecha}</td>
       <td className="du__celda du__celda--operador">{operador}</td>
       <td className="du__celda du__celda--placas">{placas}</td>
+      <td className="du__celda du__celda--numero">
+        {vale.vehiculos?.capacidad_m3 != null
+          ? `${vale.vehiculos.capacidad_m3} m³`
+          : "—"}
+      </td>
     </tr>
   );
+};
+
+const fmtMinutos = (min) => {
+  if (min <= 0) return "—";
+  if (min < 60) return `${Math.round(min)} min`;
+  return `${(min / 60).toFixed(1)} h`;
 };
 
 const fmtImporte = (v) => {
@@ -324,6 +390,8 @@ const DashboardUnificado = () => {
     cambiarMes,
     refetch,
     kpis,
+    kpisPrevio,
+    labelPeriodoPrevio,
     kpisDesdeLocales,
     aplicarKpis,
     resetearKpis,
@@ -378,8 +446,7 @@ const DashboardUnificado = () => {
   // 5. Export
   const handleExportarExcel = () => {
     const filas = valesFiltrados.map((vale) => {
-      // Reúne todos los folios de remisión: folio_vale_fisico por viaje (primero),
-      // con folio_banco del detalle como fallback si el viaje no lo tiene.
+      // Reúne todos los folios de remisión
       const foliosSet = new Set();
       for (const det of vale.vale_material_detalles ?? []) {
         const foliosViaje = (det.vale_material_viajes ?? [])
@@ -391,19 +458,42 @@ const DashboardUnificado = () => {
           foliosSet.add(det.folio_banco);
         }
       }
-      const foliosRemision = foliosSet.size > 0 ? [...foliosSet].join(", ") : "";
+      const foliosRemision =
+        foliosSet.size > 0 ? [...foliosSet].join(", ") : "";
 
       const esMaterial = vale.tipo_vale === "material";
       const rentaDet = vale.vale_renta_detalle?.[0];
-      const esPorDia = rentaDet?.es_renta_por_dia;
+      // Mismo criterio que getCantidadVale: por día si flag activo O si total_dias > 0 (cubre medio día)
+      const esPorDia =
+        rentaDet?.es_renta_por_dia || Number(rentaDet?.total_dias ?? 0) > 0;
 
-      const m3 = esMaterial ? Number(vale._cantidad?.valor ?? 0).toFixed(2) : "";
-      const dias = (!esMaterial && esPorDia) ? Number(rentaDet?.total_dias ?? 0).toFixed(2) : "";
-      const horas = (!esMaterial && !esPorDia) ? Number(rentaDet?.total_horas ?? 0).toFixed(2) : "";
+      const m3 = esMaterial ? Number(vale._cantidad?.valor ?? 0) : "";
+      const dias =
+        !esMaterial && esPorDia ? Number(rentaDet?.total_dias ?? 0) : "";
+      const horas =
+        !esMaterial && !esPorDia ? Number(rentaDet?.total_horas ?? 0) : "";
+
+      const conciliacion =
+        (vale.conciliacion_vales ?? [])
+          .map((cv) => cv.conciliaciones?.folio)
+          .filter(Boolean)
+          .join(", ") || "";
+
+      // Tarifas: precio_m3 para material; costo_hr / costo_dia para renta
+      const precioM3 = esMaterial
+        ? Number(vale.vale_material_detalles?.[0]?.precio_m3 ?? 0)
+        : "";
+      const costoHr = !esMaterial
+        ? Number(rentaDet?.precios_renta?.costo_hr ?? 0)
+        : "";
+      const costoDia = !esMaterial
+        ? Number(rentaDet?.precios_renta?.costo_dia ?? 0)
+        : "";
 
       return {
         Folio: vale.folio ?? "—",
-        Empresa: vale.obras?.empresas?.empresa ?? vale.obras?.empresas?.sufijo ?? "—",
+        Empresa:
+          vale.obras?.empresas?.empresa ?? vale.obras?.empresas?.sufijo ?? "—",
         CC: vale.obras?.cc ?? "—",
         Obra: vale.obras?.obra ?? "—",
         Tipo: ETIQUETAS_TIPO[vale._tipo]?.label ?? vale._tipo,
@@ -411,11 +501,18 @@ const DashboardUnificado = () => {
         "m³": m3,
         Días: dias,
         Horas: horas,
+        Viajes: vale._viajes > 0 ? vale._viajes : "",
+        "Precio m³": precioM3,
+        "Costo/hr": costoHr,
+        "Costo/día": costoDia,
         "Folios remisión": foliosRemision || "—",
+        Conciliación: conciliacion || "—",
         Estado: ETIQUETAS_ESTADO[vale.estado]?.label ?? vale.estado ?? "—",
-        Fecha: vale.fecha_programada ?? vale.fecha_creacion?.substring(0, 10) ?? "—",
+        Fecha:
+          vale.fecha_programada ?? vale.fecha_creacion?.substring(0, 10) ?? "—",
         Operador: vale.operadores?.nombre_completo ?? "—",
         Placas: vale.vehiculos?.placas ?? "—",
+        "Capacidad m³": vale.vehiculos?.capacidad_m3 ?? "",
         Sindicato: vale.operadores?.sindicatos?.sindicato ?? "—",
         "Motivo cancelación": vale.motivo_cancelacion ?? "",
       };
@@ -432,12 +529,12 @@ const DashboardUnificado = () => {
     filtros.periodoActivo === "hoy"
       ? "Hoy"
       : filtros.periodoActivo === "ayer"
-      ? "Ayer"
-      : filtros.periodoActivo === "semana"
-      ? "Esta semana"
-      : filtros.periodoActivo === "mes"
-      ? "Este mes"
-      : `${filtros.fechaInicio} — ${filtros.fechaFin}`;
+        ? "Ayer"
+        : filtros.periodoActivo === "semana"
+          ? "Esta semana"
+          : filtros.periodoActivo === "mes"
+            ? "Este mes"
+            : `${filtros.fechaInicio} — ${filtros.fechaFin}`;
 
   const hayFiltrosExtra =
     filtros.filtroCCs.length > 0 ||
@@ -482,229 +579,317 @@ const DashboardUnificado = () => {
         </div>
       </header>
 
-      {/* ── Aviso de datos truncados (solo Administrador) ── */}
-      {esAdministrador && hasMasDatos && (
-        <div className="du__aviso-limite">
-          <AlertTriangle size={15} />
-          <span>
-            {totalFiltrados < totalCargados
-              ? `Filtros activos: ${totalFiltrados.toLocaleString()} vales visibles de ${totalCargados.toLocaleString()} cargados (hay más en la BD). `
-              : `La tabla muestra los primeros ${totalCargados.toLocaleString()} vales del período. `}
-            Usa <strong>Calcular KPIs</strong> para obtener métricas de los vales visibles.
-          </span>
-        </div>
-      )}
-
-      {/* ── Indicador de fuente de KPIs (solo Administrador) ── */}
-      {esAdministrador && kpisDesdeLocales && (
-        <div className="du__kpi-fuente">
-          <Calculator size={13} />
-          <span>
-            KPIs calculados desde {totalFiltrados.toLocaleString()} vales filtrados
-            {hasMasDatos ? " · datos parciales (hay más en la BD)" : " · datos completos"}
-          </span>
-          <button className="du__btn-resetear-kpis" onClick={resetearKpis} type="button">
-            Ver KPIs globales
-          </button>
-        </div>
-      )}
-
-      {/* ── KPI Cards (solo Administrador) ── */}
-      {esAdministrador && (
-        <section className="du__kpi-grid">
-          <KpiCard
-            icono={FileText}
-            titulo="Total vales"
-            valor={kpis.totalVales}
-            subtitulo={kpisDesdeLocales ? "filtrados" : (hayFiltrosExtra ? "filtrados" : periodoLabel.toLowerCase())}
-            gradiente="linear-gradient(135deg, #f97316 0%, #fb923c 100%)"
-          />
-          <KpiCard
-            icono={Layers}
-            titulo="m³ material"
-            valor={kpis.totalM3.toFixed(1)}
-            gradiente="linear-gradient(135deg, #0d9488 0%, #2dd4bf 100%)"
-            desglose={kpis.m3PorMaterial.map(({ material, m3 }) => ({
-              label: material,
-              valor: m3.toFixed(1),
-            }))}
-          />
-          <KpiCard
-            icono={TruckIcon}
-            titulo="Vales renta"
-            valor={kpis.totalRenta}
-            subtitulo="equipos"
-            gradiente="linear-gradient(135deg, #1d4ed8 0%, #60a5fa 100%)"
-          />
-          <KpiCard
-            icono={Clock}
-            titulo="Tiempo renta"
-            valor={kpis.tiempoRenta}
-            subtitulo="días · horas acum."
-            gradiente="linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)"
-          />
-          <KpiCard
-            icono={BarChart3}
-            titulo="Pendientes"
-            valor={kpis.pendientes}
-            subtitulo="estado emitido"
-            gradiente="linear-gradient(135deg, #b45309 0%, #f59e0b 100%)"
-          />
-          <KpiCard
-            icono={Route}
-            titulo="Viajes"
-            valor={kpis.totalViajes}
-            subtitulo="registros de viaje"
-            gradiente="linear-gradient(135deg, #0369a1 0%, #38bdf8 100%)"
-          />
-          <KpiCard
-            icono={DollarSign}
-            titulo="Importe"
-            valor={fmtImporte(kpis.importeTotal)}
-            subtitulo="costo total acum."
-            gradiente="linear-gradient(135deg, #065f46 0%, #34d399 100%)"
-          />
-        </section>
-      )}
-
-      {/* ── Filtros ── */}
-      <section className="du__filtros">
-        {/* Fila 1: Período rápido + semana/mes pickers + rango libre */}
-        <div className="du__filtros-grupo">
-          {PERIODOS.map((p) => (
-            <button
-              key={p.id}
-              className={`du__periodo-btn ${filtros.periodoActivo === p.id ? "du__periodo-btn--activo" : ""}`}
-              onClick={() => handlePeriodo(p.id)}
-            >
-              {p.label}
-            </button>
-          ))}
-
-          <input
-            type="week"
-            className="du__input-semana"
-            value={semanaValue}
-            onChange={(e) => handleSemana(e.target.value)}
-            title="Seleccionar semana específica"
-          />
-
-          <input
-            type="month"
-            className="du__input-mes"
-            value={mesValue}
-            onChange={(e) => handleMes(e.target.value)}
-            title="Seleccionar mes específico"
-          />
-
-          <div className="du__rango">
-            <input
-              type="date"
-              className="du__input-fecha"
-              value={rangoInicio}
-              onChange={(e) => setRangoInicio(e.target.value)}
-            />
-            <span className="du__rango-sep">—</span>
-            <input
-              type="date"
-              className="du__input-fecha"
-              value={rangoFin}
-              onChange={(e) => setRangoFin(e.target.value)}
-            />
-            <button
-              className="du__btn-aplicar"
-              onClick={handleAplicarRango}
-              disabled={!rangoInicio || !rangoFin}
-            >
-              Aplicar
-            </button>
+      {/* ── Zona sticky: KPIs + Filtros ── */}
+      <div className="du__sticky-zona">
+        {/* Aviso de datos truncados (solo Administrador) */}
+        {esAdministrador && hasMasDatos && (
+          <div className="du__aviso-limite">
+            <AlertTriangle size={15} />
+            <span>
+              {totalFiltrados < totalCargados
+                ? `Filtros activos: ${totalFiltrados.toLocaleString()} vales visibles de ${totalCargados.toLocaleString()} cargados (hay más en la BD). `
+                : `La tabla muestra los primeros ${totalCargados.toLocaleString()} vales del período. `}
+              Usa <strong>Calcular KPIs</strong> para obtener métricas de los
+              vales visibles.
+            </span>
           </div>
+        )}
 
-          <button
-            className={`du__cancelados-btn ${mostrarCancelados ? "du__cancelados-btn--activo" : ""}`}
-            onClick={toggleCancelados}
-            type="button"
-            title={mostrarCancelados ? "Ocultar cancelados" : "Ver vales cancelados"}
-          >
-            <Ban size={13} />
-            Cancelados
-          </button>
-        </div>
-
-        {/* Fila 2: CC, Sindicato, Estado + Calcular KPIs */}
-        <div className="du__filtros-grupo du__filtros-grupo--checks">
-          <CheckboxDropdown
-            label="Obra"
-            opciones={opciones.ccs}
-            seleccionados={filtros.filtroCCs}
-            onChange={cambiarCCs}
-          />
-          <CheckboxDropdown
-            label="Sindicato"
-            opciones={opciones.sindicatos}
-            seleccionados={filtros.filtroSindicatos}
-            onChange={cambiarSindicatos}
-          />
-          <CheckboxDropdown
-            label="Estado"
-            opciones={ESTADOS_OPCIONES}
-            seleccionados={filtros.filtroEstados}
-            onChange={cambiarEstados}
-            labelsMap={ESTADOS_LABELS}
-          />
-          <CheckboxDropdown
-            label="Material"
-            opciones={opciones.materiales}
-            seleccionados={filtros.filtroMateriales}
-            onChange={cambiarMateriales}
-          />
-          {hayFiltrosExtra && (
+        {/* Indicador de fuente de KPIs (solo Administrador) */}
+        {esAdministrador && kpisDesdeLocales && (
+          <div className="du__kpi-fuente">
+            <Calculator size={13} />
+            <span>
+              KPIs calculados desde {totalFiltrados.toLocaleString()} vales
+              filtrados
+              {hasMasDatos
+                ? " · datos parciales (hay más en la BD)"
+                : " · datos completos"}
+            </span>
             <button
-              className="du__btn-limpiar"
-              onClick={handleLimpiarFiltros}
+              className="du__btn-resetear-kpis"
+              onClick={resetearKpis}
               type="button"
             >
-              Limpiar filtros
+              Ver KPIs globales
             </button>
-          )}
-          {esAdministrador && (
-            <div className="du__calcular-kpis-wrap">
+          </div>
+        )}
+
+        {/* KPI Cards (solo Administrador) */}
+        {esAdministrador && (
+          <>
+            <section className="du__kpi-grid">
+              <HeroCard
+                icono={FileText}
+                titulo="Total vales"
+                valor={kpis.totalVales}
+                gradiente="linear-gradient(135deg, #f97316 0%, #fb923c 100%)"
+                deltaActual={kpis.totalVales}
+                deltaPrevio={kpisPrevio.totalVales}
+                labelPrevio={labelPeriodoPrevio}
+              />
+              <HeroCard
+                icono={Layers}
+                titulo="m³ material"
+                valor={kpis.totalM3.toFixed(1)}
+                gradiente="linear-gradient(135deg, #0d9488 0%, #2dd4bf 100%)"
+                desglose={[
+                  ...kpis.m3PorMaterial.map(({ material, m3 }) => ({
+                    label: material,
+                    valor: m3.toFixed(1),
+                  })),
+                  ...(kpis.m3RentaEstimado > 0
+                    ? [
+                        {
+                          label: "Est. renta",
+                          valor: `~${kpis.m3RentaEstimado.toFixed(1)}`,
+                        },
+                      ]
+                    : []),
+                ]}
+                deltaActual={kpis.totalM3}
+                deltaPrevio={kpisPrevio.totalM3}
+                labelPrevio={labelPeriodoPrevio}
+              />
+              <HeroCard
+                icono={DollarSign}
+                titulo="Importe"
+                valor={fmtImporte(kpis.importeTotal)}
+                gradiente="linear-gradient(135deg, #065f46 0%, #34d399 100%)"
+                deltaActual={kpis.importeTotal}
+                deltaPrevio={kpisPrevio.importeTotal}
+                labelPrevio={labelPeriodoPrevio}
+              />
+              <HeroCard
+                icono={Route}
+                titulo="Viajes"
+                valor={kpis.totalViajes}
+                gradiente="linear-gradient(135deg, #0369a1 0%, #38bdf8 100%)"
+                desglose={[
+                  ...kpis.viajesPorMaterial.map(({ material, viajes }) => ({
+                    label: material,
+                    valor: viajes,
+                  })),
+                  ...(kpis.viajesRenta > 0
+                    ? [{ label: "Renta", valor: kpis.viajesRenta }]
+                    : []),
+                ]}
+                deltaActual={kpis.totalViajes}
+                deltaPrevio={kpisPrevio.totalViajes}
+                labelPrevio={labelPeriodoPrevio}
+              />
+              <HeroCard
+                icono={TruckIcon}
+                titulo="Vales renta"
+                valor={kpis.totalRenta}
+                gradiente="linear-gradient(135deg, #1d4ed8 0%, #60a5fa 100%)"
+                deltaActual={kpis.totalRenta}
+                deltaPrevio={kpisPrevio.totalRenta}
+                labelPrevio={labelPeriodoPrevio}
+              />
+            </section>
+
+            <div className="du__metricas-sec">
+              <MetricaItem
+                label="Tiempo renta"
+                valor={kpis.tiempoRenta}
+                icono={Clock}
+              />
+              <MetricaItem
+                label="En proceso"
+                valor={kpis.enProceso}
+                icono={BarChart3}
+              />
+              <MetricaItem
+                label="Cap. promedio"
+                valor={
+                  kpis.capacidadPromedio > 0
+                    ? `${kpis.capacidadPromedio.toFixed(1)} m³`
+                    : "—"
+                }
+                icono={Gauge}
+              />
+              <MetricaItem
+                label="Eficiencia renta"
+                valor={
+                  kpis.eficienciaRenta > 0
+                    ? `${kpis.eficienciaRenta.toFixed(1)} h/viaje`
+                    : "—"
+                }
+                icono={Timer}
+              />
+              <MetricaItem
+                label="Eficiencia material"
+                valor={fmtMinutos(kpis.eficienciaMaterial)}
+                icono={Activity}
+              />
+              <MetricaItem
+                label="Viajes/día"
+                valor={
+                  kpis.viajesPromedioDia > 0
+                    ? kpis.viajesPromedioDia.toFixed(1)
+                    : "—"
+                }
+                icono={Route}
+              />
+              <MetricaItem
+                label="Camiones/día"
+                valor={
+                  kpis.camionesPromedioDia > 0
+                    ? kpis.camionesPromedioDia.toFixed(1)
+                    : "—"
+                }
+                icono={TruckIcon}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Filtros */}
+        <section className="du__filtros">
+          {/* Fila 1: Período rápido + semana/mes pickers + rango libre */}
+          <div className="du__filtros-grupo">
+            {PERIODOS.map((p) => (
               <button
-                className={`du__btn-calcular-kpis ${kpisDesdeLocales ? "du__btn-calcular-kpis--activo" : ""}`}
-                onClick={aplicarKpis}
-                type="button"
-                title="Calcular KPIs con los filtros activos"
+                key={p.id}
+                className={`du__periodo-btn ${filtros.periodoActivo === p.id ? "du__periodo-btn--activo" : ""}`}
+                onClick={() => handlePeriodo(p.id)}
               >
-                <Calculator size={13} />
-                Calcular KPIs
+                {p.label}
+              </button>
+            ))}
+
+            <input
+              type="week"
+              className="du__input-semana"
+              value={semanaValue}
+              onChange={(e) => handleSemana(e.target.value)}
+              title="Seleccionar semana específica"
+            />
+
+            <input
+              type="month"
+              className="du__input-mes"
+              value={mesValue}
+              onChange={(e) => handleMes(e.target.value)}
+              title="Seleccionar mes específico"
+            />
+
+            <div className="du__rango">
+              <input
+                type="date"
+                className="du__input-fecha"
+                value={rangoInicio}
+                onChange={(e) => setRangoInicio(e.target.value)}
+              />
+              <span className="du__rango-sep">—</span>
+              <input
+                type="date"
+                className="du__input-fecha"
+                value={rangoFin}
+                onChange={(e) => setRangoFin(e.target.value)}
+              />
+              <button
+                className="du__btn-aplicar"
+                onClick={handleAplicarRango}
+                disabled={!rangoInicio || !rangoFin}
+              >
+                Aplicar
               </button>
             </div>
-          )}
-        </div>
 
-        {/* Fila 3: Pills de tipo + búsqueda libre */}
-        <div className="du__filtros-grupo du__filtros-grupo--pills">
-          {TIPOS.map((t) => (
             <button
-              key={t.id}
-              className={`du__tipo-pill ${filtros.tipoActivo === t.id ? "du__tipo-pill--activo" : ""}`}
-              onClick={() => cambiarTipo(t.id)}
+              className={`du__cancelados-btn ${mostrarCancelados ? "du__cancelados-btn--activo" : ""}`}
+              onClick={toggleCancelados}
+              type="button"
+              title={
+                mostrarCancelados
+                  ? "Ocultar cancelados"
+                  : "Ver vales cancelados"
+              }
             >
-              {t.label}
+              <Ban size={13} />
+              Cancelados
             </button>
-          ))}
-          <div className="du__busqueda">
-            <Search size={15} className="du__busqueda-icono" />
-            <input
-              type="text"
-              className="du__busqueda-input"
-              placeholder="Folio, obra, operador, material, placas…"
-              value={filtros.busqueda}
-              onChange={(e) => cambiarBusqueda(e.target.value)}
-            />
           </div>
-        </div>
-      </section>
+
+          {/* Fila 2: CC, Sindicato, Estado + Calcular KPIs */}
+          <div className="du__filtros-grupo du__filtros-grupo--checks">
+            <CheckboxDropdown
+              label="Obra"
+              opciones={opciones.ccs}
+              seleccionados={filtros.filtroCCs}
+              onChange={cambiarCCs}
+            />
+            <CheckboxDropdown
+              label="Sindicato"
+              opciones={opciones.sindicatos}
+              seleccionados={filtros.filtroSindicatos}
+              onChange={cambiarSindicatos}
+            />
+            <CheckboxDropdown
+              label="Estado"
+              opciones={ESTADOS_OPCIONES}
+              seleccionados={filtros.filtroEstados}
+              onChange={cambiarEstados}
+              labelsMap={ESTADOS_LABELS}
+            />
+            <CheckboxDropdown
+              label="Material"
+              opciones={opciones.materiales}
+              seleccionados={filtros.filtroMateriales}
+              onChange={cambiarMateriales}
+            />
+            {hayFiltrosExtra && (
+              <button
+                className="du__btn-limpiar"
+                onClick={handleLimpiarFiltros}
+                type="button"
+              >
+                Limpiar filtros
+              </button>
+            )}
+            {esAdministrador && (
+              <div className="du__calcular-kpis-wrap">
+                <button
+                  className={`du__btn-calcular-kpis ${kpisDesdeLocales ? "du__btn-calcular-kpis--activo" : ""}`}
+                  onClick={aplicarKpis}
+                  type="button"
+                  title="Calcular KPIs con los filtros activos"
+                >
+                  <Calculator size={13} />
+                  Calcular KPIs
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Fila 3: Pills de tipo + búsqueda libre */}
+          <div className="du__filtros-grupo du__filtros-grupo--pills">
+            {TIPOS.map((t) => (
+              <button
+                key={t.id}
+                className={`du__tipo-pill ${filtros.tipoActivo === t.id ? "du__tipo-pill--activo" : ""}`}
+                onClick={() => cambiarTipo(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+            <div className="du__busqueda">
+              <Search size={15} className="du__busqueda-icono" />
+              <input
+                type="text"
+                className="du__busqueda-input"
+                placeholder="Folio, obra, operador, material, placas…"
+                value={filtros.busqueda}
+                onChange={(e) => cambiarBusqueda(e.target.value)}
+              />
+            </div>
+          </div>
+        </section>
+      </div>
+      {/* /du__sticky-zona */}
 
       {/* ── Tabla ── */}
       <section className="du__tabla-wrapper">
@@ -748,10 +933,12 @@ const DashboardUnificado = () => {
                   <th className="du__th">Tipo</th>
                   <th className="du__th">Material / Equipo</th>
                   <th className="du__th du__th--numero">Cantidad</th>
+                  <th className="du__th du__th--numero">Viajes</th>
                   <th className="du__th">Estado</th>
                   <th className="du__th">Fecha</th>
                   <th className="du__th">Operador</th>
                   <th className="du__th">Placas</th>
+                  <th className="du__th du__th--numero">Cap. m³</th>
                 </tr>
               )}
             </thead>

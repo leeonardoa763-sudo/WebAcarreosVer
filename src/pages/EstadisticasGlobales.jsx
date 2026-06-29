@@ -979,6 +979,13 @@ const EstadisticasGlobales = () => {
     setModalMaterial({ obraNombre, materialNombre: mat.material, conciliaciones: concArr });
   };
 
+  const handleRentaClick = (row) => {
+    const concArr = [...(row.conciliacionesArr || [])].sort(
+      (a, b) => new Date(b.fecha_generacion) - new Date(a.fecha_generacion)
+    );
+    setModalMaterial({ obraNombre: row.obra, materialNombre: "Renta de Equipo", conciliaciones: concArr });
+  };
+
   const toggleCategoria = (key) =>
     setCategoriaAbierta((prev) => (prev === key ? null : key));
 
@@ -1380,7 +1387,12 @@ const EstadisticasGlobales = () => {
                       </tr>
                     ) : (
                       tablaRentaPorObra.map((row) => (
-                        <tr key={row.obra}>
+                        <tr
+                          key={row.obra}
+                          className="eg__tabla-row--clickable"
+                          onClick={() => handleRentaClick(row)}
+                          title="Ver conciliaciones de esta obra"
+                        >
                           <td>{row.obra}</td>
                           <td>{formatNum(row.conciliaciones)}</td>
                           <td>{formatNum(row.totalDias, 1)}</td>

@@ -693,12 +693,13 @@ export const useEstadisticasGlobales = () => {
       const obraId = c.id_obra;
       const obraNombre = c.obras?.obra || "Sin obra";
       if (!map[obraId]) {
-        map[obraId] = { obra: obraNombre, conciliaciones: 0, totalDias: 0, totalHoras: 0, importeTotal: 0 };
+        map[obraId] = { obra: obraNombre, conciliaciones: 0, totalDias: 0, totalHoras: 0, importeTotal: 0, conciliacionesArr: [] };
       }
       map[obraId].conciliaciones += 1;
       map[obraId].totalDias  += Number(c.total_dias  || 0);
       map[obraId].totalHoras += Number(c.total_horas || 0);
       map[obraId].importeTotal += Number(c.total_final || 0);
+      map[obraId].conciliacionesArr.push(c);
     });
 
     return Object.values(map).sort((a, b) => b.importeTotal - a.importeTotal);
