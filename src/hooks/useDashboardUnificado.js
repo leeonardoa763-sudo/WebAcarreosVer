@@ -25,6 +25,7 @@ const POR_PAGINA = 25;
 const PREVIO_SELECT = `
   *,
   vehiculos:id_vehiculo (capacidad_m3),
+  tickets_material (id_ticket, fecha_impresion),
   vale_material_detalles (
     volumen_real_m3, costo_total,
     material:id_material (
@@ -118,10 +119,12 @@ const getViajesVale = (vale) => {
   if (vale.tipo_vale === "renta") {
     return Number(vale.vale_renta_detalle?.[0]?.numero_viajes ?? 0);
   }
-  return (vale.vale_material_detalles ?? []).reduce(
-    (sum, det) => sum + (det.vale_material_viajes?.length ?? 0),
-    0,
-  );
+  return (vale.vale_material_detalles ?? []).reduce((sum, det) => {
+    const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
+    // Tipo 3 (Corte): los viajes se registran como tickets_material, no vale_material_viajes
+    if (tipoId === 3) return sum + (vale.tickets_material?.length ?? 0);
+    return sum + (det.vale_material_viajes?.length ?? 0);
+  }, 0);
 };
 
 const calcularKpisDeVales = (lista) => {
@@ -129,6 +132,7 @@ const calcularKpisDeVales = (lista) => {
   let totalHoras = 0, totalDias = 0, enProceso = 0;
   let capacidadSuma = 0, capacidadCount = 0, m3RentaEstimado = 0;
   let rentaHrsXViajeSuma = 0, rentaHrsXViajeCount = 0;
+  let rentaDiasXViajeSuma = 0, rentaDiasXViajeCount = 0;
   let materialMinXViajeSuma = 0, materialMinXViajeCount = 0;
   const camionesXDia = {};
   const viajesXDia = {};
@@ -149,12 +153,16 @@ const calcularKpisDeVales = (lista) => {
         // Estimado: capacidad del camión × número de viajes
         const capRenta = Number(vale.vehiculos?.capacidad_m3 ?? 0);
         m3RentaEstimado += capRenta * Number(d.numero_viajes || 0);
-        // Eficiencia: horas por viaje (solo vales con ambos datos)
+        // Eficiencia: horas por viaje si la renta es por hora; días por viaje si es por día
         const horas = Number(d.total_horas || 0);
+        const dias  = Number(d.total_dias  || 0);
         const viajes = Number(d.numero_viajes || 0);
         if (horas > 0 && viajes > 0) {
           rentaHrsXViajeSuma += horas / viajes;
           rentaHrsXViajeCount++;
+        } else if (dias > 0 && viajes > 0) {
+          rentaDiasXViajeSuma += dias / viajes;
+          rentaDiasXViajeCount++;
         }
       }
     } else {
@@ -164,12 +172,24 @@ const calcularKpisDeVales = (lista) => {
         const vol     = Number(det.volumen_real_m3 || 0);
         totalM3      += vol;
         importeTotal += Number(det.costo_total || 0);
-        totalViajes  += det.vale_material_viajes?.length ?? 0;
         const nombre = det.material?.material ?? "Sin material";
-        m3PorMaterial[nombre]     = (m3PorMaterial[nombre]     || 0) + vol;
-        viajesPorMaterial[nombre] = (viajesPorMaterial[nombre] || 0) + (det.vale_material_viajes?.length ?? 0);
-        for (const viaje of det.vale_material_viajes ?? []) {
-          if (viaje.hora_registro) marcas.push(new Date(viaje.hora_registro).getTime());
+        m3PorMaterial[nombre] = (m3PorMaterial[nombre] || 0) + vol;
+
+        const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
+        if (tipoId === 3) {
+          // Tipo 3 (Corte): los viajes vienen de tickets_material, no vale_material_viajes
+          const numTickets = vale.tickets_material?.length ?? 0;
+          totalViajes += numTickets;
+          viajesPorMaterial[nombre] = (viajesPorMaterial[nombre] || 0) + numTickets;
+          for (const ticket of vale.tickets_material ?? []) {
+            if (ticket.fecha_impresion) marcas.push(new Date(ticket.fecha_impresion).getTime());
+          }
+        } else {
+          totalViajes += det.vale_material_viajes?.length ?? 0;
+          viajesPorMaterial[nombre] = (viajesPorMaterial[nombre] || 0) + (det.vale_material_viajes?.length ?? 0);
+          for (const viaje of det.vale_material_viajes ?? []) {
+            if (viaje.hora_registro) marcas.push(new Date(viaje.hora_registro).getTime());
+          }
         }
       }
       if (marcas.length >= 2) {
@@ -217,8 +237,11 @@ const calcularKpisDeVales = (lista) => {
     enProceso,
     capacidadPromedio: capacidadCount > 0 ? capacidadSuma / capacidadCount : 0,
     m3RentaEstimado,
-    eficienciaRenta: rentaHrsXViajeCount > 0
+    eficienciaRentaHoras: rentaHrsXViajeCount > 0
       ? rentaHrsXViajeSuma / rentaHrsXViajeCount
+      : 0,
+    eficienciaRentaDias: rentaDiasXViajeCount > 0
+      ? rentaDiasXViajeSuma / rentaDiasXViajeCount
       : 0,
     eficienciaMaterial: materialMinXViajeCount > 0
       ? materialMinXViajeSuma / materialMinXViajeCount

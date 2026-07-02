@@ -713,9 +713,11 @@ const DashboardUnificado = () => {
               <MetricaItem
                 label="Eficiencia renta"
                 valor={
-                  kpis.eficienciaRenta > 0
-                    ? `${kpis.eficienciaRenta.toFixed(1)} h/viaje`
-                    : "—"
+                  kpis.eficienciaRentaHoras > 0
+                    ? `${kpis.eficienciaRentaHoras.toFixed(1)} h/viaje`
+                    : kpis.eficienciaRentaDias > 0
+                      ? `${kpis.eficienciaRentaDias.toFixed(1)} d/viaje`
+                      : "—"
                 }
                 icono={Timer}
               />

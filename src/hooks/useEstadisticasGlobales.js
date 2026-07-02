@@ -117,7 +117,7 @@ export const useEstadisticasGlobales = () => {
               tickets_material (id_ticket)
             `)
             .in("id_vale", valeIds)
-            .neq("id_obra", 8);
+            .neq("id_obra", 14);
 
           if (errorVales) throw errorVales;
           setRawVales(vales || []);
@@ -186,7 +186,7 @@ export const useEstadisticasGlobales = () => {
               )
             `)
             .in("id_vale", rentaValeIds)
-            .neq("id_obra", 8);
+            .neq("id_obra", 14);
 
           if (errorRentaVales) throw errorRentaVales;
           setRawValesRenta(rentaVales || []);
@@ -219,19 +219,19 @@ export const useEstadisticasGlobales = () => {
             .from("presupuesto_material_obra")
             .select(`
               id, id_obra, id_material, m3_presupuestados, m3_consumidos,
-              obras:id_obra (id_obra, obra),
+              obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa)),
               material:id_material (id_material, material)
             `)
             .eq("activo", true)
-            .neq("id_obra", 8),
+            .neq("id_obra", 14),
           supabase
             .from("presupuesto_renta_obra")
             .select(`
               id, id_obra, monto_presupuestado, monto_consumido,
-              obras:id_obra (id_obra, obra)
+              obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa))
             `)
             .eq("activo", true)
-            .neq("id_obra", 8),
+            .neq("id_obra", 14),
         ]);
       if (eMat) throw eMat;
       if (eRenta) throw eRenta;
@@ -319,7 +319,7 @@ export const useEstadisticasGlobales = () => {
   // ── Vales filtrados (nivel vale: mes, semana, obra, empresa, sindicato) ──
   const valesFiltrados = useMemo(() => {
     return rawVales.filter((vale) => {
-      if (vale.id_obra === 8) return false;
+      if (vale.id_obra === 14) return false;
       const conc = valeAConciliacion[vale.id_vale];
 
       if (filtros.mes && conc?.fecha_generacion?.substring(0, 7) !== filtros.mes) return false;
@@ -372,7 +372,7 @@ export const useEstadisticasGlobales = () => {
 
   // ── Resumen KPIs ────────────────────────────────────────────────────
   const resumen = useMemo(() => {
-    let concsFiltradas = rawConciliaciones;
+    let concsFiltradas = rawConciliaciones.filter((c) => c.id_obra !== 14);
     if (filtros.mes) {
       concsFiltradas = concsFiltradas.filter(
         (c) => c.fecha_generacion?.substring(0, 7) === filtros.mes
@@ -381,6 +381,21 @@ export const useEstadisticasGlobales = () => {
     if (filtros.semana) {
       concsFiltradas = concsFiltradas.filter(
         (c) => getWeekKey(c.fecha_generacion) === filtros.semana
+      );
+    }
+    if (filtros.idObra) {
+      concsFiltradas = concsFiltradas.filter(
+        (c) => String(c.id_obra) === String(filtros.idObra)
+      );
+    }
+    if (filtros.idEmpresa) {
+      concsFiltradas = concsFiltradas.filter(
+        (c) => String(c.id_empresa) === String(filtros.idEmpresa)
+      );
+    }
+    if (filtros.idSindicato) {
+      concsFiltradas = concsFiltradas.filter(
+        (c) => String(c.id_sindicato) === String(filtros.idSindicato)
       );
     }
 
@@ -403,7 +418,15 @@ export const useEstadisticasGlobales = () => {
       totalDiasRenta,
       totalConciliaciones: concsFiltradas.length,
     };
-  }, [rawConciliaciones, filtros.mes, filtros.semana, tablaMaterial]);
+  }, [
+    rawConciliaciones,
+    filtros.mes,
+    filtros.semana,
+    filtros.idObra,
+    filtros.idEmpresa,
+    filtros.idSindicato,
+    tablaMaterial,
+  ]);
 
   // ── Última conciliación ─────────────────────────────────────────────
   const ultimaConciliacion = useMemo(() => {
@@ -660,7 +683,7 @@ export const useEstadisticasGlobales = () => {
   // ── Tabla renta agrupada por obra ───────────────────────────────────
   const tablaRentaPorObra = useMemo(() => {
     let concsFiltradas = rawConciliaciones.filter(
-      (c) => c.tipo_conciliacion === "renta" && c.id_obra !== 8
+      (c) => c.tipo_conciliacion === "renta" && c.id_obra !== 14
     );
     if (filtros.mes) {
       concsFiltradas = concsFiltradas.filter(
@@ -782,7 +805,7 @@ export const useEstadisticasGlobales = () => {
   // ── Tabla viajes de renta agrupada por obra → equipo (respeta todos los filtros) ──
   const tablaViajesRentaPorEquipo = useMemo(() => {
     const valesFilt = rawValesRenta.filter((vale) => {
-      if (vale.id_obra === 8) return false;
+      if (vale.id_obra === 14) return false;
       const conc = valeRentaAConciliacion[vale.id_vale];
       if (filtros.mes && conc?.fecha_generacion?.substring(0, 7) !== filtros.mes) return false;
       if (filtros.semana && getWeekKey(conc?.fecha_generacion) !== filtros.semana) return false;

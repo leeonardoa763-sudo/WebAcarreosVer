@@ -149,6 +149,15 @@ const formatSemanaChip = (key) => {
   return `Sem ${Number(sem)}, ${year}`;
 };
 
+const formatObraCompleta = (obra) => {
+  if (!obra) return "Sin obra";
+  const partes = [];
+  if (obra.empresas?.empresa) partes.push(obra.empresas.empresa);
+  if (obra.cc != null) partes.push(`CC ${obra.cc}`);
+  partes.push(obra.obra || "Sin obra");
+  return partes.join(" · ");
+};
+
 // ── KPI Card ───────────────────────────────────────────────────────
 const KpiCard = ({ icon: Icon, label, value, sublabel, colorClass, loading }) => {
   if (loading) {
@@ -582,11 +591,12 @@ const SeccionPresupuestos = ({ materialRows, rentaRows, hayAlerta, loading }) =>
     const map = {};
     materialRows.forEach((p) => {
       const obraId = p.id_obra;
-      const obraNombre = p.obras?.obra || "Sin obra";
-      if (!map[obraId]) map[obraId] = { obra: obraNombre, items: [] };
+      if (!map[obraId]) {
+        map[obraId] = { obraId, obraLabel: formatObraCompleta(p.obras), items: [] };
+      }
       map[obraId].items.push(p);
     });
-    return Object.values(map).sort((a, b) => a.obra.localeCompare(b.obra));
+    return Object.values(map).sort((a, b) => a.obraLabel.localeCompare(b.obraLabel));
   }, [materialRows]);
 
   const tieneData = materialRows.length > 0 || rentaRows.length > 0;
@@ -633,9 +643,9 @@ const SeccionPresupuestos = ({ materialRows, rentaRows, hayAlerta, loading }) =>
                 <Truck size={12} />
                 Material
               </div>
-              {obrasMaterial.map(({ obra, items }) => (
-                <div key={obra} className="eg__presup-obra-grupo">
-                  <div className="eg__presup-obra-nombre">{obra}</div>
+              {obrasMaterial.map(({ obraId, obraLabel, items }) => (
+                <div key={obraId} className="eg__presup-obra-grupo">
+                  <div className="eg__presup-obra-nombre">{obraLabel}</div>
                   <div className="eg__presup-items">
                     {items.map((p) => {
                       const sem = getSemaforo(p.m3_consumidos, p.m3_presupuestados);
@@ -644,25 +654,23 @@ const SeccionPresupuestos = ({ materialRows, rentaRows, hayAlerta, loading }) =>
                         <div
                           key={p.id}
                           className={`eg__presup-item eg__presup-item--${sem.color}`}
+                          title={`${formatNum(p.m3_consumidos, 2)} m³ de ${formatNum(p.m3_presupuestados, 2)} m³ presupuestados`}
                         >
-                          <div className="eg__presup-item__top">
-                            <span className="eg__presup-item__nombre">
-                              {p.material?.material || "—"}
-                            </span>
-                            <span className={`eg__presup-item__pct eg__presup-item__pct--${sem.color}`}>
-                              {sem.pctLabel}
-                            </span>
-                          </div>
+                          <span className="eg__presup-item__nombre">
+                            {p.material?.material || "—"}
+                          </span>
                           <div className="eg__presup-item__bar-track">
                             <div
                               className={`eg__presup-item__bar-fill eg__presup-item__bar-fill--${sem.color}`}
                               style={{ width: `${barWidth}%` }}
                             />
                           </div>
-                          <div className="eg__presup-item__nums">
-                            <span>{formatNum(p.m3_consumidos, 2)} m³ consumidos</span>
-                            <span>de {formatNum(p.m3_presupuestados, 2)} m³</span>
-                          </div>
+                          <span className={`eg__presup-item__pct eg__presup-item__pct--${sem.color}`}>
+                            {sem.pctLabel}
+                          </span>
+                          <span className="eg__presup-item__nums">
+                            {formatNum(p.m3_consumidos, 1)} / {formatNum(p.m3_presupuestados, 1)} m³
+                          </span>
                         </div>
                       );
                     })}
@@ -678,7 +686,7 @@ const SeccionPresupuestos = ({ materialRows, rentaRows, hayAlerta, loading }) =>
                 <Clock size={12} />
                 Renta de Equipo
               </div>
-              <div className="eg__presup-items">
+              <div className="eg__presup-items eg__presup-items--full">
                 {rentaRows.map((p) => {
                   const sem = getSemaforo(p.monto_consumido, p.monto_presupuestado);
                   const barWidth = Math.min(sem.pct, 1) * 100;
@@ -686,25 +694,23 @@ const SeccionPresupuestos = ({ materialRows, rentaRows, hayAlerta, loading }) =>
                     <div
                       key={p.id}
                       className={`eg__presup-item eg__presup-item--${sem.color}`}
+                      title={`${formatObraCompleta(p.obras)} · ${formatMXN(p.monto_consumido)} de ${formatMXN(p.monto_presupuestado)} presupuestados`}
                     >
-                      <div className="eg__presup-item__top">
-                        <span className="eg__presup-item__nombre">
-                          {p.obras?.obra || "—"}
-                        </span>
-                        <span className={`eg__presup-item__pct eg__presup-item__pct--${sem.color}`}>
-                          {sem.pctLabel}
-                        </span>
-                      </div>
+                      <span className="eg__presup-item__nombre">
+                        {formatObraCompleta(p.obras)}
+                      </span>
                       <div className="eg__presup-item__bar-track">
                         <div
                           className={`eg__presup-item__bar-fill eg__presup-item__bar-fill--${sem.color}`}
                           style={{ width: `${barWidth}%` }}
                         />
                       </div>
-                      <div className="eg__presup-item__nums">
-                        <span>{formatMXN(p.monto_consumido)} consumido</span>
-                        <span>de {formatMXN(p.monto_presupuestado)}</span>
-                      </div>
+                      <span className={`eg__presup-item__pct eg__presup-item__pct--${sem.color}`}>
+                        {sem.pctLabel}
+                      </span>
+                      <span className="eg__presup-item__nums">
+                        {formatKpiMonto(p.monto_consumido)} / {formatKpiMonto(p.monto_presupuestado)}
+                      </span>
                     </div>
                   );
                 })}
@@ -1214,6 +1220,14 @@ const EstadisticasGlobales = () => {
       {/* ── KPI Cards ─────────────────────────────────────────── */}
       {!error && (
         <div className="eg__kpi-grid">
+          <KpiCard
+            icon={Package}
+            label="Material Movido"
+            value={loading ? "—" : `${formatNum(totalesTablaObra.m3Total, 2)} m³`}
+            sublabel="Volumen total transportado"
+            colorClass="teal"
+            loading={loading}
+          />
           <KpiCard
             icon={LayoutDashboard}
             label="Total Conciliaciones"
