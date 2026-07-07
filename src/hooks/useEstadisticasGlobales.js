@@ -25,6 +25,12 @@ const getWeekKey = (fechaStr) => {
   return `${year}-S${String(week).padStart(2, "0")}`;
 };
 
+// ── Helper: coincidencia con filtro multi-selección (arreglo vacío = todos) ──
+const matchesFiltro = (filtroArr, value) => {
+  if (!filtroArr || filtroArr.length === 0) return true;
+  return filtroArr.some((v) => String(v) === String(value));
+};
+
 export const useEstadisticasGlobales = () => {
   // 1. Estados base
   const [loading, setLoading] = useState(true);
@@ -42,13 +48,13 @@ export const useEstadisticasGlobales = () => {
 
   // 2. Estado de filtros
   const [filtros, setFiltrosState] = useState({
-    mes: null,
-    semana: null,
-    idObra: null,
-    idEmpresa: null,
-    idSindicato: null,
-    material: null,
-    idBanco: null,
+    mes: [],
+    semana: [],
+    idObra: [],
+    idEmpresa: [],
+    idSindicato: [],
+    material: [],
+    idBanco: [],
   });
 
   // 3. Fetch principal
@@ -61,7 +67,7 @@ export const useEstadisticasGlobales = () => {
       const { data: conciliaciones, error: errorConc } = await supabase
         .from("conciliaciones")
         .select(
-          "id_conciliacion, tipo_conciliacion, total_final, total_horas, total_dias, fecha_generacion, folio, id_obra, id_empresa, id_sindicato, obras:id_obra (id_obra, obra), sindicatos:id_sindicato (sindicato), empresas:id_empresa (empresa)"
+          "id_conciliacion, tipo_conciliacion, total_final, total_horas, total_dias, fecha_generacion, folio, id_obra, id_empresa, id_sindicato, obras:id_obra (id_obra, obra, cc), sindicatos:id_sindicato (sindicato), empresas:id_empresa (empresa)"
         );
 
       if (errorConc) throw errorConc;
@@ -97,7 +103,7 @@ export const useEstadisticasGlobales = () => {
             .from("vales")
             .select(`
               id_vale, id_obra, id_operador, id_persona_creador, id_persona_verificador, id_vehiculo,
-              obras:id_obra (id_obra, obra, empresas:id_empresa (id_empresa, empresa)),
+              obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa)),
               operadores:id_operador (id_operador, id_sindicato, nombre_completo, sindicatos:id_sindicato (id_sindicato, sindicato)),
               vehiculos:id_vehiculo (id_vehiculo, placas),
               persona_creador:id_persona_creador (nombre, primer_apellido),
@@ -322,11 +328,11 @@ export const useEstadisticasGlobales = () => {
       if (vale.id_obra === 14) return false;
       const conc = valeAConciliacion[vale.id_vale];
 
-      if (filtros.mes && conc?.fecha_generacion?.substring(0, 7) !== filtros.mes) return false;
-      if (filtros.semana && getWeekKey(conc?.fecha_generacion) !== filtros.semana) return false;
-      if (filtros.idObra && String(vale.id_obra) !== String(filtros.idObra)) return false;
-      if (filtros.idEmpresa && String(vale.obras?.empresas?.id_empresa) !== String(filtros.idEmpresa)) return false;
-      if (filtros.idSindicato && String(vale.operadores?.id_sindicato) !== String(filtros.idSindicato)) return false;
+      if (!matchesFiltro(filtros.mes, conc?.fecha_generacion?.substring(0, 7))) return false;
+      if (!matchesFiltro(filtros.semana, getWeekKey(conc?.fecha_generacion))) return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
+      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato)) return false;
 
       return true;
     });
@@ -340,8 +346,8 @@ export const useEstadisticasGlobales = () => {
         const nombre = det.material?.material || "Sin clasificar";
         const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
 
-        if (filtroMaterial && nombre !== filtroMaterial) return;
-        if (filtroBanco && String(det.id_banco) !== String(filtroBanco)) return;
+        if (!matchesFiltro(filtroMaterial, nombre)) return;
+        if (!matchesFiltro(filtroBanco, det.id_banco)) return;
 
         if (!stats[nombre]) {
           stats[nombre] = { material: nombre, m3Total: 0, valesIds: new Set(), totalViajes: 0, importeIVA: 0 };
@@ -373,31 +379,11 @@ export const useEstadisticasGlobales = () => {
   // ── Resumen KPIs ────────────────────────────────────────────────────
   const resumen = useMemo(() => {
     let concsFiltradas = rawConciliaciones.filter((c) => c.id_obra !== 14);
-    if (filtros.mes) {
-      concsFiltradas = concsFiltradas.filter(
-        (c) => c.fecha_generacion?.substring(0, 7) === filtros.mes
-      );
-    }
-    if (filtros.semana) {
-      concsFiltradas = concsFiltradas.filter(
-        (c) => getWeekKey(c.fecha_generacion) === filtros.semana
-      );
-    }
-    if (filtros.idObra) {
-      concsFiltradas = concsFiltradas.filter(
-        (c) => String(c.id_obra) === String(filtros.idObra)
-      );
-    }
-    if (filtros.idEmpresa) {
-      concsFiltradas = concsFiltradas.filter(
-        (c) => String(c.id_empresa) === String(filtros.idEmpresa)
-      );
-    }
-    if (filtros.idSindicato) {
-      concsFiltradas = concsFiltradas.filter(
-        (c) => String(c.id_sindicato) === String(filtros.idSindicato)
-      );
-    }
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.mes, c.fecha_generacion?.substring(0, 7)));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.semana, getWeekKey(c.fecha_generacion)));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idObra, c.id_obra));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idEmpresa, c.id_empresa));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idSindicato, c.id_sindicato));
 
     let totalHorasRenta = 0;
     let totalDiasRenta = 0;
@@ -440,9 +426,9 @@ export const useEstadisticasGlobales = () => {
   // ── Series de tiempo (gráfica) ─ respeta filtros excepto mes/semana ─
   const seriesTiempo = useMemo(() => {
     const valesSinTiempo = rawVales.filter((vale) => {
-      if (filtros.idObra && String(vale.id_obra) !== String(filtros.idObra)) return false;
-      if (filtros.idEmpresa && String(vale.obras?.empresas?.id_empresa) !== String(filtros.idEmpresa)) return false;
-      if (filtros.idSindicato && String(vale.operadores?.id_sindicato) !== String(filtros.idSindicato)) return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
+      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato)) return false;
       return true;
     });
 
@@ -458,8 +444,8 @@ export const useEstadisticasGlobales = () => {
         const mat = det.material?.material || "Sin clasificar";
         const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
 
-        if (filtros.material && mat !== filtros.material) return;
-        if (filtros.idBanco && String(det.id_banco) !== String(filtros.idBanco)) return;
+        if (!matchesFiltro(filtros.material, mat)) return;
+        if (!matchesFiltro(filtros.idBanco, det.id_banco)) return;
 
         let m3 = 0;
         if (tipoId === 3) {
@@ -497,8 +483,8 @@ export const useEstadisticasGlobales = () => {
   // ── Helper: filtra detalles por material/banco activos ─────────────
   const detsFiltrados = useCallback((detalles) =>
     (detalles || []).filter((det) => {
-      if (filtros.material && det.material?.material !== filtros.material) return false;
-      if (filtros.idBanco && String(det.id_banco) !== String(filtros.idBanco)) return false;
+      if (!matchesFiltro(filtros.material, det.material?.material)) return false;
+      if (!matchesFiltro(filtros.idBanco, det.id_banco)) return false;
       return true;
     }), [filtros.material, filtros.idBanco]);
 
@@ -630,15 +616,20 @@ export const useEstadisticasGlobales = () => {
       const obraNombre = vale.obras?.obra || "Sin obra";
 
       if (!obraMap[obraId]) {
-        obraMap[obraId] = { obra: obraNombre, matMap: {} };
+        obraMap[obraId] = {
+          obra: obraNombre,
+          cc: vale.obras?.cc ?? null,
+          empresa: vale.obras?.empresas?.empresa || null,
+          matMap: {},
+        };
       }
 
       (vale.vale_material_detalles || []).forEach((det) => {
         const nombreMat = det.material?.material || "Sin clasificar";
         const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
 
-        if (filtros.material && nombreMat !== filtros.material) return;
-        if (filtros.idBanco && String(det.id_banco) !== String(filtros.idBanco)) return;
+        if (!matchesFiltro(filtros.material, nombreMat)) return;
+        if (!matchesFiltro(filtros.idBanco, det.id_banco)) return;
 
         if (!obraMap[obraId].matMap[nombreMat]) {
           obraMap[obraId].matMap[nombreMat] = {
@@ -660,7 +651,7 @@ export const useEstadisticasGlobales = () => {
     });
 
     return Object.entries(obraMap)
-      .map(([, { obra, matMap }]) => {
+      .map(([, { obra, cc, empresa, matMap }]) => {
         const materiales = Object.values(matMap)
           .map((s) => ({ ...s, valesCount: s.valesIds.size }))
           .sort((a, b) => b.m3Total - a.m3Total);
@@ -675,50 +666,58 @@ export const useEstadisticasGlobales = () => {
           { m3Total: 0, valesCount: 0, totalViajes: 0, importeIVA: 0 }
         );
 
-        return { obra, materiales, subtotal };
+        return { obra, cc, empresa, materiales, subtotal };
       })
       .sort((a, b) => b.subtotal.m3Total - a.subtotal.m3Total);
   }, [valesFiltrados, filtros.material, filtros.idBanco]);
+
+  // ── Mapa: id_conciliacion (renta) → total de viajes ─────────────────
+  const viajesPorConciliacionRenta = useMemo(() => {
+    const map = {};
+    rawValesRenta.forEach((vale) => {
+      const conc = valeRentaAConciliacion[vale.id_vale];
+      if (!conc) return;
+      let viajes = 0;
+      (vale.vale_renta_detalle || []).forEach((det) => {
+        viajes += det.vale_renta_viajes?.length > 0
+          ? det.vale_renta_viajes.length
+          : (det.numero_viajes || 1);
+      });
+      map[conc.id_conciliacion] = (map[conc.id_conciliacion] || 0) + viajes;
+    });
+    return map;
+  }, [rawValesRenta, valeRentaAConciliacion]);
 
   // ── Tabla renta agrupada por obra ───────────────────────────────────
   const tablaRentaPorObra = useMemo(() => {
     let concsFiltradas = rawConciliaciones.filter(
       (c) => c.tipo_conciliacion === "renta" && c.id_obra !== 14
     );
-    if (filtros.mes) {
-      concsFiltradas = concsFiltradas.filter(
-        (c) => c.fecha_generacion?.substring(0, 7) === filtros.mes
-      );
-    }
-    if (filtros.semana) {
-      concsFiltradas = concsFiltradas.filter(
-        (c) => getWeekKey(c.fecha_generacion) === filtros.semana
-      );
-    }
-    if (filtros.idObra) {
-      concsFiltradas = concsFiltradas.filter(
-        (c) => String(c.id_obra) === String(filtros.idObra)
-      );
-    }
-    if (filtros.idEmpresa) {
-      concsFiltradas = concsFiltradas.filter(
-        (c) => String(c.id_empresa) === String(filtros.idEmpresa)
-      );
-    }
-    if (filtros.idSindicato) {
-      concsFiltradas = concsFiltradas.filter(
-        (c) => String(c.id_sindicato) === String(filtros.idSindicato)
-      );
-    }
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.mes, c.fecha_generacion?.substring(0, 7)));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.semana, getWeekKey(c.fecha_generacion)));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idObra, c.id_obra));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idEmpresa, c.id_empresa));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idSindicato, c.id_sindicato));
 
     const map = {};
     concsFiltradas.forEach((c) => {
       const obraId = c.id_obra;
       const obraNombre = c.obras?.obra || "Sin obra";
       if (!map[obraId]) {
-        map[obraId] = { obra: obraNombre, conciliaciones: 0, totalDias: 0, totalHoras: 0, importeTotal: 0, conciliacionesArr: [] };
+        map[obraId] = {
+          obra: obraNombre,
+          cc: c.obras?.cc ?? null,
+          empresa: c.empresas?.empresa || null,
+          conciliaciones: 0,
+          totalViajes: 0,
+          totalDias: 0,
+          totalHoras: 0,
+          importeTotal: 0,
+          conciliacionesArr: [],
+        };
       }
       map[obraId].conciliaciones += 1;
+      map[obraId].totalViajes += viajesPorConciliacionRenta[c.id_conciliacion] || 0;
       map[obraId].totalDias  += Number(c.total_dias  || 0);
       map[obraId].totalHoras += Number(c.total_horas || 0);
       map[obraId].importeTotal += Number(c.total_final || 0);
@@ -726,22 +725,18 @@ export const useEstadisticasGlobales = () => {
     });
 
     return Object.values(map).sort((a, b) => b.importeTotal - a.importeTotal);
-  }, [rawConciliaciones, filtros]);
+  }, [rawConciliaciones, filtros, viajesPorConciliacionRenta]);
 
   // ── Presupuestos filtrados ─────────────────────────────────────────
-  const presupuestosMaterialFiltrados = useMemo(() => {
-    if (!filtros.idObra) return presupuestosMaterial;
-    return presupuestosMaterial.filter(
-      (p) => String(p.id_obra) === String(filtros.idObra)
-    );
-  }, [presupuestosMaterial, filtros.idObra]);
+  const presupuestosMaterialFiltrados = useMemo(
+    () => presupuestosMaterial.filter((p) => matchesFiltro(filtros.idObra, p.id_obra)),
+    [presupuestosMaterial, filtros.idObra]
+  );
 
-  const presupuestosRentaFiltrados = useMemo(() => {
-    if (!filtros.idObra) return presupuestosRenta;
-    return presupuestosRenta.filter(
-      (p) => String(p.id_obra) === String(filtros.idObra)
-    );
-  }, [presupuestosRenta, filtros.idObra]);
+  const presupuestosRentaFiltrados = useMemo(
+    () => presupuestosRenta.filter((p) => matchesFiltro(filtros.idObra, p.id_obra)),
+    [presupuestosRenta, filtros.idObra]
+  );
 
   const hayAlertaPresupuesto = useMemo(
     () =>
@@ -762,8 +757,8 @@ export const useEstadisticasGlobales = () => {
   // Ignora filtro mes/semana para mostrar la evolución histórica completa
   const seriesTiempoRenta = useMemo(() => {
     const valesFilt = rawValesRenta.filter((vale) => {
-      if (filtros.idObra && String(vale.id_obra) !== String(filtros.idObra)) return false;
-      if (filtros.idEmpresa && String(vale.obras?.empresas?.id_empresa) !== String(filtros.idEmpresa)) return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
       return true;
     });
 
@@ -807,10 +802,10 @@ export const useEstadisticasGlobales = () => {
     const valesFilt = rawValesRenta.filter((vale) => {
       if (vale.id_obra === 14) return false;
       const conc = valeRentaAConciliacion[vale.id_vale];
-      if (filtros.mes && conc?.fecha_generacion?.substring(0, 7) !== filtros.mes) return false;
-      if (filtros.semana && getWeekKey(conc?.fecha_generacion) !== filtros.semana) return false;
-      if (filtros.idObra && String(vale.id_obra) !== String(filtros.idObra)) return false;
-      if (filtros.idEmpresa && String(vale.obras?.empresas?.id_empresa) !== String(filtros.idEmpresa)) return false;
+      if (!matchesFiltro(filtros.mes, conc?.fecha_generacion?.substring(0, 7))) return false;
+      if (!matchesFiltro(filtros.semana, getWeekKey(conc?.fecha_generacion))) return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
       return true;
     });
 
@@ -849,19 +844,105 @@ export const useEstadisticasGlobales = () => {
       .sort((a, b) => b.subtotal.viajes - a.subtotal.viajes);
   }, [rawValesRenta, valeRentaAConciliacion, filtros]);
 
+  // ── Estadísticas de un periodo dado (mes o semana) con filtros activos ──
+  const getPeriodoStats = useCallback((mesVal, semanaVal) => {
+    const valesPeriodo = rawVales.filter((vale) => {
+      if (vale.id_obra === 14) return false;
+      const conc = valeAConciliacion[vale.id_vale];
+      if (mesVal && conc?.fecha_generacion?.substring(0, 7) !== mesVal) return false;
+      if (semanaVal && getWeekKey(conc?.fecha_generacion) !== semanaVal) return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
+      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato)) return false;
+      return true;
+    });
+
+    const matStats = agregarPorMaterial(valesPeriodo, filtros.material, filtros.idBanco);
+    const m3Total = matStats.reduce((s, r) => s + r.m3Total, 0);
+    const importeTotal = matStats.reduce((s, r) => s + r.importeIVA, 0);
+
+    let concsPeriodo = rawConciliaciones.filter((c) => c.id_obra !== 14);
+    if (mesVal) {
+      concsPeriodo = concsPeriodo.filter((c) => c.fecha_generacion?.substring(0, 7) === mesVal);
+    }
+    if (semanaVal) {
+      concsPeriodo = concsPeriodo.filter((c) => getWeekKey(c.fecha_generacion) === semanaVal);
+    }
+    concsPeriodo = concsPeriodo.filter((c) => matchesFiltro(filtros.idObra, c.id_obra));
+    concsPeriodo = concsPeriodo.filter((c) => matchesFiltro(filtros.idEmpresa, c.id_empresa));
+    concsPeriodo = concsPeriodo.filter((c) => matchesFiltro(filtros.idSindicato, c.id_sindicato));
+
+    let totalHorasRenta = 0;
+    let totalDiasRenta = 0;
+    concsPeriodo.forEach((c) => {
+      if (c.tipo_conciliacion === "renta") {
+        totalHorasRenta += Number(c.total_horas || 0);
+        totalDiasRenta += Number(c.total_dias || 0);
+      }
+    });
+
+    return {
+      m3Total,
+      importeTotal,
+      totalHorasRenta,
+      totalDiasRenta,
+      totalConciliaciones: concsPeriodo.length,
+    };
+  }, [rawVales, rawConciliaciones, valeAConciliacion, filtros, agregarPorMaterial]);
+
+  // ── Comparativa contra el periodo anterior (mes o semana según filtro activo) ──
+  const comparativaPeriodoAnterior = useMemo(() => {
+    let modo = null;
+    let actualKey = null;
+    let anteriorKey = null;
+
+    if (filtros.semana.length === 1) {
+      modo = "semana";
+      actualKey = filtros.semana[0];
+      const idx = opcionesSemanas.indexOf(actualKey);
+      anteriorKey = idx >= 0 ? opcionesSemanas[idx + 1] || null : null;
+    } else if (filtros.mes.length === 1) {
+      modo = "mes";
+      actualKey = filtros.mes[0];
+      const idx = opcionesMeses.indexOf(actualKey);
+      anteriorKey = idx >= 0 ? opcionesMeses[idx + 1] || null : null;
+    } else if (filtros.mes.length === 0 && filtros.semana.length === 0 && opcionesMeses.length >= 2) {
+      modo = "mes";
+      actualKey = opcionesMeses[0];
+      anteriorKey = opcionesMeses[1];
+    }
+
+    if (!anteriorKey) return null;
+
+    const actual = modo === "mes" ? getPeriodoStats(actualKey, null) : getPeriodoStats(null, actualKey);
+    const anterior = modo === "mes" ? getPeriodoStats(anteriorKey, null) : getPeriodoStats(null, anteriorKey);
+
+    return { modo, actualKey, anteriorKey, actual, anterior };
+  }, [filtros.semana, filtros.mes, opcionesSemanas, opcionesMeses, getPeriodoStats]);
+
   // ── Acciones de filtros ─────────────────────────────────────────────
-  const setFiltro = useCallback((key, value) => {
-    setFiltrosState((prev) => ({ ...prev, [key]: prev[key] === value ? null : value }));
+  // value === null limpia la categoría (botón "Todos"); cualquier otro valor
+  // se agrega o quita del arreglo de selección de esa categoría.
+  const toggleFiltro = useCallback((key, value) => {
+    setFiltrosState((prev) => {
+      if (value === null) return { ...prev, [key]: [] };
+      const current = prev[key];
+      const yaExiste = current.some((v) => String(v) === String(value));
+      const next = yaExiste
+        ? current.filter((v) => String(v) !== String(value))
+        : [...current, value];
+      return { ...prev, [key]: next };
+    });
   }, []);
 
   const resetFiltros = useCallback(() => {
     setFiltrosState({
-      mes: null, semana: null, idObra: null, idEmpresa: null,
-      idSindicato: null, material: null, idBanco: null,
+      mes: [], semana: [], idObra: [], idEmpresa: [],
+      idSindicato: [], material: [], idBanco: [],
     });
   }, []);
 
-  const hayFiltrosActivos = Object.values(filtros).some(Boolean);
+  const hayFiltrosActivos = Object.values(filtros).some((arr) => arr.length > 0);
 
   return {
     loading,
@@ -873,7 +954,7 @@ export const useEstadisticasGlobales = () => {
     valeAConciliacion,
     // Filtros
     filtros,
-    setFiltro,
+    toggleFiltro,
     resetFiltros,
     hayFiltrosActivos,
     opcionesMeses,
@@ -903,5 +984,7 @@ export const useEstadisticasGlobales = () => {
     presupuestosRentaFiltrados,
     hayAlertaPresupuesto,
     fetchPresupuestos,
+    // Comparativa periodo anterior
+    comparativaPeriodoAnterior,
   };
 };

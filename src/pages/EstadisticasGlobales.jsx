@@ -35,6 +35,7 @@ import {
   AlertTriangle,
   ExternalLink,
   FileText,
+  Download,
 } from "lucide-react";
 
 // 3. Recharts
@@ -57,7 +58,10 @@ import {
 // 4. Hooks
 import { useEstadisticasGlobales } from "../hooks/useEstadisticasGlobales";
 
-// 5. Estilos
+// 5. Utils
+import { generarPDFReporteEstadisticas } from "../utils/exportarReporteEstadisticas";
+
+// 6. Estilos
 import "../styles/estadisticas-globales.css";
 
 // ── Paleta ─────────────────────────────────────────────────────────
@@ -183,13 +187,14 @@ const KpiCard = ({ icon: Icon, label, value, sublabel, colorClass, loading }) =>
   );
 };
 
-// ── Filter Panel (opciones de la categoría abierta) ────────────────
-const FilterPanel = ({ opciones, valorActivo, onSelect }) => {
+// ── Filter Panel (opciones de la categoría abierta, multi-selección) ──
+const FilterPanel = ({ opciones, valoresActivos, onSelect }) => {
   if (!opciones || opciones.length === 0) return null;
+  const activos = valoresActivos || [];
   return (
     <div className="eg__filtro-panel">
       <button
-        className={`eg__chip${!valorActivo ? " eg__chip--active" : ""}`}
+        className={`eg__chip${activos.length === 0 ? " eg__chip--active" : ""}`}
         onClick={() => onSelect(null)}
       >
         Todos
@@ -197,7 +202,7 @@ const FilterPanel = ({ opciones, valorActivo, onSelect }) => {
       {opciones.map((op) => {
         const id = op.id ?? op;
         const nombre = op.nombre ?? op;
-        const isActive = valorActivo !== null && String(valorActivo) === String(id);
+        const isActive = activos.some((v) => String(v) === String(id));
         return (
           <button
             key={id}
@@ -940,7 +945,7 @@ const EstadisticasGlobales = () => {
     fetchEstadisticas,
     valeAConciliacion,
     filtros,
-    setFiltro,
+    toggleFiltro,
     resetFiltros,
     hayFiltrosActivos,
     opcionesMeses,
@@ -965,6 +970,7 @@ const EstadisticasGlobales = () => {
     presupuestosMaterialFiltrados,
     presupuestosRentaFiltrados,
     hayAlertaPresupuesto,
+    comparativaPeriodoAnterior,
   } = useEstadisticasGlobales();
 
   // 2. Categoría abierta en el panel de filtros
@@ -972,6 +978,9 @@ const EstadisticasGlobales = () => {
 
   // 3. Modal de conciliaciones por material
   const [modalMaterial, setModalMaterial] = useState(null);
+
+  // 4. Exportación de reporte PDF
+  const [exportando, setExportando] = useState(false);
 
   const handleMaterialClick = (obraNombre, mat) => {
     const concMap = {};
@@ -994,6 +1003,58 @@ const EstadisticasGlobales = () => {
 
   const toggleCategoria = (key) =>
     setCategoriaAbierta((prev) => (prev === key ? null : key));
+
+  const handleExportarPDF = () => {
+    try {
+      setExportando(true);
+
+      const filtrosActivos = categoriasConfig
+        .filter((c) => c.valoresActivos.length > 0 && c.key !== "mes" && c.key !== "semana")
+        .map((c) => ({ label: c.label, value: c.valorLabel }));
+
+      const periodoLabel = filtros.mes.length > 0
+        ? filtros.mes.map(formatMesChip).join(", ")
+        : filtros.semana.length > 0
+        ? filtros.semana.map(formatSemanaChip).join(", ")
+        : "Todos los periodos";
+
+      const periodoAnteriorLabel = comparativaPeriodoAnterior
+        ? comparativaPeriodoAnterior.modo === "mes"
+          ? formatMesChip(comparativaPeriodoAnterior.anteriorKey)
+          : formatSemanaChip(comparativaPeriodoAnterior.anteriorKey)
+        : null;
+
+      const horaPicoDestacada = horasPico.reduce(
+        (max, h) => (h.viajes > max.viajes ? h : max),
+        { viajes: 0, label: "--" }
+      );
+
+      generarPDFReporteEstadisticas({
+        filtrosActivos,
+        periodoLabel,
+        resumen,
+        totalesTablaObra,
+        comparativaPeriodoAnterior,
+        periodoAnteriorLabel,
+        tablaObraMaterial,
+        tablaRentaPorObra,
+        totalesRenta,
+        presupuestosMaterial: presupuestosMaterialFiltrados,
+        presupuestosRenta: presupuestosRentaFiltrados,
+        hayAlertaPresupuesto,
+        topResidente: topResidentes[0] || null,
+        topChecador: topChecadores[0] || null,
+        topPlaca: topPlacas[0] || null,
+        horaPico: horaPicoDestacada.viajes > 0 ? horaPicoDestacada : null,
+        mejorRendimiento: rendimientoPorMaterial[0] || null,
+        ultimaConciliacion,
+      });
+    } catch (err) {
+      console.error("Error al exportar reporte PDF:", err);
+    } finally {
+      setExportando(false);
+    }
+  };
 
   // 3. Totales de tablas
   const totalesTabla = useMemo(
@@ -1029,68 +1090,65 @@ const EstadisticasGlobales = () => {
       tablaRentaPorObra.reduce(
         (acc, row) => ({
           conciliaciones: acc.conciliaciones + row.conciliaciones,
+          totalViajes:    acc.totalViajes    + row.totalViajes,
           totalDias:      acc.totalDias      + row.totalDias,
           totalHoras:     acc.totalHoras     + row.totalHoras,
           importeTotal:   acc.importeTotal   + row.importeTotal,
         }),
-        { conciliaciones: 0, totalDias: 0, totalHoras: 0, importeTotal: 0 }
+        { conciliaciones: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, importeTotal: 0 }
       ),
     [tablaRentaPorObra]
   );
 
-  // 4. Config de categorías de filtros
-  const categoriasConfig = useMemo(() => [
-    {
-      key: "mes", label: "Mes",
-      opciones: opcionesMeses.map((m) => ({ id: m, nombre: formatMesChip(m) })),
-      valorActivo: filtros.mes,
-      valorLabel: filtros.mes ? formatMesChip(filtros.mes) : null,
-    },
-    {
-      key: "semana", label: "Semana",
-      opciones: opcionesSemanas.map((s) => ({ id: s, nombre: formatSemanaChip(s) })),
-      valorActivo: filtros.semana,
-      valorLabel: filtros.semana ? formatSemanaChip(filtros.semana) : null,
-    },
-    {
-      key: "idObra", label: "Obra",
-      opciones: opcionesObras,
-      valorActivo: filtros.idObra,
-      valorLabel: filtros.idObra
-        ? opcionesObras.find((o) => String(o.id) === String(filtros.idObra))?.nombre
-        : null,
-    },
-    {
-      key: "idEmpresa", label: "Empresa",
-      opciones: opcionesEmpresas,
-      valorActivo: filtros.idEmpresa,
-      valorLabel: filtros.idEmpresa
-        ? opcionesEmpresas.find((o) => String(o.id) === String(filtros.idEmpresa))?.nombre
-        : null,
-    },
-    {
-      key: "idSindicato", label: "Sindicato",
-      opciones: opcionesSindicatos,
-      valorActivo: filtros.idSindicato,
-      valorLabel: filtros.idSindicato
-        ? opcionesSindicatos.find((o) => String(o.id) === String(filtros.idSindicato))?.nombre
-        : null,
-    },
-    {
-      key: "material", label: "Material",
-      opciones: opcionesMateriales.map((m) => ({ id: m, nombre: m })),
-      valorActivo: filtros.material,
-      valorLabel: filtros.material,
-    },
-    {
-      key: "idBanco", label: "Banco",
-      opciones: opcionesBancos,
-      valorActivo: filtros.idBanco,
-      valorLabel: filtros.idBanco
-        ? opcionesBancos.find((o) => String(o.id) === String(filtros.idBanco))?.nombre
-        : null,
-    },
-  ], [filtros, opcionesMeses, opcionesSemanas, opcionesObras, opcionesEmpresas, opcionesSindicatos, opcionesMateriales, opcionesBancos]);
+  // 4. Config de categorías de filtros (multi-selección por categoría)
+  const buildValorLabel = (opciones, valores) => {
+    if (!valores || valores.length === 0) return null;
+    if (valores.length === 1) {
+      return opciones.find((o) => String(o.id) === String(valores[0]))?.nombre ?? String(valores[0]);
+    }
+    return `${valores.length} seleccionados`;
+  };
+
+  const categoriasConfig = useMemo(() => {
+    const base = [
+      {
+        key: "mes", label: "Mes",
+        opciones: opcionesMeses.map((m) => ({ id: m, nombre: formatMesChip(m) })),
+        valoresActivos: filtros.mes,
+      },
+      {
+        key: "semana", label: "Semana",
+        opciones: opcionesSemanas.map((s) => ({ id: s, nombre: formatSemanaChip(s) })),
+        valoresActivos: filtros.semana,
+      },
+      {
+        key: "idObra", label: "Obra",
+        opciones: opcionesObras,
+        valoresActivos: filtros.idObra,
+      },
+      {
+        key: "idEmpresa", label: "Empresa",
+        opciones: opcionesEmpresas,
+        valoresActivos: filtros.idEmpresa,
+      },
+      {
+        key: "idSindicato", label: "Sindicato",
+        opciones: opcionesSindicatos,
+        valoresActivos: filtros.idSindicato,
+      },
+      {
+        key: "material", label: "Material",
+        opciones: opcionesMateriales.map((m) => ({ id: m, nombre: m })),
+        valoresActivos: filtros.material,
+      },
+      {
+        key: "idBanco", label: "Banco",
+        opciones: opcionesBancos,
+        valoresActivos: filtros.idBanco,
+      },
+    ];
+    return base.map((c) => ({ ...c, valorLabel: buildValorLabel(c.opciones, c.valoresActivos) }));
+  }, [filtros, opcionesMeses, opcionesSemanas, opcionesObras, opcionesEmpresas, opcionesSindicatos, opcionesMateriales, opcionesBancos]);
 
   const categoriaActual = categoriaAbierta
     ? categoriasConfig.find((c) => c.key === categoriaAbierta)
@@ -1125,6 +1183,14 @@ const EstadisticasGlobales = () => {
           </span>
         </div>
         <div className="eg__header-actions">
+          <button
+            className="eg__export-btn"
+            onClick={handleExportarPDF}
+            disabled={loading || !!error || exportando}
+          >
+            <Download size={14} />
+            {exportando ? "Generando…" : "Exportar PDF"}
+          </button>
           <button
             className={`eg__refresh-btn${loading ? " eg__refresh-btn--loading" : ""}`}
             onClick={fetchEstadisticas}
@@ -1173,7 +1239,7 @@ const EstadisticasGlobales = () => {
               .filter((c) => c.opciones.length > 0)
               .map((cat) => {
                 const isOpen = categoriaAbierta === cat.key;
-                const isActivo = !!cat.valorActivo;
+                const isActivo = cat.valoresActivos.length > 0;
                 return (
                   <button
                     key={cat.key}
@@ -1210,8 +1276,8 @@ const EstadisticasGlobales = () => {
           {categoriaActual && categoriaActual.opciones.length > 0 && (
             <FilterPanel
               opciones={categoriaActual.opciones}
-              valorActivo={categoriaActual.valorActivo}
-              onSelect={(v) => setFiltro(categoriaActual.key, v)}
+              valoresActivos={categoriaActual.valoresActivos}
+              onSelect={(v) => toggleFiltro(categoriaActual.key, v)}
             />
           )}
         </div>

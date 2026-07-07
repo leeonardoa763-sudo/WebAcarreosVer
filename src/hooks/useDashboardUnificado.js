@@ -123,7 +123,14 @@ const getViajesVale = (vale) => {
     const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
     // Tipo 3 (Corte): los viajes se registran como tickets_material, no vale_material_viajes
     if (tipoId === 3) return sum + (vale.tickets_material?.length ?? 0);
-    return sum + (det.vale_material_viajes?.length ?? 0);
+    const numViajes = det.vale_material_viajes?.length ?? 0;
+    // Tipo 2 (Base Asfáltica): siempre 1 vale = 1 viaje. El viaje se captura
+    // directo en el detalle, sin fila en vale_material_viajes.
+    if (tipoId === 2 && numViajes === 0) {
+      const tieneDatos = det.volumen_real_m3 != null || det.costo_total != null;
+      return sum + (tieneDatos ? 1 : 0);
+    }
+    return sum + numViajes;
   }, 0);
 };
 
@@ -185,8 +192,15 @@ const calcularKpisDeVales = (lista) => {
             if (ticket.fecha_impresion) marcas.push(new Date(ticket.fecha_impresion).getTime());
           }
         } else {
-          totalViajes += det.vale_material_viajes?.length ?? 0;
-          viajesPorMaterial[nombre] = (viajesPorMaterial[nombre] || 0) + (det.vale_material_viajes?.length ?? 0);
+          const numViajes = det.vale_material_viajes?.length ?? 0;
+          // Tipo 2 (Base Asfáltica): siempre 1 vale = 1 viaje. El viaje se
+          // captura directo en el detalle, sin fila en vale_material_viajes.
+          const conteoViajes =
+            tipoId === 2 && numViajes === 0
+              ? (det.volumen_real_m3 != null || det.costo_total != null ? 1 : 0)
+              : numViajes;
+          totalViajes += conteoViajes;
+          viajesPorMaterial[nombre] = (viajesPorMaterial[nombre] || 0) + conteoViajes;
           for (const viaje of det.vale_material_viajes ?? []) {
             if (viaje.hora_registro) marcas.push(new Date(viaje.hora_registro).getTime());
           }

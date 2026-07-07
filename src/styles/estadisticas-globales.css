@@ -114,6 +114,34 @@
   padding-top: 6px;
 }
 
+.eg__export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: var(--eg-r-sm);
+  border: 1.5px solid transparent;
+  background: var(--eg-accent);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Outfit', system-ui, sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 10px rgba(26, 147, 111, 0.28);
+  white-space: nowrap;
+}
+
+.eg__export-btn:hover:not(:disabled) {
+  background: #157a5c;
+  box-shadow: 0 4px 16px rgba(26, 147, 111, 0.38);
+}
+
+.eg__export-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .eg__refresh-btn {
   display: inline-flex;
   align-items: center;

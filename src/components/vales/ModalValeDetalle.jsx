@@ -156,6 +156,15 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
           const tarifaPrimerKm = primerViaje?.tarifa_primer_km != null ? Number(primerViaje.tarifa_primer_km) : null;
           const tarifaSubsec = primerViaje?.tarifa_subsecuente != null ? Number(primerViaje.tarifa_subsecuente) : null;
 
+          // Tipo 2 (Base Asfáltica): siempre 1 vale = 1 viaje. El viaje se
+          // captura directo en el detalle, sin fila en vale_material_viajes.
+          const esTipo2SinViajes =
+            idTipo === 2 &&
+            viajesDetalle.length === 0 &&
+            (volumen > 0 || costoTotal > 0 || pesoTon > 0);
+          const numViajesEfectivo =
+            viajesDetalle.length > 0 ? viajesDetalle.length : esTipo2SinViajes ? 1 : 0;
+
           return (
             <div key={detalle.id_detalle_material} className="vdm__detalle-item">
               <div className="vdm__detalle-header">
@@ -207,10 +216,10 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
                     <span className="vdm__cell-value">{formatearMoneda(tarifaSubsec)}/m³</span>
                   </div>
                 )}
-                {viajesDetalle.length > 0 && (
+                {numViajesEfectivo > 0 && (
                   <div className="vdm__detalle-cell">
                     <span className="vdm__cell-label">Viajes:</span>
-                    <span className="vdm__cell-value">{viajesDetalle.length}</span>
+                    <span className="vdm__cell-value">{numViajesEfectivo}</span>
                   </div>
                 )}
                 <div className="vdm__detalle-cell">
@@ -305,40 +314,67 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
               )}
 
               {/* Viajes tipo 1 y 2 */}
-              {!esTipo3 && viajesDetalle.length > 0 && (
+              {!esTipo3 && numViajesEfectivo > 0 && (
                 <div className="vdm__viajes">
                   <h5 className="vdm__viajes-title">
                     <Receipt size={12} aria-hidden="true" />
-                    Registro de Viajes ({viajesDetalle.length})
+                    Registro de Viajes ({numViajesEfectivo})
                   </h5>
                   <div className="vdm__viajes-tabla-header">
                     <span>Viaje</span><span>Hora</span><span>Folio</span>
                     <span>Ton</span><span>M³</span><span>Precio/m³</span><span>Costo</span>
                   </div>
                   <div className="vdm__viajes-lista">
-                    {[...viajesDetalle].sort((a, b) => a.numero_viaje - b.numero_viaje).map((viaje) => {
-                      const registrador = fmtRegistrador(viaje.persona_registro);
-                      return (
-                        <div key={viaje.id_viaje} className="vdm__viaje-row vdm__viaje-row--material">
-                          <span className="vdm__viaje-num">
-                            #{viaje.numero_viaje}
-                            {registrador && <span className="vdm__viaje-reg" title={`Registrado por ${registrador}`}>{registrador}</span>}
-                          </span>
-                          <span>{viaje.hora_registro ? formatearHora(viaje.hora_registro) : "—"}</span>
-                          <span>{viaje.folio_vale_fisico || "—"}</span>
-                          <span>{viaje.peso_ton ? `${Number(viaje.peso_ton).toFixed(2)} ton` : "—"}</span>
-                          <span>{viaje.volumen_m3 ? formatearVolumen(Number(viaje.volumen_m3)) : "—"}</span>
-                          <span title={fmtTarifaTooltip(viaje)}>{viaje.precio_m3 ? formatearMoneda(Number(viaje.precio_m3)) : "—"}</span>
-                          <span>{viaje.costo_viaje ? formatearMoneda(Number(viaje.costo_viaje)) : "—"}</span>
-                        </div>
-                      );
-                    })}
+                    {esTipo2SinViajes ? (
+                      <div className="vdm__viaje-row vdm__viaje-row--material">
+                        <span className="vdm__viaje-num">#1</span>
+                        <span>
+                          {vale.fecha_completado
+                            ? formatearHora(vale.fecha_completado)
+                            : vale.fecha_creacion
+                              ? formatearHora(vale.fecha_creacion)
+                              : "—"}
+                        </span>
+                        <span>{detalle.folio_vale_fisico || "—"}</span>
+                        <span>{pesoTon ? `${pesoTon.toFixed(2)} ton` : "—"}</span>
+                        <span>{volumen ? formatearVolumen(volumen) : "—"}</span>
+                        <span title={fmtTarifaTooltip(detalle)}>{precioM3 ? formatearMoneda(precioM3) : "—"}</span>
+                        <span>{costoTotal ? formatearMoneda(costoTotal) : "—"}</span>
+                      </div>
+                    ) : (
+                      [...viajesDetalle].sort((a, b) => a.numero_viaje - b.numero_viaje).map((viaje) => {
+                        const registrador = fmtRegistrador(viaje.persona_registro);
+                        return (
+                          <div key={viaje.id_viaje} className="vdm__viaje-row vdm__viaje-row--material">
+                            <span className="vdm__viaje-num">
+                              #{viaje.numero_viaje}
+                              {registrador && <span className="vdm__viaje-reg" title={`Registrado por ${registrador}`}>{registrador}</span>}
+                            </span>
+                            <span>{viaje.hora_registro ? formatearHora(viaje.hora_registro) : "—"}</span>
+                            <span>{viaje.folio_vale_fisico || "—"}</span>
+                            <span>{viaje.peso_ton ? `${Number(viaje.peso_ton).toFixed(2)} ton` : "—"}</span>
+                            <span>{viaje.volumen_m3 ? formatearVolumen(Number(viaje.volumen_m3)) : "—"}</span>
+                            <span title={fmtTarifaTooltip(viaje)}>{viaje.precio_m3 ? formatearMoneda(Number(viaje.precio_m3)) : "—"}</span>
+                            <span>{viaje.costo_viaje ? formatearMoneda(Number(viaje.costo_viaje)) : "—"}</span>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                   <div className="vdm__viajes-totales">
                     <span className="vdm__viajes-totales-label">Subtotal viajes:</span>
-                    <span>{viajesDetalle.reduce((s, v) => s + Number(v.peso_ton || 0), 0).toFixed(2)} ton</span>
+                    <span>
+                      {esTipo2SinViajes
+                        ? pesoTon.toFixed(2)
+                        : viajesDetalle.reduce((s, v) => s + Number(v.peso_ton || 0), 0).toFixed(2)}{" "}
+                      ton
+                    </span>
                     <span className="vdm__viajes-totales-costo">
-                      {formatearMoneda(viajesDetalle.reduce((s, v) => s + Number(v.costo_viaje || 0), 0))}
+                      {formatearMoneda(
+                        esTipo2SinViajes
+                          ? costoTotal
+                          : viajesDetalle.reduce((s, v) => s + Number(v.costo_viaje || 0), 0),
+                      )}
                     </span>
                   </div>
                 </div>
