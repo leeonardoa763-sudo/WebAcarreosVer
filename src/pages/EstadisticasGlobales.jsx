@@ -3,6 +3,9 @@
  *
  * Carta de presentación del sistema: KPIs, filtros por chips deslizables
  * (mes, semana, obra, empresa, sindicato, material, banco) y gráfica temporal.
+ * Dos secciones de desglose por obra: una desde conciliaciones (oficial,
+ * clic para ver la conciliación) y otra en tiempo real directo de `vales`
+ * (con filtro "Hoy" y exportación a imagen).
  *
  * Dependencias: useEstadisticasGlobales, recharts, estadisticas-globales.css
  * Usado en: App.jsx (ruta /estadisticas)
@@ -36,6 +39,7 @@ import {
   ExternalLink,
   FileText,
   Download,
+  Image as ImageIcon,
 } from "lucide-react";
 
 // 3. Recharts
@@ -60,6 +64,7 @@ import { useEstadisticasGlobales } from "../hooks/useEstadisticasGlobales";
 
 // 5. Utils
 import { generarPDFReporteEstadisticas } from "../utils/exportarReporteEstadisticas";
+import { exportarElementoComoImagen } from "../utils/exportarImagen";
 
 // 6. Estilos
 import "../styles/estadisticas-globales.css";
@@ -966,6 +971,15 @@ const EstadisticasGlobales = () => {
     rendimientoPorMaterial,
     tablaObraMaterial,
     tablaRentaPorObra,
+    periodoTiempoReal,
+    seleccionarPeriodoTiempoReal,
+    semanaTiempoReal,
+    seleccionarSemanaTiempoReal,
+    opcionesSemanasTiempoReal,
+    loadingTiempoReal,
+    errorTiempoReal,
+    tablaObraMaterialTiempoReal,
+    tablaObraRentaTiempoReal,
     loadingPresupuestos,
     presupuestosMaterialFiltrados,
     presupuestosRentaFiltrados,
@@ -981,6 +995,10 @@ const EstadisticasGlobales = () => {
 
   // 4. Exportación de reporte PDF
   const [exportando, setExportando] = useState(false);
+
+  // 5. Exportación de imagen del Desglose por Obra en tiempo real
+  const [exportandoImagen, setExportandoImagen] = useState(false);
+  const desgloseObraRef = useRef(null);
 
   const handleMaterialClick = (obraNombre, mat) => {
     const concMap = {};
@@ -1056,6 +1074,19 @@ const EstadisticasGlobales = () => {
     }
   };
 
+  const handleExportarImagen = async () => {
+    if (!desgloseObraRef.current) return;
+    try {
+      setExportandoImagen(true);
+      const nombreArchivo = `Desglose_Obra_${new Date().toISOString().substring(0, 10)}.png`;
+      await exportarElementoComoImagen(desgloseObraRef.current, nombreArchivo);
+    } catch (err) {
+      console.error("Error al exportar imagen:", err);
+    } finally {
+      setExportandoImagen(false);
+    }
+  };
+
   // 3. Totales de tablas
   const totalesTabla = useMemo(
     () =>
@@ -1098,6 +1129,35 @@ const EstadisticasGlobales = () => {
         { conciliaciones: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, importeTotal: 0 }
       ),
     [tablaRentaPorObra]
+  );
+
+  const totalesTablaObraTiempoReal = useMemo(
+    () =>
+      tablaObraMaterialTiempoReal.reduce(
+        (acc, obraRow) => ({
+          m3Total:     acc.m3Total     + obraRow.subtotal.m3Total,
+          valesCount:  acc.valesCount  + obraRow.subtotal.valesCount,
+          totalViajes: acc.totalViajes + obraRow.subtotal.totalViajes,
+          importeIVA:  acc.importeIVA  + obraRow.subtotal.importeIVA,
+        }),
+        { m3Total: 0, valesCount: 0, totalViajes: 0, importeIVA: 0 }
+      ),
+    [tablaObraMaterialTiempoReal]
+  );
+
+  const totalesRentaTiempoReal = useMemo(
+    () =>
+      tablaObraRentaTiempoReal.reduce(
+        (acc, row) => ({
+          vales:          acc.vales          + row.vales,
+          totalViajes:    acc.totalViajes    + row.totalViajes,
+          totalDias:      acc.totalDias      + row.totalDias,
+          totalHoras:     acc.totalHoras     + row.totalHoras,
+          subtotalSinIva: acc.subtotalSinIva + row.subtotalSinIva,
+        }),
+        { vales: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, subtotalSinIva: 0 }
+      ),
+    [tablaObraRentaTiempoReal]
   );
 
   // 4. Config de categorías de filtros (multi-selección por categoría)
@@ -1329,7 +1389,7 @@ const EstadisticasGlobales = () => {
         </div>
       )}
 
-      {/* ── Tabla por obra (material + renta) ─────────────────── */}
+      {/* ── Tabla por obra (material + renta) — desde conciliaciones ─── */}
       {!error && (
         <div className="eg__tabla-section">
           <div className="eg__tabla-header">
@@ -1376,7 +1436,15 @@ const EstadisticasGlobales = () => {
                     <Fragment key={obraRow.obra}>
                       <tr className="eg__tabla-obra-header">
                         <td colSpan={5}>
-                          <span className="eg__tabla-obra-label">{obraRow.obra}</span>
+                          <span className="eg__tabla-obra-label">
+                            {obraRow.empresa && (
+                              <span className="eg__tabla-obra-empresa">{obraRow.empresa}</span>
+                            )}
+                            {obraRow.cc != null && (
+                              <span className="eg__tabla-obra-cc">CC {obraRow.cc}</span>
+                            )}
+                            {obraRow.obra}
+                          </span>
                         </td>
                       </tr>
                       {obraRow.materiales.map((mat, matIdx) => (
@@ -1473,7 +1541,17 @@ const EstadisticasGlobales = () => {
                           onClick={() => handleRentaClick(row)}
                           title="Ver conciliaciones de esta obra"
                         >
-                          <td>{row.obra}</td>
+                          <td>
+                            <span className="eg__obra-cell">
+                              {row.empresa && (
+                                <span className="eg__tabla-obra-empresa">{row.empresa}</span>
+                              )}
+                              {row.cc != null && (
+                                <span className="eg__tabla-obra-cc">CC {row.cc}</span>
+                              )}
+                              {row.obra}
+                            </span>
+                          </td>
                           <td>{formatNum(row.conciliaciones)}</td>
                           <td>{formatNum(row.totalDias, 1)}</td>
                           <td>{formatNum(row.totalHoras, 1)}</td>
@@ -1499,6 +1577,249 @@ const EstadisticasGlobales = () => {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* ── Tabla por obra (material + renta) — en tiempo real ─── */}
+      {!error && (
+        <div className="eg__tabla-section">
+          <div className="eg__tabla-header">
+            <div className="eg__tabla-header-left">
+              <h2 className="eg__tabla-title">Desglose por Obra — Hoy</h2>
+              <span className="eg__tabla-eyebrow-live">En tiempo real</span>
+            </div>
+            <div className="eg__tabla-header-right">
+              <div className="eg__periodo-group">
+                <button
+                  className={`eg__periodo-btn${periodoTiempoReal === "hoy" ? " eg__periodo-btn--activo" : ""}`}
+                  onClick={() => seleccionarPeriodoTiempoReal("hoy")}
+                  title="Vales creados hoy"
+                >
+                  <CalendarDays size={13} />
+                  Hoy
+                </button>
+                <button
+                  className={`eg__periodo-btn${periodoTiempoReal === "ayer" ? " eg__periodo-btn--activo" : ""}`}
+                  onClick={() => seleccionarPeriodoTiempoReal("ayer")}
+                  title="Vales creados ayer"
+                >
+                  Ayer
+                </button>
+                <button
+                  className={`eg__periodo-btn${periodoTiempoReal === "semana" ? " eg__periodo-btn--activo" : ""}`}
+                  onClick={() => seleccionarPeriodoTiempoReal("semana")}
+                  title="Vales creados en la semana seleccionada"
+                >
+                  Semana
+                </button>
+                {periodoTiempoReal === "semana" && (
+                  <select
+                    className="eg__periodo-select"
+                    value={semanaTiempoReal}
+                    onChange={(e) => seleccionarSemanaTiempoReal(e.target.value)}
+                  >
+                    {opcionesSemanasTiempoReal.map((sem) => (
+                      <option key={sem} value={sem}>{formatSemanaChip(sem)}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <button
+                className="eg__export-img-btn"
+                onClick={handleExportarImagen}
+                disabled={loadingTiempoReal || !!errorTiempoReal || exportandoImagen}
+              >
+                <ImageIcon size={13} />
+                {exportandoImagen ? "Generando…" : "Exportar imagen"}
+              </button>
+              {!loadingTiempoReal && (
+                <span className="eg__tabla-badge">
+                  {tablaObraMaterialTiempoReal.length}{" "}
+                  {tablaObraMaterialTiempoReal.length === 1 ? "obra" : "obras"}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <p className="eg__tabla-subnota">
+            Incluye vales emitidos, verificados y conciliados aún no incluidos en un
+            reporte oficial (no incluye borradores ni cancelados). El importe de
+            Renta se muestra sin IVA ni retención — para la cifra oficial consulta
+            la conciliación correspondiente.
+          </p>
+
+          {errorTiempoReal && (
+            <div className="eg__empty">
+              No se pudo cargar el desglose en tiempo real: {errorTiempoReal}
+            </div>
+          )}
+
+          <div ref={desgloseObraRef}>
+            {/* ─ Sub-sección material ─ */}
+            <div className="eg__tabla-subseccion">
+              <span className="eg__tabla-subseccion__label">
+                <Truck size={12} />
+                Material
+              </span>
+            </div>
+            <div className="eg__tabla-wrap">
+              <table className="eg__tabla">
+                <thead>
+                  <tr>
+                    <th>Material</th>
+                    <th>M³ Total</th>
+                    <th>Vales</th>
+                    <th>Viajes</th>
+                    <th>Importe + IVA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingTiempoReal ? (
+                    renderSkeletonRows()
+                  ) : tablaObraMaterialTiempoReal.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="eg__empty">
+                        Sin datos de material para el periodo y filtros seleccionados.
+                      </td>
+                    </tr>
+                  ) : (
+                    tablaObraMaterialTiempoReal.map((obraRow) => (
+                      <Fragment key={obraRow.obra}>
+                        <tr className="eg__tabla-obra-header">
+                          <td colSpan={5}>
+                            <span className="eg__tabla-obra-label">
+                              {obraRow.empresa && (
+                                <span className="eg__tabla-obra-empresa">{obraRow.empresa}</span>
+                              )}
+                              {obraRow.cc != null && (
+                                <span className="eg__tabla-obra-cc">CC {obraRow.cc}</span>
+                              )}
+                              {obraRow.obra}
+                            </span>
+                          </td>
+                        </tr>
+                        {obraRow.materiales.map((mat, matIdx) => (
+                          <tr key={mat.material}>
+                            <td>
+                              <div className="eg__material-name eg__material-name--sub">
+                                <span
+                                  className="eg__material-dot"
+                                  style={{ background: DOT_COLORS[matIdx % DOT_COLORS.length] }}
+                                />
+                                {mat.material}
+                              </div>
+                            </td>
+                            <td>{formatNum(mat.m3Total, 2)} m³</td>
+                            <td>{formatNum(mat.valesCount)}</td>
+                            <td>{formatNum(mat.totalViajes)}</td>
+                            <td className="eg__importe-cell">{formatMXN(mat.importeIVA)}</td>
+                          </tr>
+                        ))}
+                        {obraRow.materiales.length > 1 && (
+                          <tr className="eg__tabla-subtotal">
+                            <td>Subtotal</td>
+                            <td>{formatNum(obraRow.subtotal.m3Total, 2)} m³</td>
+                            <td>{formatNum(obraRow.subtotal.valesCount)}</td>
+                            <td>{formatNum(obraRow.subtotal.totalViajes)}</td>
+                            <td className="eg__importe-cell">{formatMXN(obraRow.subtotal.importeIVA)}</td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    ))
+                  )}
+                </tbody>
+                {!loadingTiempoReal && tablaObraMaterialTiempoReal.length > 0 && (
+                  <tfoot>
+                    <tr>
+                      <td>Total</td>
+                      <td>{formatNum(totalesTablaObraTiempoReal.m3Total, 2)} m³</td>
+                      <td>{formatNum(totalesTablaObraTiempoReal.valesCount)}</td>
+                      <td>{formatNum(totalesTablaObraTiempoReal.totalViajes)}</td>
+                      <td className="eg__importe-cell">
+                        {formatMXN(totalesTablaObraTiempoReal.importeIVA)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+
+            {/* ─ Sub-sección renta ─ */}
+            {!loadingTiempoReal && (
+              <>
+                <div className="eg__tabla-subseccion eg__tabla-subseccion--renta">
+                  <span className="eg__tabla-subseccion__label">
+                    <Clock size={12} />
+                    Renta de Equipo
+                  </span>
+                  {tablaObraRentaTiempoReal.length > 0 && (
+                    <span className="eg__tabla-badge eg__tabla-badge--green">
+                      {tablaObraRentaTiempoReal.length}{" "}
+                      {tablaObraRentaTiempoReal.length === 1 ? "obra" : "obras"}
+                    </span>
+                  )}
+                </div>
+                <div className="eg__tabla-wrap">
+                  <table className="eg__tabla">
+                    <thead>
+                      <tr>
+                        <th>Obra</th>
+                        <th>Vales</th>
+                        <th>Viajes</th>
+                        <th>Días</th>
+                        <th>Horas</th>
+                        <th>Subtotal (sin IVA)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tablaObraRentaTiempoReal.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="eg__empty">
+                            Sin renta para el periodo y filtros seleccionados.
+                          </td>
+                        </tr>
+                      ) : (
+                        tablaObraRentaTiempoReal.map((row) => (
+                          <tr key={row.obra}>
+                            <td>
+                              <span className="eg__obra-cell">
+                                {row.empresa && (
+                                  <span className="eg__tabla-obra-empresa">{row.empresa}</span>
+                                )}
+                                {row.cc != null && (
+                                  <span className="eg__tabla-obra-cc">CC {row.cc}</span>
+                                )}
+                                {row.obra}
+                              </span>
+                            </td>
+                            <td>{formatNum(row.vales)}</td>
+                            <td>{formatNum(row.totalViajes)}</td>
+                            <td>{formatNum(row.totalDias, 1)}</td>
+                            <td>{formatNum(row.totalHoras, 1)}</td>
+                            <td className="eg__importe-cell">{formatMXN(row.subtotalSinIva)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {tablaObraRentaTiempoReal.length > 0 && (
+                      <tfoot>
+                        <tr>
+                          <td>Total</td>
+                          <td>{formatNum(totalesRentaTiempoReal.vales)}</td>
+                          <td>{formatNum(totalesRentaTiempoReal.totalViajes)}</td>
+                          <td>{formatNum(totalesRentaTiempoReal.totalDias, 1)}</td>
+                          <td>{formatNum(totalesRentaTiempoReal.totalHoras, 1)}</td>
+                          <td className="eg__importe-cell">
+                            {formatMXN(totalesRentaTiempoReal.subtotalSinIva)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 

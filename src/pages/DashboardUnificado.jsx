@@ -468,6 +468,12 @@ const DashboardUnificado = () => {
         rentaDet?.es_renta_por_dia || Number(rentaDet?.total_dias ?? 0) > 0;
 
       const m3 = esMaterial ? Number(vale._cantidad?.valor ?? 0) : "";
+      const toneladas = esMaterial
+        ? (vale.vale_material_detalles ?? []).reduce(
+            (sum, det) => sum + Number(det.peso_ton || 0),
+            0,
+          )
+        : "";
       const dias =
         !esMaterial && esPorDia ? Number(rentaDet?.total_dias ?? 0) : "";
       const horas =
@@ -499,6 +505,7 @@ const DashboardUnificado = () => {
         Tipo: ETIQUETAS_TIPO[vale._tipo]?.label ?? vale._tipo,
         "Material / Equipo": vale._material ?? "—",
         "m³": m3,
+        Toneladas: toneladas,
         Días: dias,
         Horas: horas,
         Viajes: vale._viajes > 0 ? vale._viajes : "",

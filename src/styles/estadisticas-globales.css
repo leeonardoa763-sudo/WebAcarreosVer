@@ -681,8 +681,23 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
   padding: 20px 28px 18px;
   background: linear-gradient(135deg, var(--eg-secondary) 0%, #002F5E 100%);
+}
+
+.eg__tabla-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.eg__tabla-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .eg__tabla-title {
@@ -695,6 +710,20 @@
   margin: 0;
 }
 
+.eg__tabla-eyebrow-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--eg-accent);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
 .eg__tabla-badge {
   font-size: 12px;
   font-weight: 600;
@@ -703,6 +732,85 @@
   padding: 4px 13px;
   border-radius: 20px;
   letter-spacing: 0.03em;
+}
+
+.eg__periodo-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--eg-r-sm);
+  padding: 3px;
+}
+
+.eg__periodo-btn,
+.eg__export-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.eg__export-img-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--eg-r-sm);
+  padding: 6px 12px;
+}
+
+.eg__periodo-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.eg__export-img-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.eg__periodo-btn--activo {
+  background: var(--eg-primary);
+  color: #fff;
+}
+
+.eg__periodo-select {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  padding: 5px 8px;
+  margin-left: 2px;
+  cursor: pointer;
+}
+
+.eg__periodo-select option {
+  color: var(--eg-text);
+  background: var(--eg-surface);
+}
+
+.eg__export-img-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.eg__tabla-subnota {
+  margin: 14px 28px 0;
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--eg-muted);
+  line-height: 1.5;
 }
 
 .eg__tabla-wrap {
@@ -1263,6 +1371,28 @@
   border-radius: 4px;
   background: rgba(0, 78, 137, 0.10);
   color: var(--eg-secondary);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.eg__obra-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.eg__tabla-obra-empresa {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: rgba(26, 147, 111, 0.12);
+  color: var(--eg-accent);
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -1854,3 +1984,4 @@
     justify-content: space-between;
   }
 }
+

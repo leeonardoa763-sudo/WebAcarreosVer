@@ -3,6 +3,9 @@
  *
  * Estadísticas globales con filtros reactivos por mes, semana, obra, empresa,
  * sindicato, material y banco. Expone series de tiempo para gráfica.
+ * Incluye además un desglose por obra en tiempo real (directo de `vales`,
+ * sin pasar por conciliaciones) con filtro "Hoy", para el bloque
+ * "Desglose por Obra" de la página.
  *
  * Dependencias: supabase
  * Usado en: EstadisticasGlobales.jsx
@@ -46,6 +49,14 @@ export const useEstadisticasGlobales = () => {
   const [presupuestosRenta,    setPresupuestosRenta]    = useState([]);
   const [loadingPresupuestos,  setLoadingPresupuestos]  = useState(true);
 
+  // Estados del desglose por obra en tiempo real (directo de vales, sin conciliaciones)
+  const [rawValesTiempoReal, setRawValesTiempoReal] = useState([]);
+  const [loadingTiempoReal,  setLoadingTiempoReal]  = useState(true);
+  const [errorTiempoReal,    setErrorTiempoReal]    = useState(null);
+  // Periodo local de esta sección: "hoy" (default) | "ayer" | "semana"
+  const [periodoTiempoReal, setPeriodoTiempoReal] = useState("hoy");
+  const [semanaTiempoReal,  setSemanaTiempoReal]  = useState(() => getWeekKey(new Date().toISOString()));
+
   // 2. Estado de filtros
   const [filtros, setFiltrosState] = useState({
     mes: [],
@@ -68,7 +79,9 @@ export const useEstadisticasGlobales = () => {
         .from("conciliaciones")
         .select(
           "id_conciliacion, tipo_conciliacion, total_final, total_horas, total_dias, fecha_generacion, folio, id_obra, id_empresa, id_sindicato, obras:id_obra (id_obra, obra, cc), sindicatos:id_sindicato (sindicato), empresas:id_empresa (empresa)"
-        );
+        )
+        .neq("id_obra", 14)
+        .neq("id_empresa", 4);
 
       if (errorConc) throw errorConc;
       setRawConciliaciones(conciliaciones || []);
@@ -102,7 +115,7 @@ export const useEstadisticasGlobales = () => {
           const { data: vales, error: errorVales } = await supabase
             .from("vales")
             .select(`
-              id_vale, id_obra, id_operador, id_persona_creador, id_persona_verificador, id_vehiculo,
+              id_vale, id_obra, id_empresa, id_operador, id_persona_creador, id_persona_verificador, id_vehiculo,
               obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa)),
               operadores:id_operador (id_operador, id_sindicato, nombre_completo, sindicatos:id_sindicato (id_sindicato, sindicato)),
               vehiculos:id_vehiculo (id_vehiculo, placas),
@@ -123,7 +136,8 @@ export const useEstadisticasGlobales = () => {
               tickets_material (id_ticket)
             `)
             .in("id_vale", valeIds)
-            .neq("id_obra", 14);
+            .neq("id_obra", 14)
+            .neq("id_empresa", 4);
 
           if (errorVales) throw errorVales;
           setRawVales(vales || []);
@@ -183,7 +197,7 @@ export const useEstadisticasGlobales = () => {
           const { data: rentaVales, error: errorRentaVales } = await supabase
             .from("vales")
             .select(`
-              id_vale, id_obra,
+              id_vale, id_obra, id_empresa,
               obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa)),
               vale_renta_detalle (
                 id_vale_renta_detalle, hora_inicio, total_horas, total_dias, numero_viajes, costo_total,
@@ -192,7 +206,8 @@ export const useEstadisticasGlobales = () => {
               )
             `)
             .in("id_vale", rentaValeIds)
-            .neq("id_obra", 14);
+            .neq("id_obra", 14)
+            .neq("id_empresa", 4);
 
           if (errorRentaVales) throw errorRentaVales;
           setRawValesRenta(rentaVales || []);
@@ -251,6 +266,73 @@ export const useEstadisticasGlobales = () => {
   }, []);
 
   useEffect(() => { fetchPresupuestos(); }, []);
+
+  // ── Fetch independiente: vales en tiempo real para "Desglose por Obra" ──
+  // No pasa por conciliaciones/conciliacion_vales. Incluye vales aún no
+  // conciliados. Aislado de fetchEstadisticas: un fallo aquí no debe afectar
+  // KPIs, gráficas ni tops (que siguen siendo 100% conciliaciones).
+  const fetchValesTiempoReal = useCallback(async () => {
+    try {
+      setLoadingTiempoReal(true);
+      setErrorTiempoReal(null);
+
+      const { data, error } = await supabase
+        .from("vales")
+        .select(`
+          id_vale, tipo_vale, estado, fecha_creacion, id_obra, id_empresa,
+          obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa)),
+          operadores:id_operador (id_operador, id_sindicato),
+          vale_material_detalles (
+            id_detalle_material, volumen_real_m3, cantidad_pedida_m3, costo_total, id_banco,
+            material:id_material (
+              id_material, material,
+              tipo_de_material:id_tipo_de_material (id_tipo_de_material)
+            ),
+            vale_material_viajes (id_viaje, volumen_m3)
+          ),
+          tickets_material (id_ticket),
+          vale_renta_detalle (
+            id_vale_renta_detalle, total_dias, total_horas, numero_viajes, costo_total,
+            vale_renta_viajes (id_viaje)
+          )
+        `)
+        .neq("id_obra", 14)
+        .neq("id_empresa", 4)
+        .not("estado", "in", "(borrador,cancelado)")
+        .limit(20000);
+
+      if (error) throw error;
+      setRawValesTiempoReal(data || []);
+    } catch (err) {
+      console.error("Error en fetchValesTiempoReal:", err);
+      setErrorTiempoReal(err.message);
+      setRawValesTiempoReal([]);
+    } finally {
+      setLoadingTiempoReal(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchValesTiempoReal(); }, [fetchValesTiempoReal]);
+
+  const seleccionarPeriodoTiempoReal = useCallback((periodo) => {
+    setPeriodoTiempoReal(periodo);
+  }, []);
+
+  const seleccionarSemanaTiempoReal = useCallback((semanaKey) => {
+    setSemanaTiempoReal(semanaKey);
+    setPeriodoTiempoReal("semana");
+  }, []);
+
+  // ── Opciones de semana disponibles para el selector de "Desglose por Obra — Hoy" ──
+  const opcionesSemanasTiempoReal = useMemo(() => {
+    const set = new Set();
+    rawValesTiempoReal.forEach((v) => {
+      const key = getWeekKey(v.fecha_creacion);
+      if (key) set.add(key);
+    });
+    if (!set.has(semanaTiempoReal)) set.add(semanaTiempoReal);
+    return [...set].sort().reverse();
+  }, [rawValesTiempoReal, semanaTiempoReal]);
 
   // ── Opciones de filtros (derivadas) ────────────────────────────────
   const opcionesMeses = useMemo(() => {
@@ -325,7 +407,7 @@ export const useEstadisticasGlobales = () => {
   // ── Vales filtrados (nivel vale: mes, semana, obra, empresa, sindicato) ──
   const valesFiltrados = useMemo(() => {
     return rawVales.filter((vale) => {
-      if (vale.id_obra === 14) return false;
+      if (vale.id_obra === 14 || Number(vale.id_empresa) === 4) return false;
       const conc = valeAConciliacion[vale.id_vale];
 
       if (!matchesFiltro(filtros.mes, conc?.fecha_generacion?.substring(0, 7))) return false;
@@ -378,7 +460,7 @@ export const useEstadisticasGlobales = () => {
 
   // ── Resumen KPIs ────────────────────────────────────────────────────
   const resumen = useMemo(() => {
-    let concsFiltradas = rawConciliaciones.filter((c) => c.id_obra !== 14);
+    let concsFiltradas = rawConciliaciones.filter((c) => c.id_obra !== 14 && Number(c.id_empresa) !== 4);
     concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.mes, c.fecha_generacion?.substring(0, 7)));
     concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.semana, getWeekKey(c.fecha_generacion)));
     concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idObra, c.id_obra));
@@ -671,6 +753,148 @@ export const useEstadisticasGlobales = () => {
       .sort((a, b) => b.subtotal.m3Total - a.subtotal.m3Total);
   }, [valesFiltrados, filtros.material, filtros.idBanco]);
 
+  // ── Desglose por obra en TIEMPO REAL (directo de vales, sin conciliaciones) ──
+  // Usa fecha_creacion del vale (no fecha_generacion de conciliación). El periodo
+  // (Hoy / Ayer / Semana) es local a esta sección, independiente de los chips
+  // mes/semana de conciliaciones. Los demás chips (obra/empresa/sindicato/
+  // material/banco) sí se comparten con el resto de la página.
+  const valesTiempoRealFiltrados = useMemo(() => {
+    const hoyStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    const ayerStr = new Date(Date.now() - 86400000).toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+
+    return rawValesTiempoReal.filter((vale) => {
+      if (!vale.fecha_creacion) return false;
+      const fechaValeStr = new Date(vale.fecha_creacion)
+        .toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+
+      if (periodoTiempoReal === "hoy" && fechaValeStr !== hoyStr) return false;
+      if (periodoTiempoReal === "ayer" && fechaValeStr !== ayerStr) return false;
+      if (periodoTiempoReal === "semana" && getWeekKey(vale.fecha_creacion) !== semanaTiempoReal) return false;
+
+      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
+      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato)) return false;
+      return true;
+    });
+  }, [rawValesTiempoReal, filtros, periodoTiempoReal, semanaTiempoReal]);
+
+  const valesTiempoRealMaterial = useMemo(
+    () => valesTiempoRealFiltrados.filter((v) => v.tipo_vale === "material"),
+    [valesTiempoRealFiltrados]
+  );
+
+  const valesTiempoRealRenta = useMemo(
+    () => valesTiempoRealFiltrados.filter((v) => v.tipo_vale === "renta"),
+    [valesTiempoRealFiltrados]
+  );
+
+  // ── Tabla material agrupada por obra (tiempo real) ──────────────────
+  // Duplica intencionalmente la lógica de tablaObraMaterial: así no se toca
+  // ninguna línea del código existente que alimenta KPIs/gráficas/PDF.
+  const tablaObraMaterialTiempoReal = useMemo(() => {
+    const obraMap = {};
+    valesTiempoRealMaterial.forEach((vale) => {
+      const obraId = vale.obras?.id_obra;
+      if (!obraId) return;
+      const obraNombre = vale.obras?.obra || "Sin obra";
+
+      if (!obraMap[obraId]) {
+        obraMap[obraId] = {
+          obra: obraNombre,
+          cc: vale.obras?.cc ?? null,
+          empresa: vale.obras?.empresas?.empresa || null,
+          matMap: {},
+        };
+      }
+
+      (vale.vale_material_detalles || []).forEach((det) => {
+        const nombreMat = det.material?.material || "Sin clasificar";
+        const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
+
+        if (!matchesFiltro(filtros.material, nombreMat)) return;
+        if (!matchesFiltro(filtros.idBanco, det.id_banco)) return;
+
+        if (!obraMap[obraId].matMap[nombreMat]) {
+          obraMap[obraId].matMap[nombreMat] = {
+            material: nombreMat, m3Total: 0, valesIds: new Set(), totalViajes: 0, importeIVA: 0,
+          };
+        }
+        const s = obraMap[obraId].matMap[nombreMat];
+        s.valesIds.add(vale.id_vale);
+        s.importeIVA += Number(det.costo_total || 0) * 1.16;
+
+        // Vales recién emitidos aún sin viajes/tickets registrados no tienen
+        // volumen real todavía — usamos cantidad_pedida_m3 (lo solicitado al
+        // crear el vale) como estimado, igual que useDashboardAnalytics.js.
+        // Un vale siempre representa al menos un viaje, aunque todavía no se
+        // haya registrado el ticket/viaje individual.
+        if (tipoId === 3) {
+          s.m3Total += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
+          const tickets = vale.tickets_material?.length || 0;
+          s.totalViajes += tickets > 0 ? tickets : 1;
+        } else {
+          const viajes = det.vale_material_viajes || [];
+          if (viajes.length > 0) {
+            viajes.forEach((v) => { s.m3Total += Number(v.volumen_m3 || 0); });
+          } else {
+            s.m3Total += Number(det.cantidad_pedida_m3 || 0);
+          }
+          s.totalViajes += viajes.length > 0 ? viajes.length : 1;
+        }
+      });
+    });
+
+    return Object.entries(obraMap)
+      .map(([, { obra, cc, empresa, matMap }]) => {
+        const materiales = Object.values(matMap)
+          .map((s) => ({ ...s, valesCount: s.valesIds.size }))
+          .sort((a, b) => b.m3Total - a.m3Total);
+
+        const subtotal = materiales.reduce(
+          (acc, m) => ({
+            m3Total:     acc.m3Total     + m.m3Total,
+            valesCount:  acc.valesCount  + m.valesCount,
+            totalViajes: acc.totalViajes + m.totalViajes,
+            importeIVA:  acc.importeIVA  + m.importeIVA,
+          }),
+          { m3Total: 0, valesCount: 0, totalViajes: 0, importeIVA: 0 }
+        );
+
+        return { obra, cc, empresa, materiales, subtotal };
+      })
+      .sort((a, b) => b.subtotal.m3Total - a.subtotal.m3Total);
+  }, [valesTiempoRealMaterial, filtros.material, filtros.idBanco]);
+
+  // ── Tabla renta agrupada por obra (tiempo real) ─────────────────────
+  // Importe SIN IVA ni retención: la retención 4% solo se calcula a nivel
+  // conciliación, no existe como propiedad de un vale individual.
+  const tablaObraRentaTiempoReal = useMemo(() => {
+    const obraMap = {};
+    valesTiempoRealRenta.forEach((vale) => {
+      const obraId = vale.id_obra;
+      if (!obraId) return;
+      if (!obraMap[obraId]) {
+        obraMap[obraId] = {
+          obra: vale.obras?.obra || "Sin obra",
+          cc: vale.obras?.cc ?? null,
+          empresa: vale.obras?.empresas?.empresa || null,
+          vales: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, subtotalSinIva: 0,
+        };
+      }
+      const o = obraMap[obraId];
+      o.vales += 1;
+      (vale.vale_renta_detalle || []).forEach((det) => {
+        o.totalViajes += det.vale_renta_viajes?.length > 0
+          ? det.vale_renta_viajes.length
+          : (det.numero_viajes || 1);
+        o.totalDias  += Number(det.total_dias  || 0);
+        o.totalHoras += Number(det.total_horas || 0);
+        o.subtotalSinIva += Number(det.costo_total || 0);
+      });
+    });
+    return Object.values(obraMap).sort((a, b) => b.subtotalSinIva - a.subtotalSinIva);
+  }, [valesTiempoRealRenta]);
+
   // ── Mapa: id_conciliacion (renta) → total de viajes ─────────────────
   const viajesPorConciliacionRenta = useMemo(() => {
     const map = {};
@@ -691,7 +915,7 @@ export const useEstadisticasGlobales = () => {
   // ── Tabla renta agrupada por obra ───────────────────────────────────
   const tablaRentaPorObra = useMemo(() => {
     let concsFiltradas = rawConciliaciones.filter(
-      (c) => c.tipo_conciliacion === "renta" && c.id_obra !== 14
+      (c) => c.tipo_conciliacion === "renta" && c.id_obra !== 14 && Number(c.id_empresa) !== 4
     );
     concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.mes, c.fecha_generacion?.substring(0, 7)));
     concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.semana, getWeekKey(c.fecha_generacion)));
@@ -729,12 +953,16 @@ export const useEstadisticasGlobales = () => {
 
   // ── Presupuestos filtrados ─────────────────────────────────────────
   const presupuestosMaterialFiltrados = useMemo(
-    () => presupuestosMaterial.filter((p) => matchesFiltro(filtros.idObra, p.id_obra)),
+    () => presupuestosMaterial.filter(
+      (p) => matchesFiltro(filtros.idObra, p.id_obra) && Number(p.obras?.empresas?.id_empresa) !== 4
+    ),
     [presupuestosMaterial, filtros.idObra]
   );
 
   const presupuestosRentaFiltrados = useMemo(
-    () => presupuestosRenta.filter((p) => matchesFiltro(filtros.idObra, p.id_obra)),
+    () => presupuestosRenta.filter(
+      (p) => matchesFiltro(filtros.idObra, p.id_obra) && Number(p.obras?.empresas?.id_empresa) !== 4
+    ),
     [presupuestosRenta, filtros.idObra]
   );
 
@@ -800,7 +1028,7 @@ export const useEstadisticasGlobales = () => {
   // ── Tabla viajes de renta agrupada por obra → equipo (respeta todos los filtros) ──
   const tablaViajesRentaPorEquipo = useMemo(() => {
     const valesFilt = rawValesRenta.filter((vale) => {
-      if (vale.id_obra === 14) return false;
+      if (vale.id_obra === 14 || Number(vale.id_empresa) === 4) return false;
       const conc = valeRentaAConciliacion[vale.id_vale];
       if (!matchesFiltro(filtros.mes, conc?.fecha_generacion?.substring(0, 7))) return false;
       if (!matchesFiltro(filtros.semana, getWeekKey(conc?.fecha_generacion))) return false;
@@ -847,7 +1075,7 @@ export const useEstadisticasGlobales = () => {
   // ── Estadísticas de un periodo dado (mes o semana) con filtros activos ──
   const getPeriodoStats = useCallback((mesVal, semanaVal) => {
     const valesPeriodo = rawVales.filter((vale) => {
-      if (vale.id_obra === 14) return false;
+      if (vale.id_obra === 14 || Number(vale.id_empresa) === 4) return false;
       const conc = valeAConciliacion[vale.id_vale];
       if (mesVal && conc?.fecha_generacion?.substring(0, 7) !== mesVal) return false;
       if (semanaVal && getWeekKey(conc?.fecha_generacion) !== semanaVal) return false;
@@ -861,7 +1089,7 @@ export const useEstadisticasGlobales = () => {
     const m3Total = matStats.reduce((s, r) => s + r.m3Total, 0);
     const importeTotal = matStats.reduce((s, r) => s + r.importeIVA, 0);
 
-    let concsPeriodo = rawConciliaciones.filter((c) => c.id_obra !== 14);
+    let concsPeriodo = rawConciliaciones.filter((c) => c.id_obra !== 14 && Number(c.id_empresa) !== 4);
     if (mesVal) {
       concsPeriodo = concsPeriodo.filter((c) => c.fecha_generacion?.substring(0, 7) === mesVal);
     }
@@ -978,6 +1206,17 @@ export const useEstadisticasGlobales = () => {
     // Tablas agrupadas por obra
     tablaObraMaterial,
     tablaRentaPorObra,
+    // Desglose por obra en tiempo real (directo de vales, sin conciliaciones)
+    periodoTiempoReal,
+    seleccionarPeriodoTiempoReal,
+    semanaTiempoReal,
+    seleccionarSemanaTiempoReal,
+    opcionesSemanasTiempoReal,
+    loadingTiempoReal,
+    errorTiempoReal,
+    fetchValesTiempoReal,
+    tablaObraMaterialTiempoReal,
+    tablaObraRentaTiempoReal,
     // Presupuestos
     loadingPresupuestos,
     presupuestosMaterialFiltrados,
