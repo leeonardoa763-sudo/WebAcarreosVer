@@ -89,7 +89,7 @@ const InfoRow = ({ icon: Icon, label, value, subValue, color }) => (
 
 // ─── Detalle Material ─────────────────────────────────────────────────────────
 
-const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
+const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar, pesosEspecificos }) => {
   const getCostoEfectivo = (viaje) =>
     viaje.costo_viaje_override != null
       ? Number(viaje.costo_viaje_override)
@@ -152,9 +152,17 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
               })()
             : Number(detalle.costo_total || 0);
 
+          const pesoEspecifico =
+            !esTipo3 && detalle.bancos?.id_banco && detalle.material?.id_material
+              ? pesosEspecificos?.get(`${detalle.bancos.id_banco}-${detalle.material.id_material}`)
+              : null;
+
           const primerViaje = viajesDetalle[0];
-          const tarifaPrimerKm = primerViaje?.tarifa_primer_km != null ? Number(primerViaje.tarifa_primer_km) : null;
-          const tarifaSubsec = primerViaje?.tarifa_subsecuente != null ? Number(primerViaje.tarifa_subsecuente) : null;
+          // Tipo 2 (Base Asfáltica) no tiene fila en vale_material_viajes: la tarifa vive en el detalle.
+          const tarifaPrimerKmRaw = primerViaje?.tarifa_primer_km ?? detalle.tarifa_primer_km;
+          const tarifaSubsecRaw = primerViaje?.tarifa_subsecuente ?? detalle.tarifa_subsecuente;
+          const tarifaPrimerKm = tarifaPrimerKmRaw != null ? Number(tarifaPrimerKmRaw) : null;
+          const tarifaSubsec = tarifaSubsecRaw != null ? Number(tarifaSubsecRaw) : null;
 
           // Tipo 2 (Base Asfáltica): siempre 1 vale = 1 viaje. El viaje se
           // captura directo en el detalle, sin fila en vale_material_viajes.
@@ -242,6 +250,12 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar }) => {
                   <div className="vdm__detalle-cell">
                     <span className="vdm__cell-label">Peso:</span>
                     <span className="vdm__cell-value">{formatearPeso(pesoTon)}</span>
+                  </div>
+                )}
+                {pesoEspecifico != null && (
+                  <div className="vdm__detalle-cell">
+                    <span className="vdm__cell-label">Peso Específico:</span>
+                    <span className="vdm__cell-value">{Number(pesoEspecifico).toFixed(3)} ton/m³</span>
                   </div>
                 )}
                 <div className="vdm__detalle-cell vdm__detalle-cell--full">
@@ -727,6 +741,40 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
     cargarViajes();
   }, [vale.id_vale]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Peso específico (banco + material) — Tipos 1 y 2, se define fuera del vale
+  const [pesosEspecificos, setPesosEspecificos] = useState(new Map());
+
+  useEffect(() => {
+    if (vale.tipo_vale !== "material") return;
+
+    const pares = (vale.vale_material_detalles ?? [])
+      .filter((d) => d.material?.tipo_de_material?.id_tipo_de_material !== 3)
+      .map((d) => ({ id_banco: d.bancos?.id_banco, id_material: d.material?.id_material }))
+      .filter((p) => p.id_banco && p.id_material);
+
+    if (pares.length === 0) return;
+
+    const fetchPesos = async () => {
+      const idsBanco = [...new Set(pares.map((p) => p.id_banco))];
+      const idsMaterial = [...new Set(pares.map((p) => p.id_material))];
+      const { data, error } = await supabase
+        .from("peso_especifico")
+        .select("id_banco, id_material, peso_especifico")
+        .in("id_banco", idsBanco)
+        .in("id_material", idsMaterial);
+
+      if (error) return;
+
+      const mapa = new Map();
+      (data ?? []).forEach((row) => {
+        mapa.set(`${row.id_banco}-${row.id_material}`, row.peso_especifico);
+      });
+      setPesosEspecificos(mapa);
+    };
+
+    fetchPesos();
+  }, [vale.id_vale, vale.tipo_vale]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Modales anidados
   const [modalEditar, setModalEditar] = useState({ abierto: false, idDetalle: null });
   const [modalCancelar, setModalCancelar] = useState(false);
@@ -936,7 +984,12 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
             </div>
           )}
           {valeConViajes.tipo_vale === "material" ? (
-            <DetalleMaterial vale={valeConViajes} valeEditable={valeEditable} onAbrirEditar={abrirEditar} />
+            <DetalleMaterial
+              vale={valeConViajes}
+              valeEditable={valeEditable}
+              onAbrirEditar={abrirEditar}
+              pesosEspecificos={pesosEspecificos}
+            />
           ) : (
             <DetalleRenta vale={valeConViajes} valeEditable={valeEditable} onAbrirEditar={abrirEditar} />
           )}

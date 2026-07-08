@@ -328,6 +328,7 @@ export const useDashboardUnificado = () => {
             id_detalle_material, capacidad_m3, distancia_km, cantidad_pedida_m3,
             peso_ton, volumen_real_m3, precio_m3, costo_total,
             folio_banco, requisicion, notas_adicionales,
+            tarifa_primer_km, tarifa_subsecuente,
             material:id_material (
               id_material, material,
               tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)

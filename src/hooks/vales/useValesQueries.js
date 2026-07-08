@@ -83,6 +83,8 @@ export const useValesQueries = () => {
           folio_banco,
           requisicion,
           notas_adicionales,
+          tarifa_primer_km,
+          tarifa_subsecuente,
           material:id_material (
             id_material,
             material,
