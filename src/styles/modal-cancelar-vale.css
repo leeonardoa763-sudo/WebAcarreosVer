@@ -1,0 +1,245 @@
+/**
+ * src/styles/modal-cancelar-vale.css
+ *
+ * Estilos para el modal de confirmación de cancelación de vale.
+ * Prefijo BEM: mcv__
+ * Apilado sobre vdm__overlay (z-index: 1200 vs 1100)
+ */
+
+/* ── Overlay ── */
+.mcv__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 16px;
+  animation: mcvFadeIn 0.18s ease-out;
+}
+
+@keyframes mcvFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Panel ── */
+.mcv__panel {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
+  width: 100%;
+  max-width: 460px;
+  animation: mcvSlideUp 0.2s ease-out;
+}
+
+@keyframes mcvSlideUp {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ── Header ── */
+.mcv__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.mcv__header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mcv__header-icon {
+  color: var(--color-error, #dc2626);
+}
+
+.mcv__titulo {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.mcv__cerrar {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  line-height: 1;
+}
+
+.mcv__cerrar:hover {
+  color: #475569;
+  background: #f1f5f9;
+}
+
+.mcv__cerrar:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Body ── */
+.mcv__body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Advertencia ── */
+.mcv__advertencia {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.mcv__advertencia svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--color-error, #dc2626);
+}
+
+.mcv__advertencia p {
+  margin: 4px 0 0;
+  color: #7f1d1d;
+  font-size: 12px;
+}
+
+.mcv__folio {
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* ── Campo textarea ── */
+.mcv__campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mcv__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.mcv__textarea {
+  resize: vertical;
+  min-height: 90px;
+  padding: 10px 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1e293b;
+  font-family: inherit;
+  transition: border-color 0.15s;
+  outline: none;
+}
+
+.mcv__textarea:focus {
+  border-color: var(--color-error, #dc2626);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.mcv__textarea:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.mcv__contador {
+  font-size: 11px;
+  color: #9ca3af;
+  text-align: right;
+}
+
+/* ── Error ── */
+.mcv__error {
+  font-size: 13px;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 0;
+}
+
+/* ── Acciones ── */
+.mcv__acciones {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
+  flex-wrap: wrap;
+}
+
+.mcv__btn {
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mcv__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mcv__btn--secundario {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.mcv__btn--secundario:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.mcv__btn--cancelar {
+  background: var(--color-error, #dc2626);
+  color: #fff;
+}
+
+.mcv__btn--cancelar:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .mcv__acciones {
+    flex-direction: column;
+  }
+  .mcv__btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

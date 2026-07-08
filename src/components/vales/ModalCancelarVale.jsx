@@ -20,6 +20,9 @@ import { formatearFolio } from "../../utils/formatters";
 // 4. Hooks personalizados
 import { useCancelarVale } from "../../hooks/vales/useCancelarVale";
 
+// 5. Estilos
+import "../../styles/modal-cancelar-vale.css";
+
 const MOTIVO_MIN = 10;
 
 const ModalCancelarVale = ({ vale, onCerrar, onCanceladoExitoso }) => {

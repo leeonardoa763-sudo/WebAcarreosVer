@@ -399,6 +399,18 @@ const DashboardUnificado = () => {
     toggleCancelados,
   } = useDashboardUnificado();
 
+  // Mantiene el vale del modal sincronizado tras un refetch (crear/rechazar
+  // solicitud de desverificación no cierran el modal, solo refrescan datos).
+  useEffect(() => {
+    if (!valeSeleccionado) return;
+    const actualizado = valesFiltrados.find(
+      (v) => v.id_vale === valeSeleccionado.id_vale,
+    );
+    if (actualizado && actualizado !== valeSeleccionado) {
+      setValeSeleccionado(actualizado);
+    }
+  }, [valesFiltrados]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 4. Handlers
   const handlePeriodo = (periodo) => {
     cambiarPeriodo(periodo);
@@ -439,8 +451,11 @@ const DashboardUnificado = () => {
   };
 
   const handleValeActualizado = () => {
+    // No cierra el modal: ModalValeDetalle ya llama a onCerrar() explícitamente
+    // cuando corresponde (cancelación, aprobación de desverificación). Si se
+    // cerrara aquí también, crear o rechazar una solicitud tumbaría el modal
+    // de golpe en vez de solo refrescar el badge de estado.
     refetch();
-    setValeSeleccionado(null);
   };
 
   // 5. Export

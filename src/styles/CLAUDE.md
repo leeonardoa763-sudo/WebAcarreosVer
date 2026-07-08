@@ -11,6 +11,7 @@
 | `layout.css` | `Layout.jsx` / `Navbar.jsx` / `Sidebar.jsx` |
 | `modal-vale-detalle.css` | `ModalValeDetalle.jsx` — prefijo `vdm__` |
 | `modal-editar-vale.css` | `ModalEditarVale.jsx` / `ModalEditarValeRenta.jsx` / `TablaEditarViajes.jsx` |
+| `modal-cancelar-vale.css` | `ModalCancelarVale.jsx` — prefijo `mcv__` |
 | `verificacion.css` | `VerificarVales.jsx` + componentes de `verificacion/` |
 | `conciliaciones.css` | `Conciliaciones.jsx` + componentes de `conciliaciones/` |
 | `dashboard.css` | `Dashboard.jsx` + componentes de `dashboard/` |
@@ -49,6 +50,7 @@
 | `mev__` | `ModalEditarVale` |
 | `tev__` | `TablaEditarViajes` |
 | `mer__` | `ModalEditarValeRenta` |
+| `mcv__` | `ModalCancelarVale` |
 
 Al crear un componente nuevo con modal/tabla compleja, definir un prefijo de 3-4 letras único y agregarlo aquí.
 
