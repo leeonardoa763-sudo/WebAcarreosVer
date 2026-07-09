@@ -17,6 +17,9 @@ import { Document, Page, View, Text, Font, Image } from "@react-pdf/renderer";
 import { sharedStyles } from "../shared/styles/sharedStyles";
 import { materialPetreoStyles } from "../shared/styles/materialPetreoStyles";
 
+// Utils
+import { calcularTotalesPorBanco } from "../calcularTotalesPorBanco";
+
 // Registrar fuentes
 Font.register({
   family: "Roboto",
@@ -51,6 +54,14 @@ const formatearNumero = (numero) => {
   });
 };
 
+// m³ se muestra con un decimal extra de precisión (3) por pedido del usuario
+const formatearM3 = (numero) => {
+  return Number(numero || 0).toLocaleString("es-MX", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  });
+};
+
 const PDFConciliacionMaterialPetreo = ({
   conciliacion,
   valesAgrupados,
@@ -63,6 +74,14 @@ const PDFConciliacionMaterialPetreo = ({
   const totalToneladas =
     (totales.totalToneladasTipo1 || 0) + (totales.totalToneladasTipo2 || 0);
   const precioM3 = totalM3 > 0 ? totales.subtotal / totalM3 : 0;
+
+  // Desglose por banco: una conciliación puede combinar viajes de bancos
+  // distintos, cada uno con su propio PU y peso específico
+  const todosLosVales = Object.values(valesAgrupados).flatMap(
+    (grupo) => grupo.vales,
+  );
+  const totalesPorBanco = calcularTotalesPorBanco(todosLosVales);
+  const hayVariosBancos = totalesPorBanco.length > 1;
 
   // Extraer tarifas del primer detalle disponible (todo el archivo usa las mismas)
   let tarifaPrimerKm = null;
@@ -194,7 +213,7 @@ const PDFConciliacionMaterialPetreo = ({
                             {formatearNumero(detalle.distancia_km)}
                           </Text>
                           <Text style={materialPetreoStyles.colVol}>
-                            {formatearNumero(detalle.volumen_real_m3)}
+                            {formatearM3(detalle.volumen_real_m3)}
                           </Text>
                           <Text style={materialPetreoStyles.colTon}>
                             {formatearNumero(detalle.peso_ton)}
@@ -262,7 +281,7 @@ const PDFConciliacionMaterialPetreo = ({
                               {formatearNumero(detalle.distancia_km)}
                             </Text>
                             <Text style={materialPetreoStyles.colVol}>
-                              {formatearNumero(
+                              {formatearM3(
                                 viaje.volumen_m3 || detalle.volumen_real_m3,
                               )}
                             </Text>
@@ -307,7 +326,7 @@ const PDFConciliacionMaterialPetreo = ({
                         { paddingRight: 12 },
                       ]}
                     >
-                      {formatearNumero(m3Grupo)}
+                      {formatearM3(m3Grupo)}
                     </Text>
 
                     <Text
@@ -335,7 +354,7 @@ const PDFConciliacionMaterialPetreo = ({
           <View style={sharedStyles.totalRow}>
             <Text style={sharedStyles.totalLabel}>Total m³:</Text>
             <Text style={sharedStyles.totalValue}>
-              {formatearNumero(totalM3)}
+              {formatearM3(totalM3)}
             </Text>
           </View>
 
@@ -381,6 +400,62 @@ const PDFConciliacionMaterialPetreo = ({
             </Text>
           </View>
         </View>
+
+        {/* Totales por banco — solo si se usó más de un banco en la conciliación */}
+        {hayVariosBancos && (
+          <View
+            style={{
+              marginTop: 8,
+              borderTop: "0.5pt solid #E0E0E0",
+              paddingTop: 5,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 7,
+                fontWeight: 700,
+                textAlign: "right",
+                marginBottom: 3,
+              }}
+            >
+              Totales por banco:
+            </Text>
+            {totalesPorBanco.map((b) => (
+              <View
+                key={b.banco}
+                style={{ marginBottom: 4, alignItems: "flex-end" }}
+              >
+                <Text style={{ fontSize: 7, fontWeight: 700 }}>
+                  {b.banco}
+                </Text>
+                <View style={sharedStyles.totalRow}>
+                  <Text style={sharedStyles.totalLabel}>m³:</Text>
+                  <Text style={sharedStyles.totalValue}>
+                    {formatearM3(b.m3)}
+                  </Text>
+                </View>
+                <View style={sharedStyles.totalRow}>
+                  <Text style={sharedStyles.totalLabel}>Toneladas:</Text>
+                  <Text style={sharedStyles.totalValue}>
+                    {formatearNumero(b.toneladas)}
+                  </Text>
+                </View>
+                <View style={sharedStyles.totalRow}>
+                  <Text style={sharedStyles.totalLabel}>Peso específico:</Text>
+                  <Text style={sharedStyles.totalValue}>
+                    {formatearM3(b.pesoEspecifico)}
+                  </Text>
+                </View>
+                <View style={sharedStyles.totalRow}>
+                  <Text style={sharedStyles.totalLabel}>PU/m³:</Text>
+                  <Text style={sharedStyles.totalValue}>
+                    ${formatearNumero(b.pu)}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Tarifas aplicadas */}
         {(tarifaPrimerKm != null || tarifaSubsecuente != null) && (

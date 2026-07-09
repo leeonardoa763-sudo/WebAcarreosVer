@@ -21,6 +21,7 @@
 | Archivo | Motor | Propósito |
 |---------|-------|-----------|
 | `pdfHelpers.js` | — | Helpers compartidos: `formatearMoneda`, `checkPageBreak` |
+| `calcularTotalesPorBanco.js` | — | Desglosa m³, toneladas, PU y peso específico por banco para Material Pétreo (Tipo 1/2) — usado en el PDF y en `VisualizarConciliacion.jsx` |
 | `generarPDFConciliacionRenta.js` | **jsPDF** | PDF de conciliación de renta |
 | `generarPDFConciliacionMaterialPetreo.js` | **@react-pdf/renderer** | PDF material Tipo 1 y 2 |
 | `generarPDFConciliacionMaterialCorte.js` | **@react-pdf/renderer** | PDF material Tipo 3 (corte/tepetate) |

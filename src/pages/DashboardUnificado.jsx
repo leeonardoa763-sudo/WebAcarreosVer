@@ -519,6 +519,9 @@ const DashboardUnificado = () => {
         Obra: vale.obras?.obra ?? "—",
         Tipo: ETIQUETAS_TIPO[vale._tipo]?.label ?? vale._tipo,
         "Material / Equipo": vale._material ?? "—",
+        Banco: esMaterial
+          ? (vale.vale_material_detalles?.[0]?.bancos?.banco ?? "—")
+          : "—",
         "m³": m3,
         Toneladas: toneladas,
         Días: dias,

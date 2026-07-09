@@ -185,7 +185,7 @@ export const formatearVolumen = (volumen) => {
   if (volumen === null || volumen === undefined) return "0 m³";
 
   try {
-    return `${formatearNumero(volumen, 2)} m³`;
+    return `${formatearNumero(volumen, 3)} m³`;
   } catch (error) {
     console.error("Error en formatearVolumen:", error);
     return "0 m³";

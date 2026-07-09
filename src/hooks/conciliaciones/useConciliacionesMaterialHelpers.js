@@ -156,9 +156,9 @@ export const useConciliacionesMaterialHelpers = () => {
       totalViajesTipo1,
       totalViajesTipo2,
       totalViajesTipo3,
-      totalM3Tipo1: Number(totalM3Tipo1.toFixed(2)),
-      totalM3Tipo2: Number(totalM3Tipo2.toFixed(2)),
-      totalM3Tipo3: Number(totalM3Tipo3.toFixed(2)),
+      totalM3Tipo1: Number(totalM3Tipo1.toFixed(3)),
+      totalM3Tipo2: Number(totalM3Tipo2.toFixed(3)),
+      totalM3Tipo3: Number(totalM3Tipo3.toFixed(3)),
       totalToneladasTipo1: Number(totalToneladasTipo1.toFixed(2)),
       totalToneladasTipo2: Number(totalToneladasTipo2.toFixed(2)),
     };

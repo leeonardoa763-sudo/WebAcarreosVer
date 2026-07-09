@@ -16,6 +16,7 @@ import { useParams, useNavigate } from "react-router-dom";
 
 // 2. Utils
 import { formatearVolumen } from "../utils/formatters";
+import { calcularTotalesPorBanco } from "../utils/conciliaciones/calcularTotalesPorBanco";
 
 // 3. Icons
 import {
@@ -771,6 +772,11 @@ const VisualizarConciliacion = () => {
 
   const { totalViajes: totalViajesGlobal, totalM3: totalM3Global } = calcularTotalesGlobales();
 
+  // Desglose por banco — una conciliación puede combinar viajes de bancos
+  // distintos, cada uno con su propio PU y peso específico
+  const totalesPorBanco = esMaterial ? calcularTotalesPorBanco(vales) : [];
+  const hayVariosBancos = totalesPorBanco.length > 1;
+
   // ---- Render principal ----
 
   return (
@@ -870,6 +876,61 @@ const VisualizarConciliacion = () => {
                 </span>
               </div>
             )}
+
+            {/* Desglose por banco — solo si se usó más de un banco */}
+            {hayVariosBancos && (
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px dashed #e5e7eb" }}>
+                <span className="vc-financiero-label" style={{ fontWeight: 700 }}>
+                  Totales por banco
+                </span>
+                {totalesPorBanco.map((b) => (
+                  <div
+                    key={b.banco}
+                    style={{
+                      marginTop: 6,
+                      padding: "6px 8px",
+                      background: "#f8fafc",
+                      borderRadius: 4,
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 4 }}>
+                      {b.banco}
+                    </div>
+                    <div className="vc-financiero-row">
+                      <span className="vc-financiero-label">m³</span>
+                      <span className="vc-financiero-value">
+                        {formatearVolumen(b.m3)}
+                      </span>
+                    </div>
+                    <div className="vc-financiero-row">
+                      <span className="vc-financiero-label">Toneladas</span>
+                      <span className="vc-financiero-value">
+                        {Number(b.toneladas).toLocaleString("es-MX", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                    </div>
+                    <div className="vc-financiero-row">
+                      <span className="vc-financiero-label">Peso específico</span>
+                      <span className="vc-financiero-value">
+                        {b.pesoEspecifico.toLocaleString("es-MX", {
+                          minimumFractionDigits: 3,
+                          maximumFractionDigits: 3,
+                        })}
+                      </span>
+                    </div>
+                    <div className="vc-financiero-row">
+                      <span className="vc-financiero-label">PU/m³</span>
+                      <span className="vc-financiero-value">
+                        {formatearMonedaMXN(b.pu)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="vc-financiero-row" style={{ borderTop: "1px solid #e5e7eb", marginTop: 8, paddingTop: 8 }}>
               <span className="vc-financiero-label">Subtotal</span>
               <span className="vc-financiero-value">
