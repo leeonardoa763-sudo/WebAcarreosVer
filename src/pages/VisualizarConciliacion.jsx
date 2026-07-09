@@ -4,8 +4,9 @@
  * Página pública de soporte para conciliaciones — accesible por QR desde el PDF.
  * Muestra la conciliación completa con todos sus vales, viajes, fotos y personas.
  *
- * Dependencias: supabase, formatters, ListaViajesMaterial, visualizar-vale.css,
- *               visualizar-conciliacion.css
+ * Dependencias: supabase, formatters, ListaViajesMaterial,
+ *               VerificarConciliacionAccion, visualizar-vale.css,
+ *               visualizar-conciliacion.css, verificacion.css
  * Usado en: App.jsx — ruta /conciliacion/:folio (pública, sin auth)
  */
 
@@ -37,9 +38,13 @@ import { formatearFecha, formatearHora, formatearMoneda } from "../utils/formatt
 // 6. Componentes reutilizables de VisualizarVale
 import ListaViajesMaterial from "../components/visualizar-vale/ListaViajesMaterial";
 
-// 7. Estilos
+// 7. Componentes de conciliaciones
+import VerificarConciliacionAccion from "../components/conciliaciones/VerificarConciliacionAccion";
+
+// 8. Estilos
 import "../styles/visualizar-vale.css";
 import "../styles/visualizar-conciliacion.css";
+import "../styles/verificacion.css";
 
 // ========================================
 // HELPERS LOCALES
@@ -523,6 +528,7 @@ const VisualizarConciliacion = () => {
   const [busquedaGlobal, setBusquedaGlobal] = useState("");
   const [expandedVales, setExpandedVales] = useState(new Set());
   const [expandedGrupos, setExpandedGrupos] = useState(new Set());
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Cargar datos
   useEffect(() => {
@@ -552,6 +558,9 @@ const VisualizarConciliacion = () => {
             total_horas,
             fecha_generacion,
             estado,
+            verificado,
+            fecha_verificacion,
+            persona_verificador:id_persona_verificador (nombre, primer_apellido),
             empresas:id_empresa (empresa, sufijo, logo),
             sindicatos:id_sindicato (sindicato, nombre_completo),
             obras:id_obra (id_obra, obra, cc),
@@ -677,7 +686,7 @@ const VisualizarConciliacion = () => {
     return () => {
       isMounted = false;
     };
-  }, [folio]);
+  }, [folio, refreshKey]);
 
   const toggleVale = (idVale) => {
     setExpandedVales((prev) => {
@@ -792,7 +801,18 @@ const VisualizarConciliacion = () => {
           <span className={`vc-badge vc-badge--estado-${conciliacion.estado}`}>
             {conciliacion.estado}
           </span>
+          <span
+            className={`vc-badge ${conciliacion.verificado ? "vc-badge--verificado" : "vc-badge--pendiente-verificacion"}`}
+          >
+            {conciliacion.verificado ? "Verificada" : "Pendiente de verificar"}
+          </span>
         </div>
+
+        {/* ACCIÓN DE VERIFICACIÓN */}
+        <VerificarConciliacionAccion
+          conciliacion={conciliacion}
+          onVerificada={() => setRefreshKey((k) => k + 1)}
+        />
 
         <div className="vc-divider" />
 

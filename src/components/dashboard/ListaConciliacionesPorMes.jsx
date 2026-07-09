@@ -16,7 +16,7 @@
 import { useState } from "react";
 
 // 2. Icons
-import { ChevronDown, ChevronRight, Calendar } from "lucide-react";
+import { ChevronDown, ChevronRight, Calendar, CheckCircle2 } from "lucide-react";
 
 // 3. Config
 import { colors } from "../../config/colors";
@@ -158,6 +158,14 @@ const ListaConciliacionesPorMes = ({ meses, onSeleccionar, colorTema }) => {
                               >
                                 <div className="conciliacion-item__folio">
                                   {conciliacion.folio}
+                                  {conciliacion.verificado && (
+                                    <CheckCircle2
+                                      size={14}
+                                      color={colors.accent}
+                                      style={{ marginLeft: 6, verticalAlign: "middle" }}
+                                      title="Verificada"
+                                    />
+                                  )}
                                 </div>
                                 <div className="conciliacion-item__info">
                                   <span className="conciliacion-item__obra">

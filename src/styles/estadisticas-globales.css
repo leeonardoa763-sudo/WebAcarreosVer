@@ -724,6 +724,20 @@
   border-radius: 20px;
 }
 
+.eg__tabla-eyebrow-hist {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
 .eg__tabla-badge {
   font-size: 12px;
   font-weight: 600;
@@ -902,6 +916,17 @@
   color: var(--eg-secondary) !important;
   font-weight: 700 !important;
 }
+
+/* % Presupuesto cell (mismos colores que .eg__presup-item__pct--*) */
+.eg__pct-cell {
+  font-weight: 700 !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.eg__pct-cell--green  { color: #059669 !important; }
+.eg__pct-cell--yellow { color: #D97706 !important; }
+.eg__pct-cell--red    { color: #DC2626 !important; }
+.eg__pct-cell--none   { color: var(--eg-muted) !important; font-weight: 500 !important; }
 
 /* Table foot */
 .eg__tabla tfoot tr {

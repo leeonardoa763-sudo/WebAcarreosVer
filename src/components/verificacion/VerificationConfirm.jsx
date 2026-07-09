@@ -2,8 +2,9 @@
  * src/components/verificacion/VerificationConfirm.jsx
  *
  * Botón de confirmación de verificación con advertencia
+ * Genérico vía prop itemLabel ("vale" | "conciliación")
  *
- * Usado en: VerificarVales.jsx
+ * Usado en: VerificarVales.jsx, VerificarConciliacionAccion.jsx
  */
 
 // 1. React y hooks
@@ -19,6 +20,7 @@ const VerificationConfirm = ({
   onConfirm,
   disabled = false,
   loading = false,
+  itemLabel = "vale",
 }) => {
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -43,8 +45,9 @@ const VerificationConfirm = ({
         <div className="verification-confirm__warning">
           <AlertTriangle size={20} />
           <p>
-            Esta acción no se puede deshacer. El vale quedará marcado como
-            verificado.
+            Esta acción no se puede deshacer. {itemLabel === "vale" ? "El" : "La"}{" "}
+            {itemLabel} quedará marcad{itemLabel === "vale" ? "o" : "a"} como
+            verificad{itemLabel === "vale" ? "o" : "a"}.
           </p>
         </div>
 
@@ -55,7 +58,7 @@ const VerificationConfirm = ({
           style={{ backgroundColor: colors.accent }}
         >
           <CheckCircle size={20} />
-          Verificar Vale
+          Verificar {itemLabel.charAt(0).toUpperCase() + itemLabel.slice(1)}
         </button>
       </div>
     );

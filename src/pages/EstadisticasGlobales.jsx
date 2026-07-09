@@ -980,6 +980,8 @@ const EstadisticasGlobales = () => {
     errorTiempoReal,
     tablaObraMaterialTiempoReal,
     tablaObraRentaTiempoReal,
+    tablaObraMaterialAcumulado,
+    tablaObraRentaAcumulado,
     loadingPresupuestos,
     presupuestosMaterialFiltrados,
     presupuestosRentaFiltrados,
@@ -999,6 +1001,10 @@ const EstadisticasGlobales = () => {
   // 5. Exportación de imagen del Desglose por Obra en tiempo real
   const [exportandoImagen, setExportandoImagen] = useState(false);
   const desgloseObraRef = useRef(null);
+
+  // 5b. Exportación de imagen del Volumen Acumulado por Obra
+  const [exportandoImagenAcumulado, setExportandoImagenAcumulado] = useState(false);
+  const desgloseAcumuladoRef = useRef(null);
 
   const handleMaterialClick = (obraNombre, mat) => {
     const concMap = {};
@@ -1087,6 +1093,19 @@ const EstadisticasGlobales = () => {
     }
   };
 
+  const handleExportarImagenAcumulado = async () => {
+    if (!desgloseAcumuladoRef.current) return;
+    try {
+      setExportandoImagenAcumulado(true);
+      const nombreArchivo = `Volumen_Acumulado_Obra_${new Date().toISOString().substring(0, 10)}.png`;
+      await exportarElementoComoImagen(desgloseAcumuladoRef.current, nombreArchivo);
+    } catch (err) {
+      console.error("Error al exportar imagen:", err);
+    } finally {
+      setExportandoImagenAcumulado(false);
+    }
+  };
+
   // 3. Totales de tablas
   const totalesTabla = useMemo(
     () =>
@@ -1160,6 +1179,37 @@ const EstadisticasGlobales = () => {
     [tablaObraRentaTiempoReal]
   );
 
+  const totalesTablaObraAcumulado = useMemo(() => {
+    const t = tablaObraMaterialAcumulado.reduce(
+      (acc, obraRow) => ({
+        m3Total:        acc.m3Total        + obraRow.subtotal.m3Total,
+        valesCount:     acc.valesCount     + obraRow.subtotal.valesCount,
+        totalViajes:    acc.totalViajes    + obraRow.subtotal.totalViajes,
+        importeIVA:     acc.importeIVA     + obraRow.subtotal.importeIVA,
+        m3Presupuestado: acc.m3Presupuestado + obraRow.subtotal.m3Presupuestado,
+      }),
+      { m3Total: 0, valesCount: 0, totalViajes: 0, importeIVA: 0, m3Presupuestado: 0 }
+    );
+    t.pctPresupuesto = t.m3Presupuestado ? (t.m3Total / t.m3Presupuestado) * 100 : null;
+    return t;
+  }, [tablaObraMaterialAcumulado]);
+
+  const totalesRentaAcumulado = useMemo(() => {
+    const t = tablaObraRentaAcumulado.reduce(
+      (acc, row) => ({
+        vales:              acc.vales              + row.vales,
+        totalViajes:        acc.totalViajes        + row.totalViajes,
+        totalDias:          acc.totalDias          + row.totalDias,
+        totalHoras:         acc.totalHoras         + row.totalHoras,
+        subtotalSinIva:     acc.subtotalSinIva     + row.subtotalSinIva,
+        montoPresupuestado: acc.montoPresupuestado + (row.montoPresupuestado || 0),
+      }),
+      { vales: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, subtotalSinIva: 0, montoPresupuestado: 0 }
+    );
+    t.pctPresupuesto = t.montoPresupuestado ? (t.subtotalSinIva / t.montoPresupuestado) * 100 : null;
+    return t;
+  }, [tablaObraRentaAcumulado]);
+
   // 4. Config de categorías de filtros (multi-selección por categoría)
   const buildValorLabel = (opciones, valores) => {
     if (!valores || valores.length === 0) return null;
@@ -1225,6 +1275,15 @@ const EstadisticasGlobales = () => {
         <td>████████████████</td>
       </tr>
     ));
+
+  // 5b. Color de la celda "% Presupuesto" (mismos umbrales que getSemaforo)
+  const pctCellClass = (pct) => {
+    if (pct == null) return "eg__pct-cell--none";
+    if (pct > 100) return "eg__pct-cell--red";
+    if (pct >= 80) return "eg__pct-cell--yellow";
+    return "eg__pct-cell--green";
+  };
+  const formatPct = (pct) => (pct == null ? "—" : `${formatNum(pct, 0)}%`);
 
   // 6. Render
   return (
@@ -1811,6 +1870,232 @@ const EstadisticasGlobales = () => {
                           <td>{formatNum(totalesRentaTiempoReal.totalHoras, 1)}</td>
                           <td className="eg__importe-cell">
                             {formatMXN(totalesRentaTiempoReal.subtotalSinIva)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Tabla por obra (material + renta) — acumulado histórico ─── */}
+      {!error && (
+        <div className="eg__tabla-section">
+          <div className="eg__tabla-header">
+            <div className="eg__tabla-header-left">
+              <h2 className="eg__tabla-title">Volumen Acumulado por Obra</h2>
+              <span className="eg__tabla-eyebrow-hist">Histórico total</span>
+            </div>
+            <div className="eg__tabla-header-right">
+              <button
+                className="eg__export-img-btn"
+                onClick={handleExportarImagenAcumulado}
+                disabled={loadingTiempoReal || loadingPresupuestos || !!errorTiempoReal || exportandoImagenAcumulado}
+              >
+                <ImageIcon size={13} />
+                {exportandoImagenAcumulado ? "Generando…" : "Exportar imagen"}
+              </button>
+              {!loadingTiempoReal && (
+                <span className="eg__tabla-badge">
+                  {tablaObraMaterialAcumulado.length}{" "}
+                  {tablaObraMaterialAcumulado.length === 1 ? "obra" : "obras"}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <p className="eg__tabla-subnota">
+            Volumen histórico total ejecutado (todos los vales emitidos, verificados
+            y conciliados desde el inicio, sin contar cancelados ni borradores). El
+            importe de Renta se muestra sin IVA ni retención. La columna % Presupuesto
+            compara lo ejecutado contra lo asignado por obra en{" "}
+            <code>presupuesto_material_obra</code> / <code>presupuesto_renta_obra</code>.
+          </p>
+
+          {errorTiempoReal && (
+            <div className="eg__empty">
+              No se pudo cargar el acumulado histórico: {errorTiempoReal}
+            </div>
+          )}
+
+          <div ref={desgloseAcumuladoRef}>
+            {/* ─ Sub-sección material ─ */}
+            <div className="eg__tabla-subseccion">
+              <span className="eg__tabla-subseccion__label">
+                <Truck size={12} />
+                Material
+              </span>
+            </div>
+            <div className="eg__tabla-wrap">
+              <table className="eg__tabla">
+                <thead>
+                  <tr>
+                    <th>Material</th>
+                    <th>M³ Total</th>
+                    <th>Vales</th>
+                    <th>Viajes</th>
+                    <th>Importe + IVA</th>
+                    <th>% Presupuesto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingTiempoReal || loadingPresupuestos ? (
+                    renderSkeletonRows()
+                  ) : tablaObraMaterialAcumulado.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="eg__empty">
+                        Sin datos de material para los filtros seleccionados.
+                      </td>
+                    </tr>
+                  ) : (
+                    tablaObraMaterialAcumulado.map((obraRow) => (
+                      <Fragment key={obraRow.obra}>
+                        <tr className="eg__tabla-obra-header">
+                          <td colSpan={6}>
+                            <span className="eg__tabla-obra-label">
+                              {obraRow.empresa && (
+                                <span className="eg__tabla-obra-empresa">{obraRow.empresa}</span>
+                              )}
+                              {obraRow.cc != null && (
+                                <span className="eg__tabla-obra-cc">CC {obraRow.cc}</span>
+                              )}
+                              {obraRow.obra}
+                            </span>
+                          </td>
+                        </tr>
+                        {obraRow.materiales.map((mat, matIdx) => (
+                          <tr key={mat.material}>
+                            <td>
+                              <div className="eg__material-name eg__material-name--sub">
+                                <span
+                                  className="eg__material-dot"
+                                  style={{ background: DOT_COLORS[matIdx % DOT_COLORS.length] }}
+                                />
+                                {mat.material}
+                              </div>
+                            </td>
+                            <td>{formatNum(mat.m3Total, 2)} m³</td>
+                            <td>{formatNum(mat.valesCount)}</td>
+                            <td>{formatNum(mat.totalViajes)}</td>
+                            <td className="eg__importe-cell">{formatMXN(mat.importeIVA)}</td>
+                            <td className={`eg__pct-cell ${pctCellClass(mat.pctPresupuesto)}`}>
+                              {formatPct(mat.pctPresupuesto)}
+                            </td>
+                          </tr>
+                        ))}
+                        {obraRow.materiales.length > 1 && (
+                          <tr className="eg__tabla-subtotal">
+                            <td>Subtotal</td>
+                            <td>{formatNum(obraRow.subtotal.m3Total, 2)} m³</td>
+                            <td>{formatNum(obraRow.subtotal.valesCount)}</td>
+                            <td>{formatNum(obraRow.subtotal.totalViajes)}</td>
+                            <td className="eg__importe-cell">{formatMXN(obraRow.subtotal.importeIVA)}</td>
+                            <td className={`eg__pct-cell ${pctCellClass(obraRow.subtotal.pctPresupuesto)}`}>
+                              {formatPct(obraRow.subtotal.pctPresupuesto)}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    ))
+                  )}
+                </tbody>
+                {!loadingTiempoReal && !loadingPresupuestos && tablaObraMaterialAcumulado.length > 0 && (
+                  <tfoot>
+                    <tr>
+                      <td>Total</td>
+                      <td>{formatNum(totalesTablaObraAcumulado.m3Total, 2)} m³</td>
+                      <td>{formatNum(totalesTablaObraAcumulado.valesCount)}</td>
+                      <td>{formatNum(totalesTablaObraAcumulado.totalViajes)}</td>
+                      <td className="eg__importe-cell">
+                        {formatMXN(totalesTablaObraAcumulado.importeIVA)}
+                      </td>
+                      <td className={`eg__pct-cell ${pctCellClass(totalesTablaObraAcumulado.pctPresupuesto)}`}>
+                        {formatPct(totalesTablaObraAcumulado.pctPresupuesto)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+
+            {/* ─ Sub-sección renta ─ */}
+            {!loadingTiempoReal && !loadingPresupuestos && (
+              <>
+                <div className="eg__tabla-subseccion eg__tabla-subseccion--renta">
+                  <span className="eg__tabla-subseccion__label">
+                    <Clock size={12} />
+                    Renta de Equipo
+                  </span>
+                  {tablaObraRentaAcumulado.length > 0 && (
+                    <span className="eg__tabla-badge eg__tabla-badge--green">
+                      {tablaObraRentaAcumulado.length}{" "}
+                      {tablaObraRentaAcumulado.length === 1 ? "obra" : "obras"}
+                    </span>
+                  )}
+                </div>
+                <div className="eg__tabla-wrap">
+                  <table className="eg__tabla">
+                    <thead>
+                      <tr>
+                        <th>Obra</th>
+                        <th>Vales</th>
+                        <th>Viajes</th>
+                        <th>Días</th>
+                        <th>Horas</th>
+                        <th>Subtotal (sin IVA)</th>
+                        <th>% Presupuesto</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tablaObraRentaAcumulado.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="eg__empty">
+                            Sin renta para los filtros seleccionados.
+                          </td>
+                        </tr>
+                      ) : (
+                        tablaObraRentaAcumulado.map((row) => (
+                          <tr key={row.obra}>
+                            <td>
+                              <span className="eg__obra-cell">
+                                {row.empresa && (
+                                  <span className="eg__tabla-obra-empresa">{row.empresa}</span>
+                                )}
+                                {row.cc != null && (
+                                  <span className="eg__tabla-obra-cc">CC {row.cc}</span>
+                                )}
+                                {row.obra}
+                              </span>
+                            </td>
+                            <td>{formatNum(row.vales)}</td>
+                            <td>{formatNum(row.totalViajes)}</td>
+                            <td>{formatNum(row.totalDias, 1)}</td>
+                            <td>{formatNum(row.totalHoras, 1)}</td>
+                            <td className="eg__importe-cell">{formatMXN(row.subtotalSinIva)}</td>
+                            <td className={`eg__pct-cell ${pctCellClass(row.pctPresupuesto)}`}>
+                              {formatPct(row.pctPresupuesto)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {tablaObraRentaAcumulado.length > 0 && (
+                      <tfoot>
+                        <tr>
+                          <td>Total</td>
+                          <td>{formatNum(totalesRentaAcumulado.vales)}</td>
+                          <td>{formatNum(totalesRentaAcumulado.totalViajes)}</td>
+                          <td>{formatNum(totalesRentaAcumulado.totalDias, 1)}</td>
+                          <td>{formatNum(totalesRentaAcumulado.totalHoras, 1)}</td>
+                          <td className="eg__importe-cell">
+                            {formatMXN(totalesRentaAcumulado.subtotalSinIva)}
+                          </td>
+                          <td className={`eg__pct-cell ${pctCellClass(totalesRentaAcumulado.pctPresupuesto)}`}>
+                            {formatPct(totalesRentaAcumulado.pctPresupuesto)}
                           </td>
                         </tr>
                       </tfoot>

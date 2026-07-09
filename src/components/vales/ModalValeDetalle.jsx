@@ -25,6 +25,7 @@ import {
   UserCheck,
   MapPin,
   Receipt,
+  ClipboardList,
   XCircle,
   Pencil,
   RotateCcw,
@@ -628,7 +629,9 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
       try {
         const { data, error } = await supabase
           .from("conciliacion_vales")
-          .select("conciliaciones:id_conciliacion (folio, fecha_generacion)")
+          .select(
+            "conciliaciones:id_conciliacion (folio, fecha_generacion, numero_orden_compra, numero_factura)",
+          )
           .eq("id_vale", vale.id_vale)
           .limit(1)
           .single();
@@ -939,6 +942,16 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
                 value={`${formatearFechaHora(datosConciliacion.fecha_generacion).fecha} a las ${formatearFechaHora(datosConciliacion.fecha_generacion).hora}`}
                 subValue={datosConciliacion.folio}
                 color="#065f46" />
+            )}
+            {vale.estado === "conciliado" && (
+              <>
+                <InfoRow icon={ClipboardList} label="Orden de Compra"
+                  value={datosConciliacion?.numero_orden_compra || "Pendiente"}
+                  color={datosConciliacion?.numero_orden_compra ? undefined : "#94a3b8"} />
+                <InfoRow icon={Receipt} label="Factura"
+                  value={datosConciliacion?.numero_factura || "Pendiente"}
+                  color={datosConciliacion?.numero_factura ? undefined : "#94a3b8"} />
+              </>
             )}
             {vale.fecha_cancelacion && (
               <InfoRow icon={XCircle} label="Fecha de Cancelación"

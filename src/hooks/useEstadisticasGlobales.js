@@ -895,6 +895,32 @@ export const useEstadisticasGlobales = () => {
     return Object.values(obraMap).sort((a, b) => b.subtotalSinIva - a.subtotalSinIva);
   }, [valesTiempoRealRenta]);
 
+  // ── Vales acumulados (histórico total, sin filtro de periodo) ───────
+  // Mismo origen que valesTiempoRealMaterial/Renta (rawValesTiempoReal ya
+  // excluye borrador/cancelado y datos de prueba a nivel de query), pero
+  // sin el filtro Hoy/Ayer/Semana — para el bloque "Volumen Acumulado por Obra".
+  const valesAcumuladoMaterial = useMemo(
+    () => rawValesTiempoReal.filter((vale) => {
+      if (vale.tipo_vale !== "material") return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
+      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato)) return false;
+      return true;
+    }),
+    [rawValesTiempoReal, filtros]
+  );
+
+  const valesAcumuladoRenta = useMemo(
+    () => rawValesTiempoReal.filter((vale) => {
+      if (vale.tipo_vale !== "renta") return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
+      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato)) return false;
+      return true;
+    }),
+    [rawValesTiempoReal, filtros]
+  );
+
   // ── Mapa: id_conciliacion (renta) → total de viajes ─────────────────
   const viajesPorConciliacionRenta = useMemo(() => {
     const map = {};
@@ -965,6 +991,148 @@ export const useEstadisticasGlobales = () => {
     ),
     [presupuestosRenta, filtros.idObra]
   );
+
+  // ── Mapas de presupuesto para cruce O(1) con el acumulado histórico ──
+  const presupuestoMaterialMap = useMemo(() => {
+    const map = {};
+    presupuestosMaterialFiltrados.forEach((p) => {
+      map[`${p.id_obra}::${p.id_material}`] = Number(p.m3_presupuestados || 0);
+    });
+    return map;
+  }, [presupuestosMaterialFiltrados]);
+
+  const presupuestoRentaMap = useMemo(() => {
+    const map = {};
+    presupuestosRentaFiltrados.forEach((p) => {
+      map[p.id_obra] = Number(p.monto_presupuestado || 0);
+    });
+    return map;
+  }, [presupuestosRentaFiltrados]);
+
+  // ── Tabla material agrupada por obra (acumulado histórico) ─────────
+  // Duplica intencionalmente la lógica de tablaObraMaterialTiempoReal, para
+  // no arriesgar los cálculos existentes. Agrega comparación vs presupuesto.
+  const tablaObraMaterialAcumulado = useMemo(() => {
+    const obraMap = {};
+    valesAcumuladoMaterial.forEach((vale) => {
+      const obraId = vale.obras?.id_obra;
+      if (!obraId) return;
+      const obraNombre = vale.obras?.obra || "Sin obra";
+
+      if (!obraMap[obraId]) {
+        obraMap[obraId] = {
+          obra: obraNombre,
+          cc: vale.obras?.cc ?? null,
+          empresa: vale.obras?.empresas?.empresa || null,
+          matMap: {},
+        };
+      }
+
+      (vale.vale_material_detalles || []).forEach((det) => {
+        const nombreMat = det.material?.material || "Sin clasificar";
+        const idMaterial = det.material?.id_material ?? null;
+        const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
+
+        if (!matchesFiltro(filtros.material, nombreMat)) return;
+        if (!matchesFiltro(filtros.idBanco, det.id_banco)) return;
+
+        if (!obraMap[obraId].matMap[nombreMat]) {
+          obraMap[obraId].matMap[nombreMat] = {
+            material: nombreMat, idMaterial, m3Total: 0, valesIds: new Set(), totalViajes: 0, importeIVA: 0,
+          };
+        }
+        const s = obraMap[obraId].matMap[nombreMat];
+        s.valesIds.add(vale.id_vale);
+        s.importeIVA += Number(det.costo_total || 0) * 1.16;
+
+        if (tipoId === 3) {
+          s.m3Total += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
+          const tickets = vale.tickets_material?.length || 0;
+          s.totalViajes += tickets > 0 ? tickets : 1;
+        } else {
+          const viajes = det.vale_material_viajes || [];
+          if (viajes.length > 0) {
+            viajes.forEach((v) => { s.m3Total += Number(v.volumen_m3 || 0); });
+          } else {
+            s.m3Total += Number(det.cantidad_pedida_m3 || 0);
+          }
+          s.totalViajes += viajes.length > 0 ? viajes.length : 1;
+        }
+      });
+    });
+
+    return Object.entries(obraMap)
+      .map(([obraId, { obra, cc, empresa, matMap }]) => {
+        const materiales = Object.values(matMap)
+          .map((s) => {
+            const m3Presupuestado = s.idMaterial != null
+              ? presupuestoMaterialMap[`${obraId}::${s.idMaterial}`] ?? null
+              : null;
+            return {
+              ...s,
+              valesCount: s.valesIds.size,
+              m3Presupuestado,
+              pctPresupuesto: m3Presupuestado ? (s.m3Total / m3Presupuestado) * 100 : null,
+            };
+          })
+          .sort((a, b) => b.m3Total - a.m3Total);
+
+        const subtotal = materiales.reduce(
+          (acc, m) => ({
+            m3Total:        acc.m3Total        + m.m3Total,
+            valesCount:     acc.valesCount     + m.valesCount,
+            totalViajes:    acc.totalViajes    + m.totalViajes,
+            importeIVA:     acc.importeIVA     + m.importeIVA,
+            m3Presupuestado: acc.m3Presupuestado + (m.m3Presupuestado || 0),
+          }),
+          { m3Total: 0, valesCount: 0, totalViajes: 0, importeIVA: 0, m3Presupuestado: 0 }
+        );
+        subtotal.pctPresupuesto = subtotal.m3Presupuestado
+          ? (subtotal.m3Total / subtotal.m3Presupuestado) * 100
+          : null;
+
+        return { obra, cc, empresa, materiales, subtotal };
+      })
+      .sort((a, b) => b.subtotal.m3Total - a.subtotal.m3Total);
+  }, [valesAcumuladoMaterial, filtros.material, filtros.idBanco, presupuestoMaterialMap]);
+
+  // ── Tabla renta agrupada por obra (acumulado histórico) ────────────
+  // Importe SIN IVA ni retención, igual que tablaObraRentaTiempoReal.
+  const tablaObraRentaAcumulado = useMemo(() => {
+    const obraMap = {};
+    valesAcumuladoRenta.forEach((vale) => {
+      const obraId = vale.id_obra;
+      if (!obraId) return;
+      if (!obraMap[obraId]) {
+        obraMap[obraId] = {
+          obra: vale.obras?.obra || "Sin obra",
+          cc: vale.obras?.cc ?? null,
+          empresa: vale.obras?.empresas?.empresa || null,
+          vales: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, subtotalSinIva: 0,
+        };
+      }
+      const o = obraMap[obraId];
+      o.vales += 1;
+      (vale.vale_renta_detalle || []).forEach((det) => {
+        o.totalViajes += det.vale_renta_viajes?.length > 0
+          ? det.vale_renta_viajes.length
+          : (det.numero_viajes || 1);
+        o.totalDias  += Number(det.total_dias  || 0);
+        o.totalHoras += Number(det.total_horas || 0);
+        o.subtotalSinIva += Number(det.costo_total || 0);
+      });
+    });
+    return Object.entries(obraMap)
+      .map(([obraId, row]) => {
+        const montoPresupuestado = presupuestoRentaMap[obraId] ?? null;
+        return {
+          ...row,
+          montoPresupuestado,
+          pctPresupuesto: montoPresupuestado ? (row.subtotalSinIva / montoPresupuestado) * 100 : null,
+        };
+      })
+      .sort((a, b) => b.subtotalSinIva - a.subtotalSinIva);
+  }, [valesAcumuladoRenta, presupuestoRentaMap]);
 
   const hayAlertaPresupuesto = useMemo(
     () =>
@@ -1217,6 +1385,9 @@ export const useEstadisticasGlobales = () => {
     fetchValesTiempoReal,
     tablaObraMaterialTiempoReal,
     tablaObraRentaTiempoReal,
+    // Volumen acumulado histórico por obra (sin filtro de periodo) + % vs presupuesto
+    tablaObraMaterialAcumulado,
+    tablaObraRentaAcumulado,
     // Presupuestos
     loadingPresupuestos,
     presupuestosMaterialFiltrados,

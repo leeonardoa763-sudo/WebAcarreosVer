@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Eye, DollarSign, Loader2, Edit2 } from 'lucide-react';
+import { Eye, DollarSign, Loader2, Edit2, CheckCircle2 } from 'lucide-react';
 import { colors } from '../../config/colors';
 import { useAuth } from '../../hooks/useAuth';
 import { useContabilidad } from '../../hooks/conciliaciones/useContabilidad';
@@ -249,7 +249,17 @@ const TablaContabilidad = () => {
                     <td className="ctb-volumen">{volumen}</td>
                     <td className="ctb-importe">{importeSinIva}</td>
                     <td className="ctb-importe-total">{importeTotal}</td>
-                    <td>{getEstadoBadge(estado)}</td>
+                    <td>
+                      {getEstadoBadge(estado)}
+                      {conciliacion.verificado && (
+                        <CheckCircle2
+                          size={16}
+                          color={colors.accent}
+                          style={{ marginLeft: 6, verticalAlign: 'middle' }}
+                          title="Verificada"
+                        />
+                      )}
+                    </td>
                     <td className="ctb-factura">{conciliacion.numero_factura || '—'}</td>
                     <td className="ctb-oc">{conciliacion.numero_orden_compra || '—'}</td>
                     <td className="ctb-proveedor">{conciliacion.nombre_proveedor || '—'}</td>
