@@ -522,6 +522,12 @@ const DashboardUnificado = () => {
         Banco: esMaterial
           ? (vale.vale_material_detalles?.[0]?.bancos?.banco ?? "—")
           : "—",
+        Requisición: esMaterial
+          ? (vale.vale_material_detalles?.[0]?.requisicion ?? "—")
+          : "—",
+        "Distancia km": esMaterial
+          ? (vale.vale_material_detalles?.[0]?.distancia_km ?? "")
+          : "",
         "m³": m3,
         Toneladas: toneladas,
         Días: dias,
