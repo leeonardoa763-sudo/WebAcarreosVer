@@ -208,6 +208,13 @@ const VisualizarVale = () => {
                 )
               )
             ),
+            tickets_descarga (
+              numero_ticket,
+              id_material_ticket,
+              material_ticket:id_material_ticket (
+                material
+              )
+            ),
             vale_renta_detalle (
               capacidad_m3,
               hora_inicio,
@@ -578,6 +585,7 @@ const VisualizarVale = () => {
         {vale.tipo_vale === "renta" && detalleRenta && (
           <DetallesRenta
             detalle={detalleRenta}
+            ticketsDescarga={vale.tickets_descarga}
             mostrarPrecios={mostrarPrecios}
           />
         )}

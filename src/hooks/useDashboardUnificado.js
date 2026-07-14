@@ -155,8 +155,28 @@ const calcularKpisDeVales = (lista) => {
         totalHoras   += Number(d.total_horas || 0);
         totalDias    += Number(d.total_dias  || 0);
         importeTotal += Number(d.costo_total || 0);
-        totalViajes  += Number(d.numero_viajes || 0);
-        viajesRenta  += Number(d.numero_viajes || 0);
+        const numViajes = Number(d.numero_viajes || 0);
+        totalViajes  += numViajes;
+        viajesRenta  += numViajes;
+
+        // Desglose por material: cada viaje de renta puede llevar material
+        // distinto. El material real por viaje vive en tickets_descarga
+        // (numero_ticket = numero_viaje). Los viajes sin ticket se atribuyen al
+        // material pedido del detalle para que el desglose cuadre con numViajes.
+        const tickets = vale.tickets_descarga || [];
+        let atribuidos = 0;
+        for (const ticket of tickets) {
+          if (atribuidos >= numViajes) break;
+          const nombre =
+            ticket.material_ticket?.material ?? d.material?.material ?? "Sin material";
+          viajesPorMaterial[nombre] = (viajesPorMaterial[nombre] || 0) + 1;
+          atribuidos++;
+        }
+        if (numViajes > atribuidos) {
+          const nombre = d.material?.material ?? "Sin material";
+          viajesPorMaterial[nombre] =
+            (viajesPorMaterial[nombre] || 0) + (numViajes - atribuidos);
+        }
         // Estimado: capacidad del camión × número de viajes
         const capRenta = Number(vale.vehiculos?.capacidad_m3 ?? 0);
         m3RentaEstimado += capRenta * Number(d.numero_viajes || 0);
@@ -324,6 +344,10 @@ export const useDashboardUnificado = () => {
           vehiculos:id_vehiculo (id_vehiculo, placas, capacidad_m3),
           persona:id_persona_creador (nombre, primer_apellido, segundo_apellido),
           tickets_material (id_ticket, numero_ticket, folio_ticket, fecha_impresion),
+          tickets_descarga (
+            numero_ticket, id_material_ticket,
+            material_ticket:id_material_ticket (material)
+          ),
           vale_material_detalles (
             id_detalle_material, capacidad_m3, distancia_km, cantidad_pedida_m3,
             peso_ton, volumen_real_m3, precio_m3, costo_total,

@@ -87,14 +87,25 @@ const obtenerMaterialMovido = (conc) => {
     const tipoConc = conc.tipo || conc.tipo_conciliacion;
 
     if (tipoConc === "renta") {
-      // Para renta: obtener materiales únicos
+      // Para renta el material puede variar por viaje: los materiales reales
+      // movidos están en tickets_descarga, no en el material fijo del detalle.
       const materiales = new Set();
       conc.vales.forEach((vale) => {
-        vale.vale_renta_detalle?.forEach((detalle) => {
-          if (detalle.material?.material) {
-            materiales.add(detalle.material.material);
-          }
-        });
+        const tickets = vale.tickets_descarga || [];
+        if (tickets.length > 0) {
+          tickets.forEach((ticket) => {
+            if (ticket.material_ticket?.material) {
+              materiales.add(ticket.material_ticket.material);
+            }
+          });
+        } else {
+          // Fallback: sin tickets, usar el material pedido del detalle.
+          vale.vale_renta_detalle?.forEach((detalle) => {
+            if (detalle.material?.material) {
+              materiales.add(detalle.material.material);
+            }
+          });
+        }
       });
       return materiales.size > 0 ? Array.from(materiales).join(", ") : "";
     } else {
@@ -354,6 +365,13 @@ export const exportarConVales = async (conciliaciones, tipoActivo) => {
               .select(
                 `
                 *,
+                tickets_descarga (
+                  numero_ticket,
+                  id_material_ticket,
+                  material_ticket:id_material_ticket (
+                    material
+                  )
+                ),
                 vale_renta_detalle (
                   capacidad_m3,
                   numero_viajes,

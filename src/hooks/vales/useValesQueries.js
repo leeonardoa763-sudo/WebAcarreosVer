@@ -71,6 +71,13 @@ export const useValesQueries = () => {
           folio_ticket,
           fecha_impresion
         ),
+        tickets_descarga (
+          numero_ticket,
+          id_material_ticket,
+          material_ticket:id_material_ticket (
+            material
+          )
+        ),
         vale_material_detalles (
           id_detalle_material,
           capacidad_m3,
@@ -249,6 +256,13 @@ export const useValesQueries = () => {
             folio_ticket,
             fecha_impresion
           ),
+          tickets_descarga (
+            numero_ticket,
+            id_material_ticket,
+            material_ticket:id_material_ticket (
+              material
+            )
+          ),
           vale_material_detalles (
             id_detalle_material,
             capacidad_m3,
@@ -391,6 +405,13 @@ export const useValesQueries = () => {
             numero_ticket,
             folio_ticket,
             fecha_impresion
+          ),
+          tickets_descarga (
+            numero_ticket,
+            id_material_ticket,
+            material_ticket:id_material_ticket (
+              material
+            )
           ),
           vale_material_detalles (
             capacidad_m3,

@@ -20,9 +20,15 @@ import {
   formatearVolumen,
   formatearHora,
 } from "../../utils/formatters";
+import {
+  buildTicketsMaterialMap,
+  materialDeViaje,
+} from "../../utils/rentaMaterial";
 
-const DetallesRenta = ({ detalle, mostrarPrecios }) => {
+const DetallesRenta = ({ detalle, ticketsDescarga, mostrarPrecios }) => {
   const [fotoModal, setFotoModal] = useState(false);
+
+  const ticketsMaterialMap = buildTicketsMaterialMap(ticketsDescarga);
 
   const totalDias = Number(detalle.total_dias || 0);
   const esRentaPorDia = totalDias > 0;
@@ -221,6 +227,7 @@ const DetallesRenta = ({ detalle, mostrarPrecios }) => {
             <div className="viajes-renta__fila viajes-renta__fila--header">
               <span>#</span>
               <span>Hora de registro</span>
+              <span>Material</span>
               <span>Registrado por</span>
             </div>
 
@@ -237,6 +244,13 @@ const DetallesRenta = ({ detalle, mostrarPrecios }) => {
                   </span>
                   <span className="viajes-renta__hora">
                     {formatearHora(viaje.hora_registro)}
+                  </span>
+                  <span className="viajes-renta__material">
+                    {materialDeViaje(
+                      ticketsMaterialMap,
+                      viaje,
+                      detalle.material?.material,
+                    )}
                   </span>
                   <span className="viajes-renta__persona">
                     {nombreRegistrador}

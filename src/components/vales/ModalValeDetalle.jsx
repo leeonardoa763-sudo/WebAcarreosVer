@@ -46,6 +46,7 @@ import {
   formatearHora,
   formatearDuracion,
 } from "../../utils/formatters";
+import { buildTicketsMaterialMap, materialDeViaje } from "../../utils/rentaMaterial";
 
 // 4. Config / Hooks
 import { supabase } from "../../config/supabase";
@@ -412,6 +413,8 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar, pesosEspecificos }
 // ─── Detalle Renta ────────────────────────────────────────────────────────────
 
 const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
+  const ticketsMaterialMap = buildTicketsMaterialMap(vale.tickets_descarga);
+
   const formatHora = (horaISO) => {
     if (!horaISO) return null;
     return new Date(horaISO).toLocaleTimeString("es-MX", {
@@ -548,7 +551,7 @@ const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
                         <div key={viaje.id_viaje} className="vdm__viaje-row vdm__viaje-row--renta">
                           <span>{viaje.numero_viaje}</span>
                           <span>{formatHora(viaje.hora_registro)}</span>
-                          <span>{detalle.material?.material || "—"}</span>
+                          <span>{materialDeViaje(ticketsMaterialMap, viaje, detalle.material?.material)}</span>
                           <span>{nombrePersona}</span>
                         </div>
                       );
@@ -708,18 +711,28 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
           );
           if (ids.length === 0) return;
 
-          const { data, error } = await supabase
-            .from("vale_renta_viajes")
-            .select(`
-              id_viaje, id_vale_renta_detalle, numero_viaje, hora_registro,
-              persona_registro:id_persona_registro (nombre, primer_apellido)
-            `)
-            .in("id_vale_renta_detalle", ids);
+          const [viajesRes, ticketsRes] = await Promise.all([
+            supabase
+              .from("vale_renta_viajes")
+              .select(`
+                id_viaje, id_vale_renta_detalle, numero_viaje, hora_registro,
+                persona_registro:id_persona_registro (nombre, primer_apellido)
+              `)
+              .in("id_vale_renta_detalle", ids),
+            supabase
+              .from("tickets_descarga")
+              .select(`
+                numero_ticket, id_material_ticket,
+                material_ticket:id_material_ticket (material)
+              `)
+              .eq("id_vale", vale.id_vale),
+          ]);
 
-          if (error) throw error;
+          if (viajesRes.error) throw viajesRes.error;
+          if (ticketsRes.error) throw ticketsRes.error;
 
           const porDetalle = new Map();
-          (data ?? []).forEach((v) => {
+          (viajesRes.data ?? []).forEach((v) => {
             if (!porDetalle.has(v.id_vale_renta_detalle))
               porDetalle.set(v.id_vale_renta_detalle, []);
             porDetalle.get(v.id_vale_renta_detalle).push(v);
@@ -727,6 +740,7 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
 
           setValeConViajes({
             ...vale,
+            tickets_descarga: ticketsRes.data ?? [],
             vale_renta_detalle: vale.vale_renta_detalle?.map((det) => ({
               ...det,
               vale_renta_viajes: porDetalle.get(det.id_vale_renta_detalle) ?? [],

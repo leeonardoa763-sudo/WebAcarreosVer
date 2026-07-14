@@ -35,6 +35,10 @@ import { colors } from "../config/colors";
 
 // 5. Utils
 import { formatearFecha, formatearHora, formatearMoneda } from "../utils/formatters";
+import {
+  buildTicketsMaterialMap,
+  materialDeViaje,
+} from "../utils/rentaMaterial";
 
 // 6. Componentes reutilizables de VisualizarVale
 import ListaViajesMaterial from "../components/visualizar-vale/ListaViajesMaterial";
@@ -125,8 +129,9 @@ const ValeTimeline = ({ vale, personaGenerador, fechaGeneracion }) => {
 // SUBCOMPONENTE: DETALLES RENTA
 // ========================================
 
-const ValeRentaDetalles = ({ detalles }) => {
+const ValeRentaDetalles = ({ detalles, ticketsDescarga }) => {
   const [fotoModal, setFotoModal] = useState(null);
+  const ticketsMaterialMap = buildTicketsMaterialMap(ticketsDescarga);
 
   return (
     <div>
@@ -241,6 +246,13 @@ const ValeRentaDetalles = ({ detalles }) => {
                       <span className="vc-renta-viaje-num">#{viaje.numero_viaje}</span>
                       <span className="vc-renta-viaje-hora">
                         {formatearHora(viaje.hora_registro)}
+                      </span>
+                      <span className="vc-renta-viaje-material">
+                        {materialDeViaje(
+                          ticketsMaterialMap,
+                          viaje,
+                          det.material?.material,
+                        )}
                       </span>
                       <span className="vc-renta-viaje-persona">
                         {nombrePersona(viaje.persona_registro) || "—"}
@@ -504,7 +516,10 @@ const ValeCard = ({
               <div className="vc-section-title" style={{ marginBottom: 8 }}>
                 DETALLES DEL SERVICIO
               </div>
-              <ValeRentaDetalles detalles={vale.vale_renta_detalle} />
+              <ValeRentaDetalles
+                detalles={vale.vale_renta_detalle}
+                ticketsDescarga={vale.tickets_descarga}
+              />
             </>
           )}
         </div>
@@ -621,6 +636,13 @@ const VisualizarConciliacion = () => {
                     longitud_registro,
                     distancia_obra_metros,
                     bancos_override:id_banco_override (id_banco, banco)
+                  )
+                ),
+                tickets_descarga (
+                  numero_ticket,
+                  id_material_ticket,
+                  material_ticket:id_material_ticket (
+                    material
                   )
                 ),
                 vale_renta_detalle (

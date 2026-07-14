@@ -20,6 +20,13 @@
 // 1. Config
 import { colors } from "../../config/colors";
 
+// 2. Utils
+import { formatearHora } from "../../utils/formatters";
+import {
+  buildTicketsMaterialMap,
+  materialDeViaje,
+} from "../../utils/rentaMaterial";
+
 /**
  * Obtener la fecha efectiva de un vale para mostrar.
  * Usa fecha_programada si existe, si no usa fecha_creacion.
@@ -253,44 +260,88 @@ export const prepararDatosExcelRenta = (datos) => {
           const fecha = obtenerFechaEfectivaFormateada(vale);
           const detalles = vale.vale_renta_detalle || [];
 
+          // El material de renta puede variar por viaje: vive en tickets_descarga
+          // (numero_ticket = numero_viaje), no en el material fijo del detalle.
+          const ticketsMaterialMap = buildTicketsMaterialMap(
+            vale.tickets_descarga,
+          );
+
+          const baseFila = {
+            Empresa: nombreEmpresa,
+            Placas: placas,
+            Estado: estado,
+            Folio: vale.folio || "",
+            Fecha: fecha,
+            Obra: vale.obras?.obra || "",
+          };
+          const operador = vale.operadores?.nombre_completo || "";
+
           if (detalles.length === 0) {
             filas.push({
-              Empresa: nombreEmpresa,
-              Placas: placas,
-              Estado: estado,
-              Folio: vale.folio || "",
-              Fecha: fecha,
-              Obra: vale.obras?.obra || "",
+              ...baseFila,
+              Viaje: "",
               Material: "",
+              Hora: "",
               "Num. Viajes": "",
               "Total Días": "",
               "Total Horas": "",
-              Operador: vale.operadores?.nombre_completo || "",
+              Operador: operador,
             });
-          } else {
-            detalles.forEach((detalle) => {
+            return;
+          }
+
+          detalles.forEach((detalle) => {
+            const viajes = [...(detalle.vale_renta_viajes || [])].sort(
+              (a, b) => a.numero_viaje - b.numero_viaje,
+            );
+
+            // Totales del detalle: solo en la primera fila para no duplicar al sumar.
+            const totalesDetalle = {
+              "Num. Viajes":
+                detalle.numero_viajes != null
+                  ? Number(detalle.numero_viajes)
+                  : "",
+              "Total Días":
+                detalle.total_dias != null ? Number(detalle.total_dias) : "",
+              "Total Horas":
+                detalle.total_horas != null
+                  ? Number(detalle.total_horas)
+                  : "",
+            };
+
+            if (viajes.length === 0) {
+              // Sin viajes registrados: una fila con el material pedido del detalle.
               filas.push({
-                Empresa: nombreEmpresa,
-                Placas: placas,
-                Estado: estado,
-                Folio: vale.folio || "",
-                Fecha: fecha,
-                Obra: vale.obras?.obra || "",
+                ...baseFila,
+                Viaje: "",
                 Material: detalle.material?.material || "",
-                "Num. Viajes":
-                  detalle.numero_viajes != null
-                    ? Number(detalle.numero_viajes)
-                    : "",
-                "Total Días":
-                  detalle.total_dias != null ? Number(detalle.total_dias) : "",
-                "Total Horas":
-                  detalle.total_horas != null
-                    ? Number(detalle.total_horas)
-                    : "",
-                Operador: vale.operadores?.nombre_completo || "",
+                Hora: "",
+                ...totalesDetalle,
+                Operador: operador,
+              });
+              return;
+            }
+
+            viajes.forEach((viaje, idx) => {
+              filas.push({
+                ...baseFila,
+                Viaje: viaje.numero_viaje,
+                Material: materialDeViaje(
+                  ticketsMaterialMap,
+                  viaje,
+                  detalle.material?.material,
+                ),
+                Hora: viaje.hora_registro
+                  ? formatearHora(viaje.hora_registro)
+                  : "",
+                // Totales solo en la primera fila del detalle.
+                "Num. Viajes": idx === 0 ? totalesDetalle["Num. Viajes"] : "",
+                "Total Días": idx === 0 ? totalesDetalle["Total Días"] : "",
+                "Total Horas": idx === 0 ? totalesDetalle["Total Horas"] : "",
+                Operador: operador,
               });
             });
-          }
+          });
         });
       });
     });

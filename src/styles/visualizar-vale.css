@@ -1303,7 +1303,7 @@ a,
 
 .viajes-renta__fila {
   display: grid;
-  grid-template-columns: 36px 1fr 1fr;
+  grid-template-columns: 36px 1fr 1fr 1fr;
   padding: 9px 14px;
   gap: 8px;
   align-items: center;
@@ -1340,6 +1340,14 @@ a,
 .viajes-renta__hora {
   font-weight: 600;
   color: #1e293b;
+}
+
+.viajes-renta__material {
+  font-weight: 600;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .viajes-renta__persona {

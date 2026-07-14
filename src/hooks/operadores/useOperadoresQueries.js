@@ -176,6 +176,13 @@ const construirQueryBase = (tipoVale) => {
               numero_viaje,
               hora_registro
             )
+          ),
+          tickets_descarga (
+            numero_ticket,
+            id_material_ticket,
+            material_ticket:id_material_ticket (
+              material
+            )
           )`
       }
     `,

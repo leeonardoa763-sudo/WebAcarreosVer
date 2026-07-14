@@ -697,15 +697,10 @@ const DashboardUnificado = () => {
                 titulo="Viajes"
                 valor={kpis.totalViajes}
                 gradiente="linear-gradient(135deg, #0369a1 0%, #38bdf8 100%)"
-                desglose={[
-                  ...kpis.viajesPorMaterial.map(({ material, viajes }) => ({
-                    label: material,
-                    valor: viajes,
-                  })),
-                  ...(kpis.viajesRenta > 0
-                    ? [{ label: "Renta", valor: kpis.viajesRenta }]
-                    : []),
-                ]}
+                desglose={kpis.viajesPorMaterial.map(({ material, viajes }) => ({
+                  label: material,
+                  valor: viajes,
+                }))}
                 deltaActual={kpis.totalViajes}
                 deltaPrevio={kpisPrevio.totalViajes}
                 labelPrevio={labelPeriodoPrevio}
