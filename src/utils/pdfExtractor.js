@@ -51,20 +51,22 @@ export const extractTextFromPDF = async (file) => {
  */
 export const extractFolioFromText = (text) => {
   try {
-    // Patrón para folios: 2 letras - 3 dígitos - 5 dígitos
-    const folioPattern = /FOLIO\s+([A-Z]{2}-\d{3}-\d{5})/i;
+    // Patrón para folios: 2-3 letras - 3 dígitos - 5 dígitos.
+    // Se toleran espacios alrededor de los guiones porque pdf.js parte el folio
+    // en varios items (ver extractFolioFromPDF); se limpian del resultado.
+    const folioPattern = /FOLIO\s+([A-Z]{2,3}\s*-\s*\d{3}\s*-\s*\d{5})/i;
     const match = text.match(folioPattern);
 
     if (match && match[1]) {
-      return { success: true, folio: match[1].toUpperCase() };
+      return { success: true, folio: match[1].replace(/\s+/g, "").toUpperCase() };
     }
 
     // Intentar patrón alternativo sin la palabra FOLIO
-    const altPattern = /([A-Z]{2}-\d{3}-\d{5})/;
+    const altPattern = /([A-Z]{2,3}\s*-\s*\d{3}\s*-\s*\d{5})/;
     const altMatch = text.match(altPattern);
 
     if (altMatch && altMatch[1]) {
-      return { success: true, folio: altMatch[1].toUpperCase() };
+      return { success: true, folio: altMatch[1].replace(/\s+/g, "").toUpperCase() };
     }
 
     return { success: false, error: "No se encontró folio en el texto" };
@@ -117,14 +119,17 @@ export const extractFolioFromPDF = async (file) => {
     // Extraer TODO el texto
     const textoCompleto = textContent.items.map((item) => item.str).join(" ");
 
-    // Buscar folio en el texto
-    const folioRegex = /[A-Z]{2,3}-\d{3}-\d{5}/;
+    // Buscar folio en el texto.
+    // pdf.js parte el folio del encabezado en varios items ("CD" + "-149-02038")
+    // que se unen con espacio, quedando "CD -149-02038". Por eso el regex tolera
+    // espacios alrededor de los guiones y luego se limpian del resultado.
+    const folioRegex = /[A-Z]{2,3}\s*-\s*\d{3}\s*-\s*\d{5}/;
     const match = textoCompleto.match(folioRegex);
 
     if (match) {
       return {
         success: true,
-        folio: match[0],
+        folio: match[0].replace(/\s+/g, ""),
         textoCompleto: textoCompleto,
       };
     }

@@ -215,6 +215,9 @@ export const useVerificacion = () => {
             ),
             vale_material_viajes (
               id_viaje,
+              numero_viaje,
+              folio_vale_fisico,
+              peso_ton,
               volumen_m3,
               precio_m3,
               costo_viaje,

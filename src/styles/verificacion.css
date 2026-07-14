@@ -1035,6 +1035,54 @@
   font-size: 12px;
 }
 
+.batch-results__remisiones {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed #bbf7d0;
+}
+
+.batch-results__remisiones-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+
+.batch-results__remisiones-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
+.batch-results__remision {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #d1fae5;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.batch-results__remision-folio {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.batch-results__remision-ton {
+  color: var(--color-secondary);
+  font-weight: 600;
+}
+
+.batch-results__remision-m3 {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
 .batch-results__total {
   margin-top: 6px;
   padding-top: 6px;

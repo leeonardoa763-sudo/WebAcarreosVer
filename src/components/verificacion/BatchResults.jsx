@@ -24,6 +24,7 @@ import { getISOWeek } from "date-fns";
 import { colors } from "../../config/colors";
 import {
   formatearVolumen,
+  formatearPeso,
   formatearDuracion,
   formatearMoneda,
 } from "../../utils/formatters";
@@ -119,6 +120,15 @@ const BatchResults = ({
             (s, v) => s + Number(v.volumen_m3 ?? 0),
             0,
           );
+          // Remisiones (folio físico) con su volumen — solo las que la tengan
+          const remisiones = grupo.viajes
+            .filter((v) => v.folio_vale_fisico)
+            .sort((a, b) => (a.numero_viaje ?? 0) - (b.numero_viaje ?? 0))
+            .map((v) => ({
+              remision: v.folio_vale_fisico,
+              ton: Number(v.peso_ton ?? 0),
+              m3: Number(v.volumen_m3 ?? 0),
+            }));
           grupos.push({
             material: d.material?.material ?? "Sin especificar",
             banco: grupo.banco,
@@ -130,6 +140,7 @@ const BatchResults = ({
             m3,
             labelM3,
             costo,
+            remisiones,
           });
         });
       });
@@ -362,6 +373,33 @@ const BatchResults = ({
                               </span>
                             </div>
                           </div>
+
+                          {/* Remisiones (folio físico) con volumen */}
+                          {d.remisiones?.length > 0 && (
+                            <div className="batch-results__remisiones">
+                              <span className="batch-results__remisiones-title">
+                                Remisiones:
+                              </span>
+                              <div className="batch-results__remisiones-list">
+                                {d.remisiones.map((r, ri) => (
+                                  <span
+                                    key={ri}
+                                    className="batch-results__remision"
+                                  >
+                                    <span className="batch-results__remision-folio">
+                                      {r.remision}
+                                    </span>
+                                    <span className="batch-results__remision-ton">
+                                      {formatearPeso(r.ton)}
+                                    </span>
+                                    <span className="batch-results__remision-m3">
+                                      {formatearVolumen(r.m3)}
+                                    </span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
 
