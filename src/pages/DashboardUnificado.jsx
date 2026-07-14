@@ -460,7 +460,7 @@ const DashboardUnificado = () => {
 
   // 5. Export
   const handleExportarExcel = () => {
-    const filas = valesFiltrados.map((vale) => {
+    const filas = valesFiltrados.flatMap((vale) => {
       // Reúne todos los folios de remisión
       const foliosSet = new Set();
       for (const det of vale.vale_material_detalles ?? []) {
@@ -511,31 +511,16 @@ const DashboardUnificado = () => {
         ? Number(rentaDet?.precios_renta?.costo_dia ?? 0)
         : "";
 
-      return {
+      // Columnas de identidad del vale (se repiten en cada fila de viaje)
+      const identidad = {
         Folio: vale.folio ?? "—",
         Empresa:
           vale.obras?.empresas?.empresa ?? vale.obras?.empresas?.sufijo ?? "—",
         CC: vale.obras?.cc ?? "—",
         Obra: vale.obras?.obra ?? "—",
         Tipo: ETIQUETAS_TIPO[vale._tipo]?.label ?? vale._tipo,
-        "Material / Equipo": vale._material ?? "—",
-        Banco: esMaterial
-          ? (vale.vale_material_detalles?.[0]?.bancos?.banco ?? "—")
-          : "—",
-        Requisición: esMaterial
-          ? (vale.vale_material_detalles?.[0]?.requisicion ?? "—")
-          : "—",
-        "Distancia km": esMaterial
-          ? (vale.vale_material_detalles?.[0]?.distancia_km ?? "")
-          : "",
-        "m³": m3,
-        Toneladas: toneladas,
-        Días: dias,
-        Horas: horas,
-        Viajes: vale._viajes > 0 ? vale._viajes : "",
-        "Precio m³": precioM3,
-        "Costo/hr": costoHr,
-        "Costo/día": costoDia,
+      };
+      const resto = {
         "Folios remisión": foliosRemision || "—",
         Conciliación: conciliacion || "—",
         Estado: ETIQUETAS_ESTADO[vale.estado]?.label ?? vale.estado ?? "—",
@@ -547,6 +532,79 @@ const DashboardUnificado = () => {
         Sindicato: vale.operadores?.sindicatos?.sindicato ?? "—",
         "Motivo cancelación": vale.motivo_cancelacion ?? "",
       };
+
+      // Renta: una fila por viaje con su material real (tickets_descarga).
+      // El material puede variar por viaje; los viajes sin ticket se atribuyen
+      // al material pedido del detalle. Días/Horas van solo en la 1ª fila.
+      if (!esMaterial && rentaDet) {
+        const materialDetalle = rentaDet.material?.material ?? "—";
+        const numViajes = Number(rentaDet.numero_viajes ?? 0);
+        const tickets = [...(vale.tickets_descarga ?? [])].sort(
+          (a, b) => a.numero_ticket - b.numero_ticket,
+        );
+
+        const viajes = [];
+        tickets.forEach((t) => {
+          if (numViajes > 0 && viajes.length >= numViajes) return;
+          viajes.push({
+            numero: t.numero_ticket,
+            material: t.material_ticket?.material ?? materialDetalle,
+          });
+        });
+        // Padear los viajes sin ticket con el material del detalle
+        for (let n = viajes.length + 1; n <= numViajes; n++) {
+          viajes.push({ numero: n, material: materialDetalle });
+        }
+        // Sin viajes registrados: una sola fila resumen
+        if (viajes.length === 0) {
+          viajes.push({ numero: "", material: materialDetalle });
+        }
+
+        return viajes.map((v, idx) => ({
+          ...identidad,
+          Viaje: v.numero,
+          "Material / Equipo": v.material,
+          Banco: "—",
+          Requisición: "—",
+          "Distancia km": "",
+          "m³": "",
+          Toneladas: "",
+          Días: idx === 0 ? dias : "",
+          Horas: idx === 0 ? horas : "",
+          Viajes: 1,
+          "Precio m³": "",
+          "Costo/hr": costoHr,
+          "Costo/día": costoDia,
+          ...resto,
+        }));
+      }
+
+      // Material (y renta sin detalle): una fila por vale, como antes.
+      return [
+        {
+          ...identidad,
+          Viaje: "",
+          "Material / Equipo": vale._material ?? "—",
+          Banco: esMaterial
+            ? (vale.vale_material_detalles?.[0]?.bancos?.banco ?? "—")
+            : "—",
+          Requisición: esMaterial
+            ? (vale.vale_material_detalles?.[0]?.requisicion ?? "—")
+            : "—",
+          "Distancia km": esMaterial
+            ? (vale.vale_material_detalles?.[0]?.distancia_km ?? "")
+            : "",
+          "m³": m3,
+          Toneladas: toneladas,
+          Días: dias,
+          Horas: horas,
+          Viajes: vale._viajes > 0 ? vale._viajes : "",
+          "Precio m³": precioM3,
+          "Costo/hr": costoHr,
+          "Costo/día": costoDia,
+          ...resto,
+        },
+      ];
     });
     exportToExcel(
       filas,
