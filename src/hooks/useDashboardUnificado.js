@@ -115,6 +115,16 @@ const getMaterialVale = (vale) => {
   return vale.vale_material_detalles?.[0]?.material?.material ?? "—";
 };
 
+// Distintivos de un vale: rasgos operativos que ameritan una etiqueta visual.
+// - Planta de asfaltos: vale de material cargado a la planta (banco -> planta).
+// - Turno nocturno: renta capturada en jornada nocturna.
+// - Programado: material emitido hoy para operar mañana (ver es_programado en app).
+const getDistintivosVale = (vale) => ({
+  esPlantaAsfaltos: !!vale.vale_material_detalles?.[0]?.es_planta_asfaltos,
+  esTurnoNocturno: !!vale.vale_renta_detalle?.[0]?.es_turno_nocturno,
+  esProgramado: !!vale.es_programado,
+});
+
 const getViajesVale = (vale) => {
   if (vale.tipo_vale === "renta") {
     return Number(vale.vale_renta_detalle?.[0]?.numero_viajes ?? 0);
@@ -352,7 +362,7 @@ export const useDashboardUnificado = () => {
             id_detalle_material, capacidad_m3, distancia_km, cantidad_pedida_m3,
             peso_ton, volumen_real_m3, precio_m3, costo_total,
             folio_banco, requisicion, notas_adicionales,
-            tarifa_primer_km, tarifa_subsecuente,
+            tarifa_primer_km, tarifa_subsecuente, es_planta_asfaltos,
             material:id_material (
               id_material, material,
               tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)
@@ -363,7 +373,7 @@ export const useDashboardUnificado = () => {
           vale_renta_detalle (
             id_vale_renta_detalle, capacidad_m3, hora_inicio, hora_fin,
             total_horas, total_dias, costo_total, numero_viajes,
-            notas_adicionales, es_renta_por_dia,
+            notas_adicionales, es_renta_por_dia, es_turno_nocturno,
             material:id_material (id_material, material),
             precios_renta:id_precios_renta (costo_hr, costo_dia)
           ),
@@ -437,6 +447,7 @@ export const useDashboardUnificado = () => {
         _cantidad: getCantidadVale(v),
         _material: getMaterialVale(v),
         _viajes: getViajesVale(v),
+        _distintivos: getDistintivosVale(v),
       })),
     [todosLosVales],
   );

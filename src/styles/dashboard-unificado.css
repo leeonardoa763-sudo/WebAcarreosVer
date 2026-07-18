@@ -915,6 +915,46 @@
   color: #6d28d9;
 }
 
+/* ── Chips de distintivo (planta, nocturno, programado) ──────────────────── */
+
+.du__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 5px;
+}
+
+.du__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.du__chip svg {
+  flex-shrink: 0;
+}
+
+.du__chip--planta {
+  background: #e8f0fa;
+  color: var(--color-secondary, #004e89);
+}
+
+.du__chip--nocturno {
+  background: #eae8fb;
+  color: #4338ca;
+}
+
+.du__chip--programado {
+  background: #fdece2;
+  color: #c2410c;
+}
+
 /* ── Badges de estado ────────────────────────────────────────────────────── */
 
 .du__badge-estado {

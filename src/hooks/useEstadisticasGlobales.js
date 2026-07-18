@@ -442,8 +442,16 @@ export const useEstadisticasGlobales = () => {
           s.m3Total += Number(det.volumen_real_m3 || 0);
           s.totalViajes += vale.tickets_material?.length || 0;
         } else {
-          (det.vale_material_viajes || []).forEach((v) => { s.m3Total += Number(v.volumen_m3 || 0); });
-          s.totalViajes += det.vale_material_viajes?.length || 0;
+          const viajes = det.vale_material_viajes || [];
+          if (viajes.length > 0) {
+            viajes.forEach((v) => { s.m3Total += Number(v.volumen_m3 || 0); });
+            s.totalViajes += viajes.length;
+          } else {
+            // Tipo 2 (Base/Carpeta Asfáltica): 1 vale = 1 viaje capturado directo
+            // en el detalle, sin filas en vale_material_viajes → usar volumen_real_m3.
+            s.m3Total += Number(det.volumen_real_m3 || 0);
+            s.totalViajes += (det.volumen_real_m3 != null || det.costo_total != null) ? 1 : 0;
+          }
         }
       });
     });
@@ -726,8 +734,16 @@ export const useEstadisticasGlobales = () => {
           s.m3Total  += Number(det.volumen_real_m3 || 0);
           s.totalViajes += vale.tickets_material?.length || 0;
         } else {
-          (det.vale_material_viajes || []).forEach((v) => { s.m3Total += Number(v.volumen_m3 || 0); });
-          s.totalViajes += det.vale_material_viajes?.length || 0;
+          const viajes = det.vale_material_viajes || [];
+          if (viajes.length > 0) {
+            viajes.forEach((v) => { s.m3Total += Number(v.volumen_m3 || 0); });
+            s.totalViajes += viajes.length;
+          } else {
+            // Tipo 2 (Base/Carpeta Asfáltica): 1 vale = 1 viaje capturado directo
+            // en el detalle, sin filas en vale_material_viajes → usar volumen_real_m3.
+            s.m3Total += Number(det.volumen_real_m3 || 0);
+            s.totalViajes += (det.volumen_real_m3 != null || det.costo_total != null) ? 1 : 0;
+          }
         }
       });
     });
@@ -837,7 +853,10 @@ export const useEstadisticasGlobales = () => {
           if (viajes.length > 0) {
             viajes.forEach((v) => { s.m3Total += Number(v.volumen_m3 || 0); });
           } else {
-            s.m3Total += Number(det.cantidad_pedida_m3 || 0);
+            // Tipo 2 (asfáltico) captura el volumen directo en el detalle (sin
+            // filas en vale_material_viajes) → volumen_real_m3. Vales recién
+            // emitidos sin captura aún caen a cantidad_pedida_m3 como estimado.
+            s.m3Total += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
           }
           s.totalViajes += viajes.length > 0 ? viajes.length : 1;
         }
@@ -980,16 +999,23 @@ export const useEstadisticasGlobales = () => {
   // ── Presupuestos filtrados ─────────────────────────────────────────
   const presupuestosMaterialFiltrados = useMemo(
     () => presupuestosMaterial.filter(
-      (p) => matchesFiltro(filtros.idObra, p.id_obra) && Number(p.obras?.empresas?.id_empresa) !== 4
+      (p) =>
+        matchesFiltro(filtros.idObra, p.id_obra) &&
+        matchesFiltro(filtros.idEmpresa, p.obras?.empresas?.id_empresa) &&
+        matchesFiltro(filtros.material, p.material?.material) &&
+        Number(p.obras?.empresas?.id_empresa) !== 4
     ),
-    [presupuestosMaterial, filtros.idObra]
+    [presupuestosMaterial, filtros.idObra, filtros.idEmpresa, filtros.material]
   );
 
   const presupuestosRentaFiltrados = useMemo(
     () => presupuestosRenta.filter(
-      (p) => matchesFiltro(filtros.idObra, p.id_obra) && Number(p.obras?.empresas?.id_empresa) !== 4
+      (p) =>
+        matchesFiltro(filtros.idObra, p.id_obra) &&
+        matchesFiltro(filtros.idEmpresa, p.obras?.empresas?.id_empresa) &&
+        Number(p.obras?.empresas?.id_empresa) !== 4
     ),
-    [presupuestosRenta, filtros.idObra]
+    [presupuestosRenta, filtros.idObra, filtros.idEmpresa]
   );
 
   // ── Mapas de presupuesto para cruce O(1) con el acumulado histórico ──
@@ -1054,7 +1080,10 @@ export const useEstadisticasGlobales = () => {
           if (viajes.length > 0) {
             viajes.forEach((v) => { s.m3Total += Number(v.volumen_m3 || 0); });
           } else {
-            s.m3Total += Number(det.cantidad_pedida_m3 || 0);
+            // Tipo 2 (asfáltico) captura el volumen directo en el detalle (sin
+            // filas en vale_material_viajes) → volumen_real_m3. Vales recién
+            // emitidos sin captura aún caen a cantidad_pedida_m3 como estimado.
+            s.m3Total += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
           }
           s.totalViajes += viajes.length > 0 ? viajes.length : 1;
         }
@@ -1164,6 +1193,9 @@ export const useEstadisticasGlobales = () => {
     valesFilt.forEach((vale) => {
       const conc = valeRentaAConciliacion[vale.id_vale];
       if (!conc?.fecha_generacion) return;
+      // El sindicato de un vale de renta vive en la conciliación (rawValesRenta
+      // no trae operador); sin esto el filtro Sindicato no afecta esta gráfica.
+      if (!matchesFiltro(filtros.idSindicato, conc?.id_sindicato)) return;
       const mes = conc.fecha_generacion.substring(0, 7);
 
       (vale.vale_renta_detalle || []).forEach((det) => {
@@ -1191,7 +1223,7 @@ export const useEstadisticasGlobales = () => {
     });
 
     return { data, equipos };
-  }, [rawValesRenta, valeRentaAConciliacion, filtros.idObra, filtros.idEmpresa]);
+  }, [rawValesRenta, valeRentaAConciliacion, filtros.idObra, filtros.idEmpresa, filtros.idSindicato]);
 
   // ── Tabla viajes de renta agrupada por obra → equipo (respeta todos los filtros) ──
   const tablaViajesRentaPorEquipo = useMemo(() => {
@@ -1202,6 +1234,8 @@ export const useEstadisticasGlobales = () => {
       if (!matchesFiltro(filtros.semana, getWeekKey(conc?.fecha_generacion))) return false;
       if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
       if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
+      // Sindicato desde la conciliación (rawValesRenta no trae operador).
+      if (!matchesFiltro(filtros.idSindicato, conc?.id_sindicato)) return false;
       return true;
     });
 

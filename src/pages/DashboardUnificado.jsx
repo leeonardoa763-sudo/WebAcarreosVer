@@ -34,6 +34,9 @@ import {
   Gauge,
   Timer,
   Activity,
+  Factory,
+  Moon,
+  CalendarClock,
 } from "lucide-react";
 
 // 3. Config
@@ -245,6 +248,64 @@ const CheckboxDropdown = ({
   );
 };
 
+// Jornada laboral 8:00 AM → 3:00 AM: timestamps antes de las 3 AM pertenecen a
+// la jornada del día anterior. Réplica de utils/jornadaLaboral.js de la app
+// móvil para etiquetar el vale programado relativo a la jornada actual.
+const getFechaJornada = (fecha) => {
+  const f = new Date(fecha);
+  if (f.getHours() < 3) f.setDate(f.getDate() - 1);
+  f.setHours(0, 0, 0, 0);
+  return f;
+};
+
+const etiquetaProgramado = (fechaCreacion) => {
+  if (!fechaCreacion) return "Programado";
+  const diffDias = Math.round(
+    (getFechaJornada(new Date()) - getFechaJornada(fechaCreacion)) / 86400000,
+  );
+  if (diffDias === 0) return "Programado mañana";
+  if (diffDias === 1) return "Programado hoy";
+  return "Programado";
+};
+
+const Distintivos = ({ vale }) => {
+  const { esPlantaAsfaltos, esTurnoNocturno, esProgramado } =
+    vale._distintivos ?? {};
+  if (!esPlantaAsfaltos && !esTurnoNocturno && !esProgramado) return null;
+
+  return (
+    <div className="du__chips">
+      {esPlantaAsfaltos && (
+        <span
+          className="du__chip du__chip--planta"
+          title="Vale de planta de asfaltos"
+        >
+          <Factory size={11} />
+          Planta asfaltos
+        </span>
+      )}
+      {esTurnoNocturno && (
+        <span
+          className="du__chip du__chip--nocturno"
+          title="Renta de turno nocturno"
+        >
+          <Moon size={11} />
+          Turno nocturno
+        </span>
+      )}
+      {esProgramado && (
+        <span
+          className="du__chip du__chip--programado"
+          title="Vale programado para operar el día siguiente"
+        >
+          <CalendarClock size={11} />
+          {etiquetaProgramado(vale.fecha_creacion)}
+        </span>
+      )}
+    </div>
+  );
+};
+
 const FilaVale = ({ vale, onClick, mostrarCancelados }) => {
   const tipoInfo = ETIQUETAS_TIPO[vale._tipo] ?? ETIQUETAS_TIPO.petreos;
   const estadoInfo = ETIQUETAS_ESTADO[vale.estado] ?? {
@@ -285,6 +346,7 @@ const FilaVale = ({ vale, onClick, mostrarCancelados }) => {
       <tr className="du__fila du__fila--cancelada" {...trProps}>
         <td className="du__celda du__celda--folio">
           <span className="du__folio">{vale.folio}</span>
+          <Distintivos vale={vale} />
         </td>
         <td className="du__celda">{empresa}</td>
         <td className="du__celda du__celda--obra">{obra}</td>
@@ -308,6 +370,7 @@ const FilaVale = ({ vale, onClick, mostrarCancelados }) => {
     <tr className="du__fila" {...trProps}>
       <td className="du__celda du__celda--folio">
         <span className="du__folio">{vale.folio}</span>
+        <Distintivos vale={vale} />
       </td>
       <td className="du__celda">{empresa}</td>
       <td className="du__celda du__celda--obra">{obra}</td>

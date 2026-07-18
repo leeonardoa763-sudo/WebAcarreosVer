@@ -233,8 +233,12 @@ const dibujarEncabezadoColumnas = (doc, yPos, columnas) => {
 };
 
 // ── Tabla: Material Movido por Obra ─────────────────────────────────
-const dibujarTablaMaterial = (doc, yPosInicial, tablaObraMaterial, totalesTablaObra) => {
-  let yPos = dibujarTituloSeccion(doc, yPosInicial, "Material Movido por Obra");
+const dibujarTablaMaterial = (doc, yPosInicial, tablaObraMaterial, totalesTablaObra, periodoTablas) => {
+  let yPos = dibujarTituloSeccion(
+    doc,
+    yPosInicial,
+    periodoTablas ? `Material Movido por Obra — ${periodoTablas}` : "Material Movido por Obra"
+  );
 
   const columnas = [
     { label: "MATERIAL", width: 70, align: "left" },
@@ -331,18 +335,22 @@ const dibujarTablaMaterial = (doc, yPosInicial, tablaObraMaterial, totalesTablaO
 };
 
 // ── Tabla: Renta de Equipo por Obra ─────────────────────────────────
-const dibujarTablaRenta = (doc, yPosInicial, tablaRentaPorObra, totalesRenta) => {
+const dibujarTablaRenta = (doc, yPosInicial, tablaRentaPorObra, totalesRenta, periodoTablas) => {
   if (!tablaRentaPorObra || tablaRentaPorObra.length === 0) return yPosInicial;
 
-  let yPos = dibujarTituloSeccion(doc, yPosInicial, "Renta de Equipo por Obra");
+  let yPos = dibujarTituloSeccion(
+    doc,
+    yPosInicial,
+    periodoTablas ? `Renta de Equipo por Obra — ${periodoTablas}` : "Renta de Equipo por Obra"
+  );
 
   const columnas = [
     { label: "OBRA", width: 65, align: "left" },
-    { label: "CONCILIACIONES", width: 20, align: "right" },
+    { label: "VALES", width: 20, align: "right" },
     { label: "VIAJES", width: 20, align: "right" },
     { label: "DÍAS", width: 20, align: "right" },
     { label: "HORAS", width: 20, align: "right" },
-    { label: "IMPORTE", width: 40, align: "right" },
+    { label: "IMPORTE S/IVA", width: 40, align: "right" },
   ];
 
   yPos = dibujarEncabezadoColumnas(doc, yPos, columnas);
@@ -382,21 +390,21 @@ const dibujarTablaRenta = (doc, yPosInicial, tablaRentaPorObra, totalesRenta) =>
   tablaRentaPorObra.forEach((row) => {
     drawRow([
       formatearObraCompleta(row.empresa, row.cc, row.obra),
-      formatearNumero(row.conciliaciones),
+      formatearNumero(row.vales),
       formatearNumero(row.totalViajes),
       formatearNumero(row.totalDias, 1),
       formatearNumero(row.totalHoras, 1),
-      formatearMoneda(row.importeTotal),
+      formatearMoneda(row.subtotalSinIva),
     ]);
   });
 
   drawRow([
     "TOTAL",
-    formatearNumero(totalesRenta.conciliaciones),
+    formatearNumero(totalesRenta.vales),
     formatearNumero(totalesRenta.totalViajes),
     formatearNumero(totalesRenta.totalDias, 1),
     formatearNumero(totalesRenta.totalHoras, 1),
-    formatearMoneda(totalesRenta.importeTotal),
+    formatearMoneda(totalesRenta.subtotalSinIva),
   ], { fillHeader: true, bold: true });
 
   return yPos + 6;
@@ -585,6 +593,7 @@ export const generarPDFReporteEstadisticas = (datos) => {
   const {
     filtrosActivos = [],
     periodoLabel = "Todos los periodos",
+    periodoTablasLabel = null,
     resumen,
     totalesTablaObra,
     comparativaPeriodoAnterior,
@@ -677,12 +686,12 @@ export const generarPDFReporteEstadisticas = (datos) => {
 
   // ── Tabla material ──
   yPos = checkPageBreak(doc, yPos, 20, PAGE_HEIGHT, MARGIN_BOTTOM);
-  yPos = dibujarTablaMaterial(doc, yPos, tablaObraMaterial, totalesTablaObra);
+  yPos = dibujarTablaMaterial(doc, yPos, tablaObraMaterial, totalesTablaObra, periodoTablasLabel);
 
   // ── Tabla renta ──
   if (tablaRentaPorObra.length > 0) {
     yPos = checkPageBreak(doc, yPos, 20, PAGE_HEIGHT, MARGIN_BOTTOM);
-    yPos = dibujarTablaRenta(doc, yPos, tablaRentaPorObra, totalesRenta);
+    yPos = dibujarTablaRenta(doc, yPos, tablaRentaPorObra, totalesRenta, periodoTablasLabel);
   }
 
   // ── Datos destacados ──

@@ -193,37 +193,56 @@ const KpiCard = ({ icon: Icon, label, value, sublabel, colorClass, loading }) =>
 };
 
 // ── Filter Panel (opciones de la categoría abierta, multi-selección) ──
+// Lista con checkboxes: se pueden marcar varias opciones a la vez. El botón
+// "Limpiar" (onSelect(null)) deja la categoría en "todos".
 const FilterPanel = ({ opciones, valoresActivos, onSelect }) => {
   if (!opciones || opciones.length === 0) return null;
   const activos = valoresActivos || [];
   return (
-    <div className="eg__filtro-panel">
-      <button
-        className={`eg__chip${activos.length === 0 ? " eg__chip--active" : ""}`}
-        onClick={() => onSelect(null)}
-      >
-        Todos
-      </button>
-      {opciones.map((op) => {
-        const id = op.id ?? op;
-        const nombre = op.nombre ?? op;
-        const isActive = activos.some((v) => String(v) === String(id));
-        return (
+    <div className="eg__filtro-lista">
+      <div className="eg__filtro-lista-head">
+        <span className="eg__filtro-lista-titulo">
+          {activos.length > 0
+            ? `${activos.length} seleccionada${activos.length === 1 ? "" : "s"}`
+            : "Selecciona una o varias opciones"}
+        </span>
+        {activos.length > 0 && (
           <button
-            key={id}
-            className={`eg__chip${isActive ? " eg__chip--active" : ""}`}
-            onClick={() => onSelect(id)}
+            type="button"
+            className="eg__filtro-lista-limpiar"
+            onClick={() => onSelect(null)}
           >
-            {nombre}
+            Limpiar
           </button>
-        );
-      })}
+        )}
+      </div>
+      <div className="eg__filtro-lista-opciones">
+        {opciones.map((op) => {
+          const id = op.id ?? op;
+          const nombre = op.nombre ?? op;
+          const isActive = activos.some((v) => String(v) === String(id));
+          return (
+            <label
+              key={id}
+              className={`eg__filtro-opcion${isActive ? " eg__filtro-opcion--active" : ""}`}
+            >
+              <input
+                type="checkbox"
+                className="eg__filtro-opcion-check"
+                checked={isActive}
+                onChange={() => onSelect(id)}
+              />
+              <span className="eg__filtro-opcion-nombre">{nombre}</span>
+            </label>
+          );
+        })}
+      </div>
     </div>
   );
 };
 
 // ── Gráfica Material vs Tiempo ─────────────────────────────────────
-const GraficaTiempo = ({ seriesTiempo, loading }) => {
+const GraficaTiempo = ({ seriesTiempo, loading, mostrarEncabezado = true }) => {
   const { data, materiales } = seriesTiempo;
 
   if (loading) {
@@ -238,16 +257,18 @@ const GraficaTiempo = ({ seriesTiempo, loading }) => {
 
   return (
     <div className="eg__chart-section">
-      <div className="eg__chart-header">
-        <div className="eg__chart-header-left">
-          <div className="eg__chart-eyebrow">
-            <BarChart2 size={13} />
-            Evolución histórica
+      {mostrarEncabezado && (
+        <div className="eg__chart-header">
+          <div className="eg__chart-header-left">
+            <div className="eg__chart-eyebrow">
+              <BarChart2 size={13} />
+              Evolución histórica
+            </div>
+            <h2 className="eg__chart-title">Material vs Tiempo</h2>
           </div>
-          <h2 className="eg__chart-title">Material vs Tiempo</h2>
+          <span className="eg__chart-subtitle">m³ transportados por mes · Top {materiales.length} materiales</span>
         </div>
-        <span className="eg__chart-subtitle">m³ transportados por mes · Top {materiales.length} materiales</span>
-      </div>
+      )}
       <div className="eg__chart-wrap">
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={data} margin={{ top: 12, right: 28, left: -8, bottom: 0 }} barCategoryGap="30%">
@@ -314,7 +335,7 @@ const tooltipStyle = {
 };
 
 // ── Gráfica Viajes de Renta ────────────────────────────────────────
-const GraficaViajesRenta = ({ seriesTiempoRenta, tablaViajesRentaPorEquipo, loading }) => {
+const GraficaViajesRenta = ({ seriesTiempoRenta, tablaViajesRentaPorEquipo, loading, mostrarEncabezado = true }) => {
   const { data, equipos } = seriesTiempoRenta;
 
   if (loading) {
@@ -338,18 +359,20 @@ const GraficaViajesRenta = ({ seriesTiempoRenta, tablaViajesRentaPorEquipo, load
 
   return (
     <div className="eg__chart-section">
-      <div className="eg__chart-header">
-        <div className="eg__chart-header-left">
-          <div className="eg__chart-eyebrow">
-            <Clock size={13} />
-            Equipo rentado en obra
+      {mostrarEncabezado && (
+        <div className="eg__chart-header">
+          <div className="eg__chart-header-left">
+            <div className="eg__chart-eyebrow">
+              <Clock size={13} />
+              Equipo rentado en obra
+            </div>
+            <h2 className="eg__chart-title">Viajes de Renta por Tipo de Equipo</h2>
           </div>
-          <h2 className="eg__chart-title">Viajes de Renta por Tipo de Equipo</h2>
+          <span className="eg__chart-subtitle">
+            Viajes registrados por mes · Top {equipos.length} tipos de equipo
+          </span>
         </div>
-        <span className="eg__chart-subtitle">
-          Viajes registrados por mes · Top {equipos.length} tipos de equipo
-        </span>
-      </div>
+      )}
 
       <div className="eg__chart-wrap">
         <ResponsiveContainer width="100%" height={260}>
@@ -596,7 +619,7 @@ const TopTable = ({ rows, cols, emptyMsg }) => (
 );
 
 // ── Sección Análisis Avanzado ──────────────────────────────────────
-const SeccionPresupuestos = ({ materialRows, rentaRows, hayAlerta, loading }) => {
+const SeccionPresupuestos = ({ materialRows, rentaRows, hayAlerta, loading, mostrarEncabezado = true }) => {
   const obrasMaterial = useMemo(() => {
     const map = {};
     materialRows.forEach((p) => {
@@ -630,16 +653,18 @@ const SeccionPresupuestos = ({ materialRows, rentaRows, hayAlerta, loading }) =>
         </div>
       )}
 
-      <div className="eg__presup-header">
-        <div className="eg__presup-eyebrow">
-          <Target size={13} />
-          Control de Presupuesto
+      {mostrarEncabezado && (
+        <div className="eg__presup-header">
+          <div className="eg__presup-eyebrow">
+            <Target size={13} />
+            Control de Presupuesto
+          </div>
+          <h2 className="eg__presup-title">Presupuestos</h2>
+          <p className="eg__presup-sub">
+            Consumo acumulado vs. presupuesto asignado por obra
+          </p>
         </div>
-        <h2 className="eg__presup-title">Presupuestos</h2>
-        <p className="eg__presup-sub">
-          Consumo acumulado vs. presupuesto asignado por obra
-        </p>
-      </div>
+      )}
 
       {!tieneData ? (
         <div className="eg__presup-empty">
@@ -735,6 +760,7 @@ const SeccionPresupuestos = ({ materialRows, rentaRows, hayAlerta, loading }) =>
 
 const SeccionAnalisisAvanzado = ({
   horasPico, viajesPorVale, topResidentes, topChecadores, topPlacas, rendimientoPorMaterial,
+  mostrarEncabezado = true,
 }) => {
   const totalViajes = horasPico.reduce((s, h) => s + h.viajes, 0);
   const horaPico = horasPico.reduce((max, h) => h.viajes > max.viajes ? h : max, { viajes: 0, label: "--" });
@@ -742,14 +768,16 @@ const SeccionAnalisisAvanzado = ({
   return (
     <div className="eg__avanzado-section">
       {/* Eyebrow */}
-      <div className="eg__avanzado-header">
-        <div className="eg__avanzado-eyebrow">
-          <Activity size={13} />
-          Análisis Detallado
+      {mostrarEncabezado && (
+        <div className="eg__avanzado-header">
+          <div className="eg__avanzado-eyebrow">
+            <Activity size={13} />
+            Análisis Detallado
+          </div>
+          <h2 className="eg__avanzado-title">Estadísticas de Operación</h2>
+          <p className="eg__avanzado-sub">Rendimientos, horas pico, residentes, checadores y vehículos más activos</p>
         </div>
-        <h2 className="eg__avanzado-title">Estadísticas de Operación</h2>
-        <p className="eg__avanzado-sub">Rendimientos, horas pico, residentes, checadores y vehículos más activos</p>
-      </div>
+      )}
 
       {/* Fila 1: Horas pico + Viajes por vale */}
       <div className="eg__avanzado-grid-2">
@@ -938,6 +966,55 @@ const ModalConciliacionesMaterial = ({ obraNombre, materialNombre, conciliacione
   );
 };
 
+// ── Sección colapsable (acordeón) ──────────────────────────────────
+// Encabezado clicable con chevron; el cuerpo se desmonta al plegarse.
+// El estado abierto/cerrado lo controla el padre (persistido en localStorage).
+const SeccionColapsable = ({
+  id,
+  titulo,
+  subtitulo,
+  badge,
+  headerRight,
+  abierta,
+  onToggle,
+  bodyClassName = "",
+  children,
+}) => (
+  <div className={`eg__col ${abierta ? "eg__col--abierta" : "eg__col--cerrada"}`}>
+    <div
+      className="eg__col-head"
+      role="button"
+      tabIndex={0}
+      aria-expanded={abierta}
+      onClick={() => onToggle(id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggle(id);
+        }
+      }}
+    >
+      <ChevronDown
+        size={18}
+        className={`eg__col-chevron${abierta ? "" : " eg__col-chevron--cerrado"}`}
+      />
+      <div className="eg__col-head-main">
+        <h2 className="eg__col-title">{titulo}</h2>
+        {subtitulo && <span className="eg__col-subtitulo">{subtitulo}</span>}
+      </div>
+      {badge}
+      {headerRight && (
+        <div className="eg__col-head-right" onClick={(e) => e.stopPropagation()}>
+          {headerRight}
+        </div>
+      )}
+    </div>
+    {abierta && (
+      <div className={`eg__col-body ${bodyClassName}`}>{children}</div>
+    )}
+  </div>
+);
+
 // ── Componente principal ────────────────────────────────────────────
 const EstadisticasGlobales = () => {
   // 1. Hook principal
@@ -1006,6 +1083,14 @@ const EstadisticasGlobales = () => {
   const [exportandoImagenAcumulado, setExportandoImagenAcumulado] = useState(false);
   const desgloseAcumuladoRef = useRef(null);
 
+  // 6. Estado de secciones colapsables. Todas inician colapsadas (cerradas)
+  // en cada carga — solo se muestran los encabezados; expandir/plegar es solo
+  // para la sesión actual.
+  const [seccionesAbiertas, setSeccionesAbiertas] = useState({});
+  const seccionAbierta = (secId) => !!seccionesAbiertas[secId];
+  const toggleSeccion = (secId) =>
+    setSeccionesAbiertas((prev) => ({ ...prev, [secId]: !prev[secId] }));
+
   const handleMaterialClick = (obraNombre, mat) => {
     const concMap = {};
     [...(mat.valesIds || [])].forEach((id) => {
@@ -1053,16 +1138,27 @@ const EstadisticasGlobales = () => {
         { viajes: 0, label: "--" }
       );
 
+      // Las tablas del reporte usan datos reales al día (directo de `vales`,
+      // periodo Hoy/Ayer/Semana), no conciliaciones. Los KPIs de material
+      // (m³ e importe) se recalculan desde esa misma fuente para que cuadren.
+      const periodoTablasLabel =
+        periodoTiempoReal === "hoy"
+          ? "Hoy"
+          : periodoTiempoReal === "ayer"
+          ? "Ayer"
+          : formatSemanaChip(semanaTiempoReal);
+
       generarPDFReporteEstadisticas({
         filtrosActivos,
         periodoLabel,
-        resumen,
-        totalesTablaObra,
+        periodoTablasLabel,
+        resumen: { ...resumen, totalImporte: totalesTablaObraTiempoReal.importeIVA },
+        totalesTablaObra: totalesTablaObraTiempoReal,
         comparativaPeriodoAnterior,
         periodoAnteriorLabel,
-        tablaObraMaterial,
-        tablaRentaPorObra,
-        totalesRenta,
+        tablaObraMaterial: tablaObraMaterialTiempoReal,
+        tablaRentaPorObra: tablaObraRentaTiempoReal,
+        totalesRenta: totalesRentaTiempoReal,
         presupuestosMaterial: presupuestosMaterialFiltrados,
         presupuestosRenta: presupuestosRentaFiltrados,
         hayAlertaPresupuesto,
@@ -1404,6 +1500,14 @@ const EstadisticasGlobales = () => {
 
       {/* ── KPI Cards ─────────────────────────────────────────── */}
       {!error && (
+        <SeccionColapsable
+          id="resumen"
+          titulo="Resumen"
+          subtitulo="Indicadores principales del periodo"
+          abierta={seccionAbierta("resumen")}
+          onToggle={toggleSeccion}
+          bodyClassName="eg__col-body--pad"
+        >
         <div className="eg__kpi-grid">
           <KpiCard
             icon={Package}
@@ -1446,21 +1550,26 @@ const EstadisticasGlobales = () => {
             loading={loading}
           />
         </div>
+        </SeccionColapsable>
       )}
 
       {/* ── Tabla por obra (material + renta) — desde conciliaciones ─── */}
       {!error && (
-        <div className="eg__tabla-section">
-          <div className="eg__tabla-header">
-            <h2 className="eg__tabla-title">Desglose por Obra</h2>
-            {!loading && (
+        <SeccionColapsable
+          id="desglose"
+          titulo="Desglose por Obra"
+          subtitulo="Oficial · desde conciliaciones finalizadas"
+          abierta={seccionAbierta("desglose")}
+          onToggle={toggleSeccion}
+          badge={
+            !loading && (
               <span className="eg__tabla-badge">
                 {tablaObraMaterial.length}{" "}
                 {tablaObraMaterial.length === 1 ? "obra" : "obras"}
               </span>
-            )}
-          </div>
-
+            )
+          }
+        >
           {/* ─ Sub-sección material ─ */}
           <div className="eg__tabla-subseccion">
             <span className="eg__tabla-subseccion__label">
@@ -1636,18 +1745,27 @@ const EstadisticasGlobales = () => {
               </div>
             </>
           )}
-        </div>
+        </SeccionColapsable>
       )}
 
       {/* ── Tabla por obra (material + renta) — en tiempo real ─── */}
       {!error && (
-        <div className="eg__tabla-section">
-          <div className="eg__tabla-header">
-            <div className="eg__tabla-header-left">
-              <h2 className="eg__tabla-title">Desglose por Obra — Hoy</h2>
-              <span className="eg__tabla-eyebrow-live">En tiempo real</span>
-            </div>
-            <div className="eg__tabla-header-right">
+        <SeccionColapsable
+          id="hoy"
+          titulo="Desglose por Obra — Hoy"
+          subtitulo="En tiempo real · directo de vales"
+          abierta={seccionAbierta("hoy")}
+          onToggle={toggleSeccion}
+          badge={
+            !loadingTiempoReal && (
+              <span className="eg__tabla-badge">
+                {tablaObraMaterialTiempoReal.length}{" "}
+                {tablaObraMaterialTiempoReal.length === 1 ? "obra" : "obras"}
+              </span>
+            )
+          }
+          headerRight={
+            <>
               <div className="eg__periodo-group">
                 <button
                   className={`eg__periodo-btn${periodoTiempoReal === "hoy" ? " eg__periodo-btn--activo" : ""}`}
@@ -1691,15 +1809,9 @@ const EstadisticasGlobales = () => {
                 <ImageIcon size={13} />
                 {exportandoImagen ? "Generando…" : "Exportar imagen"}
               </button>
-              {!loadingTiempoReal && (
-                <span className="eg__tabla-badge">
-                  {tablaObraMaterialTiempoReal.length}{" "}
-                  {tablaObraMaterialTiempoReal.length === 1 ? "obra" : "obras"}
-                </span>
-              )}
-            </div>
-          </div>
-
+            </>
+          }
+        >
           <p className="eg__tabla-subnota">
             Incluye vales emitidos, verificados y conciliados aún no incluidos en un
             reporte oficial (no incluye borradores ni cancelados). El importe de
@@ -1879,35 +1991,36 @@ const EstadisticasGlobales = () => {
               </>
             )}
           </div>
-        </div>
+        </SeccionColapsable>
       )}
 
       {/* ── Tabla por obra (material + renta) — acumulado histórico ─── */}
       {!error && (
-        <div className="eg__tabla-section">
-          <div className="eg__tabla-header">
-            <div className="eg__tabla-header-left">
-              <h2 className="eg__tabla-title">Volumen Acumulado por Obra</h2>
-              <span className="eg__tabla-eyebrow-hist">Histórico total</span>
-            </div>
-            <div className="eg__tabla-header-right">
-              <button
-                className="eg__export-img-btn"
-                onClick={handleExportarImagenAcumulado}
-                disabled={loadingTiempoReal || loadingPresupuestos || !!errorTiempoReal || exportandoImagenAcumulado}
-              >
-                <ImageIcon size={13} />
-                {exportandoImagenAcumulado ? "Generando…" : "Exportar imagen"}
-              </button>
-              {!loadingTiempoReal && (
-                <span className="eg__tabla-badge">
-                  {tablaObraMaterialAcumulado.length}{" "}
-                  {tablaObraMaterialAcumulado.length === 1 ? "obra" : "obras"}
-                </span>
-              )}
-            </div>
-          </div>
-
+        <SeccionColapsable
+          id="acumulado"
+          titulo="Volumen Acumulado por Obra"
+          subtitulo="Histórico total · vs presupuesto"
+          abierta={seccionAbierta("acumulado")}
+          onToggle={toggleSeccion}
+          badge={
+            !loadingTiempoReal && (
+              <span className="eg__tabla-badge">
+                {tablaObraMaterialAcumulado.length}{" "}
+                {tablaObraMaterialAcumulado.length === 1 ? "obra" : "obras"}
+              </span>
+            )
+          }
+          headerRight={
+            <button
+              className="eg__export-img-btn"
+              onClick={handleExportarImagenAcumulado}
+              disabled={loadingTiempoReal || loadingPresupuestos || !!errorTiempoReal || exportandoImagenAcumulado}
+            >
+              <ImageIcon size={13} />
+              {exportandoImagenAcumulado ? "Generando…" : "Exportar imagen"}
+            </button>
+          }
+        >
           <p className="eg__tabla-subnota">
             Volumen histórico total ejecutado (todos los vales emitidos, verificados
             y conciliados desde el inicio, sin contar cancelados ni borradores). El
@@ -2105,43 +2218,84 @@ const EstadisticasGlobales = () => {
               </>
             )}
           </div>
-        </div>
+        </SeccionColapsable>
       )}
 
       {/* ── Presupuestos ──────────────────────────────────────── */}
       {!error && (
-        <SeccionPresupuestos
-          materialRows={presupuestosMaterialFiltrados}
-          rentaRows={presupuestosRentaFiltrados}
-          hayAlerta={hayAlertaPresupuesto}
-          loading={loadingPresupuestos}
-        />
+        <SeccionColapsable
+          id="presupuestos"
+          titulo="Presupuestos"
+          subtitulo="Consumo acumulado vs. presupuesto asignado por obra"
+          abierta={seccionAbierta("presupuestos")}
+          onToggle={toggleSeccion}
+          bodyClassName="eg__col-body--pad"
+        >
+          <SeccionPresupuestos
+            materialRows={presupuestosMaterialFiltrados}
+            rentaRows={presupuestosRentaFiltrados}
+            hayAlerta={hayAlertaPresupuesto}
+            loading={loadingPresupuestos}
+            mostrarEncabezado={false}
+          />
+        </SeccionColapsable>
       )}
 
       {/* ── Gráfica Material vs Tiempo ─────────────────────────── */}
       {!error && (
-        <GraficaTiempo seriesTiempo={seriesTiempo} loading={loading} />
+        <SeccionColapsable
+          id="grafica-material"
+          titulo="Material vs Tiempo"
+          subtitulo="Evolución histórica · m³ transportados por mes"
+          abierta={seccionAbierta("grafica-material")}
+          onToggle={toggleSeccion}
+        >
+          <GraficaTiempo
+            seriesTiempo={seriesTiempo}
+            loading={loading}
+            mostrarEncabezado={false}
+          />
+        </SeccionColapsable>
       )}
 
       {/* ── Viajes de Renta por Tipo de Equipo ───────────────── */}
       {!error && (
-        <GraficaViajesRenta
-          seriesTiempoRenta={seriesTiempoRenta}
-          tablaViajesRentaPorEquipo={tablaViajesRentaPorEquipo}
-          loading={loading}
-        />
+        <SeccionColapsable
+          id="viajes-renta"
+          titulo="Viajes de Renta por Tipo de Equipo"
+          subtitulo="Equipo rentado en obra · viajes registrados por mes"
+          abierta={seccionAbierta("viajes-renta")}
+          onToggle={toggleSeccion}
+        >
+          <GraficaViajesRenta
+            seriesTiempoRenta={seriesTiempoRenta}
+            tablaViajesRentaPorEquipo={tablaViajesRentaPorEquipo}
+            loading={loading}
+            mostrarEncabezado={false}
+          />
+        </SeccionColapsable>
       )}
 
       {/* ── Análisis Avanzado ─────────────────────────────────── */}
       {!error && !loading && (
-        <SeccionAnalisisAvanzado
-          horasPico={horasPico}
-          viajesPorVale={viajesPorVale}
-          topResidentes={topResidentes}
-          topChecadores={topChecadores}
-          topPlacas={topPlacas}
-          rendimientoPorMaterial={rendimientoPorMaterial}
-        />
+        <SeccionColapsable
+          id="analisis-avanzado"
+          titulo="Análisis de Operación"
+          subtitulo="Rendimientos, horas pico, residentes, checadores y vehículos"
+          abierta={seccionAbierta("analisis-avanzado")}
+          onToggle={toggleSeccion}
+          bodyClassName="eg__col-body--pad"
+        >
+          <SeccionAnalisisAvanzado
+            horasPico={horasPico}
+            viajesPorVale={viajesPorVale}
+            topResidentes={topResidentes}
+            topChecadores={topChecadores}
+            topPlacas={topPlacas}
+            rendimientoPorMaterial={rendimientoPorMaterial}
+            mostrarEncabezado={false}
+          />
+        </SeccionColapsable>
       )}
 
       {/* ── Modal conciliaciones por material ──────────────────── */}
