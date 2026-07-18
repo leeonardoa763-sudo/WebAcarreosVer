@@ -426,6 +426,9 @@ const DashboardUnificado = () => {
   // 2. Auth
   const { userProfile } = useAuth();
   const esAdministrador = userProfile?.roles?.role === "Administrador";
+  const esGerencia = userProfile?.roles?.role === "Gerencia";
+  // Gerencia puede ver KPIs y exportar, pero no editar vales
+  const puedeVerKpis = esAdministrador || esGerencia;
 
   // 3. Hook principal
   const {
@@ -733,8 +736,8 @@ const DashboardUnificado = () => {
 
       {/* ── Zona sticky: KPIs + Filtros ── */}
       <div className="du__sticky-zona">
-        {/* Aviso de datos truncados (solo Administrador) */}
-        {esAdministrador && hasMasDatos && (
+        {/* Aviso de datos truncados (Administrador y Gerencia) */}
+        {puedeVerKpis && hasMasDatos && (
           <div className="du__aviso-limite">
             <AlertTriangle size={15} />
             <span>
@@ -747,8 +750,8 @@ const DashboardUnificado = () => {
           </div>
         )}
 
-        {/* Indicador de fuente de KPIs (solo Administrador) */}
-        {esAdministrador && kpisDesdeLocales && (
+        {/* Indicador de fuente de KPIs (Administrador y Gerencia) */}
+        {puedeVerKpis && kpisDesdeLocales && (
           <div className="du__kpi-fuente">
             <Calculator size={13} />
             <span>
@@ -768,8 +771,8 @@ const DashboardUnificado = () => {
           </div>
         )}
 
-        {/* KPI Cards (solo Administrador) */}
-        {esAdministrador && (
+        {/* KPI Cards (Administrador y Gerencia) */}
+        {puedeVerKpis && (
           <>
             <section className="du__kpi-grid">
               <HeroCard
@@ -999,7 +1002,7 @@ const DashboardUnificado = () => {
                 Limpiar filtros
               </button>
             )}
-            {esAdministrador && (
+            {puedeVerKpis && (
               <div className="du__calcular-kpis-wrap">
                 <button
                   className={`du__btn-calcular-kpis ${kpisDesdeLocales ? "du__btn-calcular-kpis--activo" : ""}`}

@@ -41,4 +41,9 @@ export const initialAuthState = {
 /**
  * Roles permitidos para acceso web
  */
-export const ROLES_PERMITIDOS = ["Administrador", "Finanzas", "Sindicato"];
+export const ROLES_PERMITIDOS = [
+  "Administrador",
+  "Finanzas",
+  "Sindicato",
+  "Gerencia",
+];

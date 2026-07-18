@@ -31,12 +31,13 @@ const Sidebar = () => {
   const esAdministrador = rol === "Administrador";
   const esFinanzas = rol === "Finanzas";
   const esSindicato = rol === "Sindicato";
+  const esGerencia = rol === "Gerencia";
 
   return (
     <aside className="sidebar">
       <nav className="sidebar__nav">
-        {/* Estadísticas Globales - solo Administrador */}
-        {esAdministrador && (
+        {/* Estadísticas Globales - Administrador y Gerencia */}
+        {(esAdministrador || esGerencia) && (
           <NavLink
             to="/estadisticas"
             className={({ isActive }) =>

@@ -1059,6 +1059,8 @@ const EstadisticasGlobales = () => {
     tablaObraRentaTiempoReal,
     tablaObraMaterialAcumulado,
     tablaObraRentaAcumulado,
+    tablaObraMaterialReporte,
+    tablaObraRentaReporte,
     loadingPresupuestos,
     presupuestosMaterialFiltrados,
     presupuestosRentaFiltrados,
@@ -1138,27 +1140,24 @@ const EstadisticasGlobales = () => {
         { viajes: 0, label: "--" }
       );
 
-      // Las tablas del reporte usan datos reales al día (directo de `vales`,
-      // periodo Hoy/Ayer/Semana), no conciliaciones. Los KPIs de material
-      // (m³ e importe) se recalculan desde esa misma fuente para que cuadren.
+      // Las tablas del reporte usan datos reales (directo de `vales`) pero
+      // agrupados según los filtros seleccionados de la página (mes/semana/obra/
+      // etc.), no conciliaciones. Los KPIs de material (m³ e importe) se
+      // recalculan desde esa misma fuente para que cuadren con la tabla.
       const periodoTablasLabel =
-        periodoTiempoReal === "hoy"
-          ? "Hoy"
-          : periodoTiempoReal === "ayer"
-          ? "Ayer"
-          : formatSemanaChip(semanaTiempoReal);
+        filtros.mes.length > 0 || filtros.semana.length > 0 ? periodoLabel : null;
 
       generarPDFReporteEstadisticas({
         filtrosActivos,
         periodoLabel,
         periodoTablasLabel,
-        resumen: { ...resumen, totalImporte: totalesTablaObraTiempoReal.importeIVA },
-        totalesTablaObra: totalesTablaObraTiempoReal,
+        resumen: { ...resumen, totalImporte: totalesReporteMaterial.importeIVA },
+        totalesTablaObra: totalesReporteMaterial,
         comparativaPeriodoAnterior,
         periodoAnteriorLabel,
-        tablaObraMaterial: tablaObraMaterialTiempoReal,
-        tablaRentaPorObra: tablaObraRentaTiempoReal,
-        totalesRenta: totalesRentaTiempoReal,
+        tablaObraMaterial: tablaObraMaterialReporte,
+        tablaRentaPorObra: tablaObraRentaReporte,
+        totalesRenta: totalesReporteRenta,
         presupuestosMaterial: presupuestosMaterialFiltrados,
         presupuestosRenta: presupuestosRentaFiltrados,
         hayAlertaPresupuesto,
@@ -1305,6 +1304,36 @@ const EstadisticasGlobales = () => {
     t.pctPresupuesto = t.montoPresupuestado ? (t.subtotalSinIva / t.montoPresupuestado) * 100 : null;
     return t;
   }, [tablaObraRentaAcumulado]);
+
+  // Totales de las tablas del reporte PDF (vales reales por filtros globales)
+  const totalesReporteMaterial = useMemo(
+    () =>
+      tablaObraMaterialReporte.reduce(
+        (acc, obraRow) => ({
+          m3Total:     acc.m3Total     + obraRow.subtotal.m3Total,
+          valesCount:  acc.valesCount  + obraRow.subtotal.valesCount,
+          totalViajes: acc.totalViajes + obraRow.subtotal.totalViajes,
+          importeIVA:  acc.importeIVA  + obraRow.subtotal.importeIVA,
+        }),
+        { m3Total: 0, valesCount: 0, totalViajes: 0, importeIVA: 0 }
+      ),
+    [tablaObraMaterialReporte]
+  );
+
+  const totalesReporteRenta = useMemo(
+    () =>
+      tablaObraRentaReporte.reduce(
+        (acc, row) => ({
+          vales:          acc.vales          + row.vales,
+          totalViajes:    acc.totalViajes    + row.totalViajes,
+          totalDias:      acc.totalDias      + row.totalDias,
+          totalHoras:     acc.totalHoras     + row.totalHoras,
+          subtotalSinIva: acc.subtotalSinIva + row.subtotalSinIva,
+        }),
+        { vales: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, subtotalSinIva: 0 }
+      ),
+    [tablaObraRentaReporte]
+  );
 
   // 4. Config de categorías de filtros (multi-selección por categoría)
   const buildValorLabel = (opciones, valores) => {

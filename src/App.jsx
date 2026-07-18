@@ -55,11 +55,11 @@ const App = () => {
             }
           />
 
-          {/* Verificar Vales - todos los roles autenticados */}
+          {/* Verificar Vales - Administrador y Sindicato */}
           <Route
             path="/verificar-vales"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredRole={["Administrador", "Sindicato"]}>
                 <Layout>
                   <VerificarVales />
                 </Layout>
@@ -67,11 +67,11 @@ const App = () => {
             }
           />
 
-          {/* Conciliaciones - todos los roles autenticados */}
+          {/* Conciliaciones - Administrador y Sindicato */}
           <Route
             path="/conciliaciones"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredRole={["Administrador", "Sindicato"]}>
                 <Layout>
                   <Conciliaciones />
                 </Layout>
@@ -79,11 +79,11 @@ const App = () => {
             }
           />
 
-          {/* Historial de Conciliaciones - todos los roles autenticados */}
+          {/* Historial de Conciliaciones - Administrador y Sindicato */}
           <Route
             path="/historial-conciliaciones"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredRole={["Administrador", "Sindicato"]}>
                 <Layout>
                   <HistorialConciliaciones />
                 </Layout>
@@ -91,11 +91,11 @@ const App = () => {
             }
           />
 
-          {/* Estadísticas Globales - solo Administrador */}
+          {/* Estadísticas Globales - Administrador y Gerencia */}
           <Route
             path="/estadisticas"
             element={
-              <ProtectedRoute requiredRole="Administrador">
+              <ProtectedRoute requiredRole={["Administrador", "Gerencia"]}>
                 <Layout>
                   <EstadisticasGlobales />
                 </Layout>

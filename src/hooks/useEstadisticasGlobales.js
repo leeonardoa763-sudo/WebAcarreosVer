@@ -34,6 +34,106 @@ const matchesFiltro = (filtroArr, value) => {
   return filtroArr.some((v) => String(v) === String(value));
 };
 
+// ── Agregación de material por obra desde vales reales (tabla `vales`) ──────
+// Compartida por las tablas del reporte PDF. Respeta filtro material/banco a
+// nivel detalle. Tipo 3 (corte) toma volumen_real_m3 y cuenta tickets; el resto
+// suma volumen de vale_material_viajes, y si no hay viajes (Tipo 2 asfáltico o
+// vale recién emitido) usa volumen_real_m3 y, en su defecto, cantidad_pedida_m3.
+const agregarObraMaterialReal = (valesMaterial, filtroMaterial, filtroBanco) => {
+  const obraMap = {};
+  valesMaterial.forEach((vale) => {
+    const obraId = vale.obras?.id_obra;
+    if (!obraId) return;
+
+    if (!obraMap[obraId]) {
+      obraMap[obraId] = {
+        obra: vale.obras?.obra || "Sin obra",
+        cc: vale.obras?.cc ?? null,
+        empresa: vale.obras?.empresas?.empresa || null,
+        matMap: {},
+      };
+    }
+
+    (vale.vale_material_detalles || []).forEach((det) => {
+      const nombreMat = det.material?.material || "Sin clasificar";
+      const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
+
+      if (!matchesFiltro(filtroMaterial, nombreMat)) return;
+      if (!matchesFiltro(filtroBanco, det.id_banco)) return;
+
+      if (!obraMap[obraId].matMap[nombreMat]) {
+        obraMap[obraId].matMap[nombreMat] = {
+          material: nombreMat, m3Total: 0, valesIds: new Set(), totalViajes: 0, importeIVA: 0,
+        };
+      }
+      const s = obraMap[obraId].matMap[nombreMat];
+      s.valesIds.add(vale.id_vale);
+      s.importeIVA += Number(det.costo_total || 0) * 1.16;
+
+      if (tipoId === 3) {
+        s.m3Total += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
+        const tickets = vale.tickets_material?.length || 0;
+        s.totalViajes += tickets > 0 ? tickets : 1;
+      } else {
+        const viajes = det.vale_material_viajes || [];
+        if (viajes.length > 0) {
+          viajes.forEach((v) => { s.m3Total += Number(v.volumen_m3 || 0); });
+        } else {
+          s.m3Total += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
+        }
+        s.totalViajes += viajes.length > 0 ? viajes.length : 1;
+      }
+    });
+  });
+
+  return Object.values(obraMap)
+    .map(({ obra, cc, empresa, matMap }) => {
+      const materiales = Object.values(matMap)
+        .map((s) => ({ ...s, valesCount: s.valesIds.size }))
+        .sort((a, b) => b.m3Total - a.m3Total);
+      const subtotal = materiales.reduce(
+        (acc, m) => ({
+          m3Total:     acc.m3Total     + m.m3Total,
+          valesCount:  acc.valesCount  + m.valesCount,
+          totalViajes: acc.totalViajes + m.totalViajes,
+          importeIVA:  acc.importeIVA  + m.importeIVA,
+        }),
+        { m3Total: 0, valesCount: 0, totalViajes: 0, importeIVA: 0 }
+      );
+      return { obra, cc, empresa, materiales, subtotal };
+    })
+    .sort((a, b) => b.subtotal.m3Total - a.subtotal.m3Total);
+};
+
+// ── Agregación de renta por obra desde vales reales (tabla `vales`) ─────────
+// Importe SIN IVA ni retención (esas solo existen a nivel conciliación).
+const agregarObraRentaReal = (valesRenta) => {
+  const obraMap = {};
+  valesRenta.forEach((vale) => {
+    const obraId = vale.id_obra;
+    if (!obraId) return;
+    if (!obraMap[obraId]) {
+      obraMap[obraId] = {
+        obra: vale.obras?.obra || "Sin obra",
+        cc: vale.obras?.cc ?? null,
+        empresa: vale.obras?.empresas?.empresa || null,
+        vales: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, subtotalSinIva: 0,
+      };
+    }
+    const o = obraMap[obraId];
+    o.vales += 1;
+    (vale.vale_renta_detalle || []).forEach((det) => {
+      o.totalViajes += det.vale_renta_viajes?.length > 0
+        ? det.vale_renta_viajes.length
+        : (det.numero_viajes || 1);
+      o.totalDias  += Number(det.total_dias  || 0);
+      o.totalHoras += Number(det.total_horas || 0);
+      o.subtotalSinIva += Number(det.costo_total || 0);
+    });
+  });
+  return Object.values(obraMap).sort((a, b) => b.subtotalSinIva - a.subtotalSinIva);
+};
+
 export const useEstadisticasGlobales = () => {
   // 1. Estados base
   const [loading, setLoading] = useState(true);
@@ -1163,6 +1263,39 @@ export const useEstadisticasGlobales = () => {
       .sort((a, b) => b.subtotalSinIva - a.subtotalSinIva);
   }, [valesAcumuladoRenta, presupuestoRentaMap]);
 
+  // ── Fuente del reporte PDF: vales reales filtrados por los chips globales ──
+  // A diferencia de las tablas "tiempo real" (Hoy/Ayer/Semana local), esta
+  // respeta los filtros de la página: mes/semana (por fecha_creacion del vale)
+  // + obra/empresa/sindicato. Así el PDF agrupa según los filtros seleccionados.
+  const valesReporteFiltrados = useMemo(
+    () =>
+      rawValesTiempoReal.filter((vale) => {
+        if (!matchesFiltro(filtros.mes, vale.fecha_creacion?.substring(0, 7))) return false;
+        if (!matchesFiltro(filtros.semana, getWeekKey(vale.fecha_creacion))) return false;
+        if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
+        if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
+        if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato)) return false;
+        return true;
+      }),
+    [rawValesTiempoReal, filtros]
+  );
+
+  const tablaObraMaterialReporte = useMemo(
+    () =>
+      agregarObraMaterialReal(
+        valesReporteFiltrados.filter((v) => v.tipo_vale === "material"),
+        filtros.material,
+        filtros.idBanco
+      ),
+    [valesReporteFiltrados, filtros.material, filtros.idBanco]
+  );
+
+  const tablaObraRentaReporte = useMemo(
+    () =>
+      agregarObraRentaReal(valesReporteFiltrados.filter((v) => v.tipo_vale === "renta")),
+    [valesReporteFiltrados]
+  );
+
   const hayAlertaPresupuesto = useMemo(
     () =>
       presupuestosMaterialFiltrados.some(
@@ -1422,6 +1555,9 @@ export const useEstadisticasGlobales = () => {
     // Volumen acumulado histórico por obra (sin filtro de periodo) + % vs presupuesto
     tablaObraMaterialAcumulado,
     tablaObraRentaAcumulado,
+    // Fuente del reporte PDF: vales reales agrupados por los chips globales
+    tablaObraMaterialReporte,
+    tablaObraRentaReporte,
     // Presupuestos
     loadingPresupuestos,
     presupuestosMaterialFiltrados,
