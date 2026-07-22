@@ -44,7 +44,7 @@ Segundo clic: ejecuta la verificación. Protege contra clicks accidentales.
 
 ## Validaciones (en useVerificacion, no en componentes)
 
-- Rechaza PDFs con texto "COPIA ROJA" — solo acepta "COPIA BLANCA" / "COPIA BLANCO"
+- Rechaza PDFs con texto "COPIA ROJA" — acepta "COPIA BLANCA" / "COPIA BLANCO" o formato ticket (contiene "VERIFICA QR", sin leyenda de copia)
 - Requiere "VALE DE MATERIAL" o "VALE DE RENTA" en el contenido del PDF
 - Retry QR a escala 3x si falla a 2x (default)
 - Máx 20 MB por archivo en batch

@@ -336,7 +336,7 @@ useEffect(() => {
 
 ## Verificación de PDFs
 
-- Solo se aceptan **copias blancas** (`COPIA BLANCA` / `COPIA BLANCO`)
+- Se aceptan **copias blancas** (`COPIA BLANCA` / `COPIA BLANCO`) y el **formato ticket** (impresión térmica, sin leyenda de copia — se identifica por `VERIFICA QR`)
 - **Copias rojas** → rechazar con error explícito
 - Flujo: OCR primero → si falla, decodificar QR a escala 2x → si falla, reintentar QR a escala 3x
 - Validar que el PDF contenga `VALE DE MATERIAL` o `VALE DE RENTA` + `OPERADOR`

@@ -78,10 +78,13 @@ export const useVerificacion = () => {
           );
         }
 
-        // Validación 2: Debe ser copia blanca o blanco
+        // Validación 2: Debe ser copia blanca/blanco o formato ticket
+        // El formato ticket (impresión térmica) no lleva leyenda de copia,
+        // pero incluye "VERIFICA QR". Las copias rojas ya fueron rechazadas arriba.
         const esCopiaBlanca =
           texto.includes("COPIA BLANCA") || texto.includes("COPIA BLANCO");
-        if (!esCopiaBlanca) {
+        const esFormatoTicket = texto.includes("VERIFICA QR");
+        if (!esCopiaBlanca && !esFormatoTicket) {
           throw new Error(
             "PDF inválido: debe ser una copia blanca original del vale."
           );
