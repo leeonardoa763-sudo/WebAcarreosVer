@@ -216,6 +216,16 @@ export const useEstadisticasGlobales = () => {
       if (errorConc) throw errorConc;
       setRawConciliaciones(conciliaciones || []);
 
+      // Debug: log de conciliaciones obtenidas
+      console.log("[EstadisticasGlobales] Conciliaciones obtenidas:", conciliaciones?.length || 0);
+      if (esResidente) {
+        console.log("[EstadisticasGlobales] Filtro aplicado - Obras:", idObrasAsignadas);
+        console.log("[EstadisticasGlobales] Conciliaciones por obra:", conciliaciones?.reduce((acc, c) => {
+          acc[c.id_obra] = (acc[c.id_obra] || 0) + 1;
+          return acc;
+        }, {}));
+      }
+
       // Mapa conciliación completa (compartido por material y renta)
       const concMap = {};
       (conciliaciones || []).forEach((c) => { concMap[c.id_conciliacion] = c; });
