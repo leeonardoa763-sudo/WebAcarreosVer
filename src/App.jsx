@@ -91,11 +91,11 @@ const App = () => {
             }
           />
 
-          {/* Estadísticas Globales - Administrador y Gerencia */}
+          {/* Estadísticas Globales - Administrador, Gerencia y Residente */}
           <Route
             path="/estadisticas"
             element={
-              <ProtectedRoute requiredRole={["Administrador", "Gerencia"]}>
+              <ProtectedRoute requiredRole={["Administrador", "Gerencia", "Residente"]}>
                 <Layout>
                   <EstadisticasGlobales />
                 </Layout>
