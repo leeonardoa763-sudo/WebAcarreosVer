@@ -58,10 +58,13 @@ export const useAuthSession = () => {
         .eq("auth_user_id", authUserId)
         .single();
 
-      // Si tiene obras asignadas, usar la primera como obra principal
+      // Si tiene obras asignadas, extraer todos los IDs de obras
       if (data && data.persona_obra && data.persona_obra.length > 0) {
+        // Guardar la primera obra como principal (para compatibilidad)
         data.obras = data.persona_obra[0].obras;
         data.id_current_obra = data.persona_obra[0].obra_id;
+        // Guardar TODOS los IDs de obras asignadas para filtrado múltiple
+        data.id_obras_asignadas = data.persona_obra.map(po => po.obra_id);
       }
 
       const queryEndTime = Date.now();

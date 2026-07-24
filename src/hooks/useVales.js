@@ -67,7 +67,7 @@ export const useVales = () => {
 
   // Detectar rol residente
   const esResidente = userProfile?.roles?.role === "Residente";
-  const idObraResidente = userProfile?.id_current_obra;
+  const idObrasAsignadas = userProfile?.id_obras_asignadas || [];
 
   /**
    * Cargar catálogo de obras
@@ -149,13 +149,12 @@ export const useVales = () => {
         );
       }
 
-      // Filtro automático por obra para rol Residente
+      // Filtro automático por obras para rol Residente
       // Se aplica antes de los filtros de usuario para que sea transparente
-      if (esResidente && idObraResidente) {
+      if (esResidente && idObrasAsignadas.length > 0) {
         datos = datos.filter(
           (vale) =>
-            Number(vale.id_obra) ===
-            Number(idObraResidente),
+            idObrasAsignadas.includes(Number(vale.id_obra)),
         );
       }
 
@@ -175,7 +174,7 @@ export const useVales = () => {
     esSindicato,
     idSindicatoUsuario,
     esResidente,
-    idObraResidente,
+    idObrasAsignadas,
     filters.searchTerm,
     filters.id_obra,
     filters.id_material,

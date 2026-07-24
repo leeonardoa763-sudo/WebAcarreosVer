@@ -141,14 +141,13 @@ export const useEstadisticasGlobales = () => {
   // Detectar perfil de usuario
   const { userProfile } = useAuth();
   const esResidente = userProfile?.roles?.role === "Residente";
-  // Usar id_current_obra directamente en lugar de la relación
-  const idObraResidente = userProfile?.id_current_obra;
+  // Usar TODAS las obras asignadas al residente
+  const idObrasAsignadas = userProfile?.id_obras_asignadas || [];
 
   // Debug: loguear configuración de residente
   if (esResidente) {
     console.log("[EstadisticasGlobales] Residente detectado");
-    console.log("[EstadisticasGlobales] userProfile.id_current_obra:", userProfile?.id_current_obra);
-    console.log("[EstadisticasGlobales] idObraResidente:", idObraResidente);
+    console.log("[EstadisticasGlobales] Obras asignadas:", idObrasAsignadas);
   }
 
   // 1. Estados base
@@ -190,10 +189,10 @@ export const useEstadisticasGlobales = () => {
       setLoading(true);
       setError(null);
 
-      // Validación: Residente debe tener obra asignada
-      if (esResidente && !idObraResidente) {
-        console.error("[EstadisticasGlobales] Residente sin obra asignada");
-        setError("No tienes una obra asignada. Contacta al administrador.");
+      // Validación: Residente debe tener obras asignadas
+      if (esResidente && (!idObrasAsignadas || idObrasAsignadas.length === 0)) {
+        console.error("[EstadisticasGlobales] Residente sin obras asignadas");
+        setError("No tienes obras asignadas. Contacta al administrador.");
         setLoading(false);
         return;
       }
@@ -207,9 +206,9 @@ export const useEstadisticasGlobales = () => {
         .neq("id_obra", 14)
         .neq("id_empresa", 4);
 
-      // Filtro por obra si es residente
-      if (esResidente && idObraResidente) {
-        queryConc = queryConc.eq("id_obra", idObraResidente);
+      // Filtro por obras si es residente
+      if (esResidente && idObrasAsignadas.length > 0) {
+        queryConc = queryConc.in("id_obra", idObrasAsignadas);
       }
 
       const { data: conciliaciones, error: errorConc } = await queryConc;
@@ -270,9 +269,9 @@ export const useEstadisticasGlobales = () => {
             .neq("id_obra", 14)
             .neq("id_empresa", 4);
 
-          // Filtro por obra si es residente
-          if (esResidente && idObraResidente) {
-            queryVales = queryVales.eq("id_obra", idObraResidente);
+          // Filtro por obras si es residente
+          if (esResidente && idObrasAsignadas.length > 0) {
+            queryVales = queryVales.in("id_obra", idObrasAsignadas);
           }
 
           const { data: vales, error: errorVales } = await queryVales;
@@ -347,9 +346,9 @@ export const useEstadisticasGlobales = () => {
             .neq("id_obra", 14)
             .neq("id_empresa", 4);
 
-          // Filtro por obra si es residente
-          if (esResidente && idObraResidente) {
-            queryRentaVales = queryRentaVales.eq("id_obra", idObraResidente);
+          // Filtro por obras si es residente
+          if (esResidente && idObrasAsignadas.length > 0) {
+            queryRentaVales = queryRentaVales.in("id_obra", idObrasAsignadas);
           }
 
           const { data: rentaVales, error: errorRentaVales } = await queryRentaVales;
@@ -370,7 +369,7 @@ export const useEstadisticasGlobales = () => {
     } finally {
       setLoading(false);
     }
-  }, [esResidente, idObraResidente]);
+  }, [esResidente, idObrasAsignadas]);
 
   // 4. Effect inicial
   useEffect(() => { fetchEstadisticas(); }, []);
@@ -398,10 +397,10 @@ export const useEstadisticasGlobales = () => {
         .eq("activo", true)
         .neq("id_obra", 14);
 
-      // Filtro por obra si es residente
-      if (esResidente && idObraResidente) {
-        queryPresupuestoMat = queryPresupuestoMat.eq("id_obra", idObraResidente);
-        queryPresupuestoRenta = queryPresupuestoRenta.eq("id_obra", idObraResidente);
+      // Filtro por obras si es residente
+      if (esResidente && idObrasAsignadas.length > 0) {
+        queryPresupuestoMat = queryPresupuestoMat.in("id_obra", idObrasAsignadas);
+        queryPresupuestoRenta = queryPresupuestoRenta.in("id_obra", idObrasAsignadas);
       }
 
       const [{ data: pMat, error: eMat }, { data: pRenta, error: eRenta }] =
@@ -418,7 +417,7 @@ export const useEstadisticasGlobales = () => {
     } finally {
       setLoadingPresupuestos(false);
     }
-  }, [esResidente, idObraResidente]);
+  }, [esResidente, idObrasAsignadas]);
 
   useEffect(() => { fetchPresupuestos(); }, []);
 
@@ -455,9 +454,9 @@ export const useEstadisticasGlobales = () => {
         .neq("id_empresa", 4)
         .not("estado", "in", "(borrador,cancelado)");
 
-      // Filtro por obra si es residente
-      if (esResidente && idObraResidente) {
-        queryValesTR = queryValesTR.eq("id_obra", idObraResidente);
+      // Filtro por obras si es residente
+      if (esResidente && idObrasAsignadas.length > 0) {
+        queryValesTR = queryValesTR.in("id_obra", idObrasAsignadas);
       }
 
       const { data, error } = await queryValesTR.limit(20000);
@@ -471,7 +470,7 @@ export const useEstadisticasGlobales = () => {
     } finally {
       setLoadingTiempoReal(false);
     }
-  }, [esResidente, idObraResidente]);
+  }, [esResidente, idObrasAsignadas]);
 
   useEffect(() => { fetchValesTiempoReal(); }, [fetchValesTiempoReal]);
 
