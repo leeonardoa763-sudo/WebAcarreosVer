@@ -143,6 +143,13 @@ export const useEstadisticasGlobales = () => {
   const esResidente = userProfile?.roles?.role === "Residente";
   const idObraResidente = userProfile?.obras?.id_obra;
 
+  // Debug: loguear configuración de residente
+  if (esResidente) {
+    console.log("[EstadisticasGlobales] Residente detectado");
+    console.log("[EstadisticasGlobales] userProfile.obras:", userProfile?.obras);
+    console.log("[EstadisticasGlobales] idObraResidente:", idObraResidente);
+  }
+
   // 1. Estados base
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -181,6 +188,14 @@ export const useEstadisticasGlobales = () => {
     try {
       setLoading(true);
       setError(null);
+
+      // Validación: Residente debe tener obra asignada
+      if (esResidente && !idObraResidente) {
+        console.error("[EstadisticasGlobales] Residente sin obra asignada");
+        setError("No tienes una obra asignada. Contacta al administrador.");
+        setLoading(false);
+        return;
+      }
 
       // Query A: todas las conciliaciones
       let queryConc = supabase
