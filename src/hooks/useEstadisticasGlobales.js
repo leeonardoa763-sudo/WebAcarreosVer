@@ -206,6 +206,19 @@ export const useEstadisticasGlobales = () => {
         .neq("id_obra", 14)
         .neq("id_empresa", 4);
 
+      // Debug: obtener total SIN filtro
+      if (esResidente) {
+        const { data: concSinFiltro } = await supabase
+          .from("conciliaciones")
+          .select("id_conciliacion, id_obra")
+          .neq("id_obra", 14)
+          .neq("id_empresa", 4);
+        console.log("[EstadisticasGlobales] Total conciliaciones (SIN filtro):", concSinFiltro?.length || 0);
+        if (concSinFiltro?.length > 0) {
+          console.log("[EstadisticasGlobales] Obras con conciliaciones:", [...new Set(concSinFiltro.map(c => c.id_obra))]);
+        }
+      }
+
       // Filtro por obras si es residente
       if (esResidente && idObrasAsignadas.length > 0) {
         queryConc = queryConc.in("id_obra", idObrasAsignadas);
@@ -217,13 +230,9 @@ export const useEstadisticasGlobales = () => {
       setRawConciliaciones(conciliaciones || []);
 
       // Debug: log de conciliaciones obtenidas
-      console.log("[EstadisticasGlobales] Conciliaciones obtenidas:", conciliaciones?.length || 0);
+      console.log("[EstadisticasGlobales] Conciliaciones obtenidas (CON filtro):", conciliaciones?.length || 0);
       if (esResidente) {
         console.log("[EstadisticasGlobales] Filtro aplicado - Obras:", idObrasAsignadas);
-        console.log("[EstadisticasGlobales] Conciliaciones por obra:", conciliaciones?.reduce((acc, c) => {
-          acc[c.id_obra] = (acc[c.id_obra] || 0) + 1;
-          return acc;
-        }, {}));
       }
 
       // Mapa conciliación completa (compartido por material y renta)
