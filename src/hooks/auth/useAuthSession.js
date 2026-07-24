@@ -38,21 +38,31 @@ export const useAuthSession = () => {
             id_roles,
             role
           ),
-          obras:id_current_obra (
-            id_obra,
-            obra,
-            cc,
-            empresas:id_empresa (
-              id_empresa,
-              empresa,
-              sufijo,
-              logo
+          persona_obra (
+            id,
+            obra_id,
+            obras:obra_id (
+              id_obra,
+              obra,
+              cc,
+              empresas:id_empresa (
+                id_empresa,
+                empresa,
+                sufijo,
+                logo
+              )
             )
           )
         `
         )
         .eq("auth_user_id", authUserId)
         .single();
+
+      // Si tiene obras asignadas, usar la primera como obra principal
+      if (data && data.persona_obra && data.persona_obra.length > 0) {
+        data.obras = data.persona_obra[0].obras;
+        data.id_current_obra = data.persona_obra[0].obra_id;
+      }
 
       const queryEndTime = Date.now();
 
