@@ -144,12 +144,6 @@ export const useEstadisticasGlobales = () => {
   // Usar TODAS las obras asignadas al residente
   const idObrasAsignadas = userProfile?.id_obras_asignadas || [];
 
-  // Debug: loguear configuración de residente
-  if (esResidente) {
-    console.log("[EstadisticasGlobales] Residente detectado");
-    console.log("[EstadisticasGlobales] Obras asignadas:", idObrasAsignadas);
-  }
-
   // 1. Estados base
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -191,7 +185,6 @@ export const useEstadisticasGlobales = () => {
 
       // Validación: Residente debe tener obras asignadas
       if (esResidente && (!idObrasAsignadas || idObrasAsignadas.length === 0)) {
-        console.error("[EstadisticasGlobales] Residente sin obras asignadas");
         setError("No tienes obras asignadas. Contacta al administrador.");
         setLoading(false);
         return;
@@ -206,34 +199,15 @@ export const useEstadisticasGlobales = () => {
         .neq("id_obra", 14)
         .neq("id_empresa", 4);
 
-      // Debug: obtener total SIN filtro
-      if (esResidente) {
-        const { data: concSinFiltro } = await supabase
-          .from("conciliaciones")
-          .select("id_conciliacion, id_obra")
-          .neq("id_obra", 14)
-          .neq("id_empresa", 4);
-        console.log("[EstadisticasGlobales] Total conciliaciones (SIN filtro):", concSinFiltro?.length || 0);
-        if (concSinFiltro?.length > 0) {
-          console.log("[EstadisticasGlobales] Obras con conciliaciones:", [...new Set(concSinFiltro.map(c => c.id_obra))]);
-        }
-      }
-
       // Filtro por obras si es residente
       if (esResidente && idObrasAsignadas.length > 0) {
         queryConc = queryConc.in("id_obra", idObrasAsignadas);
       }
 
       const { data: conciliaciones, error: errorConc } = await queryConc;
-
       if (errorConc) throw errorConc;
-      setRawConciliaciones(conciliaciones || []);
 
-      // Debug: log de conciliaciones obtenidas
-      console.log("[EstadisticasGlobales] Conciliaciones obtenidas (CON filtro):", conciliaciones?.length || 0);
-      if (esResidente) {
-        console.log("[EstadisticasGlobales] Filtro aplicado - Obras:", idObrasAsignadas);
-      }
+      setRawConciliaciones(conciliaciones || []);
 
       // Mapa conciliación completa (compartido por material y renta)
       const concMap = {};
@@ -261,7 +235,7 @@ export const useEstadisticasGlobales = () => {
 
         if (valeIds.length > 0) {
           // Query C: vales con todos los campos para filtros y agregación
-          let queryVales = supabase
+          const { data: vales, error: errorVales } = await supabase
             .from("vales")
             .select(`
               id_vale, id_obra, id_empresa, id_operador, id_persona_creador, id_persona_verificador, id_vehiculo,
@@ -284,44 +258,10 @@ export const useEstadisticasGlobales = () => {
               ),
               tickets_material (id_ticket)
             `)
-            .in("id_vale", valeIds)
-            .neq("id_obra", 14)
-            .neq("id_empresa", 4);
-
-          // Filtro por obras si es residente
-          if (esResidente && idObrasAsignadas.length > 0) {
-            queryVales = queryVales.in("id_obra", idObrasAsignadas);
-          }
-
-          const { data: vales, error: errorVales } = await queryVales;
+            .in("id_vale", valeIds);
 
           if (errorVales) throw errorVales;
           setRawVales(vales || []);
-
-          const logStats = {};
-          (vales || []).forEach((vale) => {
-            (vale.vale_material_detalles || []).forEach((det) => {
-              const nombre = det.material?.material || "Sin clasificar";
-              const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
-              if (!logStats[nombre]) logStats[nombre] = { material: nombre, tipoId, m3: 0, valesIds: new Set(), importeIVA: 0 };
-              const s = logStats[nombre];
-              s.valesIds.add(vale.id_vale);
-              s.importeIVA += Number(det.costo_total || 0) * 1.16;
-              if (tipoId === 3) {
-                s.m3 += Number(det.volumen_real_m3 || 0);
-              } else {
-                (det.vale_material_viajes || []).forEach((v) => { s.m3 += Number(v.volumen_m3 || 0); });
-              }
-            });
-          });
-          const logTable = Object.values(logStats)
-            .map((s) => ({ material: s.material, tipo: s.tipoId, m3_total: Math.round(s.m3 * 100) / 100, vales_count: s.valesIds.size, importe_iva: Math.round(s.importeIVA * 100) / 100 }))
-            .sort((a, b) => b.m3_total - a.m3_total);
-          console.group("[EstadisticasGlobales] Verificación de datos");
-          console.log(`Conciliaciones: ${(conciliaciones || []).length} total`);
-          console.log(`Vales con material conciliado: ${(vales || []).length}`);
-          console.table(logTable);
-          console.groupEnd();
         } else {
           setRawVales([]);
         }
@@ -350,7 +290,7 @@ export const useEstadisticasGlobales = () => {
         const rentaValeIds = [...new Set((cvRentaData || []).map((cv) => cv.id_vale))];
 
         if (rentaValeIds.length > 0) {
-          let queryRentaVales = supabase
+          const { data: rentaVales, error: errorRentaVales } = await supabase
             .from("vales")
             .select(`
               id_vale, id_obra, id_empresa,
@@ -361,16 +301,7 @@ export const useEstadisticasGlobales = () => {
                 vale_renta_viajes (id_viaje, hora_registro)
               )
             `)
-            .in("id_vale", rentaValeIds)
-            .neq("id_obra", 14)
-            .neq("id_empresa", 4);
-
-          // Filtro por obras si es residente
-          if (esResidente && idObrasAsignadas.length > 0) {
-            queryRentaVales = queryRentaVales.in("id_obra", idObrasAsignadas);
-          }
-
-          const { data: rentaVales, error: errorRentaVales } = await queryRentaVales;
+            .in("id_vale", rentaValeIds);
 
           if (errorRentaVales) throw errorRentaVales;
           setRawValesRenta(rentaVales || []);
@@ -391,7 +322,7 @@ export const useEstadisticasGlobales = () => {
   }, [esResidente, idObrasAsignadas]);
 
   // 4. Effect inicial
-  useEffect(() => { fetchEstadisticas(); }, []);
+  useEffect(() => { fetchEstadisticas(); }, [fetchEstadisticas]);
 
   // 5. Fetch presupuestos (independiente de conciliaciones)
   const fetchPresupuestos = useCallback(async () => {
