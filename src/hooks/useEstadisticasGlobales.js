@@ -14,7 +14,10 @@
 // 1. React
 import { useState, useEffect, useCallback, useMemo } from "react";
 
-// 2. Config
+// 2. Hooks personalizados
+import { useAuth } from "./useAuth";
+
+// 3. Config
 import { supabase } from "../config/supabase";
 
 // ── Helper: semana del año ──────────────────────────────────────────
@@ -135,6 +138,11 @@ const agregarObraRentaReal = (valesRenta) => {
 };
 
 export const useEstadisticasGlobales = () => {
+  // Detectar perfil de usuario
+  const { userProfile } = useAuth();
+  const esResidente = userProfile?.roles?.role === "Residente";
+  const idObraResidente = userProfile?.obras?.id_obra;
+
   // 1. Estados base
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -175,13 +183,20 @@ export const useEstadisticasGlobales = () => {
       setError(null);
 
       // Query A: todas las conciliaciones
-      const { data: conciliaciones, error: errorConc } = await supabase
+      let queryConc = supabase
         .from("conciliaciones")
         .select(
           "id_conciliacion, tipo_conciliacion, total_final, total_horas, total_dias, fecha_generacion, folio, id_obra, id_empresa, id_sindicato, obras:id_obra (id_obra, obra, cc), sindicatos:id_sindicato (sindicato), empresas:id_empresa (empresa)"
         )
         .neq("id_obra", 14)
         .neq("id_empresa", 4);
+
+      // Filtro por obra si es residente
+      if (esResidente && idObraResidente) {
+        queryConc = queryConc.eq("id_obra", idObraResidente);
+      }
+
+      const { data: conciliaciones, error: errorConc } = await queryConc;
 
       if (errorConc) throw errorConc;
       setRawConciliaciones(conciliaciones || []);
@@ -212,7 +227,7 @@ export const useEstadisticasGlobales = () => {
 
         if (valeIds.length > 0) {
           // Query C: vales con todos los campos para filtros y agregación
-          const { data: vales, error: errorVales } = await supabase
+          let queryVales = supabase
             .from("vales")
             .select(`
               id_vale, id_obra, id_empresa, id_operador, id_persona_creador, id_persona_verificador, id_vehiculo,
@@ -238,6 +253,13 @@ export const useEstadisticasGlobales = () => {
             .in("id_vale", valeIds)
             .neq("id_obra", 14)
             .neq("id_empresa", 4);
+
+          // Filtro por obra si es residente
+          if (esResidente && idObraResidente) {
+            queryVales = queryVales.eq("id_obra", idObraResidente);
+          }
+
+          const { data: vales, error: errorVales } = await queryVales;
 
           if (errorVales) throw errorVales;
           setRawVales(vales || []);
@@ -294,7 +316,7 @@ export const useEstadisticasGlobales = () => {
         const rentaValeIds = [...new Set((cvRentaData || []).map((cv) => cv.id_vale))];
 
         if (rentaValeIds.length > 0) {
-          const { data: rentaVales, error: errorRentaVales } = await supabase
+          let queryRentaVales = supabase
             .from("vales")
             .select(`
               id_vale, id_obra, id_empresa,
@@ -308,6 +330,13 @@ export const useEstadisticasGlobales = () => {
             .in("id_vale", rentaValeIds)
             .neq("id_obra", 14)
             .neq("id_empresa", 4);
+
+          // Filtro por obra si es residente
+          if (esResidente && idObraResidente) {
+            queryRentaVales = queryRentaVales.eq("id_obra", idObraResidente);
+          }
+
+          const { data: rentaVales, error: errorRentaVales } = await queryRentaVales;
 
           if (errorRentaVales) throw errorRentaVales;
           setRawValesRenta(rentaVales || []);
@@ -325,7 +354,7 @@ export const useEstadisticasGlobales = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [esResidente, idObraResidente]);
 
   // 4. Effect inicial
   useEffect(() => { fetchEstadisticas(); }, []);
@@ -334,25 +363,35 @@ export const useEstadisticasGlobales = () => {
   const fetchPresupuestos = useCallback(async () => {
     try {
       setLoadingPresupuestos(true);
+      let queryPresupuestoMat = supabase
+        .from("presupuesto_material_obra")
+        .select(`
+          id, id_obra, id_material, m3_presupuestados, m3_consumidos,
+          obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa)),
+          material:id_material (id_material, material)
+        `)
+        .eq("activo", true)
+        .neq("id_obra", 14);
+
+      let queryPresupuestoRenta = supabase
+        .from("presupuesto_renta_obra")
+        .select(`
+          id, id_obra, monto_presupuestado, monto_consumido,
+          obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa))
+        `)
+        .eq("activo", true)
+        .neq("id_obra", 14);
+
+      // Filtro por obra si es residente
+      if (esResidente && idObraResidente) {
+        queryPresupuestoMat = queryPresupuestoMat.eq("id_obra", idObraResidente);
+        queryPresupuestoRenta = queryPresupuestoRenta.eq("id_obra", idObraResidente);
+      }
+
       const [{ data: pMat, error: eMat }, { data: pRenta, error: eRenta }] =
         await Promise.all([
-          supabase
-            .from("presupuesto_material_obra")
-            .select(`
-              id, id_obra, id_material, m3_presupuestados, m3_consumidos,
-              obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa)),
-              material:id_material (id_material, material)
-            `)
-            .eq("activo", true)
-            .neq("id_obra", 14),
-          supabase
-            .from("presupuesto_renta_obra")
-            .select(`
-              id, id_obra, monto_presupuestado, monto_consumido,
-              obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa))
-            `)
-            .eq("activo", true)
-            .neq("id_obra", 14),
+          queryPresupuestoMat,
+          queryPresupuestoRenta,
         ]);
       if (eMat) throw eMat;
       if (eRenta) throw eRenta;
@@ -363,7 +402,7 @@ export const useEstadisticasGlobales = () => {
     } finally {
       setLoadingPresupuestos(false);
     }
-  }, []);
+  }, [esResidente, idObraResidente]);
 
   useEffect(() => { fetchPresupuestos(); }, []);
 
@@ -376,7 +415,7 @@ export const useEstadisticasGlobales = () => {
       setLoadingTiempoReal(true);
       setErrorTiempoReal(null);
 
-      const { data, error } = await supabase
+      let queryValesTR = supabase
         .from("vales")
         .select(`
           id_vale, tipo_vale, estado, fecha_creacion, id_obra, id_empresa,
@@ -398,8 +437,14 @@ export const useEstadisticasGlobales = () => {
         `)
         .neq("id_obra", 14)
         .neq("id_empresa", 4)
-        .not("estado", "in", "(borrador,cancelado)")
-        .limit(20000);
+        .not("estado", "in", "(borrador,cancelado)");
+
+      // Filtro por obra si es residente
+      if (esResidente && idObraResidente) {
+        queryValesTR = queryValesTR.eq("id_obra", idObraResidente);
+      }
+
+      const { data, error } = await queryValesTR.limit(20000);
 
       if (error) throw error;
       setRawValesTiempoReal(data || []);
@@ -410,7 +455,7 @@ export const useEstadisticasGlobales = () => {
     } finally {
       setLoadingTiempoReal(false);
     }
-  }, []);
+  }, [esResidente, idObraResidente]);
 
   useEffect(() => { fetchValesTiempoReal(); }, [fetchValesTiempoReal]);
 

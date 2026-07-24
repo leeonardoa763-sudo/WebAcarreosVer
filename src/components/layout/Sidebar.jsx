@@ -32,12 +32,13 @@ const Sidebar = () => {
   const esFinanzas = rol === "Finanzas";
   const esSindicato = rol === "Sindicato";
   const esGerencia = rol === "Gerencia";
+  const esResidente = rol === "Residente";
 
   return (
     <aside className="sidebar">
       <nav className="sidebar__nav">
-        {/* Estadísticas Globales - Administrador y Gerencia */}
-        {(esAdministrador || esGerencia) && (
+        {/* Estadísticas Globales - Administrador, Gerencia y Residente */}
+        {(esAdministrador || esGerencia || esResidente) && (
           <NavLink
             to="/estadisticas"
             className={({ isActive }) =>
@@ -61,8 +62,8 @@ const Sidebar = () => {
         </NavLink>
 
 
-        {/* Verificar Vales - Administrador y Sindicato */}
-        {(esAdministrador || esSindicato) && (
+        {/* Verificar Vales - Administrador y Sindicato (NO Residente) */}
+        {(esAdministrador || esSindicato) && !esResidente && (
           <NavLink
             to="/verificar-vales"
             className={({ isActive }) =>
@@ -74,8 +75,8 @@ const Sidebar = () => {
           </NavLink>
         )}
 
-        {/* Conciliaciones (generar) - Administrador y Sindicato */}
-        {(esAdministrador || esSindicato) && (
+        {/* Conciliaciones (generar) - Administrador y Sindicato (NO Residente) */}
+        {(esAdministrador || esSindicato) && !esResidente && (
           <NavLink
             to="/conciliaciones"
             className={({ isActive }) =>
@@ -87,8 +88,8 @@ const Sidebar = () => {
           </NavLink>
         )}
 
-        {/* Historial de Conciliaciones - Administrador y Sindicato */}
-        {(esAdministrador || esSindicato) && (
+        {/* Historial de Conciliaciones - Administrador y Sindicato (NO Residente) */}
+        {(esAdministrador || esSindicato) && !esResidente && (
           <NavLink
             to="/historial-conciliaciones"
             className={({ isActive }) =>
@@ -100,8 +101,8 @@ const Sidebar = () => {
           </NavLink>
         )}
 
-        {/* Contabilidad - Administrador y Finanzas */}
-        {(esAdministrador || esFinanzas) && (
+        {/* Contabilidad - Administrador y Finanzas (NO Residente) */}
+        {(esAdministrador || esFinanzas) && !esResidente && (
           <NavLink
             to="/contabilidad"
             className={({ isActive }) =>

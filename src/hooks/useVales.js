@@ -65,6 +65,10 @@ export const useVales = () => {
   const esSindicato = userProfile?.roles?.role === "Sindicato";
   const idSindicatoUsuario = userProfile?.id_sindicato;
 
+  // Detectar rol residente
+  const esResidente = userProfile?.roles?.role === "Residente";
+  const idObraResidente = userProfile?.obras?.id_obra;
+
   /**
    * Cargar catálogo de obras
    */
@@ -145,7 +149,17 @@ export const useVales = () => {
         );
       }
 
-      // Aplicar filtros del usuario encima del filtro de sindicato
+      // Filtro automático por obra para rol Residente
+      // Se aplica antes de los filtros de usuario para que sea transparente
+      if (esResidente && idObraResidente) {
+        datos = datos.filter(
+          (vale) =>
+            Number(vale.id_obra) ===
+            Number(idObraResidente),
+        );
+      }
+
+      // Aplicar filtros del usuario encima del filtro de sindicato/residente
       const filteredData = applyFilters(datos, filters);
 
       setVales(filteredData);
@@ -160,6 +174,8 @@ export const useVales = () => {
     applyFilters,
     esSindicato,
     idSindicatoUsuario,
+    esResidente,
+    idObraResidente,
     filters.searchTerm,
     filters.id_obra,
     filters.id_material,

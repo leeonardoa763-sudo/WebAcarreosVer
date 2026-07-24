@@ -46,4 +46,5 @@ export const ROLES_PERMITIDOS = [
   "Finanzas",
   "Sindicato",
   "Gerencia",
+  "Residente",
 ];
