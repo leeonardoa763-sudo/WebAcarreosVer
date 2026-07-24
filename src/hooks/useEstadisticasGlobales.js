@@ -141,12 +141,13 @@ export const useEstadisticasGlobales = () => {
   // Detectar perfil de usuario
   const { userProfile } = useAuth();
   const esResidente = userProfile?.roles?.role === "Residente";
-  const idObraResidente = userProfile?.obras?.id_obra;
+  // Usar id_current_obra directamente en lugar de la relación
+  const idObraResidente = userProfile?.id_current_obra;
 
   // Debug: loguear configuración de residente
   if (esResidente) {
     console.log("[EstadisticasGlobales] Residente detectado");
-    console.log("[EstadisticasGlobales] userProfile.obras:", userProfile?.obras);
+    console.log("[EstadisticasGlobales] userProfile.id_current_obra:", userProfile?.id_current_obra);
     console.log("[EstadisticasGlobales] idObraResidente:", idObraResidente);
   }
 

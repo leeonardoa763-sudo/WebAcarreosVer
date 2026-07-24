@@ -67,7 +67,7 @@ export const useVales = () => {
 
   // Detectar rol residente
   const esResidente = userProfile?.roles?.role === "Residente";
-  const idObraResidente = userProfile?.obras?.id_obra;
+  const idObraResidente = userProfile?.id_current_obra;
 
   /**
    * Cargar catálogo de obras
