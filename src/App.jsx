@@ -24,6 +24,7 @@ import DashboardUnificado from "./pages/DashboardUnificado";
 import Conciliaciones from "./pages/Conciliaciones";
 import Contabilidad from "./pages/Contabilidad";
 import VerificarVales from "./pages/VerificarVales";
+import AutorizarVales from "./pages/AutorizarVales";
 import VisualizarVale from "./pages/VisualizarVale";
 import VisualizarConciliacion from "./pages/VisualizarConciliacion";
 import HistorialConciliaciones from "./pages/HistorialConciliaciones";
@@ -62,6 +63,18 @@ const App = () => {
               <ProtectedRoute requiredRole={["Administrador", "Sindicato"]}>
                 <Layout>
                   <VerificarVales />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Autorizar Vales - Solo Administrador */}
+          <Route
+            path="/autorizar-vales"
+            element={
+              <ProtectedRoute requiredRole="Administrador">
+                <Layout>
+                  <AutorizarVales />
                 </Layout>
               </ProtectedRoute>
             }

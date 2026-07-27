@@ -106,6 +106,7 @@ export const useConciliacionesQueries = () => {
           )
           .eq("tipo_vale", "renta")
           .eq("verificado_por_sindicato", true)
+          .eq("autorizado", true)
           .neq("estado", "conciliado");
 
         // Filtrar por obra
@@ -185,6 +186,7 @@ export const useConciliacionesQueries = () => {
           )
           .eq("tipo_vale", "renta")
           .eq("verificado_por_sindicato", true)
+          .eq("autorizado", true)
           .neq("estado", "conciliado")
           // Usar fecha_programada si existe, si no fecha_creacion
           .or(
@@ -254,6 +256,7 @@ export const useConciliacionesQueries = () => {
           )
           .eq("tipo_vale", "renta")
           .eq("verificado_por_sindicato", true)
+          .eq("autorizado", true)
           .neq("estado", "conciliado")
           .order("fecha_creacion", { ascending: false });
 

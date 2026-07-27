@@ -125,6 +125,7 @@ export const useConciliacionesMaterialQueries = () => {
           )
           .eq("tipo_vale", "material")
           .eq("verificado_por_sindicato", true)
+          .eq("autorizado", true)
           .neq("estado", "conciliado");
 
         // Filtrar por obra
@@ -214,6 +215,7 @@ export const useConciliacionesMaterialQueries = () => {
         )
         .eq("tipo_vale", "material")
         .eq("verificado_por_sindicato", true)
+        .eq("autorizado", true)
         .neq("estado", "conciliado")
         // Usar fecha_programada si existe, si no fecha_creacion
         .or(
@@ -260,6 +262,7 @@ export const useConciliacionesMaterialQueries = () => {
         .select("fecha_creacion, fecha_programada")
         .eq("tipo_vale", "material")
         .eq("verificado_por_sindicato", true)
+        .eq("autorizado", true)
         .neq("estado", "conciliado")
         .order("fecha_creacion", { ascending: false });
 
@@ -334,6 +337,7 @@ export const useConciliacionesMaterialQueries = () => {
         )
         .eq("tipo_vale", "material")
         .eq("verificado_por_sindicato", true)
+        .eq("autorizado", true)
         .neq("estado", "conciliado")
         .eq("id_obra", idObra)
         // Usar fecha_programada si existe, si no fecha_creacion

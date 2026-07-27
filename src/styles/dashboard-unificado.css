@@ -991,6 +991,12 @@
   color: #6b7280;
 }
 
+.du__icono-autorizado {
+  color: var(--color-success, #10b981);
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
 /* ── Estados de carga / vacío / error ───────────────────────────────────── */
 
 .du__loading,

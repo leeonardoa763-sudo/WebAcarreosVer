@@ -13,6 +13,7 @@ hooks/
 ├── useVales.js              ← orquestador
 │   └── vales/{State, Queries, Filters, Helpers, Pagination, useCancelarVale, useSolicitudesDesver}
 ├── useVerificacion.js       ← autónomo (sin submódulos)
+├── useAutorizacion.js       ← autónomo (sin submódulos)
 ├── useConciliaciones.js     ← orquestador (renta)
 │   └── conciliaciones/{State, Queries, Helpers, Generar, Sindicatos}
 ├── useConciliacionesMaterial.js  ← orquestador (material)
@@ -35,6 +36,7 @@ hooks/
 | `useAuth.jsx` | `App.jsx` (AuthProvider global) | Auth, perfil de usuario, roles, helpers |
 | `useVales.js` | `Vales.jsx`, `Conciliaciones.jsx` | Fetch + filtrado client-side de vales |
 | `useVerificacion.js` | `VerificarVales.jsx` | OCR + QR + batch verify de PDFs |
+| `useAutorizacion.js` | `AutorizarVales.jsx` | Fetch + filtros + autorizar en lote / desautorizar (RPC `autorizar_vale` / `desautorizar_vale`) |
 | `useConciliaciones.js` | `Conciliaciones.jsx` (tab renta) | Generación de conciliaciones de renta |
 | `useConciliacionesMaterial.js` | `Conciliaciones.jsx` (tab material) | Generación de conciliaciones de material |
 | `useOperadores.js` | `Operadores.jsx` | Vales agrupados por empresa → placas → estado |

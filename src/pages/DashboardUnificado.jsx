@@ -37,6 +37,7 @@ import {
   Factory,
   Moon,
   CalendarClock,
+  ShieldCheck,
 } from "lucide-react";
 
 // 3. Config
@@ -388,6 +389,13 @@ const FilaVale = ({ vale, onClick, mostrarCancelados }) => {
         <span className={`du__badge-estado ${estadoInfo.clase}`}>
           {estadoInfo.label}
         </span>
+        {vale.autorizado && (
+          <ShieldCheck
+            size={13}
+            className="du__icono-autorizado"
+            title="Autorizado por Administrador"
+          />
+        )}
       </td>
       <td className="du__celda du__celda--fecha">{fecha}</td>
       <td className="du__celda du__celda--operador">{operador}</td>

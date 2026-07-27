@@ -11,6 +11,7 @@
 | `Dashboard.jsx` | `/dashboard` | Solo Administrador | `useDashboardAnalytics`, `useMvStats` | `dashboard.css` |
 | `EstadisticasGlobales.jsx` | `/estadisticas` | Administrador, Finanzas | `useEstadisticasGlobales` | `estadisticas-globales.css` |
 | `VerificarVales.jsx` | `/verificar-vales` | Todos autenticados | `useVerificacion` | `verificacion.css` |
+| `AutorizarVales.jsx` | `/autorizar-vales` | Solo Administrador | `useAutorizacion` | `autorizar-vales.css` |
 | `Conciliaciones.jsx` | `/conciliaciones` | Todos autenticados | `useConciliaciones` + `useConciliacionesMaterial` | `conciliaciones.css` |
 | `HistorialConciliaciones.jsx` | `/historial-conciliaciones` | Admin, Sindicato | — (wrapper de `SeccionConciliaciones`) | — |
 | `Contabilidad.jsx` | `/contabilidad` | Admin, Finanzas | — (wrapper de `TablaContabilidad`) | `contabilidad.css` |

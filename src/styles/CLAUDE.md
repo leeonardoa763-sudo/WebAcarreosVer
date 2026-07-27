@@ -13,6 +13,7 @@
 | `modal-editar-vale.css` | `ModalEditarVale.jsx` / `ModalEditarValeRenta.jsx` / `TablaEditarViajes.jsx` |
 | `modal-cancelar-vale.css` | `ModalCancelarVale.jsx` — prefijo `mcv__` |
 | `verificacion.css` | `VerificarVales.jsx` + componentes de `verificacion/` |
+| `autorizar-vales.css` | `AutorizarVales.jsx` — prefijo `atv__` |
 | `conciliaciones.css` | `Conciliaciones.jsx` + componentes de `conciliaciones/` |
 | `dashboard.css` | `Dashboard.jsx` + componentes de `dashboard/` |
 | `dashboard-unificado.css` | `DashboardUnificado.jsx` |
@@ -51,6 +52,7 @@
 | `tev__` | `TablaEditarViajes` |
 | `mer__` | `ModalEditarValeRenta` |
 | `mcv__` | `ModalCancelarVale` |
+| `atv__` | `AutorizarVales` (usa también `mcv__` para `ModalDesautorizarVale`, reutiliza `modal-cancelar-vale.css`) |
 
 Al crear un componente nuevo con modal/tabla compleja, definir un prefijo de 3-4 letras único y agregarlo aquí.
 

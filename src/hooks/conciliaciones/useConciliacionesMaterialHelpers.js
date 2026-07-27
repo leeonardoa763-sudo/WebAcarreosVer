@@ -177,6 +177,15 @@ export const useConciliacionesMaterialHelpers = () => {
       };
     }
 
+    // Validar que todos los vales estén autorizados por un Administrador
+    const sinAutorizar = vales.filter((v) => !v.autorizado);
+    if (sinAutorizar.length > 0) {
+      return {
+        valid: false,
+        error: `Hay ${sinAutorizar.length} vale(s) no autorizados en la selección. Autorízalos en la pestaña "Autorizar Vales" antes de conciliar.`,
+      };
+    }
+
     // Validar que todos los vales tengan detalles de material
     const sinDetalles = vales.filter(
       (v) => !v.vale_material_detalles || v.vale_material_detalles.length === 0,

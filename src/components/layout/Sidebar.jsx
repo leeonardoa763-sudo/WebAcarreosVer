@@ -18,6 +18,7 @@ import {
   BookOpen,
   LayoutList,
   BarChart3,
+  ShieldCheck,
 } from "lucide-react";
 
 // 3. Hooks personalizados
@@ -72,6 +73,19 @@ const Sidebar = () => {
           >
             <FileCheck className="sidebar__icon" size={20} />
             <span className="sidebar__text">Verificar Vales</span>
+          </NavLink>
+        )}
+
+        {/* Autorizar Vales - Solo Administrador */}
+        {esAdministrador && (
+          <NavLink
+            to="/autorizar-vales"
+            className={({ isActive }) =>
+              isActive ? "sidebar__link sidebar__link--active" : "sidebar__link"
+            }
+          >
+            <ShieldCheck className="sidebar__icon" size={20} />
+            <span className="sidebar__text">Autorizar Vales</span>
           </NavLink>
         )}
 
