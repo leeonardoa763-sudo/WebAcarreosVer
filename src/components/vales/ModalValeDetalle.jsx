@@ -4,8 +4,8 @@
  * Modal centrado para ver el detalle completo de un vale (material o renta).
  * Reemplaza el desplegable inline de ValeCardMaterial y ValeCardRenta.
  *
- * Dependencias: formatters.js, useAuth.jsx, ModalEditarVale, ModalEditarValeRenta, ModalCancelarVale
- * Usado en: ValeCardMaterial.jsx, ValeCardRenta.jsx
+ * Dependencias: formatters.js, alertasVale.js, useAuth.jsx, ModalEditarVale, ModalEditarValeRenta, ModalCancelarVale
+ * Usado en: ValeCardMaterial.jsx, ValeCardRenta.jsx, AutorizarVales.jsx
  */
 
 // 1. React y hooks
@@ -31,6 +31,7 @@ import {
   RotateCcw,
   RefreshCw,
   ExternalLink,
+  AlertTriangle,
 } from "lucide-react";
 
 // 3. Utils
@@ -47,6 +48,7 @@ import {
   formatearDuracion,
 } from "../../utils/formatters";
 import { buildTicketsMaterialMap, materialDeViaje } from "../../utils/rentaMaterial";
+import { getAlertaConfig } from "../../utils/alertasVale";
 
 // 4. Config / Hooks
 import { supabase } from "../../config/supabase";
@@ -77,6 +79,53 @@ const formatearFechaCorta = (fechaISO) => {
 const ESTADOS_CANCELABLES = ["emitido", "en_proceso"];
 
 // ─── Sub-componentes internos ─────────────────────────────────────────────────
+
+// Alertas de atención calculadas en useAutorizacion.js (vale._alertas) —
+// solo llegan pobladas cuando el modal se abre desde AutorizarVales.jsx.
+// `relacionados` (id_vale + folio del otro vale) permite decir con cuál
+// vale se está comparando y saltar directo a él.
+const SeccionAlertas = ({ alertas, onVerVale }) => {
+  if (!alertas?.length) return null;
+
+  return (
+    <div className="vdm__alertas-section">
+      <h4 className="vdm__section-title vdm__section-title--alerta">
+        <AlertTriangle size={15} aria-hidden="true" />
+        Alertas de este vale ({alertas.length})
+      </h4>
+      <div className="vdm__alertas-lista">
+        {alertas.map((alerta, i) => {
+          const cfg = getAlertaConfig(alerta.tipo);
+          const Icono = cfg.icono;
+          return (
+            <div key={i} className={`vdm__alerta-item vdm__alerta-item--${cfg.nivel}`}>
+              <Icono size={14} className="vdm__alerta-icon" aria-hidden="true" />
+              <div className="vdm__alerta-contenido">
+                <span className="vdm__alerta-texto">{alerta.texto}</span>
+                {alerta.relacionados?.length > 0 && (
+                  <div className="vdm__alerta-relacionados">
+                    {alerta.relacionados.map((r) => (
+                      <button
+                        key={r.idVale}
+                        type="button"
+                        className="vdm__alerta-link"
+                        onClick={() => onVerVale?.(r.idVale)}
+                        disabled={!onVerVale}
+                        title={onVerVale ? `Ver vale ${formatearFolio(r.folio)}` : undefined}
+                      >
+                        Ver vale {formatearFolio(r.folio)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const InfoRow = ({ icon: Icon, label, value, subValue, color }) => (
   <div className="vdm__info-row">
@@ -583,7 +632,7 @@ const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
-const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
+const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado, onVerVale }) => {
   const { userProfile } = useAuth();
   const esAdministrador = userProfile?.roles?.role === "Administrador";
   const esSindicato = userProfile?.roles?.role === "Sindicato";
@@ -920,6 +969,8 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado }) => {
 
         {/* Body */}
         <div className="vdm__body">
+          <SeccionAlertas alertas={vale._alertas} onVerVale={onVerVale} />
+
           {/* Info general */}
           <div className="vdm__info-general">
             {/* ── Quién / dónde ── */}

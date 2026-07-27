@@ -21,16 +21,22 @@ import {
   ShieldOff,
   RefreshCw,
   AlertCircle,
+  AlertTriangle,
   ChevronDown,
   CheckCircle2,
   XCircle,
   Download,
+  FileText,
+  Layers,
+  Weight,
+  DollarSign,
 } from "lucide-react";
 
 // 4. Hooks / Utils
 import { useAutorizacion } from "../hooks/useAutorizacion";
 import { formatearFolio } from "../utils/formatters";
 import { exportToExcel } from "../utils/exportToExcel";
+import { getAlertaConfig } from "../utils/alertasVale";
 
 // 5. Componentes
 import ModalValeDetalle from "../components/vales/ModalValeDetalle";
@@ -54,7 +60,23 @@ const ESTADOS_AUTORIZACION = [
   { id: "todos", label: "Todos" },
 ];
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+const fmtImporte = (v) => {
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
+  if (v >= 10_000) return `$${(v / 1_000).toFixed(1)}k`;
+  return `$${Number(v).toLocaleString("es-MX", { maximumFractionDigits: 0 })}`;
+};
+
 // ─── Subcomponentes ──────────────────────────────────────────────────────────
+
+const KpiCard = ({ icono: Icono, titulo, valor, gradiente }) => (
+  <div className="atv__kpi-card" style={{ background: gradiente }}>
+    <span className="atv__kpi-titulo">{titulo}</span>
+    <span className="atv__kpi-valor">{valor}</span>
+    <Icono size={56} className="atv__kpi-deco" />
+  </div>
+);
 
 const CheckboxDropdown = ({ label, opciones, seleccionados, onChange }) => {
   const [abierto, setAbierto] = useState(false);
@@ -122,12 +144,33 @@ const CheckboxDropdown = ({ label, opciones, seleccionados, onChange }) => {
   );
 };
 
+const AlertasVale = ({ alertas }) => {
+  if (!alertas || alertas.length === 0) {
+    return <span className="atv__sin-alertas">—</span>;
+  }
+  return (
+    <div className="atv__alertas-grupo">
+      {alertas.map((a, i) => {
+        const cfg = getAlertaConfig(a.tipo);
+        const Icono = cfg.icono;
+        return (
+          <span key={i} className={`atv__badge-alerta atv__badge-alerta--${cfg.nivel}`} title={a.texto}>
+            <Icono size={11} />
+            {cfg.label}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
 const FilaVale = ({ vale, seleccionable, seleccionado, onToggle, onClick, onDesautorizar }) => {
   const estadoInfo = ESTADOS_LABELS[vale.estado] ?? { label: vale.estado, clase: "atv__estado--emitido" };
   const obra = vale.obras?.obra ?? "—";
   const empresa = vale.obras?.empresas?.empresa ?? vale.obras?.empresas?.sufijo ?? "—";
-  const fecha = vale.fecha_programada ?? vale.fecha_creacion?.substring(0, 10) ?? "—";
+  const fecha = vale._fecha ?? "—";
   const operador = vale.operadores?.nombre_completo ?? "—";
+  const volumen = vale._volumen != null ? vale._volumen.toFixed(2) : "—";
 
   return (
     <tr
@@ -151,7 +194,9 @@ const FilaVale = ({ vale, seleccionable, seleccionado, onToggle, onClick, onDesa
       </td>
       <td className="atv__celda">{empresa}</td>
       <td className="atv__celda atv__celda--obra">{obra}</td>
+      <td className="atv__celda">{vale._tipoVale}</td>
       <td className="atv__celda atv__celda--material">{vale._material}</td>
+      <td className="atv__celda atv__celda--volumen">{volumen}</td>
       <td className="atv__celda">
         <span className={`atv__badge-estado ${estadoInfo.clase}`}>{estadoInfo.label}</span>
       </td>
@@ -167,6 +212,9 @@ const FilaVale = ({ vale, seleccionable, seleccionado, onToggle, onClick, onDesa
             <XCircle size={12} /> Pendiente
           </span>
         )}
+      </td>
+      <td className="atv__celda atv__celda--alertas">
+        <AlertasVale alertas={vale._alertas} />
       </td>
       <td className="atv__celda atv__celda--accion" onClick={(e) => e.stopPropagation()}>
         {vale.autorizado && vale.estado !== "conciliado" && (
@@ -191,20 +239,31 @@ const AutorizarVales = () => {
   const [valeADesautorizar, setValeADesautorizar] = useState(null);
   const [rangoInicio, setRangoInicio] = useState("");
   const [rangoFin, setRangoFin] = useState("");
+  const [semanaValue, setSemanaValue] = useState("");
+  const [mesValue, setMesValue] = useState("");
   const [resultadoBatch, setResultadoBatch] = useState(null);
 
   const {
     valesFiltrados,
+    todosVales,
     loading,
     error,
     opciones,
+    kpis,
+    kpisDesdeFiltros,
+    aplicarKpis,
+    resetearKpis,
     filtros,
     cambiarRango,
+    cambiarSemana,
+    cambiarMes,
     cambiarCCs,
     cambiarSindicatos,
     cambiarMateriales,
+    cambiarTiposVale,
     cambiarEstadoAutorizacion,
     cambiarBusqueda,
+    cambiarSoloAlertas,
     refetch,
     selectedIds,
     esSeleccionable,
@@ -224,7 +283,28 @@ const AutorizarVales = () => {
 
   const handleAplicarRango = () => {
     if (rangoInicio && rangoFin) {
+      setSemanaValue("");
+      setMesValue("");
       cambiarRango(rangoInicio, rangoFin);
+      aplicarKpis();
+    }
+  };
+
+  const handleSemana = (weekStr) => {
+    setSemanaValue(weekStr);
+    if (weekStr) {
+      setMesValue("");
+      cambiarSemana(weekStr);
+      aplicarKpis();
+    }
+  };
+
+  const handleMes = (monthStr) => {
+    setMesValue(monthStr);
+    if (monthStr) {
+      setSemanaValue("");
+      cambiarMes(monthStr);
+      aplicarKpis();
     }
   };
 
@@ -242,33 +322,126 @@ const AutorizarVales = () => {
   const hayFiltrosExtra =
     filtros.filtroCCs.length > 0 ||
     filtros.filtroSindicatos.length > 0 ||
-    filtros.filtroMateriales.length > 0;
+    filtros.filtroMateriales.length > 0 ||
+    filtros.filtroTiposVale.length > 0;
 
   const handleLimpiarFiltros = () => {
     cambiarCCs([]);
     cambiarSindicatos([]);
     cambiarMateriales([]);
+    cambiarTiposVale([]);
+  };
+
+  // Salta al vale comparado en una alerta cruzada (remisión/vale duplicado),
+  // dentro del mismo modal — buscarlo en todosVales, no en valesFiltrados,
+  // porque puede estar fuera de los filtros/tab activos.
+  const handleVerVale = (idVale) => {
+    const otro = todosVales.find((v) => v.id_vale === idVale);
+    if (otro) setValeSeleccionado(otro);
   };
 
   const handleExportarExcel = () => {
-    const filas = valesFiltrados.map((vale) => ({
-      Folio: vale.folio ?? "—",
-      Empresa: vale.obras?.empresas?.empresa ?? vale.obras?.empresas?.sufijo ?? "—",
-      CC: vale.obras?.cc ?? "—",
-      Obra: vale.obras?.obra ?? "—",
-      "Material / Equipo": vale._material ?? "—",
-      Estado: ESTADOS_LABELS[vale.estado]?.label ?? vale.estado ?? "—",
-      Fecha: vale.fecha_programada ?? vale.fecha_creacion?.substring(0, 10) ?? "—",
-      Operador: vale.operadores?.nombre_completo ?? "—",
-      Sindicato: vale.operadores?.sindicatos?.sindicato ?? "—",
-      Verificado: vale.verificado_por_sindicato ? "Sí" : "No",
-      Autorización: vale.autorizado ? "Autorizado" : "Pendiente",
-      "Fecha autorización": vale.fecha_autorizacion
-        ? new Date(vale.fecha_autorizacion).toLocaleString("es-MX", {
-            timeZone: "America/Mexico_City",
-          })
-        : "—",
-    }));
+    const filas = valesFiltrados.flatMap((vale) => {
+      const identidad = {
+        Folio: vale.folio ?? "—",
+        Empresa: vale.obras?.empresas?.empresa ?? vale.obras?.empresas?.sufijo ?? "—",
+        CC: vale.obras?.cc ?? "—",
+        Obra: vale.obras?.obra ?? "—",
+        Tipo: vale._tipoVale,
+        "Material / Equipo": vale._material ?? "—",
+      };
+      const resto = {
+        Estado: ESTADOS_LABELS[vale.estado]?.label ?? vale.estado ?? "—",
+        Fecha: vale._fecha ?? "—",
+        Operador: vale.operadores?.nombre_completo ?? "—",
+        Sindicato: vale.operadores?.sindicatos?.sindicato ?? "—",
+        Verificado: vale.verificado_por_sindicato ? "Sí" : "No",
+        Autorización: vale.autorizado ? "Autorizado" : "Pendiente",
+        "Fecha autorización": vale.fecha_autorizacion
+          ? new Date(vale.fecha_autorizacion).toLocaleString("es-MX", {
+              timeZone: "America/Mexico_City",
+            })
+          : "—",
+        Alertas: vale._alertas?.length
+          ? vale._alertas.map((a) => a.texto).join(" | ")
+          : "—",
+      };
+      const filaBase = {
+        Remisión: "—",
+        Viaje: "",
+        Banco: "—",
+        "Distancia km": "",
+        "m³": "",
+        Toneladas: "",
+        "Precio m³": "",
+        "Costo viaje": "",
+      };
+
+      // Renta: sin concepto de remisión — una sola fila resumen.
+      if (vale.tipo_vale === "renta") {
+        return [{ ...identidad, ...filaBase, ...resto }];
+      }
+
+      // Material: un renglón por remisión física.
+      // Tipos 1/2 → un viaje = una remisión (folio_vale_fisico), con su
+      // propio peso_ton / volumen_m3. Tipo 3 (corte) → un ticket = una
+      // remisión, pero el peso/volumen solo existe a nivel detalle (no por
+      // ticket individual), así que se asigna únicamente al primer renglón
+      // para no fabricar cifras por remisión que no se midieron.
+      const filas = [];
+      for (const det of vale.vale_material_detalles ?? []) {
+        const banco = det.bancos?.banco ?? "—";
+        const viajes = det.vale_material_viajes ?? [];
+
+        if (viajes.length > 0) {
+          for (const v of viajes) {
+            filas.push({
+              ...identidad,
+              Remisión: v.folio_vale_fisico ?? det.folio_banco ?? "—",
+              Viaje: v.numero_viaje ?? "",
+              Banco: v.bancos_override?.banco ?? banco,
+              "Distancia km": v.distancia_km_override ?? det.distancia_km ?? "",
+              "m³": v.volumen_m3 ?? "",
+              Toneladas: v.peso_ton ?? "",
+              "Precio m³": v.precio_m3_override ?? v.precio_m3 ?? det.precio_m3 ?? "",
+              "Costo viaje": v.costo_viaje_override ?? v.costo_viaje ?? "",
+              ...resto,
+            });
+          }
+        } else if ((vale.tickets_material ?? []).length > 0) {
+          vale.tickets_material.forEach((ticket, idx) => {
+            filas.push({
+              ...identidad,
+              Remisión: ticket.folio_ticket ?? "—",
+              Viaje: ticket.numero_ticket ?? "",
+              Banco: banco,
+              "Distancia km": det.distancia_km ?? "",
+              "m³": idx === 0 ? (det.volumen_real_m3 ?? "") : "",
+              Toneladas: idx === 0 ? (det.peso_ton ?? "") : "",
+              "Precio m³": idx === 0 ? (det.precio_m3 ?? "") : "",
+              "Costo viaje": idx === 0 ? (det.costo_total ?? "") : "",
+              ...resto,
+            });
+          });
+        } else {
+          // Sin viajes ni tickets registrados: una fila resumen del detalle.
+          filas.push({
+            ...identidad,
+            Remisión: det.folio_banco ?? "—",
+            Viaje: "",
+            Banco: banco,
+            "Distancia km": det.distancia_km ?? "",
+            "m³": det.volumen_real_m3 ?? "",
+            Toneladas: det.peso_ton ?? "",
+            "Precio m³": det.precio_m3 ?? "",
+            "Costo viaje": det.costo_total ?? "",
+            ...resto,
+          });
+        }
+      }
+
+      return filas.length > 0 ? filas : [{ ...identidad, ...filaBase, ...resto }];
+    });
     exportToExcel(filas, `autorizar_vales_${filtros.fechaInicio}_${filtros.fechaFin}`, "Vales");
   };
 
@@ -304,6 +477,67 @@ const AutorizarVales = () => {
         </div>
       </header>
 
+      {/* ── KPIs ── */}
+      {kpisDesdeFiltros && (
+        <div className="atv__kpi-fuente">
+          <span>
+            KPIs recalculados con los filtros activos ({valesFiltrados.length}{" "}
+            vale{valesFiltrados.length !== 1 ? "s" : ""})
+          </span>
+          <button
+            className="atv__btn-resetear-kpis"
+            onClick={resetearKpis}
+            type="button"
+          >
+            Ver KPIs de todo el período
+          </button>
+        </div>
+      )}
+      <section className="atv__kpi-grid">
+        <KpiCard
+          icono={FileText}
+          titulo="Total vales"
+          valor={kpis.total}
+          gradiente="linear-gradient(135deg, #f97316 0%, #fb923c 100%)"
+        />
+        <KpiCard
+          icono={ShieldOff}
+          titulo="Pendientes"
+          valor={kpis.pendientes}
+          gradiente="linear-gradient(135deg, #b45309 0%, #f59e0b 100%)"
+        />
+        <KpiCard
+          icono={ShieldCheck}
+          titulo="Autorizados"
+          valor={kpis.autorizados}
+          gradiente="linear-gradient(135deg, #065f46 0%, #34d399 100%)"
+        />
+        <KpiCard
+          icono={AlertTriangle}
+          titulo="Con alertas"
+          valor={kpis.conAlertas}
+          gradiente="linear-gradient(135deg, #b91c1c 0%, #f87171 100%)"
+        />
+        <KpiCard
+          icono={Layers}
+          titulo="m³ total"
+          valor={kpis.totalM3.toFixed(1)}
+          gradiente="linear-gradient(135deg, #0d9488 0%, #2dd4bf 100%)"
+        />
+        <KpiCard
+          icono={Weight}
+          titulo="Toneladas"
+          valor={kpis.totalToneladas.toFixed(1)}
+          gradiente="linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)"
+        />
+        <KpiCard
+          icono={DollarSign}
+          titulo="Importe"
+          valor={fmtImporte(kpis.importeTotal)}
+          gradiente="linear-gradient(135deg, #1d4ed8 0%, #60a5fa 100%)"
+        />
+      </section>
+
       {/* ── Zona sticky: filtros ── */}
       <div className="atv__sticky-zona">
         <section className="atv__filtros">
@@ -327,9 +561,26 @@ const AutorizarVales = () => {
               onClick={handleAplicarRango}
               disabled={!rangoInicio || !rangoFin}
               type="button"
+              title="Aplica el rango de fechas y recalcula los KPIs con los filtros activos"
             >
               Aplicar
             </button>
+
+            <input
+              type="week"
+              className="atv__input-semana"
+              value={semanaValue}
+              onChange={(e) => handleSemana(e.target.value)}
+              title="Filtrar por semana específica"
+            />
+
+            <input
+              type="month"
+              className="atv__input-mes"
+              value={mesValue}
+              onChange={(e) => handleMes(e.target.value)}
+              title="Filtrar por mes específico"
+            />
 
             {ESTADOS_AUTORIZACION.map((e) => (
               <button
@@ -341,9 +592,19 @@ const AutorizarVales = () => {
                 {e.label}
               </button>
             ))}
+
+            <button
+              className={`atv__estado-pill atv__estado-pill--alerta ${filtros.soloAlertas ? "atv__estado-pill--alerta-activo" : ""}`}
+              onClick={() => cambiarSoloAlertas((v) => !v)}
+              type="button"
+              title="Mostrar solo vales con alguna alerta"
+            >
+              <AlertTriangle size={12} />
+              Con alertas
+            </button>
           </div>
 
-          {/* Fila 2: Obra, Sindicato, Material + búsqueda */}
+          {/* Fila 2: Obra, Sindicato, Tipo, Material + búsqueda */}
           <div className="atv__filtros-grupo atv__filtros-grupo--checks">
             <CheckboxDropdown
               label="Obra"
@@ -356,6 +617,12 @@ const AutorizarVales = () => {
               opciones={opciones.sindicatos}
               seleccionados={filtros.filtroSindicatos}
               onChange={cambiarSindicatos}
+            />
+            <CheckboxDropdown
+              label="Tipo"
+              opciones={opciones.tiposVale}
+              seleccionados={filtros.filtroTiposVale}
+              onChange={cambiarTiposVale}
             />
             <CheckboxDropdown
               label="Material"
@@ -475,11 +742,14 @@ const AutorizarVales = () => {
                 <th className="atv__th">Folio</th>
                 <th className="atv__th">Empresa</th>
                 <th className="atv__th">Obra</th>
+                <th className="atv__th">Tipo</th>
                 <th className="atv__th">Material / Equipo</th>
+                <th className="atv__th">Vol. (m³)</th>
                 <th className="atv__th">Estado</th>
                 <th className="atv__th">Fecha</th>
                 <th className="atv__th">Operador</th>
                 <th className="atv__th">Autorización</th>
+                <th className="atv__th">Alertas</th>
                 <th className="atv__th"></th>
               </tr>
             </thead>
@@ -503,9 +773,11 @@ const AutorizarVales = () => {
       {/* ── Modal de Detalle ── */}
       {valeSeleccionado && (
         <ModalValeDetalle
+          key={valeSeleccionado.id_vale}
           vale={valeSeleccionado}
           onCerrar={() => setValeSeleccionado(null)}
           onValeActualizado={refetch}
+          onVerVale={handleVerVale}
         />
       )}
 

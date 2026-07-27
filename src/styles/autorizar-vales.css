@@ -98,6 +98,107 @@
   cursor: not-allowed;
 }
 
+/* ── KPIs ────────────────────────────────────────────────────────────────── */
+
+.atv__kpi-fuente {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  color: #1e40af;
+  font-size: 0.78rem;
+}
+
+.atv__kpi-fuente span {
+  flex: 1;
+}
+
+.atv__btn-resetear-kpis {
+  padding: 3px 10px;
+  border: 1.5px solid #1e40af;
+  border-radius: 6px;
+  background: transparent;
+  color: #1e40af;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.atv__btn-resetear-kpis:hover {
+  background: #1e40af;
+  color: #fff;
+}
+
+.atv__kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 1200px) {
+  .atv__kpi-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .atv__kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.atv__kpi-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+  border-radius: 14px;
+  padding: 14px 18px 12px;
+  min-height: 90px;
+  border: none;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+}
+
+.atv__kpi-titulo {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.75);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  order: -1;
+}
+
+.atv__kpi-valor {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.02em;
+}
+
+.atv__kpi-deco {
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.15;
+  color: #fff;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
 /* ── Zona sticky (filtros) ───────────────────────────────────────────────── */
 
 .atv__sticky-zona {
@@ -158,6 +259,25 @@
   font-size: 0.75rem;
 }
 
+/* Inputs de semana y mes */
+
+.atv__input-semana,
+.atv__input-mes {
+  padding: 4px 8px;
+  border: 1.5px solid #dde3eb;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--color-text-primary, #2c3e50);
+  background: #f9fafb;
+  transition: border-color 0.15s;
+}
+
+.atv__input-semana:focus,
+.atv__input-mes:focus {
+  outline: none;
+  border-color: var(--color-primary, #ff6b35);
+}
+
 /* Pills de estado de autorización */
 
 .atv__estado-pill {
@@ -181,6 +301,28 @@
 .atv__estado-pill--activo {
   background: var(--color-secondary, #004e89);
   border-color: var(--color-secondary, #004e89);
+  color: #fff;
+}
+
+/* Pill de filtro "Con alertas" — mismo look que atv__estado-pill, con icono */
+
+.atv__estado-pill--alerta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.atv__estado-pill--alerta:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.atv__estado-pill--alerta-activo,
+.atv__estado-pill--alerta-activo:hover {
+  background: #dc2626;
+  border-color: #dc2626;
   color: #fff;
 }
 
@@ -550,6 +692,12 @@
   font-size: 0.78rem;
 }
 
+.atv__celda--volumen {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .atv__celda--operador {
   max-width: 150px;
   overflow: hidden;
@@ -640,6 +788,47 @@
 .atv__btn-desautorizar:hover {
   background: #dc2626;
   color: #fff;
+}
+
+/* ── Alertas por vale ────────────────────────────────────────────────────── */
+
+.atv__celda--alertas {
+  max-width: 220px;
+}
+
+.atv__alertas-grupo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.atv__sin-alertas {
+  color: var(--color-text-secondary, #7f8c8d);
+}
+
+.atv__badge-alerta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.atv__badge-alerta--warn {
+  background: #fef3c7;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.atv__badge-alerta--alerta {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #b91c1c;
 }
 
 /* ── Estados de carga / vacío / error ───────────────────────────────────── */
