@@ -1041,7 +1041,7 @@ const DashboardUnificado = () => {
               <input
                 type="text"
                 className="du__busqueda-input"
-                placeholder="Folio, obra, operador, material, placas…"
+                placeholder="Folio, remisión, obra, operador, material, placas…"
                 value={filtros.busqueda}
                 onChange={(e) => cambiarBusqueda(e.target.value)}
               />

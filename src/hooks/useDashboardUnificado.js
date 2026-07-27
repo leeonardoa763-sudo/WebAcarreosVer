@@ -115,6 +115,27 @@ const getMaterialVale = (vale) => {
   return vale.vale_material_detalles?.[0]?.material?.material ?? "—";
 };
 
+// Folios de remisión: folio_vale_fisico por viaje (Tipos 1/2), con fallback a
+// folio_banco del detalle si el viaje no lo tiene; más folio_ticket de
+// tickets_material (Tipo 3 — corte).
+const getFoliosRemision = (vale) => {
+  const folios = new Set();
+  for (const det of vale.vale_material_detalles ?? []) {
+    const foliosViaje = (det.vale_material_viajes ?? [])
+      .map((v) => v.folio_vale_fisico)
+      .filter(Boolean);
+    if (foliosViaje.length > 0) {
+      foliosViaje.forEach((f) => folios.add(f));
+    } else if (det.folio_banco) {
+      folios.add(det.folio_banco);
+    }
+  }
+  for (const ticket of vale.tickets_material ?? []) {
+    if (ticket.folio_ticket) folios.add(ticket.folio_ticket);
+  }
+  return [...folios];
+};
+
 // Distintivos de un vale: rasgos operativos que ameritan una etiqueta visual.
 // - Planta de asfaltos: vale de material cargado a la planta (banco -> planta).
 // - Turno nocturno: renta capturada en jornada nocturna.
@@ -448,6 +469,7 @@ export const useDashboardUnificado = () => {
         _material: getMaterialVale(v),
         _viajes: getViajesVale(v),
         _distintivos: getDistintivosVale(v),
+        _foliosRemision: getFoliosRemision(v),
       })),
     [todosLosVales],
   );
@@ -483,7 +505,8 @@ export const useDashboardUnificado = () => {
           v.obras?.obra?.toLowerCase().includes(term) ||
           v.operadores?.nombre_completo?.toLowerCase().includes(term) ||
           v._material?.toLowerCase().includes(term) ||
-          v.vehiculos?.placas?.toLowerCase().includes(term),
+          v.vehiculos?.placas?.toLowerCase().includes(term) ||
+          v._foliosRemision?.some((f) => f.toLowerCase().includes(term)),
       );
     }
 
