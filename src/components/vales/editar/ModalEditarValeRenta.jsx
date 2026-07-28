@@ -1,10 +1,11 @@
 /**
  * src/components/vales/editar/ModalEditarValeRenta.jsx
  *
- * Modal para cambiar el tipo de renta de un vale (día completo, medio día, por horas).
+ * Modal para editar un vale de renta: material, tipo de renta (día completo,
+ * medio día, por horas) y sus viajes (agregar/editar hora/eliminar).
  * Solo visible para Administrador. Bloqueado si el vale está conciliado o verificado.
  *
- * Dependencias: useEditarValeRenta, useAuth, lucide-react, modal-editar-vale.css
+ * Dependencias: useEditarValeRenta, useAuth, TablaEditarViajesRenta, lucide-react, modal-editar-vale.css
  * Usado en: ValeCardRenta.jsx
  */
 
@@ -22,12 +23,15 @@ import {
   Clock,
   Sun,
   CalendarDays,
+  Receipt,
+  Package,
 } from "lucide-react";
 
 // 3. Config
 import { colors } from "../../../config/colors";
 
 // 4. Hooks personalizados
+import { useAuth } from "../../../hooks/useAuth";
 import {
   useEditarValeRenta,
   OPCIONES_TIPO_RENTA,
@@ -36,7 +40,10 @@ import {
 // 5. Utils
 import { formatearMoneda, formatearFolio } from "../../../utils/formatters";
 
-// 6. Estilos
+// 6. Componentes
+import TablaEditarViajesRenta from "./TablaEditarViajesRenta";
+
+// 7. Estilos
 import "../../../styles/modal-editar-vale.css";
 
 // ─── Icono por opción ─────────────────────────────────────────────────────────
@@ -59,11 +66,17 @@ const ModalEditarValeRenta = ({
   /** Callback cuando se guardan cambios exitosamente */
   onGuardadoExitoso,
 }) => {
+  const { userProfile } = useAuth();
+
   const {
     detalle,
     opcionSeleccionada,
     totalHorasInput,
     costoPreview,
+    materiales,
+    viajes,
+    viajesAEliminar,
+    viajesNuevos,
     loading,
     guardando,
     error,
@@ -72,6 +85,11 @@ const ModalEditarValeRenta = ({
     cargarDetalle,
     seleccionarOpcion,
     setTotalHorasInput,
+    editarMaterialDetalle,
+    editarCampoViaje,
+    agregarViaje,
+    eliminarViaje,
+    cancelarEliminacionViaje,
     guardarCambios,
     descartarCambios,
   } = useEditarValeRenta();
@@ -101,7 +119,8 @@ const ModalEditarValeRenta = ({
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleGuardar = async () => {
-    await guardarCambios();
+    if (!userProfile?.id_persona) return;
+    await guardarCambios(userProfile.id_persona);
   };
 
   const handleDescartar = () => {
@@ -180,7 +199,7 @@ const ModalEditarValeRenta = ({
         if (e.target === e.currentTarget) handleCerrar();
       }}
     >
-      <div className="mev__panel mev__panel--sm">
+      <div className="mev__panel mev__panel--md">
         {/* ── Header ── */}
         <div className="mev__header">
           <div className="mev__header-izq">
@@ -189,7 +208,7 @@ const ModalEditarValeRenta = ({
             </div>
             <div>
               <h2 id="mer-titulo" className="mev__titulo">
-                Editar Tipo de Renta
+                Editar Vale de Renta
               </h2>
               <p className="mev__subtitulo">
                 Vale {formatearFolio(folioVale)} — {materialNombre}
@@ -209,6 +228,28 @@ const ModalEditarValeRenta = ({
 
         {/* ── Cuerpo ── */}
         <div className="mev__body">
+          {/* Material del detalle */}
+          <div className="mer__opciones">
+            <p className="mer__opciones-titulo">
+              <Package size={14} aria-hidden="true" />
+              Material
+            </p>
+            <select
+              className="mev__campo-input mer__material-select"
+              value={detalle?.id_material || ""}
+              onChange={(e) => editarMaterialDetalle(Number(e.target.value))}
+              disabled={guardando}
+              aria-label="Material del detalle de renta"
+            >
+              <option value="">Seleccionar material...</option>
+              {materiales.map((mat) => (
+                <option key={mat.id_material} value={mat.id_material}>
+                  {mat.material}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Tarifas de referencia */}
           {(costo_dia || costo_hr) && (
             <div className="mer__tarifas">
@@ -298,6 +339,23 @@ const ModalEditarValeRenta = ({
               </span>
             </div>
           )}
+
+          {/* Viajes registrados */}
+          <div className="mer__viajes-section">
+            <p className="mer__opciones-titulo">
+              <Receipt size={14} aria-hidden="true" />
+              Registro de viajes ({viajes.length})
+            </p>
+            <TablaEditarViajesRenta
+              viajes={viajes}
+              viajesAEliminar={viajesAEliminar}
+              viajesNuevos={viajesNuevos}
+              onEditarCampoViaje={editarCampoViaje}
+              onAgregarViaje={agregarViaje}
+              onEliminarViaje={eliminarViaje}
+              onCancelarEliminacion={cancelarEliminacionViaje}
+            />
+          </div>
 
           {/* Mensaje de error */}
           {error && (

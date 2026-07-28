@@ -17,6 +17,7 @@
 | `ModalCancelarVale.jsx` | Confirmación de cancelación con campo de motivo requerido — solo Admin |
 | `ModalSolicitudDesver.jsx` | Crear (Admin) o responder (Sindicato) solicitud de desverificación |
 | `editar/TablaEditarViajes.jsx` | Tabla editable de viajes dentro de `ModalEditarVale` |
+| `editar/TablaEditarViajesRenta.jsx` | Tabla editable de viajes (número + hora) dentro de `ModalEditarValeRenta` |
 
 ## Cadena de modales
 
@@ -26,7 +27,7 @@ ValesList
        ├─ ValeCardMaterial  ─┐
        └─ ValeCardRenta     ─┤─ clic abre ModalValeDetalle (createPortal)
                                   ├─ ModalEditarVale → editar/TablaEditarViajes
-                                  ├─ ModalEditarValeRenta
+                                  ├─ ModalEditarValeRenta → editar/TablaEditarViajesRenta
                                   ├─ ModalCancelarVale
                                   └─ ModalSolicitudDesver
 ```
@@ -37,7 +38,7 @@ ValesList
 |---------|-------------|-----------|
 | `mev__` | `modal-editar-vale.css` | `ModalEditarVale` |
 | `mer__` | `modal-editar-vale.css` | `ModalEditarValeRenta` |
-| `tev__` | `modal-editar-vale.css` | `TablaEditarViajes` |
+| `tev__` | `modal-editar-vale.css` | `TablaEditarViajes` (compartido con `TablaEditarViajesRenta`) |
 
 ## Reglas de edición y acceso
 

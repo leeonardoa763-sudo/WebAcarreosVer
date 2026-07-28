@@ -950,6 +950,10 @@
   max-width: 480px;
 }
 
+.mev__panel--md {
+  max-width: 720px;
+}
+
 /* Tarifas de referencia */
 .mer__tarifas {
   display: flex;
@@ -981,10 +985,24 @@
 
 /* Sección de opciones */
 .mer__opciones-titulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   font-weight: 600;
   color: #4b5563;
   margin: 0 0 12px;
+}
+
+.mer__viajes-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.mer__material-select {
+  width: 100%;
+  margin-bottom: 16px;
 }
 
 .mer__opciones-grid {
