@@ -623,22 +623,23 @@ const DashboardUnificado = () => {
           viajes.push({
             numero: t.numero_ticket,
             material: t.material_ticket?.material ?? materialDetalle,
+            banco: t.banco_descarga ?? "—",
           });
         });
         // Padear los viajes sin ticket con el material del detalle
         for (let n = viajes.length + 1; n <= numViajes; n++) {
-          viajes.push({ numero: n, material: materialDetalle });
+          viajes.push({ numero: n, material: materialDetalle, banco: "—" });
         }
         // Sin viajes registrados: una sola fila resumen
         if (viajes.length === 0) {
-          viajes.push({ numero: "", material: materialDetalle });
+          viajes.push({ numero: "", material: materialDetalle, banco: "—" });
         }
 
         return viajes.map((v, idx) => ({
           ...identidad,
           Viaje: v.numero,
           "Material / Equipo": v.material,
-          Banco: "—",
+          Banco: v.banco,
           Requisición: "—",
           "Distancia km": "",
           "m³": "",

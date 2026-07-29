@@ -596,7 +596,7 @@
 }
 
 .vdm__viaje-row--renta {
-  grid-template-columns: 32px 80px 1fr 1fr;
+  grid-template-columns: 32px 80px 1fr 1fr 1fr;
 }
 
 .vdm__viaje-row--header {

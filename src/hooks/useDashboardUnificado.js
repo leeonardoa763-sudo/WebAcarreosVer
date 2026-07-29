@@ -379,7 +379,7 @@ export const useDashboardUnificado = () => {
           persona_verificador:id_persona_verificador (nombre, primer_apellido, segundo_apellido),
           tickets_material (id_ticket, numero_ticket, folio_ticket, fecha_impresion),
           tickets_descarga (
-            numero_ticket, id_material_ticket,
+            numero_ticket, id_material_ticket, banco_descarga,
             material_ticket:id_material_ticket (material)
           ),
           vale_material_detalles (

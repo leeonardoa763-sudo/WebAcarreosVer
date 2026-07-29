@@ -48,7 +48,12 @@ import {
   formatearHora,
   formatearDuracion,
 } from "../../utils/formatters";
-import { buildTicketsMaterialMap, materialDeViaje } from "../../utils/rentaMaterial";
+import {
+  buildTicketsMaterialMap,
+  materialDeViaje,
+  buildTicketsBancoMap,
+  bancoDeViaje,
+} from "../../utils/rentaMaterial";
 import { getAlertaConfig } from "../../utils/alertasVale";
 
 // 4. Config / Hooks
@@ -464,6 +469,7 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar, pesosEspecificos }
 
 const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
   const ticketsMaterialMap = buildTicketsMaterialMap(vale.tickets_descarga);
+  const ticketsBancoMap = buildTicketsBancoMap(vale.tickets_descarga);
 
   const formatHora = (horaISO) => {
     if (!horaISO) return null;
@@ -590,6 +596,7 @@ const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
                       <span>#</span>
                       <span>Hora</span>
                       <span>Material movido</span>
+                      <span>Banco descarga</span>
                       <span>Registrado por</span>
                     </div>
                     {viajesOrdenados.map((viaje) => {
@@ -602,6 +609,7 @@ const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
                           <span>{viaje.numero_viaje}</span>
                           <span>{formatHora(viaje.hora_registro)}</span>
                           <span>{materialDeViaje(ticketsMaterialMap, viaje, detalle.material?.material)}</span>
+                          <span>{bancoDeViaje(ticketsBancoMap, viaje)}</span>
                           <span>{nombrePersona}</span>
                         </div>
                       );
@@ -775,7 +783,7 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado, onVerVale }) => {
             supabase
               .from("tickets_descarga")
               .select(`
-                numero_ticket, id_material_ticket,
+                numero_ticket, id_material_ticket, banco_descarga,
                 material_ticket:id_material_ticket (material)
               `)
               .eq("id_vale", vale.id_vale),

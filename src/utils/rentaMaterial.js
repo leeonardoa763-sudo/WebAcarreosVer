@@ -24,3 +24,20 @@ export const buildTicketsMaterialMap = (ticketsDescarga = []) => {
 // Material de un viaje: ticket por numero_viaje, con fallback al material del detalle.
 export const materialDeViaje = (ticketsMap, viaje, materialDetalle) =>
   ticketsMap?.get(Number(viaje?.numero_viaje)) || materialDetalle || "—";
+
+// Construye Map(numero_ticket -> banco_descarga) desde los tickets_descarga de un vale.
+export const buildTicketsBancoMap = (ticketsDescarga = []) => {
+  const map = new Map();
+  (ticketsDescarga || []).forEach((ticket) => {
+    const banco = ticket?.banco_descarga;
+    if (ticket?.numero_ticket != null && banco) {
+      map.set(Number(ticket.numero_ticket), banco);
+    }
+  });
+  return map;
+};
+
+// Banco de descarga de un viaje: ticket por numero_viaje (sin fallback, ya que
+// el banco de descarga solo existe cuando se registró el ticket).
+export const bancoDeViaje = (ticketsBancoMap, viaje) =>
+  ticketsBancoMap?.get(Number(viaje?.numero_viaje)) || "—";
