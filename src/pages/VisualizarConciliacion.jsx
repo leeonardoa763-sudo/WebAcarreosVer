@@ -34,7 +34,12 @@ import { supabase } from "../config/supabase";
 import { colors } from "../config/colors";
 
 // 5. Utils
-import { formatearFecha, formatearHora, formatearMoneda } from "../utils/formatters";
+import {
+  formatearFecha,
+  formatearHora,
+  formatearMoneda,
+  formatearDistancia,
+} from "../utils/formatters";
 import {
   buildTicketsMaterialMap,
   materialDeViaje,
@@ -66,6 +71,22 @@ const formatearMonedaMXN = (num) =>
     currency: "MXN",
     minimumFractionDigits: 2,
   });
+
+// Describe la estructura de tarifa (tabla precios_material) tal como está
+// configurada — no es un precio calculado, es la tarifa pactada por km.
+const formatearTarifaKm = (tarifa) => {
+  if (!tarifa) return null;
+  const partes = [`1er km: ${formatearMonedaMXN(tarifa.primer_km)}`];
+  if (tarifa.km_sub_int1 != null) {
+    partes.push(`km subsecuente: ${formatearMonedaMXN(tarifa.km_sub_int1)}`);
+  }
+  if (tarifa.limite_int1 != null && tarifa.km_sub_int2 != null) {
+    partes.push(
+      `después de ${tarifa.limite_int1} km: ${formatearMonedaMXN(tarifa.km_sub_int2)}`
+    );
+  }
+  return partes.join(" · ");
+};
 
 // ========================================
 // SUBCOMPONENTE: TIMELINE DEL VALE
@@ -618,6 +639,15 @@ const VisualizarConciliacion = () => {
                     )
                   ),
                   bancos:id_banco (banco),
+                  precios_material:id_precios_material (
+                    id_precios_material,
+                    numero_de_intervalos,
+                    primer_km,
+                    km_sub_int1,
+                    limite_int1,
+                    km_sub_int2,
+                    limite_int2
+                  ),
                   vale_material_viajes (
                     id_viaje,
                     numero_viaje,
@@ -635,7 +665,16 @@ const VisualizarConciliacion = () => {
                     latitud_registro,
                     longitud_registro,
                     distancia_obra_metros,
-                    bancos_override:id_banco_override (id_banco, banco)
+                    bancos_override:id_banco_override (id_banco, banco),
+                    precios_material:id_precios_material (
+                      id_precios_material,
+                      numero_de_intervalos,
+                      primer_km,
+                      km_sub_int1,
+                      limite_int1,
+                      km_sub_int2,
+                      limite_int2
+                    )
                   )
                 ),
                 tickets_descarga (
@@ -899,11 +938,11 @@ const VisualizarConciliacion = () => {
               </div>
             )}
 
-            {/* Desglose por banco — solo si se usó más de un banco */}
-            {hayVariosBancos && (
+            {/* Desglose por banco — precios unitarios, tarifa de kilometraje y totales */}
+            {totalesPorBanco.length > 0 && (
               <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px dashed #e5e7eb" }}>
                 <span className="vc-financiero-label" style={{ fontWeight: 700 }}>
-                  Totales por banco
+                  {hayVariosBancos ? "Totales por banco" : "Detalle del banco"}
                 </span>
                 {totalesPorBanco.map((b) => (
                   <div
@@ -917,6 +956,10 @@ const VisualizarConciliacion = () => {
                   >
                     <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 4 }}>
                       {b.banco}
+                    </div>
+                    <div className="vc-financiero-row">
+                      <span className="vc-financiero-label">Viajes</span>
+                      <span className="vc-financiero-value">{b.viajes}</span>
                     </div>
                     <div className="vc-financiero-row">
                       <span className="vc-financiero-label">m³</span>
@@ -943,9 +986,32 @@ const VisualizarConciliacion = () => {
                       </span>
                     </div>
                     <div className="vc-financiero-row">
-                      <span className="vc-financiero-label">PU/m³</span>
+                      <span className="vc-financiero-label">Distancia</span>
+                      <span className="vc-financiero-value">
+                        {formatearDistancia(b.distanciaKmProm)}
+                      </span>
+                    </div>
+                    {b.tarifas.map((tarifa) => (
+                      <div
+                        className="vc-financiero-row"
+                        key={tarifa.id_precios_material}
+                      >
+                        <span className="vc-financiero-label">Tarifa de kilometraje</span>
+                        <span className="vc-financiero-value" style={{ textAlign: "right" }}>
+                          {formatearTarifaKm(tarifa)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="vc-financiero-row">
+                      <span className="vc-financiero-label">Precio unitario (PU/m³)</span>
                       <span className="vc-financiero-value">
                         {formatearMonedaMXN(b.pu)}
+                      </span>
+                    </div>
+                    <div className="vc-financiero-row" style={{ borderTop: "1px dashed #e5e7eb", marginTop: 4, paddingTop: 4 }}>
+                      <span className="vc-financiero-label">Importe</span>
+                      <span className="vc-financiero-value" style={{ fontWeight: 700 }}>
+                        {formatearMonedaMXN(b.importe)}
                       </span>
                     </div>
                   </div>
