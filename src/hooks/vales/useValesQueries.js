@@ -65,6 +65,21 @@ export const useValesQueries = () => {
           primer_apellido,
           segundo_apellido
         ),
+        persona_autorizador:id_persona_autorizador (
+          nombre,
+          primer_apellido,
+          segundo_apellido
+        ),
+        persona_completador:id_persona_completador (
+          nombre,
+          primer_apellido,
+          segundo_apellido
+        ),
+        persona_verificador:id_persona_verificador (
+          nombre,
+          primer_apellido,
+          segundo_apellido
+        ),
         tickets_material (
           id_ticket,
           numero_ticket,

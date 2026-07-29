@@ -32,6 +32,7 @@ import {
   RefreshCw,
   ExternalLink,
   AlertTriangle,
+  ShieldCheck,
 } from "lucide-react";
 
 // 3. Utils
@@ -682,7 +683,10 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado, onVerVale }) => {
         const { data, error } = await supabase
           .from("conciliacion_vales")
           .select(
-            "conciliaciones:id_conciliacion (folio, fecha_generacion, numero_orden_compra, numero_factura)",
+            `conciliaciones:id_conciliacion (
+              folio, fecha_generacion, numero_orden_compra, numero_factura,
+              persona:generado_por (nombre, primer_apellido, segundo_apellido)
+            )`,
           )
           .eq("id_vale", vale.id_vale)
           .limit(1)
@@ -986,7 +990,14 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado, onVerVale }) => {
             )}
 
             {/* ── Timeline operacional ── */}
-            <InfoRow icon={Calendar} label="Fecha de Creación" value={`${fecha} a las ${hora}`} />
+            <InfoRow icon={Calendar} label="Fecha de Creación" value={`${fecha} a las ${hora}`}
+              subValue={vale.persona ? `Creó: ${getNombreCompleto(vale.persona)}` : null} />
+            {vale.autorizado && vale.fecha_autorizacion && (
+              <InfoRow icon={ShieldCheck} label="Fecha de Autorización"
+                value={`${formatearFechaHora(vale.fecha_autorizacion).fecha} a las ${formatearFechaHora(vale.fecha_autorizacion).hora}`}
+                subValue={vale.persona_autorizador ? `Autorizó: ${getNombreCompleto(vale.persona_autorizador)}` : null}
+                color="#0891B2" />
+            )}
             {tieneFechaProgramada && (
               <InfoRow icon={Calendar} label="Fecha de Emisión"
                 value={formatearFechaCorta(vale.fecha_programada)}
@@ -995,17 +1006,19 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado, onVerVale }) => {
             {vale.fecha_completado && (
               <InfoRow icon={Calendar} label="Fecha de Completado"
                 value={`${formatearFechaHora(vale.fecha_completado).fecha} a las ${formatearFechaHora(vale.fecha_completado).hora}`}
+                subValue={vale.persona_completador ? `Completó: ${getNombreCompleto(vale.persona_completador)}` : null}
                 color="#10B981" />
             )}
             {vale.fecha_verificacion && (
               <InfoRow icon={Calendar} label="Fecha de Verificación"
                 value={`${formatearFechaHora(vale.fecha_verificacion).fecha} a las ${formatearFechaHora(vale.fecha_verificacion).hora}`}
+                subValue={vale.persona_verificador ? `Verificó: ${getNombreCompleto(vale.persona_verificador)}` : null}
                 color="#004E89" />
             )}
             {datosConciliacion?.fecha_generacion && (
               <InfoRow icon={Receipt} label="Fecha de Conciliación"
                 value={`${formatearFechaHora(datosConciliacion.fecha_generacion).fecha} a las ${formatearFechaHora(datosConciliacion.fecha_generacion).hora}`}
-                subValue={datosConciliacion.folio}
+                subValue={[datosConciliacion.folio, datosConciliacion.persona ? `Generó: ${getNombreCompleto(datosConciliacion.persona)}` : null].filter(Boolean).join(" | ")}
                 color="#065f46" />
             )}
             {vale.estado === "conciliado" && (
