@@ -62,11 +62,14 @@ import {
 // 4. Hooks
 import { useEstadisticasGlobales } from "../hooks/useEstadisticasGlobales";
 
-// 5. Utils
+// 5. Componentes
+import ModalReporteDiario from "../components/estadisticas/ModalReporteDiario";
+
+// 6. Utils
 import { generarPDFReporteEstadisticas } from "../utils/exportarReporteEstadisticas";
 import { exportarElementoComoImagen } from "../utils/exportarImagen";
 
-// 6. Estilos
+// 7. Estilos
 import "../styles/estadisticas-globales.css";
 
 // ── Paleta ─────────────────────────────────────────────────────────
@@ -1074,6 +1077,9 @@ const EstadisticasGlobales = () => {
   // 3. Modal de conciliaciones por material
   const [modalMaterial, setModalMaterial] = useState(null);
 
+  // 3b. Modal de Reporte Diario
+  const [mostrarReporteDiario, setMostrarReporteDiario] = useState(false);
+
   // 4. Exportación de reporte PDF
   const [exportando, setExportando] = useState(false);
 
@@ -1427,6 +1433,13 @@ const EstadisticasGlobales = () => {
           </span>
         </div>
         <div className="eg__header-actions">
+          <button
+            className="eg__report-btn"
+            onClick={() => setMostrarReporteDiario(true)}
+          >
+            <CalendarDays size={14} />
+            Reporte Diario
+          </button>
           <button
             className="eg__export-btn"
             onClick={handleExportarPDF}
@@ -2334,6 +2347,15 @@ const EstadisticasGlobales = () => {
           materialNombre={modalMaterial.materialNombre}
           conciliaciones={modalMaterial.conciliaciones}
           onClose={() => setModalMaterial(null)}
+        />
+      )}
+
+      {/* ── Modal Reporte Diario ──────────────────────────────── */}
+      {mostrarReporteDiario && (
+        <ModalReporteDiario
+          presupuestosMaterial={tablaObraMaterialAcumulado}
+          presupuestosRenta={tablaObraRentaAcumulado}
+          onClose={() => setMostrarReporteDiario(false)}
         />
       )}
 

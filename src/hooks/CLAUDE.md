@@ -42,6 +42,7 @@ hooks/
 | `useOperadores.js` | `Operadores.jsx` | Vales agrupados por empresa → placas → estado |
 | `useDashboardAnalytics.js` | `Dashboard.jsx` | Métricas con comparativa periodo anterior |
 | `useEstadisticasGlobales.js` | `EstadisticasGlobales.jsx` | KPIs desde conciliaciones; desglose por material con m³, viajes, importe |
+| `useReporteDiario.js` | `ModalReporteDiario.jsx` | KPIs de un día específico + comparativa vs. día anterior, desglose por material y por renta (agrupado por obra, con CC) y eficiencia operativa |
 | `useDashboardUnificado.js` | `DashboardUnificado.jsx` | Vista unificada con paginación y KPIs |
 | `useMvStats.js` | `Dashboard.jsx` | Vistas materializadas históricas (mv_stats_*) |
 | `useNotifications.js` | `NotificationBell.jsx` | Realtime: vales nuevos vía Supabase Realtime |

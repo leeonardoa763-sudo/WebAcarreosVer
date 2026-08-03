@@ -14,6 +14,7 @@
 | `pdfPublicGenerator.js` | `generarPDFMaterialPublico`, `generarPDFRentaPublico` | PDF para vista pública `/vale/:folio` con marca de agua |
 | `exportConciliacionesDashboard.js` | `exportarConciliacionesDashboard(conciliaciones, tipo, cb)` | Carga vales bajo demanda y genera Excel de conciliaciones |
 | `exportarReporteEstadisticas.js` | `generarPDFReporteEstadisticas(datos)` | PDF de Estadísticas Globales (jsPDF imperativo) |
+| `exportarReporteDiario.js` | `generarPDFReporteDiario(datos)` | PDF del Reporte Diario: KPIs de un día, comparativa vs. día anterior, desglose por material y por renta (agrupado por obra, con CC), eficiencia y alertas de presupuesto (jsPDF imperativo) |
 | `exportarImagen.js` | `exportarElementoComoImagen(elemento, nombreArchivo)` | Captura un nodo DOM como PNG descargable (html2canvas) |
 
 ## conciliaciones/ — generadores de PDF

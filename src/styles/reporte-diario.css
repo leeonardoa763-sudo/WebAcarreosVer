@@ -1,0 +1,401 @@
+/*
+ * src/styles/reporte-diario.css
+ *
+ * Estilos del modal "Reporte Diario" (prefijo BEM: rpd__)
+ * Usado en: ModalReporteDiario.jsx
+ */
+
+.rpd__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 24, 45, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.rpd__modal {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 16px 48px rgba(0, 78, 137, 0.15), 0 4px 16px rgba(0, 0, 0, 0.07);
+  width: 100%;
+  max-width: 920px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: rpd-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes rpd-in {
+  from { opacity: 0; transform: scale(0.97) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.rpd__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #0a1f3d 0%, #004e89 100%);
+  flex-wrap: wrap;
+}
+
+.rpd__title {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.rpd__subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.rpd__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rpd__date-input {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 13px;
+  color-scheme: dark;
+}
+
+.rpd__export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #1a936f;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  white-space: nowrap;
+}
+
+.rpd__export-btn:hover:not(:disabled) {
+  background: #157a5c;
+}
+
+.rpd__export-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rpd__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.rpd__close:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* ── Body ───────────────────────────────────────────────── */
+.rpd__body {
+  padding: 20px 24px 28px;
+  overflow-y: auto;
+}
+
+.rpd__fecha-label {
+  margin: 0 0 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: capitalize;
+}
+
+.rpd__loading,
+.rpd__empty {
+  padding: 32px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13px;
+  background: #f5f6fa;
+  border-radius: 12px;
+}
+
+.rpd__empty--sano {
+  color: #1a936f;
+  background: rgba(26, 147, 111, 0.08);
+  font-weight: 600;
+}
+
+.rpd__error {
+  padding: 16px;
+  border-radius: 12px;
+  background: #fee2e2;
+  color: #dc2626;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.rpd__error button {
+  margin-top: 8px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #dc2626;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* ── KPIs ───────────────────────────────────────────────── */
+.rpd__kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.rpd__kpi {
+  background: #f5f6fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rpd__kpi-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rpd__kpi-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rpd__kpi-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #1a2332;
+}
+
+.rpd__kpi-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.rpd__kpi-trend--up { color: #1a936f; }
+.rpd__kpi-trend--down { color: #dc2626; }
+
+/* ── Secciones ──────────────────────────────────────────── */
+.rpd__section-header {
+  margin: 24px 0 12px;
+}
+
+.rpd__section-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #004e89;
+}
+
+.rpd__section-header p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* ── Tablas de desglose (material / renta) ─────────────────── */
+.rpd__table-wrap {
+  overflow-x: auto;
+  background: #f5f6fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 4px 0;
+}
+
+.rpd__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.rpd__table th {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #64748b;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.rpd__table td {
+  padding: 8px 14px;
+  color: #1a2332;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.rpd__table-right {
+  text-align: right;
+}
+
+.rpd__table-indent {
+  padding-left: 26px !important;
+  color: #64748b;
+}
+
+.rpd__table-row--obra td {
+  font-weight: 700;
+  color: #004e89;
+  background: rgba(0, 78, 137, 0.06);
+}
+
+.rpd__table-row--subtotal td {
+  font-weight: 700;
+  font-style: italic;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+/* ── Gráficas ───────────────────────────────────────────── */
+.rpd__chart-card {
+  background: #f5f6fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.rpd__chart-card--full {
+  margin-top: 16px;
+}
+
+.rpd__chart-card h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a2332;
+}
+
+/* ── Eficiencia ─────────────────────────────────────────── */
+.rpd__eficiencia-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.rpd__stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f5f6fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #004e89;
+}
+
+.rpd__stat-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a2332;
+}
+
+.rpd__stat-label {
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+/* ── Alertas de presupuesto ─────────────────────────────── */
+.rpd__alertas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rpd__alerta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+}
+
+.rpd__alerta--yellow {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #b45309;
+}
+
+.rpd__alerta--red {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.28);
+  color: #dc2626;
+}
+
+.rpd__alerta-info {
+  flex: 1;
+}
+
+.rpd__alerta-obra {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1a2332;
+}
+
+.rpd__alerta-concepto {
+  font-size: 12px;
+  color: #1a2332;
+}
+
+.rpd__alerta-detalle {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.rpd__alerta-pct {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .rpd__kpi-grid,
+  .rpd__eficiencia-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
