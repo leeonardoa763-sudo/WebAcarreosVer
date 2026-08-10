@@ -72,6 +72,7 @@ const ModalPagarConciliacion = ({ isOpen, onClose, conciliacion, onPagada, esEdi
     setNumeroOrdenCompra('');
     setNombreProveedor('');
     setError(null);
+    setLoading(false);
     onClose();
   };
 

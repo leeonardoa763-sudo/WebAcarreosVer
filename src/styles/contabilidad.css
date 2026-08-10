@@ -71,6 +71,28 @@
   color: #9ca3af;
 }
 
+.ctb-btn-limpiar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.ctb-btn-limpiar:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
 /* Error */
 .ctb-error {
   background: #fee2e2;
@@ -130,6 +152,39 @@
   font-weight: 700;
   color: var(--color-text, #1f2937);
   white-space: nowrap;
+}
+
+/* Fila de filtros por columna */
+.ctb-fila-filtros th {
+  padding: 6px 8px 12px;
+  font-weight: 400;
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+}
+
+.ctb-select-filtro,
+.ctb-input-filtro {
+  width: 100%;
+  min-width: 90px;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 400;
+  font-family: inherit;
+  color: var(--color-text, #1f2937);
+  background: white;
+  transition: all 0.2s;
+}
+
+.ctb-select-filtro:focus,
+.ctb-input-filtro:focus {
+  outline: none;
+  border-color: var(--color-primary, #ff6b35);
+  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.1);
+}
+
+.ctb-input-filtro::placeholder {
+  color: #9ca3af;
 }
 
 .ctb-tabla tbody tr {

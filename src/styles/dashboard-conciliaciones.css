@@ -361,6 +361,19 @@
   text-overflow: ellipsis;
 }
 
+.conciliacion-item__material {
+  font-size: 12px;
+  font-weight: 600;
+  color: #004e89;
+  background: #e8f4f8;
+  padding: 3px 10px;
+  border-radius: 10px;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .conciliacion-item__total {
   font-size: 15px;
   font-weight: 700;
@@ -767,6 +780,10 @@
   }
 
   .conciliacion-item__obra {
+    max-width: 100%;
+  }
+
+  .conciliacion-item__material {
     max-width: 100%;
   }
 

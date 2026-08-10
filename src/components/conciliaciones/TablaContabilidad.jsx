@@ -8,14 +8,25 @@
  * Usado en: Conciliaciones.jsx
  */
 
-import { useEffect, useState } from 'react';
-import { Eye, DollarSign, Loader2, Edit2, CheckCircle2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Eye, DollarSign, Loader2, Edit2, CheckCircle2, X } from 'lucide-react';
 import { colors } from '../../config/colors';
 import { useAuth } from '../../hooks/useAuth';
 import { useContabilidad } from '../../hooks/conciliaciones/useContabilidad';
 import ModalPagarConciliacion from './ModalPagarConciliacion';
 import ModalVistaPreviewConciliacion from '../dashboard/ModalVistaPreviewConciliacion';
 import '../../styles/contabilidad.css';
+
+const FILTROS_INICIALES = {
+  empresa: '',
+  mes: '',
+  semana: '',
+  material: '',
+  estado: '',
+  factura: '',
+  oc: '',
+  proveedor: '',
+};
 
 const TablaContabilidad = () => {
   const { userProfile } = useAuth();
@@ -27,6 +38,7 @@ const TablaContabilidad = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [buscador, setBuscador] = useState('');
+  const [filtros, setFiltros] = useState(FILTROS_INICIALES);
 
   const [conciliacionSeleccionada, setConciliacionSeleccionada] = useState(null);
   const [modalVistaPrevia, setModalVistaPrevia] = useState(false);
@@ -54,13 +66,97 @@ const TablaContabilidad = () => {
     cargarDatos();
   }, [subTabActivo, fetchConciliacionesContabilidad]);
 
-  const datosFiltrodos = datos.filter((c) => {
+  useEffect(() => {
+    setBuscador('');
+    setFiltros(FILTROS_INICIALES);
+  }, [subTabActivo]);
+
+  const formatearMes = (fecha) => {
+    try {
+      const date = new Date(fecha);
+      return date.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+    } catch {
+      return '—';
+    }
+  };
+
+  // Filas con campos ya resueltos para mostrar y filtrar (evita recalcular en cada render)
+  const filasBase = useMemo(() => {
+    return datos.map((c) => {
+      const empresa = c.obras?.empresas?.empresa || '—';
+      const mes = formatearMes(c.fecha_inicio);
+      const material =
+        subTabActivo === 'renta' ? 'Renta de material' : c.nombreMaterial || '—';
+      const volumenTexto =
+        subTabActivo === 'renta'
+          ? `${c.total_dias ?? 0} días`
+          : `${(c.totalVolumenM3 ?? 0).toFixed(2)} m³`;
+      const estado = c.estado || 'generada';
+
+      return {
+        ...c,
+        _empresa: empresa,
+        _mes: mes,
+        _semana: c.numero_semana,
+        _material: material,
+        _volumenTexto: volumenTexto,
+        _estado: estado,
+        _factura: c.numero_factura || '',
+        _oc: c.numero_orden_compra || '',
+        _proveedor: c.nombre_proveedor || '',
+      };
+    });
+  }, [datos, subTabActivo]);
+
+  // Opciones únicas para los selects de filtro por columna
+  const opcionesFiltro = useMemo(() => {
+    const unicos = (valores) =>
+      Array.from(new Set(valores.filter((v) => v !== undefined && v !== null && v !== '')))
+        .sort((a, b) => String(a).localeCompare(String(b), 'es'));
+
+    return {
+      empresas: unicos(filasBase.map((f) => f._empresa)),
+      meses: unicos(filasBase.map((f) => f._mes)),
+      semanas: unicos(filasBase.map((f) => f._semana)).sort((a, b) => a - b),
+      materiales: unicos(filasBase.map((f) => f._material)),
+      estados: unicos(filasBase.map((f) => f._estado)),
+    };
+  }, [filasBase]);
+
+  const hayFiltrosActivos =
+    buscador !== '' || Object.values(filtros).some((v) => v !== '');
+
+  const handleFiltroChange = (campo, valor) => {
+    setFiltros((prev) => ({ ...prev, [campo]: valor }));
+  };
+
+  const handleLimpiarFiltros = () => {
+    setBuscador('');
+    setFiltros(FILTROS_INICIALES);
+  };
+
+  const datosFiltrodos = filasBase.filter((c) => {
     const busqueda = buscador.toLowerCase();
-    return (
+    const coincideBusqueda =
+      !busqueda ||
       c.folio?.toLowerCase().includes(busqueda) ||
-      c.obras?.empresa?.toLowerCase().includes(busqueda) ||
-      c.obras?.obra?.toLowerCase().includes(busqueda)
-    );
+      c._empresa.toLowerCase().includes(busqueda) ||
+      c.obras?.obra?.toLowerCase().includes(busqueda) ||
+      c._factura.toLowerCase().includes(busqueda) ||
+      c._oc.toLowerCase().includes(busqueda);
+
+    const coincideColumnas =
+      (!filtros.empresa || c._empresa === filtros.empresa) &&
+      (!filtros.mes || c._mes === filtros.mes) &&
+      (!filtros.semana || String(c._semana) === filtros.semana) &&
+      (!filtros.material || c._material === filtros.material) &&
+      (!filtros.estado || c._estado === filtros.estado) &&
+      (!filtros.factura || c._factura.toLowerCase().includes(filtros.factura.toLowerCase())) &&
+      (!filtros.oc || c._oc.toLowerCase().includes(filtros.oc.toLowerCase())) &&
+      (!filtros.proveedor ||
+        c._proveedor.toLowerCase().includes(filtros.proveedor.toLowerCase()));
+
+    return coincideBusqueda && coincideColumnas;
   });
 
   const getEstadoBadge = (estado) => {
@@ -87,15 +183,6 @@ const TablaContabilidad = () => {
         {estado?.charAt(0).toUpperCase() + estado?.slice(1).toLowerCase()}
       </span>
     );
-  };
-
-  const formatearMes = (fecha) => {
-    try {
-      const date = new Date(fecha);
-      return date.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
-    } catch {
-      return '—';
-    }
   };
 
   const handleAbrirVistaPrevia = (conciliacion) => {
@@ -175,10 +262,20 @@ const TablaContabilidad = () => {
         <input
           type="text"
           className="ctb-input-busqueda"
-          placeholder="Buscar por folio, empresa u obra..."
+          placeholder="Buscar por folio, empresa, obra, factura u OC..."
           value={buscador}
           onChange={(e) => setBuscador(e.target.value)}
         />
+        {hayFiltrosActivos && (
+          <button
+            type="button"
+            className="ctb-btn-limpiar"
+            onClick={handleLimpiarFiltros}
+          >
+            <X size={14} />
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       {/* Error */}
@@ -212,20 +309,113 @@ const TablaContabilidad = () => {
                 <th>Proveedor</th>
                 <th>Acciones</th>
               </tr>
+              <tr className="ctb-fila-filtros">
+                <th></th>
+                <th>
+                  <select
+                    className="ctb-select-filtro"
+                    value={filtros.empresa}
+                    onChange={(e) => handleFiltroChange('empresa', e.target.value)}
+                  >
+                    <option value="">Todas</option>
+                    {opcionesFiltro.empresas.map((valor) => (
+                      <option key={valor} value={valor}>
+                        {valor}
+                      </option>
+                    ))}
+                  </select>
+                </th>
+                <th>
+                  <select
+                    className="ctb-select-filtro"
+                    value={filtros.mes}
+                    onChange={(e) => handleFiltroChange('mes', e.target.value)}
+                  >
+                    <option value="">Todos</option>
+                    {opcionesFiltro.meses.map((valor) => (
+                      <option key={valor} value={valor}>
+                        {valor}
+                      </option>
+                    ))}
+                  </select>
+                </th>
+                <th>
+                  <select
+                    className="ctb-select-filtro"
+                    value={filtros.semana}
+                    onChange={(e) => handleFiltroChange('semana', e.target.value)}
+                  >
+                    <option value="">Todas</option>
+                    {opcionesFiltro.semanas.map((valor) => (
+                      <option key={valor} value={String(valor)}>
+                        {valor}
+                      </option>
+                    ))}
+                  </select>
+                </th>
+                <th>
+                  <select
+                    className="ctb-select-filtro"
+                    value={filtros.material}
+                    onChange={(e) => handleFiltroChange('material', e.target.value)}
+                  >
+                    <option value="">Todos</option>
+                    {opcionesFiltro.materiales.map((valor) => (
+                      <option key={valor} value={valor}>
+                        {valor}
+                      </option>
+                    ))}
+                  </select>
+                </th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th>
+                  <select
+                    className="ctb-select-filtro"
+                    value={filtros.estado}
+                    onChange={(e) => handleFiltroChange('estado', e.target.value)}
+                  >
+                    <option value="">Todos</option>
+                    {opcionesFiltro.estados.map((valor) => (
+                      <option key={valor} value={valor}>
+                        {valor.charAt(0).toUpperCase() + valor.slice(1).toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+                </th>
+                <th>
+                  <input
+                    type="text"
+                    className="ctb-input-filtro"
+                    placeholder="Filtrar..."
+                    value={filtros.factura}
+                    onChange={(e) => handleFiltroChange('factura', e.target.value)}
+                  />
+                </th>
+                <th>
+                  <input
+                    type="text"
+                    className="ctb-input-filtro"
+                    placeholder="Filtrar..."
+                    value={filtros.oc}
+                    onChange={(e) => handleFiltroChange('oc', e.target.value)}
+                  />
+                </th>
+                <th>
+                  <input
+                    type="text"
+                    className="ctb-input-filtro"
+                    placeholder="Filtrar..."
+                    value={filtros.proveedor}
+                    onChange={(e) => handleFiltroChange('proveedor', e.target.value)}
+                  />
+                </th>
+                <th></th>
+              </tr>
             </thead>
             <tbody>
               {datosFiltrodos.map((conciliacion) => {
-                const empresa = conciliacion.obras?.empresas?.empresa || '—';
-                const mes = formatearMes(conciliacion.fecha_inicio);
-                const semana = conciliacion.numero_semana;
-                const material =
-                  subTabActivo === 'renta'
-                    ? 'Renta de material'
-                    : conciliacion.nombreMaterial || '—';
-                const volumen =
-                  subTabActivo === 'renta'
-                    ? `${conciliacion.total_dias ?? 0} días`
-                    : `${(conciliacion.totalVolumenM3 ?? 0).toFixed(2)} m³`;
                 const importeSinIva = (conciliacion.subtotal ?? 0).toLocaleString(
                   'es-MX',
                   { style: 'currency', currency: 'MXN' }
@@ -234,7 +424,7 @@ const TablaContabilidad = () => {
                   'es-MX',
                   { style: 'currency', currency: 'MXN' }
                 );
-                const estado = conciliacion.estado || 'generada';
+                const estado = conciliacion._estado;
 
                 const puedeSerPagada = esAdmin && estado !== 'pagada';
                 const puedeSerEditada = esAdmin && estado === 'pagada';
@@ -242,11 +432,11 @@ const TablaContabilidad = () => {
                 return (
                   <tr key={conciliacion.id_conciliacion} className="ctb-fila">
                     <td className="ctb-codigo">{conciliacion.folio}</td>
-                    <td>{empresa}</td>
-                    <td>{mes}</td>
-                    <td className="ctb-semana">{semana}</td>
-                    <td>{material}</td>
-                    <td className="ctb-volumen">{volumen}</td>
+                    <td>{conciliacion._empresa}</td>
+                    <td>{conciliacion._mes}</td>
+                    <td className="ctb-semana">{conciliacion._semana}</td>
+                    <td>{conciliacion._material}</td>
+                    <td className="ctb-volumen">{conciliacion._volumenTexto}</td>
                     <td className="ctb-importe">{importeSinIva}</td>
                     <td className="ctb-importe-total">{importeTotal}</td>
                     <td>
@@ -260,9 +450,9 @@ const TablaContabilidad = () => {
                         />
                       )}
                     </td>
-                    <td className="ctb-factura">{conciliacion.numero_factura || '—'}</td>
-                    <td className="ctb-oc">{conciliacion.numero_orden_compra || '—'}</td>
-                    <td className="ctb-proveedor">{conciliacion.nombre_proveedor || '—'}</td>
+                    <td className="ctb-factura">{conciliacion._factura || '—'}</td>
+                    <td className="ctb-oc">{conciliacion._oc || '—'}</td>
+                    <td className="ctb-proveedor">{conciliacion._proveedor || '—'}</td>
                     <td className="ctb-acciones">
                       <button
                         className="ctb-btn-icon"

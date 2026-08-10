@@ -529,6 +529,16 @@ export const useConciliacionesQueries = () => {
               nombre,
               primer_apellido,
               segundo_apellido
+            ),
+            conciliacion_vales (
+              vales (
+                vale_material_detalles (
+                  material:id_material ( material )
+                ),
+                vale_renta_detalle (
+                  material:id_material ( material )
+                )
+              )
             )
           `,
           )
@@ -556,7 +566,31 @@ export const useConciliacionesQueries = () => {
 
         if (error) throw error;
 
-        return { success: true, data: data || [] };
+        // Calcular lista de materiales distintos por conciliación
+        // (a partir de los vales asociados, sin cargar el vale completo)
+        const dataConMateriales = (data || []).map((conc) => {
+          const detalles = (conc.conciliacion_vales || []).flatMap(
+            (cv) => [
+              ...(cv.vales?.vale_material_detalles || []),
+              ...(cv.vales?.vale_renta_detalle || []),
+            ],
+          );
+
+          const materialesUnicos = [
+            ...new Set(
+              detalles
+                .map((d) => d.material?.material)
+                .filter(Boolean),
+            ),
+          ];
+
+          return {
+            ...conc,
+            materialesTexto: materialesUnicos.join(", "),
+          };
+        });
+
+        return { success: true, data: dataConMateriales };
       } catch (error) {
         console.error("Error en fetchConciliacionesSinVales:", error);
         return { success: false, error: error.message, data: [] };

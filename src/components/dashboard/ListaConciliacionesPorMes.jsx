@@ -171,6 +171,11 @@ const ListaConciliacionesPorMes = ({ meses, onSeleccionar, colorTema }) => {
                                   <span className="conciliacion-item__obra">
                                     {conciliacion.obras?.obra}
                                   </span>
+                                  {conciliacion.materialesTexto && (
+                                    <span className="conciliacion-item__material">
+                                      {conciliacion.materialesTexto}
+                                    </span>
+                                  )}
                                   <span className="conciliacion-item__total">
                                     $
                                     {conciliacion.total_final.toLocaleString(
