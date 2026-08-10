@@ -6,7 +6,7 @@
  * rango de fechas + filtros client-side + selección en lote para autorizar
  * varios vales a la vez, más desautorizar uno por uno.
  *
- * Dependencias: config/supabase.js, hooks/useAuth.jsx
+ * Dependencias: config/supabase.js, hooks/useAuth.jsx, utils/excepcionesVale.js
  * Usado en: pages/AutorizarVales.jsx
  */
 
@@ -21,6 +21,11 @@ import { useAuth } from "./useAuth";
 
 // 4. Utils
 import { formatearFolio } from "../utils/formatters";
+import {
+  recolectarExcepciones,
+  textoAnticipado,
+  textoSinFoto,
+} from "../utils/excepcionesVale";
 
 const formatDate = (date) => {
   const y = date.getFullYear();
@@ -78,6 +83,7 @@ const SELECT_AUTORIZACION = `
     peso_ton, volumen_real_m3, precio_m3, costo_total,
     folio_banco, requisicion, notas_adicionales,
     tarifa_primer_km, tarifa_subsecuente,
+    foto_omitida, motivo_sin_foto_codigo, motivo_sin_foto_texto,
     material:id_material (
       id_material, material,
       tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)
@@ -87,6 +93,9 @@ const SELECT_AUTORIZACION = `
       id_viaje, numero_viaje, hora_registro, peso_ton, volumen_m3,
       precio_m3, costo_viaje, folio_vale_fisico,
       id_banco_override, distancia_km_override, precio_m3_override, costo_viaje_override,
+      registro_anticipado, minutos_minimos_calculados, minutos_faltantes_anticipado,
+      motivo_anticipado_codigo, motivo_anticipado_texto,
+      foto_omitida, motivo_sin_foto_codigo, motivo_sin_foto_texto,
       bancos_override:id_banco_override (id_banco, banco)
     )
   ),
@@ -94,6 +103,7 @@ const SELECT_AUTORIZACION = `
     id_vale_renta_detalle, capacidad_m3, hora_inicio, hora_fin,
     total_horas, total_dias, costo_total, numero_viajes,
     notas_adicionales, es_renta_por_dia,
+    foto_omitida, motivo_sin_foto_codigo, motivo_sin_foto_texto,
     material:id_material (id_material, material),
     precios_renta:id_precios_renta (costo_hr, costo_dia),
     vale_renta_viajes (id_viaje, numero_viaje, hora_registro)
@@ -239,6 +249,17 @@ const getFoliosRemisionCrudo = (vale) => getRemisionesConViaje(vale).map((r) => 
 const detectarAlertasIntraVale = (vale) => {
   const alertas = [];
 
+  // 0. Excepciones que la app YA declaro con motivo. Van primero porque son un
+  // hecho registrado, no una inferencia de la web: el checador supo que estaba
+  // fuera de norma y explico por que.
+  const excepciones = recolectarExcepciones(vale);
+  for (const exc of excepciones.anticipados) {
+    alertas.push({ tipo: "registro_anticipado", texto: textoAnticipado(exc) });
+  }
+  for (const exc of excepciones.sinFoto) {
+    alertas.push({ tipo: "sin_foto", texto: textoSinFoto(exc) });
+  }
+
   // 1. Renta: menos viajes registrados de los declarados al crear el vale.
   for (const det of vale.vale_renta_detalle ?? []) {
     const declarados = Number(det.numero_viajes || 0);
@@ -275,6 +296,7 @@ const detectarAlertasIntraVale = (vale) => {
           distanciaKm: v.distancia_km_override ?? det.distancia_km,
           peso: v.peso_ton,
           numero: v.numero_viaje,
+          registroAnticipado: !!v.registro_anticipado,
         });
       }
     }
@@ -282,7 +304,11 @@ const detectarAlertasIntraVale = (vale) => {
   viajes.sort((a, b) => a.hora - b.hora);
 
   // 3. Tiempos entre viajes incongruentes con la distancia banco↔obra.
+  // Se omite si la app ya declaro ese viaje como apresurado: ahi el hueco corto
+  // no es un hallazgo sino un hecho conocido, y ya se reporto arriba CON motivo.
+  // Levantar las dos alertas por el mismo viaje solo duplicaria el ruido.
   for (let i = 1; i < viajes.length; i++) {
+    if (viajes[i].registroAnticipado) continue;
     const gapMin = (viajes[i].hora - viajes[i - 1].hora) / 60000;
     const minimoEsperado = minutosMinimosViaje(viajes[i].distanciaKm);
     if (minimoEsperado > 0 && gapMin >= 0 && gapMin < minimoEsperado * 0.4) {

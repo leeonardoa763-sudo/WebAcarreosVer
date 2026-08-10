@@ -110,6 +110,9 @@ const construirQueryBase = (tipoVale) => {
             folio_banco,
             requisicion,
             notas_adicionales,
+            foto_omitida,
+            motivo_sin_foto_codigo,
+            motivo_sin_foto_texto,
             material (
               id_material,
               material,
@@ -135,6 +138,14 @@ const construirQueryBase = (tipoVale) => {
               distancia_km_override,
               precio_m3_override,
               costo_viaje_override,
+              registro_anticipado,
+              minutos_minimos_calculados,
+              minutos_faltantes_anticipado,
+              motivo_anticipado_codigo,
+              motivo_anticipado_texto,
+              foto_omitida,
+              motivo_sin_foto_codigo,
+              motivo_sin_foto_texto,
               bancos_override:id_banco_override (
                 id_banco,
                 banco
@@ -158,6 +169,9 @@ const construirQueryBase = (tipoVale) => {
             es_renta_por_dia,
             costo_total,
             notas_adicionales,
+            foto_omitida,
+            motivo_sin_foto_codigo,
+            motivo_sin_foto_texto,
             material (
               id_material,
               material

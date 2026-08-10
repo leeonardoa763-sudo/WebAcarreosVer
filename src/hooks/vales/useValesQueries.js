@@ -107,6 +107,9 @@ export const useValesQueries = () => {
           notas_adicionales,
           tarifa_primer_km,
           tarifa_subsecuente,
+          foto_omitida,
+          motivo_sin_foto_codigo,
+          motivo_sin_foto_texto,
           material:id_material (
             id_material,
             material,
@@ -134,6 +137,14 @@ export const useValesQueries = () => {
             distancia_km_override,
             precio_m3_override,
             costo_viaje_override,
+            registro_anticipado,
+            minutos_minimos_calculados,
+            minutos_faltantes_anticipado,
+            motivo_anticipado_codigo,
+            motivo_anticipado_texto,
+            foto_omitida,
+            motivo_sin_foto_codigo,
+            motivo_sin_foto_texto,
             bancos_override:id_banco_override (
               id_banco,
               banco
@@ -155,6 +166,9 @@ export const useValesQueries = () => {
           numero_viajes,
           notas_adicionales,
           es_renta_por_dia,
+          foto_omitida,
+          motivo_sin_foto_codigo,
+          motivo_sin_foto_texto,
           material:id_material (
             id_material,
             material
@@ -289,6 +303,9 @@ export const useValesQueries = () => {
             costo_total,
             folio_banco,
             notas_adicionales,
+            foto_omitida,
+            motivo_sin_foto_codigo,
+            motivo_sin_foto_texto,
             material:id_material (
               id_material,
               material,
@@ -314,6 +331,14 @@ export const useValesQueries = () => {
               distancia_km_override,
               precio_m3_override,
               costo_viaje_override,
+              registro_anticipado,
+              minutos_minimos_calculados,
+              minutos_faltantes_anticipado,
+              motivo_anticipado_codigo,
+              motivo_anticipado_texto,
+              foto_omitida,
+              motivo_sin_foto_codigo,
+              motivo_sin_foto_texto,
               bancos_override:id_banco_override (
                 id_banco,
                 banco
@@ -331,6 +356,9 @@ export const useValesQueries = () => {
             numero_viajes,
             notas_adicionales,
             es_renta_por_dia,
+            foto_omitida,
+            motivo_sin_foto_codigo,
+            motivo_sin_foto_texto,
             material:id_material (
               id_material,
               material
@@ -436,6 +464,9 @@ export const useValesQueries = () => {
             volumen_real_m3,
             precio_m3,
             costo_total,
+            foto_omitida,
+            motivo_sin_foto_codigo,
+            motivo_sin_foto_texto,
             material:id_material (
               id_material,
               material,
@@ -460,6 +491,14 @@ export const useValesQueries = () => {
               distancia_km_override,
               precio_m3_override,
               costo_viaje_override,
+              registro_anticipado,
+              minutos_minimos_calculados,
+              minutos_faltantes_anticipado,
+              motivo_anticipado_codigo,
+              motivo_anticipado_texto,
+              foto_omitida,
+              motivo_sin_foto_codigo,
+              motivo_sin_foto_texto,
               bancos_override:id_banco_override (
                 id_banco,
                 banco
@@ -475,6 +514,9 @@ export const useValesQueries = () => {
             costo_total,
             numero_viajes,
             es_renta_por_dia,
+            foto_omitida,
+            motivo_sin_foto_codigo,
+            motivo_sin_foto_texto,
             material:id_material (
               material
             ),

@@ -39,6 +39,10 @@ import {
   getNombreCompleto,
   formatearDuracion,
 } from "../../utils/formatters";
+import { recolectarExcepciones } from "../../utils/excepcionesVale";
+
+// 4. Componentes
+import AvisoExcepciones from "../vales/AvisoExcepciones";
 
 const ValePreview = ({ vale }) => {
   const badgeEstado = getBadgeEstado(vale.estado);
@@ -291,6 +295,10 @@ const ValePreview = ({ vale }) => {
           </>
         )}
       </div>
+
+      {/* Excepciones declaradas en la app. Van antes del footer para que se
+          lean antes de confirmar: verificar_vale no se revierte facilmente. */}
+      <AvisoExcepciones excepciones={recolectarExcepciones(vale)} />
 
       <div className="vale-preview__footer">
         <AlertCircle size={16} aria-hidden="true" />

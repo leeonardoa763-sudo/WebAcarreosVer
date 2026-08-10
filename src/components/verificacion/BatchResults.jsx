@@ -28,6 +28,8 @@ import {
   formatearDuracion,
   formatearMoneda,
 } from "../../utils/formatters";
+import { recolectarExcepciones } from "../../utils/excepcionesVale";
+import AvisoExcepciones from "../vales/AvisoExcepciones";
 
 const BatchResults = ({
   results,
@@ -467,6 +469,13 @@ const BatchResults = ({
                           </div>
                         </div>
                       ))}
+
+                    {/* Excepciones declaradas en la app — variante compacta
+                        porque aqui se apilan decenas de vales */}
+                    <AvisoExcepciones
+                      excepciones={recolectarExcepciones(item.vale)}
+                      compacto
+                    />
 
                     {/* Costo total (siempre) */}
                     {costoTotal > 0 && (

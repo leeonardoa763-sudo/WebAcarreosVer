@@ -33,6 +33,8 @@ import {
   ExternalLink,
   AlertTriangle,
   ShieldCheck,
+  Timer,
+  CameraOff,
 } from "lucide-react";
 
 // 3. Utils
@@ -55,6 +57,12 @@ import {
   bancoDeViaje,
 } from "../../utils/rentaMaterial";
 import { getAlertaConfig } from "../../utils/alertasVale";
+import {
+  recolectarExcepciones,
+  etiquetaMotivo,
+  MOTIVOS_ANTICIPADO,
+  MOTIVOS_SIN_FOTO,
+} from "../../utils/excepcionesVale";
 
 // 4. Config / Hooks
 import { supabase } from "../../config/supabase";
@@ -65,6 +73,7 @@ import ModalEditarVale from "./editar/ModalEditarVale";
 import ModalEditarValeRenta from "./editar/ModalEditarValeRenta";
 import ModalCancelarVale from "./ModalCancelarVale";
 import ModalSolicitudDesver from "./ModalSolicitudDesver";
+import AvisoExcepciones from "./AvisoExcepciones";
 
 // 7. Estilos
 import "../../styles/modal-vale-detalle.css";
@@ -144,6 +153,35 @@ const InfoRow = ({ icon: Icon, label, value, subValue, color }) => (
   </div>
 );
 
+/**
+ * Marcas de excepcion junto al numero de viaje. El detalle completo (minutos y
+ * motivo) esta en el bloque AvisoExcepciones de arriba; aqui solo se senala en
+ * que fila paso, siguiendo el patron de vdm__override-dot.
+ */
+const MarcasExcepcion = ({ viaje }) => {
+  if (!viaje.registro_anticipado && !viaje.foto_omitida) return null;
+  return (
+    <>
+      {viaje.registro_anticipado && (
+        <span
+          className="vdm__excepcion-dot"
+          title={`Registro apresurado — ${etiquetaMotivo(MOTIVOS_ANTICIPADO, viaje.motivo_anticipado_codigo)}`}
+        >
+          <Timer size={10} aria-hidden="true" />
+        </span>
+      )}
+      {viaje.foto_omitida && (
+        <span
+          className="vdm__excepcion-dot"
+          title={`Sin foto de evidencia — ${etiquetaMotivo(MOTIVOS_SIN_FOTO, viaje.motivo_sin_foto_codigo)}`}
+        >
+          <CameraOff size={10} aria-hidden="true" />
+        </span>
+      )}
+    </>
+  );
+};
+
 // ─── Detalle Material ─────────────────────────────────────────────────────────
 
 const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar, pesosEspecificos }) => {
@@ -188,6 +226,10 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar, pesosEspecificos }
         <Package size={15} aria-hidden="true" />
         Detalles de Material
       </h4>
+
+      {/* Excepciones declaradas en la app (registro apresurado / sin foto).
+          Va antes de las tablas para que se lea antes del viaje por viaje. */}
+      <AvisoExcepciones excepciones={recolectarExcepciones(vale)} />
 
       {!vale.vale_material_detalles?.length ? (
         <p className="vdm__no-data">Sin detalles de material</p>
@@ -356,6 +398,7 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar, pesosEspecificos }
                           <span className="vdm__viaje-num">
                             #{viaje.numero_viaje}
                             {tieneOverride && <span className="vdm__override-dot" title="Banco o distancia diferente al detalle">*</span>}
+                            <MarcasExcepcion viaje={viaje} />
                             {registrador && <span className="vdm__viaje-reg" title={`Registrado por ${registrador}`}>{registrador}</span>}
                           </span>
                           <span>{viaje.hora_registro ? formatearHora(viaje.hora_registro) : "—"}</span>
@@ -419,6 +462,7 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar, pesosEspecificos }
                           <div key={viaje.id_viaje} className="vdm__viaje-row vdm__viaje-row--material">
                             <span className="vdm__viaje-num">
                               #{viaje.numero_viaje}
+                              <MarcasExcepcion viaje={viaje} />
                               {registrador && <span className="vdm__viaje-reg" title={`Registrado por ${registrador}`}>{registrador}</span>}
                             </span>
                             <span>{viaje.hora_registro ? formatearHora(viaje.hora_registro) : "—"}</span>
@@ -493,6 +537,10 @@ const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
           Sindicato: {vale.vale_renta_detalle[0].sindicatos.sindicato}
         </div>
       )}
+
+      {/* En renta la unica excepcion posible es la foto omitida, y vive en el
+          detalle: la renta no genera filas en vale_material_viajes. */}
+      <AvisoExcepciones excepciones={recolectarExcepciones(vale)} />
 
       {!vale.vale_renta_detalle?.length ? (
         <p className="vdm__no-data">Sin detalles de renta</p>
@@ -745,6 +793,10 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado, onVerVale }) => {
               tarifa_primer_km, tarifa_subsecuente,
               id_banco_override, distancia_km_override,
               precio_m3_override, costo_viaje_override,
+              registro_anticipado, minutos_minimos_calculados,
+              minutos_faltantes_anticipado, motivo_anticipado_codigo,
+              motivo_anticipado_texto, foto_omitida,
+              motivo_sin_foto_codigo, motivo_sin_foto_texto,
               bancos_override:id_banco_override (id_banco, banco),
               persona_registro:id_persona_registro (nombre, primer_apellido)
             `)

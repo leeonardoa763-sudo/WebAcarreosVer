@@ -387,6 +387,7 @@ export const useDashboardUnificado = () => {
             peso_ton, volumen_real_m3, precio_m3, costo_total,
             folio_banco, requisicion, notas_adicionales,
             tarifa_primer_km, tarifa_subsecuente, es_planta_asfaltos,
+            foto_omitida, motivo_sin_foto_codigo, motivo_sin_foto_texto,
             material:id_material (
               id_material, material,
               tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)
@@ -398,6 +399,7 @@ export const useDashboardUnificado = () => {
             id_vale_renta_detalle, capacidad_m3, hora_inicio, hora_fin,
             total_horas, total_dias, costo_total, numero_viajes,
             notas_adicionales, es_renta_por_dia, es_turno_nocturno,
+            foto_omitida, motivo_sin_foto_codigo, motivo_sin_foto_texto,
             material:id_material (id_material, material),
             precios_renta:id_precios_renta (costo_hr, costo_dia)
           ),

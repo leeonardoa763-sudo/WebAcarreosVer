@@ -206,6 +206,9 @@ export const useVerificacion = () => {
             volumen_real_m3,
             precio_m3,
             costo_total,
+            foto_omitida,
+            motivo_sin_foto_codigo,
+            motivo_sin_foto_texto,
             material:id_material (
               material,
               tipo_de_material:id_tipo_de_material (
@@ -230,6 +233,14 @@ export const useVerificacion = () => {
               costo_viaje_override,
               tarifa_primer_km,
               tarifa_subsecuente,
+              registro_anticipado,
+              minutos_minimos_calculados,
+              minutos_faltantes_anticipado,
+              motivo_anticipado_codigo,
+              motivo_anticipado_texto,
+              foto_omitida,
+              motivo_sin_foto_codigo,
+              motivo_sin_foto_texto,
               bancos_override:id_banco_override (
                 banco
               )
@@ -245,6 +256,9 @@ export const useVerificacion = () => {
             costo_total,
             numero_viajes,
             es_renta_por_dia,
+            foto_omitida,
+            motivo_sin_foto_codigo,
+            motivo_sin_foto_texto,
             material:id_material (
               material
             ),

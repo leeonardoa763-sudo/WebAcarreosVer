@@ -5,7 +5,7 @@
  * Recibe vale_material_detalles con vale_material_viajes anidados y los aplana.
  * Cada viaje muestra: foto full-width, banco, material y grid de datos numéricos.
  *
- * Dependencias: formatters, lucide-react, visualizar-vale.css
+ * Dependencias: formatters, excepcionesVale, lucide-react, visualizar-vale.css
  * Usado en: VisualizarVale.jsx
  */
 
@@ -13,7 +13,7 @@
 import { useState } from "react";
 
 // 2. Icons
-import { MapPin, Expand, ImageOff, X, Clock } from "lucide-react";
+import { MapPin, Expand, ImageOff, X, Clock, Timer, CameraOff } from "lucide-react";
 
 // 3. Utils
 import {
@@ -22,6 +22,11 @@ import {
   formatearPeso,
   formatearHora,
 } from "../../utils/formatters";
+import {
+  etiquetaMotivo,
+  MOTIVOS_ANTICIPADO,
+  MOTIVOS_SIN_FOTO,
+} from "../../utils/excepcionesVale";
 
 const ListaViajesMaterial = ({ detalles, mostrarPrecios, vehiculoCapacidad }) => {
   const [fotoModal, setFotoModal] = useState(null);
@@ -129,6 +134,21 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios, vehiculoCapacidad }) =>
                         Override
                       </span>
                     )}
+                    {viaje.registro_anticipado && (
+                      <span
+                        className="excepcion-badge"
+                        title={`Registrado antes del tiempo mínimo — ${etiquetaMotivo(MOTIVOS_ANTICIPADO, viaje.motivo_anticipado_codigo)}`}
+                      >
+                        <Timer size={11} />
+                        Apresurado
+                      </span>
+                    )}
+                    {viaje.foto_omitida && (
+                      <span className="excepcion-badge">
+                        <CameraOff size={11} />
+                        Sin foto
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -171,6 +191,16 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios, vehiculoCapacidad }) =>
                   <div className="viaje-item__foto-empty">
                     <ImageOff size={22} />
                     <span>Sin foto de evidencia</span>
+                    {/* Si la omision fue declarada en la app, el motivo es
+                        exactamente lo que este campo existe para responder */}
+                    {viaje.foto_omitida && (
+                      <span className="viaje-item__foto-motivo">
+                        {etiquetaMotivo(MOTIVOS_SIN_FOTO, viaje.motivo_sin_foto_codigo)}
+                        {viaje.motivo_sin_foto_texto
+                          ? ` — ${viaje.motivo_sin_foto_texto}`
+                          : ""}
+                      </span>
+                    )}
                     {tieneGeo && (
                       <a
                         href={`https://www.google.com/maps?q=${latEfectiva},${lngEfectiva}`}

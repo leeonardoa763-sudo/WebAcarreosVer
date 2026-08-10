@@ -633,6 +633,15 @@
   margin-left: 2px;
 }
 
+/* Marcas de excepcion declarada en la app: apresurado / sin foto */
+.vdm__excepcion-dot {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-warning);
+  margin-left: 3px;
+  vertical-align: middle;
+}
+
 /* ── Totales de viajes ── */
 .vdm__viajes-totales {
   display: flex;

@@ -47,6 +47,11 @@ import {
   generarPDFMaterialPublico,
   generarPDFRentaPublico,
 } from "../utils/pdfPublicGenerator";
+import {
+  recolectarExcepciones,
+  textoAnticipado,
+  textoSinFoto,
+} from "../utils/excepcionesVale";
 
 // 6. Componentes
 import DetallesMaterial from "../components/visualizar-vale/DetallesMaterial";
@@ -157,6 +162,7 @@ const VisualizarVale = () => {
               segundo_apellido
             ),
             vale_material_detalles (
+              id_detalle_material,
               capacidad_m3,
               distancia_km,
               cantidad_pedida_m3,
@@ -173,6 +179,9 @@ const VisualizarVale = () => {
               latitud_completado,
               longitud_completado,
               distancia_obra_metros,
+              foto_omitida,
+              motivo_sin_foto_codigo,
+              motivo_sin_foto_texto,
               material:id_material (
                 material,
                 tipo_de_material:id_tipo_de_material (
@@ -202,6 +211,14 @@ const VisualizarVale = () => {
                 latitud_registro,
                 longitud_registro,
                 distancia_obra_metros,
+                registro_anticipado,
+                minutos_minimos_calculados,
+                minutos_faltantes_anticipado,
+                motivo_anticipado_codigo,
+                motivo_anticipado_texto,
+                foto_omitida,
+                motivo_sin_foto_codigo,
+                motivo_sin_foto_texto,
                 bancos_override:id_banco_override (
                   id_banco,
                   banco
@@ -216,6 +233,7 @@ const VisualizarVale = () => {
               )
             ),
             vale_renta_detalle (
+              id_vale_renta_detalle,
               capacidad_m3,
               hora_inicio,
               hora_fin,
@@ -229,6 +247,9 @@ const VisualizarVale = () => {
               latitud_completado,
               longitud_completado,
               distancia_obra_metros,
+              foto_omitida,
+              motivo_sin_foto_codigo,
+              motivo_sin_foto_texto,
               material:id_material (
                 material
               ),
@@ -422,6 +443,9 @@ const VisualizarVale = () => {
   const detalleRenta = vale.vale_renta_detalle?.[0];
   const badgeEstado = getBadgeEstado(vale.estado);
   const badgeTipo = getBadgeTipo(vale.tipo_vale);
+  // Excepciones que la app declaro con motivo. Van visibles tambien sin sesion:
+  // a diferencia de los precios, no son informacion reservada.
+  const excepciones = recolectarExcepciones(vale);
 
   return (
     <div className={`visualizar-vale-page ${getBackgroundClass(vale.estado)}`}>
@@ -588,6 +612,29 @@ const VisualizarVale = () => {
             ticketsDescarga={vale.tickets_descarga}
             mostrarPrecios={mostrarPrecios}
           />
+        )}
+
+        {/* REGISTROS FUERA DE LO NORMAL — antes de la lista de viajes para que
+            se lea antes del detalle viaje por viaje */}
+        {excepciones.total > 0 && (
+          <>
+            <div className="divider"></div>
+            <div className="vale-section">
+              <h3 className="section-title">REGISTROS FUERA DE LO NORMAL</h3>
+              <ul className="excepciones-lista">
+                {excepciones.anticipados.map((exc) => (
+                  <li key={exc.clave} className="excepciones-item">
+                    {textoAnticipado(exc)}
+                  </li>
+                ))}
+                {excepciones.sinFoto.map((exc) => (
+                  <li key={exc.clave} className="excepciones-item">
+                    {textoSinFoto(exc)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
         )}
 
         {/* LISTA DE VIAJES - MATERIAL */}

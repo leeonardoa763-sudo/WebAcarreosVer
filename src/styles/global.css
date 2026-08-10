@@ -49,6 +49,8 @@ body {
   --color-error: #dc2626;
   --color-success: #10b981;
   --color-warning: #f59e0b;
+  /* Fondo ambar de avisos — mismo tono que el bloque de excepciones de la app */
+  --color-warning-bg: #fef5e7;
 
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);

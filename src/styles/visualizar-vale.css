@@ -250,6 +250,58 @@ a,
 }
 
 /* ========================================
+   REGISTROS FUERA DE LO NORMAL
+   Excepciones que la app declaro con motivo
+   ======================================== */
+
+.excepciones-lista {
+  list-style: none;
+  margin: 0;
+  padding: 12px;
+  background: var(--color-warning-bg);
+  border-left: 3px solid var(--color-warning);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.excepciones-item {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #2c3e50;
+  padding-left: 12px;
+  position: relative;
+}
+
+.excepciones-item::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--color-warning);
+}
+
+/* Badges de excepcion por viaje y motivo de la foto faltante */
+.excepcion-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--color-warning-bg);
+  color: #92400e;
+}
+
+.viaje-item__foto-motivo {
+  width: 100%;
+  font-size: 11px;
+  color: #92400e;
+  line-height: 1.4;
+}
+
+/* ========================================
    FOOTER
    ======================================== */
 
