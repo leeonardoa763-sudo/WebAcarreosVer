@@ -424,23 +424,25 @@ const ModalEditarVale = ({
                       </select>
                     </div>
 
-                    {/* Distancia */}
-                    <div className="mev__campo-grupo">
-                      <label className="mev__campo-label" htmlFor="mev-distancia">
-                        Distancia (km)
-                      </label>
-                      <input
-                        id="mev-distancia"
-                        type="number"
-                        className="mev__campo-input"
-                        value={detalle.distancia_km || ""}
-                        onChange={(e) => editarDistanciaDetalle(e.target.value)}
-                        placeholder="0"
-                        min="0"
-                        step="0.1"
-                        disabled={guardando}
-                      />
-                    </div>
+                    {/* Distancia — tipo 1 y 2 (tipo 3 la edita por viaje, ver TablaEditarViajes) */}
+                    {tipoMaterial !== 3 && (
+                      <div className="mev__campo-grupo">
+                        <label className="mev__campo-label" htmlFor="mev-distancia">
+                          Distancia (km)
+                        </label>
+                        <input
+                          id="mev-distancia"
+                          type="number"
+                          className="mev__campo-input"
+                          value={detalle.distancia_km || ""}
+                          onChange={(e) => editarDistanciaDetalle(e.target.value)}
+                          placeholder="0"
+                          min="0"
+                          step="0.1"
+                          disabled={guardando}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
