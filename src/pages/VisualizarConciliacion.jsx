@@ -539,7 +539,6 @@ const ValeCard = ({
               detalles={aplanarViajesMaterial(vale.vale_material_detalles)}
               mostrarPrecios={true}
               vehiculoCapacidad={vale.vehiculos?.capacidad_m3}
-              ticketsMaterial={vale.tickets_material}
             />
           )}
 

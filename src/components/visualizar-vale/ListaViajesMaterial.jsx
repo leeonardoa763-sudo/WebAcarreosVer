@@ -4,8 +4,8 @@
  * Lista de viajes registrados para un vale de material en la página pública.
  * Recibe vale_material_detalles con vale_material_viajes anidados y los aplana.
  * Cada viaje muestra: foto full-width, banco, material, remisión y grid de
- * datos numéricos. Tipo 3 (corte) no tiene vale_material_viajes — su remisión
- * sale de tickets_material (recibido aparte, a nivel vale).
+ * datos numéricos. Tipo 3 (corte) no tiene vale_material_viajes ni folio de
+ * remisión — se marca como "N/A".
  *
  * Dependencias: formatters, excepcionesVale, lucide-react, visualizar-vale.css
  * Usado en: VisualizarVale.jsx
@@ -34,7 +34,6 @@ const ListaViajesMaterial = ({
   detalles,
   mostrarPrecios,
   vehiculoCapacidad,
-  ticketsMaterial = [],
 }) => {
   const [fotoModal, setFotoModal] = useState(null);
 
@@ -114,19 +113,12 @@ const ListaViajesMaterial = ({
             const pesoMostrar = viaje._esFallback ? detalle.peso_ton : viaje.peso_ton;
             const idTipoDetalle =
               detalle.material?.tipo_de_material?.id_tipo_de_material;
-            // Tipo 3 (corte) no registra vale_material_viajes — su remisión
-            // son los tickets_material impresos para el vale completo
-            const remisionTipo3 =
-              idTipoDetalle === 3 && ticketsMaterial.length > 0
-                ? ticketsMaterial
-                    .map((t) => t.folio_ticket || t.numero_ticket)
-                    .filter(Boolean)
-                    .join(", ")
-                : null;
+            const esCorte = idTipoDetalle === 3;
             // viaje.folio_vale_fisico ya viene resuelto tanto en el viaje real
             // como en los objetos pre-aplanados de VisualizarConciliacion.jsx
-            // (donde todo llega marcado _esFallback aunque sí sea un viaje real)
-            const folioFisico = viaje.folio_vale_fisico || remisionTipo3;
+            // (donde todo llega marcado _esFallback aunque sí sea un viaje real).
+            // Tipo 3 (corte) no tiene folio de remisión — se declara "N/A".
+            const folioFisico = esCorte ? "N/A" : viaje.folio_vale_fisico;
             const tieneOverride = !viaje._esFallback && (viaje.id_banco_override || viaje.distancia_km_override);
 
             return (

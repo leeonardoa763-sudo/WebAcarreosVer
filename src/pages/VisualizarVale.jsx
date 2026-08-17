@@ -672,7 +672,6 @@ const VisualizarVale = () => {
           <ListaViajesMaterial
             detalles={vale.vale_material_detalles}
             mostrarPrecios={mostrarPrecios}
-            ticketsMaterial={vale.tickets_material}
           />
         )}
 
