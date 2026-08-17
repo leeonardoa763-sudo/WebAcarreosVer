@@ -408,7 +408,13 @@ const TablaMaterialCorte = ({ valesAgrupados }) => {
                     // Solo mostrar Tipo 3
                     if (idTipo !== 3) return null;
 
-                    viajesGrupo += 1;
+                    // Tipo 3 (corte) registra sus viajes como tickets_material
+                    // (a nivel vale, no en vale_material_detalles); fallback a
+                    // 1 si aún no hay tickets registrados
+                    const tickets = vale.tickets_material || [];
+                    const numViajes = tickets.length > 0 ? tickets.length : 1;
+
+                    viajesGrupo += numViajes;
                     m3Grupo += Number(detalle.volumen_real_m3 || 0);
 
                     return (
@@ -425,7 +431,7 @@ const TablaMaterialCorte = ({ valesAgrupados }) => {
                         <td className="text-center">
                           {Number(detalle.distancia_km).toFixed(1)}
                         </td>
-                        <td className="text-center">1</td>
+                        <td className="text-center">{numViajes}</td>
                         <td className="text-right">
                           {Number(
                             detalle.capacidad_m3 ??

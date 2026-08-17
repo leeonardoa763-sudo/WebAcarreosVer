@@ -180,6 +180,9 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                 primer_apellido,
                 segundo_apellido
               ),
+              tickets_material (
+                id_ticket
+              ),
               vale_material_detalles (
                 id_detalle_material,
                 capacidad_m3,
@@ -326,27 +329,24 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
 
         grupos[placas].subtotal += costo;
 
-        // Viajes reales registrados; fallback a 1 si aún no hay viajes
-        const viajes = detalle.vale_material_viajes || [];
-        const numViajes = viajes.length > 0 ? viajes.length : 1;
+        if (idTipo === 1 || idTipo === 2) {
+          // Viajes reales registrados en vale_material_viajes; fallback a 1 si aún no hay viajes
+          const viajes = detalle.vale_material_viajes || [];
+          const numViajes = viajes.length > 0 ? viajes.length : 1;
+          const targetTipo =
+            idTipo === 1
+              ? grupos[placas].totalesTipo1
+              : grupos[placas].totalesTipo2;
 
-        if (idTipo === 1) {
-          grupos[placas].totalesTipo1.totalViajes += numViajes;
-          grupos[placas].totalesTipo1.totalM3 += Number(
-            detalle.volumen_real_m3 || 0,
-          );
-          grupos[placas].totalesTipo1.totalToneladas += Number(
-            detalle.peso_ton || 0,
-          );
-        } else if (idTipo === 2) {
-          grupos[placas].totalesTipo2.totalViajes += numViajes;
-          grupos[placas].totalesTipo2.totalM3 += Number(
-            detalle.volumen_real_m3 || 0,
-          );
-          grupos[placas].totalesTipo2.totalToneladas += Number(
-            detalle.peso_ton || 0,
-          );
+          targetTipo.totalViajes += numViajes;
+          targetTipo.totalM3 += Number(detalle.volumen_real_m3 || 0);
+          targetTipo.totalToneladas += Number(detalle.peso_ton || 0);
         } else if (idTipo === 3) {
+          // Tipo 3 (corte) registra sus viajes como tickets_material,
+          // no en vale_material_viajes; fallback a 1 si aún no hay tickets
+          const tickets = vale.tickets_material || [];
+          const numViajes = tickets.length > 0 ? tickets.length : 1;
+
           grupos[placas].totalesTipo3.totalViajes += numViajes;
           grupos[placas].totalesTipo3.totalM3 += Number(
             detalle.volumen_real_m3 || 0,

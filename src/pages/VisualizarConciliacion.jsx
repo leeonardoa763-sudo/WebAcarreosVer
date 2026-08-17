@@ -115,6 +115,15 @@ const ValeTimeline = ({ vale, personaGenerador, fechaGeneracion }) => {
       persona: nombrePersona(vale.persona_verificador),
       clase: "verificacion",
     },
+    // Autorización del Administrador — control independiente de la verificación
+    // del sindicato, así que puede quedar registrada antes o después de ella.
+    vale.autorizado && vale.fecha_autorizacion && {
+      key: "autorizacion",
+      label: "Autorización",
+      fecha: vale.fecha_autorizacion,
+      persona: nombrePersona(vale.persona_autorizador),
+      clase: "autorizacion",
+    },
     fechaGeneracion && {
       key: "conciliacion",
       label: "Conciliación",
@@ -122,7 +131,9 @@ const ValeTimeline = ({ vale, personaGenerador, fechaGeneracion }) => {
       persona: nombrePersona(personaGenerador),
       clase: "conciliacion",
     },
-  ].filter(Boolean);
+  ]
+    .filter(Boolean)
+    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
 
   return (
     <div className="vc-timeline">
@@ -134,8 +145,9 @@ const ValeTimeline = ({ vale, personaGenerador, fechaGeneracion }) => {
           <div className="vc-timeline-dot" />
           <div className="vc-timeline-content">
             <span className="vc-timeline-label">{item.label}</span>
-            <span className="vc-timeline-fecha">{formatearFecha(item.fecha)}</span>
-            <span className="vc-timeline-hora">{formatearHora(item.fecha)}</span>
+            <span className="vc-timeline-fecha">
+              {formatearFecha(item.fecha)} · {formatearHora(item.fecha)}
+            </span>
             {item.persona && (
               <span className="vc-timeline-persona">{item.persona}</span>
             )}
@@ -527,6 +539,7 @@ const ValeCard = ({
               detalles={aplanarViajesMaterial(vale.vale_material_detalles)}
               mostrarPrecios={true}
               vehiculoCapacidad={vale.vehiculos?.capacidad_m3}
+              ticketsMaterial={vale.tickets_material}
             />
           )}
 
@@ -591,6 +604,8 @@ const VisualizarConciliacion = () => {
             iva_16_porciento,
             retencion_4_porciento,
             total_final,
+            numero_orden_compra,
+            numero_factura,
             total_dias,
             total_horas,
             fecha_generacion,
@@ -611,11 +626,14 @@ const VisualizarConciliacion = () => {
                 fecha_creacion,
                 fecha_completado,
                 fecha_verificacion,
+                autorizado,
+                fecha_autorizacion,
                 operadores:id_operador (nombre_completo, id_sindicato),
                 vehiculos:id_vehiculo (placas, capacidad_m3),
                 persona:id_persona_creador (nombre, primer_apellido),
                 persona_verificador:id_persona_verificador (nombre, primer_apellido),
                 persona_completador:id_persona_completador (nombre, primer_apellido),
+                persona_autorizador:id_persona_autorizador (nombre, primer_apellido),
                 vale_material_detalles (
                   id_detalle_material,
                   capacidad_m3,
@@ -676,6 +694,11 @@ const VisualizarConciliacion = () => {
                       limite_int2
                     )
                   )
+                ),
+                tickets_material (
+                  id_ticket,
+                  numero_ticket,
+                  folio_ticket
                 ),
                 tickets_descarga (
                   numero_ticket,
@@ -909,6 +932,18 @@ const VisualizarConciliacion = () => {
             <span className="vc-info-label">Periodo:</span>
             <span className="vc-info-value">{formatearPeriodo()}</span>
           </div>
+          {conciliacion.numero_orden_compra && (
+            <div className="vc-info-row">
+              <span className="vc-info-label">Orden de compra:</span>
+              <span className="vc-info-value">{conciliacion.numero_orden_compra}</span>
+            </div>
+          )}
+          {conciliacion.numero_factura && (
+            <div className="vc-info-row">
+              <span className="vc-info-label">Factura:</span>
+              <span className="vc-info-value">{conciliacion.numero_factura}</span>
+            </div>
+          )}
           {conciliacion.persona_generador && (
             <div className="vc-info-row">
               <span className="vc-info-label">Generado por:</span>

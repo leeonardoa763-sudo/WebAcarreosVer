@@ -428,25 +428,17 @@
    ======================================== */
 
 .vc-timeline {
-  padding: 4px 0 10px 4px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  padding: 4px 0 10px 0;
 }
 
 .vc-timeline-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  position: relative;
-  padding-bottom: 14px;
-}
-
-.vc-timeline-item:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 12px;
-  bottom: 0;
-  width: 2px;
-  background: #e5e7eb;
+  gap: 8px;
+  min-width: 0;
 }
 
 .vc-timeline-dot {
@@ -455,8 +447,6 @@
   border-radius: 50%;
   flex-shrink: 0;
   margin-top: 3px;
-  position: relative;
-  z-index: 1;
   border: 2px solid white;
   box-shadow: 0 0 0 2px currentColor;
 }
@@ -464,12 +454,14 @@
 .vc-timeline-item--creacion .vc-timeline-dot { background: #6b7280; color: #6b7280; }
 .vc-timeline-item--emision .vc-timeline-dot  { background: #3b82f6; color: #3b82f6; }
 .vc-timeline-item--verificacion .vc-timeline-dot { background: #eab308; color: #eab308; }
+.vc-timeline-item--autorizacion .vc-timeline-dot { background: #0891b2; color: #0891b2; }
 .vc-timeline-item--conciliacion .vc-timeline-dot { background: #10b981; color: #10b981; }
 
 .vc-timeline-content {
   display: flex;
   flex-direction: column;
   gap: 1px;
+  min-width: 0;
 }
 
 .vc-timeline-label {
@@ -482,23 +474,23 @@
 .vc-timeline-item--creacion .vc-timeline-label    { color: #6b7280; }
 .vc-timeline-item--emision .vc-timeline-label     { color: #3b82f6; }
 .vc-timeline-item--verificacion .vc-timeline-label { color: #ca8a04; }
+.vc-timeline-item--autorizacion .vc-timeline-label { color: #0891b2; }
 .vc-timeline-item--conciliacion .vc-timeline-label { color: #10b981; }
 
 .vc-timeline-fecha {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #2c3e50;
-}
-
-.vc-timeline-hora {
-  font-size: 10px;
-  color: #7f8c8d;
+  white-space: nowrap;
 }
 
 .vc-timeline-persona {
   font-size: 10px;
   color: #6b7280;
   font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ========================================

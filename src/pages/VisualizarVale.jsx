@@ -74,6 +74,7 @@ const VisualizarVale = () => {
   const [downloadingPDF, setDownloadingPDF] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [fechaConciliacion, setFechaConciliacion] = useState(null);
+  const [datosOcFactura, setDatosOcFactura] = useState(null);
 
   /**
    * Obtener clase de fondo según estado del vale
@@ -185,6 +186,7 @@ const VisualizarVale = () => {
               material:id_material (
                 material,
                 tipo_de_material:id_tipo_de_material (
+                  id_tipo_de_material,
                   tipo_de_material
                 )
               ),
@@ -231,6 +233,11 @@ const VisualizarVale = () => {
               material_ticket:id_material_ticket (
                 material
               )
+            ),
+            tickets_material (
+              id_ticket,
+              numero_ticket,
+              folio_ticket
             ),
             vale_renta_detalle (
               id_vale_renta_detalle,
@@ -340,7 +347,9 @@ const VisualizarVale = () => {
         .select(
           `
           conciliaciones:id_conciliacion (
-            fecha_creacion
+            fecha_creacion,
+            numero_orden_compra,
+            numero_factura
           )
         `,
         )
@@ -351,6 +360,15 @@ const VisualizarVale = () => {
       if (error) return;
       if (data?.conciliaciones?.fecha_creacion) {
         setFechaConciliacion(data.conciliaciones.fecha_creacion);
+      }
+      if (
+        data?.conciliaciones?.numero_orden_compra ||
+        data?.conciliaciones?.numero_factura
+      ) {
+        setDatosOcFactura({
+          oc: data.conciliaciones.numero_orden_compra,
+          factura: data.conciliaciones.numero_factura,
+        });
       }
     } catch {
       // No bloquear si falla
@@ -523,6 +541,18 @@ const VisualizarVale = () => {
               </span>
             </div>
           )}
+          {datosOcFactura?.oc && (
+            <div className="info-full">
+              <span className="info-label">Orden de compra:</span>
+              <span className="info-value">{datosOcFactura.oc}</span>
+            </div>
+          )}
+          {datosOcFactura?.factura && (
+            <div className="info-full">
+              <span className="info-label">Factura:</span>
+              <span className="info-value">{datosOcFactura.factura}</span>
+            </div>
+          )}
         </div>
 
         <div className="divider"></div>
@@ -642,6 +672,7 @@ const VisualizarVale = () => {
           <ListaViajesMaterial
             detalles={vale.vale_material_detalles}
             mostrarPrecios={mostrarPrecios}
+            ticketsMaterial={vale.tickets_material}
           />
         )}
 

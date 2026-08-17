@@ -3,7 +3,9 @@
  *
  * Lista de viajes registrados para un vale de material en la página pública.
  * Recibe vale_material_detalles con vale_material_viajes anidados y los aplana.
- * Cada viaje muestra: foto full-width, banco, material y grid de datos numéricos.
+ * Cada viaje muestra: foto full-width, banco, material, remisión y grid de
+ * datos numéricos. Tipo 3 (corte) no tiene vale_material_viajes — su remisión
+ * sale de tickets_material (recibido aparte, a nivel vale).
  *
  * Dependencias: formatters, excepcionesVale, lucide-react, visualizar-vale.css
  * Usado en: VisualizarVale.jsx
@@ -28,7 +30,12 @@ import {
   MOTIVOS_SIN_FOTO,
 } from "../../utils/excepcionesVale";
 
-const ListaViajesMaterial = ({ detalles, mostrarPrecios, vehiculoCapacidad }) => {
+const ListaViajesMaterial = ({
+  detalles,
+  mostrarPrecios,
+  vehiculoCapacidad,
+  ticketsMaterial = [],
+}) => {
   const [fotoModal, setFotoModal] = useState(null);
 
   const viajesAplanados = detalles.flatMap((detalle) => {
@@ -105,7 +112,21 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios, vehiculoCapacidad }) =>
             const horaRegistro = viaje._esFallback ? null : viaje.hora_registro;
             const volumenMostrar = viaje._esFallback ? detalle.volumen_real_m3 : viaje.volumen_m3;
             const pesoMostrar = viaje._esFallback ? detalle.peso_ton : viaje.peso_ton;
-            const folioFisico = viaje._esFallback ? null : viaje.folio_vale_fisico;
+            const idTipoDetalle =
+              detalle.material?.tipo_de_material?.id_tipo_de_material;
+            // Tipo 3 (corte) no registra vale_material_viajes — su remisión
+            // son los tickets_material impresos para el vale completo
+            const remisionTipo3 =
+              idTipoDetalle === 3 && ticketsMaterial.length > 0
+                ? ticketsMaterial
+                    .map((t) => t.folio_ticket || t.numero_ticket)
+                    .filter(Boolean)
+                    .join(", ")
+                : null;
+            // viaje.folio_vale_fisico ya viene resuelto tanto en el viaje real
+            // como en los objetos pre-aplanados de VisualizarConciliacion.jsx
+            // (donde todo llega marcado _esFallback aunque sí sea un viaje real)
+            const folioFisico = viaje.folio_vale_fisico || remisionTipo3;
             const tieneOverride = !viaje._esFallback && (viaje.id_banco_override || viaje.distancia_km_override);
 
             return (
@@ -232,7 +253,7 @@ const ListaViajesMaterial = ({ detalles, mostrarPrecios, vehiculoCapacidad }) =>
 
                   {folioFisico && (
                     <div className="viaje-item__dato">
-                      <span className="viaje-item__dato-label">Folio físico</span>
+                      <span className="viaje-item__dato-label">Remisión</span>
                       <span className="viaje-item__dato-valor">{folioFisico}</span>
                     </div>
                   )}

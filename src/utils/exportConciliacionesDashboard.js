@@ -204,7 +204,10 @@ const obtenerTotalDiasNumero = (conc) => {
 /**
  * Obtener número total de viajes
  * Para renta: suma de numero_viajes de los detalles
- * Para material: cuenta cada detalle como 1 viaje
+ * Para material: cuenta los viajes reales — filas de vale_material_viajes
+ * (Tipo 1/2) más filas de tickets_material (Tipo 3/corte), NO los
+ * renglones de vale_material_detalles (que son un detalle por material,
+ * no un viaje)
  *
  * @param {Object} conc - Objeto de conciliación
  * @returns {string|number} - Total de viajes o vacío
@@ -225,12 +228,14 @@ const obtenerNumeroViajes = (conc) => {
       });
       return totalViajes > 0 ? totalViajes : "";
     } else {
-      // Para material: contar cada detalle como 1 viaje
+      // Para material: contar viajes reales de vale_material_viajes (Tipo 1/2)
+      // y de tickets_material (Tipo 3/corte)
       let totalViajes = 0;
       conc.vales.forEach((vale) => {
-        vale.vale_material_detalles?.forEach(() => {
-          totalViajes += 1;
+        vale.vale_material_detalles?.forEach((detalle) => {
+          totalViajes += detalle.vale_material_viajes?.length || 0;
         });
+        totalViajes += vale.tickets_material?.length || 0;
       });
       return totalViajes > 0 ? totalViajes : "";
     }
@@ -393,6 +398,9 @@ export const exportarConVales = async (conciliaciones, tipoActivo) => {
               .select(
                 `
                 *,
+                tickets_material (
+                  id_ticket
+                ),
                 vale_material_detalles (
                   cantidad_pedida_m3,
                   volumen_real_m3,
@@ -401,6 +409,9 @@ export const exportarConVales = async (conciliaciones, tipoActivo) => {
                   costo_total,
                   material:id_material (
                     material
+                  ),
+                  vale_material_viajes (
+                    id_viaje
                   )
                 )
               `
