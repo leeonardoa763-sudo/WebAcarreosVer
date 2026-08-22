@@ -144,17 +144,29 @@ const prefijo = (exc) =>
   exc.numeroViaje != null ? `Viaje ${exc.numeroViaje}` : "Vale";
 
 /**
- * Motivo legible. Con el codigo "otro" la etiqueta del catalogo es
- * "Otro (especificar)" — texto de formulario, inutil en un reporte — asi que
- * manda lo que el checador escribio. Con cualquier otro codigo el texto libre
- * es un complemento y va entre parentesis.
+ * Motivo legible a partir de lo que hay en BD. Con el codigo "otro" la etiqueta
+ * del catalogo es "Otro (especificar)" — texto de formulario, inutil en un
+ * reporte — asi que manda lo que el checador escribio. Con cualquier otro
+ * codigo el texto libre es un complemento y va entre parentesis.
+ *
+ * @param {Array} motivos MOTIVOS_ANTICIPADO o MOTIVOS_SIN_FOTO
+ * @param {string|null} codigo motivo_*_codigo
+ * @param {string|null} textoLibre motivo_*_texto
+ * @returns {string|null} null si no hay ni codigo ni texto
  */
-const motivoLegible = (exc) => {
-  if (exc.codigo === CODIGO_MOTIVO_OTRO && exc.motivoTexto) {
-    return exc.motivoTexto;
-  }
-  return `${exc.motivo}${exc.motivoTexto ? ` (${exc.motivoTexto})` : ""}`;
+export const motivoLegibleDe = (motivos, codigo, textoLibre) => {
+  if (!codigo && !textoLibre) return null;
+  return componerMotivo(etiquetaMotivo(motivos, codigo), codigo, textoLibre);
 };
+
+/** Une la etiqueta del catalogo con el texto libre. La etiqueta ya viene resuelta. */
+const componerMotivo = (etiqueta, codigo, textoLibre) => {
+  if (codigo === CODIGO_MOTIVO_OTRO && textoLibre) return textoLibre;
+  return `${etiqueta}${textoLibre ? ` (${textoLibre})` : ""}`;
+};
+
+const motivoLegible = (exc) =>
+  componerMotivo(exc.motivo, exc.codigo, exc.motivoTexto);
 
 /**
  * Linea completa de un registro apresurado.

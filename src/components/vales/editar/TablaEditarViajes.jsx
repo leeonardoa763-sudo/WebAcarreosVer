@@ -8,7 +8,7 @@
  * Tipo 3:     edición de volumen_m3 directo, banco override, distancia override
  *             por viaje. Recálculo automático de precio_m3_override y costo.
  *
- * Dependencias: useEditarValeViajes, lucide-react, colors
+ * Dependencias: useEditarValeViajes, horaMexico, lucide-react
  * Usado en: ModalEditarVale.jsx
  */
 
@@ -25,8 +25,11 @@ import {
   Info,
 } from "lucide-react";
 
-// 3. Config
-import { colors } from "../../../config/colors";
+// 3. Utils
+import {
+  horaInputDesdeISO,
+  isoDesdeHoraInput,
+} from "../../../utils/horaMexico";
 
 // ─── Helpers de formato ───────────────────────────────────────────────────────
 
@@ -52,26 +55,6 @@ const fmtMoneda = (n) => {
     currency: "MXN",
     minimumFractionDigits: 2,
   }).format(Number(n));
-};
-
-const getHoraInputValue = (horaISO) => {
-  if (!horaISO) return "";
-  return new Date(horaISO)
-    .toLocaleTimeString("en-GB", {
-      timeZone: "America/Mexico_City",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    })
-    .slice(0, 5);
-};
-
-const horaInputToISO = (timeValue, existingISO) => {
-  if (!timeValue) return null;
-  const dateStr = existingISO
-    ? new Date(existingISO).toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" })
-    : new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
-  return `${dateStr}T${timeValue}:00`;
 };
 
 // ─── Sub-componente: fila tipo 1 y 2 ─────────────────────────────────────────
@@ -119,9 +102,9 @@ const FilaViajeT1T2 = ({
         <input
           type="time"
           className="tev__input tev__input--hora"
-          value={getHoraInputValue(viaje.hora_registro)}
+          value={horaInputDesdeISO(viaje.hora_registro)}
           onChange={(e) =>
-            onEditarCampo(viaje.id_viaje, "hora_registro", horaInputToISO(e.target.value, viaje.hora_registro))
+            onEditarCampo(viaje.id_viaje, "hora_registro", isoDesdeHoraInput(e.target.value, viaje.hora_registro))
           }
           disabled={estaDeshabilitado}
         />
@@ -301,9 +284,9 @@ const FilaViajeT3 = ({
         <input
           type="time"
           className="tev__input tev__input--hora"
-          value={getHoraInputValue(viaje.hora_registro)}
+          value={horaInputDesdeISO(viaje.hora_registro)}
           onChange={(e) =>
-            onEditarCampo(viaje.id_viaje, "hora_registro", horaInputToISO(e.target.value, viaje.hora_registro))
+            onEditarCampo(viaje.id_viaje, "hora_registro", isoDesdeHoraInput(e.target.value, viaje.hora_registro))
           }
           disabled={estaDeshabilitado}
         />

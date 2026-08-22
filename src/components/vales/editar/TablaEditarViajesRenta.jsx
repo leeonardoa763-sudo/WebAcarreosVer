@@ -6,38 +6,24 @@
  * registro — el material movido por viaje vive en tickets_descarga (solo
  * lectura, se captura desde la app móvil) y no se edita aquí.
  *
- * Dependencias: lucide-react, colors
+ * Dependencias: horaMexico, lucide-react
  * Usado en: ModalEditarValeRenta.jsx
  */
 
 // 2. Icons
 import { Plus, Trash2, RotateCcw, AlertTriangle } from "lucide-react";
 
+// 3. Utils
+import {
+  horaInputDesdeISO,
+  isoDesdeHoraInput,
+} from "../../../utils/horaMexico";
+
 // ─── Helpers de formato ───────────────────────────────────────────────────────
 
 const fmtRegistrador = (persona) => {
   if (!persona) return null;
   return `${persona.nombre || ""} ${persona.primer_apellido || ""}`.trim();
-};
-
-const getHoraInputValue = (horaISO) => {
-  if (!horaISO) return "";
-  return new Date(horaISO)
-    .toLocaleTimeString("en-GB", {
-      timeZone: "America/Mexico_City",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    })
-    .slice(0, 5);
-};
-
-const horaInputToISO = (timeValue, existingISO) => {
-  if (!timeValue) return null;
-  const dateStr = existingISO
-    ? new Date(existingISO).toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" })
-    : new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
-  return `${dateStr}T${timeValue}:00`;
 };
 
 // ─── Componente principal ─────────────────────────────────────────────────────
@@ -112,12 +98,12 @@ const TablaEditarViajesRenta = ({
                       <input
                         type="time"
                         className="tev__input tev__input--hora"
-                        value={getHoraInputValue(viaje.hora_registro)}
+                        value={horaInputDesdeISO(viaje.hora_registro)}
                         onChange={(e) =>
                           onEditarCampoViaje(
                             viaje.id_viaje,
                             "hora_registro",
-                            horaInputToISO(e.target.value, viaje.hora_registro),
+                            isoDesdeHoraInput(e.target.value, viaje.hora_registro),
                           )
                         }
                         disabled={marcadoEliminar}

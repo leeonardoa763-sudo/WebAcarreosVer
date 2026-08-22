@@ -204,10 +204,11 @@ const obtenerTotalDiasNumero = (conc) => {
 /**
  * Obtener número total de viajes
  * Para renta: suma de numero_viajes de los detalles
- * Para material: cuenta los viajes reales — filas de vale_material_viajes
- * (Tipo 1/2) más filas de tickets_material (Tipo 3/corte), NO los
- * renglones de vale_material_detalles (que son un detalle por material,
- * no un viaje)
+ * Para material: `vale_material_viajes` manda en los tres tipos (el Tipo 3
+ * también registra ahí sus viajes). `tickets_material` son los tickets
+ * impresos — uno por viaje —, así que sumarlos aparte contaba dos veces
+ * cada viaje de corte; solo sirven de respaldo cuando el vale tiene tickets
+ * pero ninguna fila de viaje.
  *
  * @param {Object} conc - Objeto de conciliación
  * @returns {string|number} - Total de viajes o vacío
@@ -228,14 +229,31 @@ const obtenerNumeroViajes = (conc) => {
       });
       return totalViajes > 0 ? totalViajes : "";
     } else {
-      // Para material: contar viajes reales de vale_material_viajes (Tipo 1/2)
-      // y de tickets_material (Tipo 3/corte)
+      // Para material: los viajes reales viven en vale_material_viajes
       let totalViajes = 0;
       conc.vales.forEach((vale) => {
+        let viajesVale = 0;
         vale.vale_material_detalles?.forEach((detalle) => {
-          totalViajes += detalle.vale_material_viajes?.length || 0;
+          const registrados = detalle.vale_material_viajes?.length || 0;
+          if (registrados > 0) {
+            viajesVale += registrados;
+            return;
+          }
+          // Tipo 2 (Base Asfaltica): 1 vale = 1 viaje capturado en el propio
+          // detalle, sin fila en vale_material_viajes.
+          const esTipo2 =
+            detalle.material?.tipo_de_material?.id_tipo_de_material === 2;
+          const tieneDatos =
+            detalle.volumen_real_m3 != null || detalle.costo_total != null;
+          if (esTipo2 && tieneDatos) viajesVale += 1;
         });
-        totalViajes += vale.tickets_material?.length || 0;
+
+        // Respaldo para el corte: tickets impresos sin viaje registrado.
+        if (viajesVale === 0) {
+          viajesVale += vale.tickets_material?.length || 0;
+        }
+
+        totalViajes += viajesVale;
       });
       return totalViajes > 0 ? totalViajes : "";
     }
@@ -408,7 +426,10 @@ export const exportarConVales = async (conciliaciones, tipoActivo) => {
                   precio_m3,
                   costo_total,
                   material:id_material (
-                    material
+                    material,
+                    tipo_de_material:id_tipo_de_material (
+                      id_tipo_de_material
+                    )
                   ),
                   vale_material_viajes (
                     id_viaje

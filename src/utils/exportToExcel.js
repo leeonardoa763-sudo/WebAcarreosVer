@@ -11,13 +11,74 @@
  * - Nombres de columnas automáticos
  * - Descargar archivo en el navegador
  * - Formateo básico de celdas
+ * - Formato de celda por columna (fechas, horas, moneda) vía `opciones.formatos`
  *
  * Dependencias: xlsx
- * Usado en: Conciliaciones, Operadores, otros reportes
+ * Usado en: Conciliaciones, Operadores, Vales (exportarValesExcel), otros reportes
  */
 
 // Importar librería xlsx
 import * as XLSX from "xlsx";
+
+/**
+ * Aplica el formato de celda (numFmt) de cada columna listada en `formatos` y
+ * devuelve, por índice de columna, el formato aplicado.
+ *
+ * El valor de la celda ya debe venir como número (p. ej. una serie de fecha de
+ * excelFechas.js): `z` solo controla cómo se muestra. Las celdas no numéricas
+ * —las vacías "—" o "" de un vale que no tiene ese dato— se dejan intactas.
+ */
+const aplicarFormatos = (worksheet, range, formatos) => {
+  const formatoPorColumna = [];
+
+  for (let C = range.s.c; C <= range.e.c; ++C) {
+    const encabezado =
+      worksheet[XLSX.utils.encode_cell({ r: range.s.r, c: C })]?.v;
+    const formato = formatos[encabezado];
+    if (!formato) continue;
+
+    formatoPorColumna[C] = formato;
+
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      const cell = worksheet[XLSX.utils.encode_cell({ r: R, c: C })];
+      if (cell && typeof cell.v === "number") {
+        cell.t = "n";
+        cell.z = formato;
+      }
+    }
+  }
+
+  return formatoPorColumna;
+};
+
+/**
+ * Ancho automático por columna. Para las columnas con formato se mide el
+ * formato ("dd/mm/yyyy" = 10) y no el número de serie (45890 = 5), que dejaría
+ * la columna demasiado angosta y Excel la mostraría como #####.
+ */
+const calcularAnchos = (worksheet, range, formatoPorColumna = []) => {
+  const columnWidths = [];
+
+  for (let C = range.s.c; C <= range.e.c; ++C) {
+    let maxWidth = 10; // Ancho mínimo
+
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      const cell = worksheet[XLSX.utils.encode_cell({ r: R, c: C })];
+      if (!cell || cell.v == null) continue;
+
+      const texto =
+        R > range.s.r && formatoPorColumna[C]
+          ? formatoPorColumna[C]
+          : String(cell.v);
+      if (texto.length > maxWidth) maxWidth = texto.length;
+    }
+
+    // Limitar el ancho máximo a 50 caracteres
+    columnWidths.push({ wch: Math.min(maxWidth + 2, 50) });
+  }
+
+  return columnWidths;
+};
 
 /**
  * Exportar datos a archivo Excel
@@ -25,13 +86,18 @@ import * as XLSX from "xlsx";
  * @param {Array} data - Array de objetos con los datos
  * @param {string} fileName - Nombre del archivo (sin extensión)
  * @param {string} sheetName - Nombre de la hoja (opcional)
+ * @param {Object} opciones - { formatos: { "Nombre de columna": "dd/mm/yyyy" },
+ *                              autoFiltro: boolean }
  */
 export const exportToExcel = (
   data,
   fileName = "datos",
-  sheetName = "Hoja1"
+  sheetName = "Hoja1",
+  opciones = {}
 ) => {
   try {
+    const { formatos = {}, autoFiltro = false } = opciones;
+
     // Validar que hay datos
     if (!data || data.length === 0) {
       console.warn("No hay datos para exportar");
@@ -47,31 +113,18 @@ export const exportToExcel = (
     // Obtener el rango de la hoja
     const range = XLSX.utils.decode_range(worksheet["!ref"]);
 
-    // Aplicar ancho automático a las columnas
-    const columnWidths = [];
+    const formatoPorColumna = aplicarFormatos(worksheet, range, formatos);
+    worksheet["!cols"] = calcularAnchos(worksheet, range, formatoPorColumna);
 
-    // Iterar por cada columna
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      let maxWidth = 10; // Ancho mínimo
-
-      // Revisar cada celda de la columna
-      for (let R = range.s.r; R <= range.e.r; ++R) {
-        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-        const cell = worksheet[cellAddress];
-
-        if (cell && cell.v) {
-          const cellLength = cell.v.toString().length;
-          if (cellLength > maxWidth) {
-            maxWidth = cellLength;
-          }
-        }
-      }
-
-      // Limitar el ancho máximo a 50 caracteres
-      columnWidths.push({ wch: Math.min(maxWidth + 2, 50) });
+    // Filtros en la fila de encabezados (útil con muchas columnas)
+    if (autoFiltro) {
+      worksheet["!autofilter"] = {
+        ref: XLSX.utils.encode_range({
+          s: { r: range.s.r, c: range.s.c },
+          e: { r: range.e.r, c: range.e.c },
+        }),
+      };
     }
-
-    worksheet["!cols"] = columnWidths;
 
     // Agregar la hoja al libro
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
@@ -111,14 +164,20 @@ export const exportToExcel = (
 /**
  * Exportar múltiples hojas a un solo archivo Excel
  *
- * @param {Array} sheets - Array de objetos { name: string, data: Array }
+ * Las hojas sin datos se omiten: un libro con la hoja "Renta" vacía porque el
+ * período no tuvo rentas confunde más de lo que ayuda.
+ *
+ * @param {Array} sheets - Array de { name, data, formatos?, autoFiltro? }
+ *                         `formatos` y `autoFiltro` funcionan igual que en
+ *                         exportToExcel, pero por hoja.
  * @param {string} fileName - Nombre del archivo (sin extensión)
  */
 export const exportMultipleSheetsToExcel = (sheets, fileName = "datos") => {
   try {
-    // Validar que hay hojas
-    if (!sheets || sheets.length === 0) {
-      console.warn("No hay hojas para exportar");
+    const conDatos = (sheets ?? []).filter((s) => s.data?.length > 0);
+
+    if (conDatos.length === 0) {
+      console.warn("No hay hojas con datos para exportar");
       return;
     }
 
@@ -126,34 +185,21 @@ export const exportMultipleSheetsToExcel = (sheets, fileName = "datos") => {
     const workbook = XLSX.utils.book_new();
 
     // Agregar cada hoja
-    sheets.forEach((sheet) => {
-      if (!sheet.data || sheet.data.length === 0) {
-        console.warn(`La hoja "${sheet.name}" no tiene datos`);
-        return;
-      }
-
+    conDatos.forEach((sheet) => {
       // Convertir datos a hoja
       const worksheet = XLSX.utils.json_to_sheet(sheet.data);
-
-      // Aplicar ancho automático
       const range = XLSX.utils.decode_range(worksheet["!ref"]);
-      const columnWidths = [];
 
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        let maxWidth = 10;
-        for (let R = range.s.r; R <= range.e.r; ++R) {
-          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-          const cell = worksheet[cellAddress];
-          if (cell && cell.v) {
-            const cellLength = cell.v.toString().length;
-            if (cellLength > maxWidth) {
-              maxWidth = cellLength;
-            }
-          }
-        }
-        columnWidths.push({ wch: Math.min(maxWidth + 2, 50) });
+      const formatoPorColumna = aplicarFormatos(
+        worksheet,
+        range,
+        sheet.formatos ?? {},
+      );
+      worksheet["!cols"] = calcularAnchos(worksheet, range, formatoPorColumna);
+
+      if (sheet.autoFiltro) {
+        worksheet["!autofilter"] = { ref: XLSX.utils.encode_range(range) };
       }
-      worksheet["!cols"] = columnWidths;
 
       // Agregar hoja al libro
       XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
@@ -180,7 +226,7 @@ export const exportMultipleSheetsToExcel = (sheets, fileName = "datos") => {
     window.URL.revokeObjectURL(url);
 
     console.log(
-      `✅ Archivo exportado: ${fileName}.xlsx con ${sheets.length} hojas`
+      `✅ Archivo exportado: ${fileName}.xlsx con ${conDatos.length} hojas`
     );
   } catch (error) {
     console.error("Error al exportar múltiples hojas a Excel:", error);
@@ -238,24 +284,8 @@ export const exportToExcelWithFormat = (
     }
 
     // Ancho automático de columnas
-    const range = XLSX.utils.decode_range(worksheet["!ref"]);
-    const columnWidths = [];
-
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      let maxWidth = 10;
-      for (let R = range.s.r; R <= range.e.r; ++R) {
-        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-        const cell = worksheet[cellAddress];
-        if (cell && cell.v) {
-          const cellLength = cell.v.toString().length;
-          if (cellLength > maxWidth) {
-            maxWidth = cellLength;
-          }
-        }
-      }
-      columnWidths.push({ wch: Math.min(maxWidth + 2, 50) });
-    }
-    worksheet["!cols"] = columnWidths;
+    const rangeAnchos = XLSX.utils.decode_range(worksheet["!ref"]);
+    worksheet["!cols"] = calcularAnchos(worksheet, rangeAnchos);
 
     // Agregar hoja y generar archivo
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);

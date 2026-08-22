@@ -377,15 +377,19 @@ export const useDashboardUnificado = () => {
           persona_autorizador:id_persona_autorizador (nombre, primer_apellido, segundo_apellido),
           persona_completador:id_persona_completador (nombre, primer_apellido, segundo_apellido),
           persona_verificador:id_persona_verificador (nombre, primer_apellido, segundo_apellido),
-          tickets_material (id_ticket, numero_ticket, folio_ticket, fecha_impresion),
+          tickets_material (
+            id_ticket, numero_ticket, folio_ticket, fecha_impresion,
+            persona_registro:id_persona_registro (nombre, primer_apellido, segundo_apellido)
+          ),
           tickets_descarga (
-            numero_ticket, id_material_ticket, banco_descarga,
-            material_ticket:id_material_ticket (material)
+            numero_ticket, folio_ticket, id_material_ticket, banco_descarga, fecha_impresion,
+            material_ticket:id_material_ticket (material),
+            persona_registro:id_persona_registro (nombre, primer_apellido, segundo_apellido)
           ),
           vale_material_detalles (
             id_detalle_material, capacidad_m3, distancia_km, cantidad_pedida_m3,
             peso_ton, volumen_real_m3, precio_m3, costo_total,
-            folio_banco, requisicion, notas_adicionales,
+            folio_banco, folio_vale_fisico, requisicion, notas_adicionales,
             tarifa_primer_km, tarifa_subsecuente, es_planta_asfaltos,
             foto_omitida, motivo_sin_foto_codigo, motivo_sin_foto_texto,
             material:id_material (
@@ -393,7 +397,17 @@ export const useDashboardUnificado = () => {
               tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)
             ),
             bancos:id_banco (id_banco, banco),
-            vale_material_viajes (id_viaje, folio_vale_fisico, hora_registro)
+            vale_material_viajes (
+              id_viaje, numero_viaje, folio_vale_fisico, hora_registro,
+              peso_ton, volumen_m3, precio_m3, costo_viaje,
+              id_banco_override, distancia_km_override,
+              precio_m3_override, costo_viaje_override,
+              registro_anticipado, minutos_minimos_calculados, minutos_faltantes_anticipado,
+              motivo_anticipado_codigo, motivo_anticipado_texto,
+              foto_omitida, motivo_sin_foto_codigo, motivo_sin_foto_texto,
+              bancos_override:id_banco_override (id_banco, banco),
+              persona_registro:id_persona_registro (nombre, primer_apellido, segundo_apellido)
+            )
           ),
           vale_renta_detalle (
             id_vale_renta_detalle, capacidad_m3, hora_inicio, hora_fin,
@@ -401,16 +415,23 @@ export const useDashboardUnificado = () => {
             notas_adicionales, es_renta_por_dia, es_turno_nocturno,
             foto_omitida, motivo_sin_foto_codigo, motivo_sin_foto_texto,
             material:id_material (id_material, material),
-            precios_renta:id_precios_renta (costo_hr, costo_dia)
+            precios_renta:id_precios_renta (costo_hr, costo_dia),
+            vale_renta_viajes (
+              id_viaje, numero_viaje, hora_registro,
+              persona_registro:id_persona_registro (nombre, primer_apellido, segundo_apellido)
+            )
           ),
           conciliacion_vales (
-            conciliaciones:id_conciliacion (folio)
+            conciliaciones:id_conciliacion (
+              folio, estado, numero_orden_compra, numero_factura
+            )
           ),
           solicitudes_desverificacion (
             id_solicitud, estado, motivo_solicitud, motivo_respuesta,
             fecha_solicitud, fecha_respuesta, id_sindicato_requerido,
             sindicatos:id_sindicato_requerido (sindicato),
-            persona_solicitante:id_persona_solicitante (nombre, primer_apellido)
+            persona_solicitante:id_persona_solicitante (nombre, primer_apellido),
+            persona_respondedor:id_persona_respondedor (nombre, primer_apellido)
           )
         `,
           { count: "exact" },

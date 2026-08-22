@@ -47,7 +47,7 @@ import { colors } from "../config/colors";
 import { useDashboardUnificado } from "../hooks/useDashboardUnificado";
 import { calcularSemanaISO } from "../utils/dateUtils";
 import { useAuth } from "../hooks/useAuth";
-import { exportToExcel } from "../utils/exportToExcel";
+import { exportarValesExcel } from "../utils/exportarValesExcel";
 
 // 5. Componentes
 import ModalValeDetalle from "../components/vales/ModalValeDetalle";
@@ -532,159 +532,11 @@ const DashboardUnificado = () => {
     refetch();
   };
 
-  // 5. Export
+  // 5. Export — libro normalizado por hojas (ver utils/exportarValesExcel.js)
   const handleExportarExcel = () => {
-    const filas = valesFiltrados.flatMap((vale) => {
-      // Reúne todos los folios de remisión
-      const foliosSet = new Set();
-      for (const det of vale.vale_material_detalles ?? []) {
-        const foliosViaje = (det.vale_material_viajes ?? [])
-          .map((v) => v.folio_vale_fisico)
-          .filter(Boolean);
-        if (foliosViaje.length > 0) {
-          foliosViaje.forEach((f) => foliosSet.add(f));
-        } else if (det.folio_banco) {
-          foliosSet.add(det.folio_banco);
-        }
-      }
-      const foliosRemision =
-        foliosSet.size > 0 ? [...foliosSet].join(", ") : "";
-
-      const esMaterial = vale.tipo_vale === "material";
-      const rentaDet = vale.vale_renta_detalle?.[0];
-      // Mismo criterio que getCantidadVale: por día si flag activo O si total_dias > 0 (cubre medio día)
-      const esPorDia =
-        rentaDet?.es_renta_por_dia || Number(rentaDet?.total_dias ?? 0) > 0;
-
-      const m3 = esMaterial ? Number(vale._cantidad?.valor ?? 0) : "";
-      const toneladas = esMaterial
-        ? (vale.vale_material_detalles ?? []).reduce(
-            (sum, det) => sum + Number(det.peso_ton || 0),
-            0,
-          )
-        : "";
-      const dias =
-        !esMaterial && esPorDia ? Number(rentaDet?.total_dias ?? 0) : "";
-      const horas =
-        !esMaterial && !esPorDia ? Number(rentaDet?.total_horas ?? 0) : "";
-
-      const conciliacion =
-        (vale.conciliacion_vales ?? [])
-          .map((cv) => cv.conciliaciones?.folio)
-          .filter(Boolean)
-          .join(", ") || "";
-
-      // Tarifas: precio_m3 para material; costo_hr / costo_dia para renta
-      const precioM3 = esMaterial
-        ? Number(vale.vale_material_detalles?.[0]?.precio_m3 ?? 0)
-        : "";
-      const costoHr = !esMaterial
-        ? Number(rentaDet?.precios_renta?.costo_hr ?? 0)
-        : "";
-      const costoDia = !esMaterial
-        ? Number(rentaDet?.precios_renta?.costo_dia ?? 0)
-        : "";
-
-      // Columnas de identidad del vale (se repiten en cada fila de viaje)
-      const identidad = {
-        Folio: vale.folio ?? "—",
-        Empresa:
-          vale.obras?.empresas?.empresa ?? vale.obras?.empresas?.sufijo ?? "—",
-        CC: vale.obras?.cc ?? "—",
-        Obra: vale.obras?.obra ?? "—",
-        Tipo: ETIQUETAS_TIPO[vale._tipo]?.label ?? vale._tipo,
-      };
-      const resto = {
-        "Folios remisión": foliosRemision || "—",
-        Conciliación: conciliacion || "—",
-        Estado: ETIQUETAS_ESTADO[vale.estado]?.label ?? vale.estado ?? "—",
-        Fecha:
-          vale.fecha_programada ?? vale.fecha_creacion?.substring(0, 10) ?? "—",
-        Operador: vale.operadores?.nombre_completo ?? "—",
-        Placas: vale.vehiculos?.placas ?? "—",
-        "Capacidad m³": vale.vehiculos?.capacidad_m3 ?? "",
-        Sindicato: vale.operadores?.sindicatos?.sindicato ?? "—",
-        "Motivo cancelación": vale.motivo_cancelacion ?? "",
-      };
-
-      // Renta: una fila por viaje con su material real (tickets_descarga).
-      // El material puede variar por viaje; los viajes sin ticket se atribuyen
-      // al material pedido del detalle. Días/Horas van solo en la 1ª fila.
-      if (!esMaterial && rentaDet) {
-        const materialDetalle = rentaDet.material?.material ?? "—";
-        const numViajes = Number(rentaDet.numero_viajes ?? 0);
-        const tickets = [...(vale.tickets_descarga ?? [])].sort(
-          (a, b) => a.numero_ticket - b.numero_ticket,
-        );
-
-        const viajes = [];
-        tickets.forEach((t) => {
-          if (numViajes > 0 && viajes.length >= numViajes) return;
-          viajes.push({
-            numero: t.numero_ticket,
-            material: t.material_ticket?.material ?? materialDetalle,
-            banco: t.banco_descarga ?? "—",
-          });
-        });
-        // Padear los viajes sin ticket con el material del detalle
-        for (let n = viajes.length + 1; n <= numViajes; n++) {
-          viajes.push({ numero: n, material: materialDetalle, banco: "—" });
-        }
-        // Sin viajes registrados: una sola fila resumen
-        if (viajes.length === 0) {
-          viajes.push({ numero: "", material: materialDetalle, banco: "—" });
-        }
-
-        return viajes.map((v, idx) => ({
-          ...identidad,
-          Viaje: v.numero,
-          "Material / Equipo": v.material,
-          Banco: v.banco,
-          Requisición: "—",
-          "Distancia km": "",
-          "m³": "",
-          Toneladas: "",
-          Días: idx === 0 ? dias : "",
-          Horas: idx === 0 ? horas : "",
-          Viajes: 1,
-          "Precio m³": "",
-          "Costo/hr": costoHr,
-          "Costo/día": costoDia,
-          ...resto,
-        }));
-      }
-
-      // Material (y renta sin detalle): una fila por vale, como antes.
-      return [
-        {
-          ...identidad,
-          Viaje: "",
-          "Material / Equipo": vale._material ?? "—",
-          Banco: esMaterial
-            ? (vale.vale_material_detalles?.[0]?.bancos?.banco ?? "—")
-            : "—",
-          Requisición: esMaterial
-            ? (vale.vale_material_detalles?.[0]?.requisicion ?? "—")
-            : "—",
-          "Distancia km": esMaterial
-            ? (vale.vale_material_detalles?.[0]?.distancia_km ?? "")
-            : "",
-          "m³": m3,
-          Toneladas: toneladas,
-          Días: dias,
-          Horas: horas,
-          Viajes: vale._viajes > 0 ? vale._viajes : "",
-          "Precio m³": precioM3,
-          "Costo/hr": costoHr,
-          "Costo/día": costoDia,
-          ...resto,
-        },
-      ];
-    });
-    exportToExcel(
-      filas,
+    exportarValesExcel(
+      valesFiltrados,
       `vales_${filtros.fechaInicio}_${filtros.fechaFin}`,
-      "Vales",
     );
   };
 
@@ -727,7 +579,7 @@ const DashboardUnificado = () => {
             className="du__btn-exportar"
             onClick={handleExportarExcel}
             disabled={loading || valesFiltrados.length === 0}
-            title={`Exportar ${valesFiltrados.length} vales a Excel`}
+            title={`Exportar ${valesFiltrados.length} vales a Excel: una hoja por nivel de detalle (vales, material, renta, viajes)`}
           >
             <Download size={15} />
             Excel

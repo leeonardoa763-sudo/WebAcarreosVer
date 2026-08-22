@@ -57,6 +57,8 @@ src/
     ├── formatters.js
     ├── dateUtils.js
     ├── exportToExcel.js
+    ├── excelFechas.js                # Fechas/horas como serie de Excel (no texto)
+    ├── exportarValesExcel.js         # Export de Vales, normalizado en hojas
     └── conciliaciones/              # Generadores PDF con formato aprobado — no tocar sin ver output
 ```
 
@@ -187,7 +189,24 @@ Excepciones declaradas por la app (ver "Registros fuera de lo normal"): `registr
 | ---- | ------------------ | ---------------------- | -------------------------------------------------- |
 | 1    | Materiales Pétreos | `vale_material_viajes` | `volumen_m3 = peso_ton / peso_especifico`          |
 | 2    | Base Asfáltica     | `vale_material_viajes` | `volumen_m3 = peso_ton / peso_especifico`          |
-| 3    | Tepetate/Corte     | `tickets_material`     | `volumen_real_m3` — **nunca** `cantidad_pedida_m3` |
+| 3    | Tepetate/Corte     | `vale_material_viajes` | `volumen_real_m3` — **nunca** `cantidad_pedida_m3` |
+
+**Los viajes del Tipo 3 también viven en `vale_material_viajes`.** `tickets_material`
+son los tickets físicos impresos (uno por viaje, `folio_ticket = {folio}-NN`,
+cruzables por `numero_ticket = numero_viaje`), no la tabla de viajes. `volumen_real_m3`
+es el total del detalle; el desglose por viaje está en `vale_material_viajes.volumen_m3`.
+El Tipo 3 no captura `peso_ton` por viaje — se mide en volumen.
+
+**El banco se puede cambiar por viaje.** La app (`ModalCambiarBanco`, flujo fijo del
+Tipo 3 sin feature flag) escribe `id_banco_override` / `distancia_km_override` /
+`precio_m3_override` / `costo_viaje_override` en el viaje y recalcula el costo con la
+distancia del banco nuevo. Cualquier lectura de banco, distancia, precio o costo **por
+viaje** debe resolverse como `viaje.*_override ?? detalle.*` — leer el detalle a secas
+reporta el banco con el que se creó el vale, no en el que se cargó. El alias del join es
+`bancos_override` en todo el repo (web y app).
+
+El Tipo 2 es la excepción: 1 vale = 1 viaje capturado en el propio detalle, sin fila en
+`vale_material_viajes`.
 
 ### Fórmulas de precio
 
