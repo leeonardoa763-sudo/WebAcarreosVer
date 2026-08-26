@@ -37,7 +37,8 @@ const PREVIO_SELECT = `
   vale_renta_detalle (
     id_vale_renta_detalle, total_horas, total_dias, costo_total,
     numero_viajes, es_renta_por_dia,
-    material:id_material (id_material, material)
+    material:id_material (id_material, material),
+    vale_renta_viajes (id_viaje)
   )
 `;
 
@@ -146,9 +147,21 @@ const getDistintivosVale = (vale) => ({
   esProgramado: !!vale.es_programado,
 });
 
+// Viajes registrados de un detalle de renta: se prefiere el conteo real de
+// vale_renta_viajes (el ledger, igual que en material); numero_viajes es solo
+// lo declarado al crear el vale y puede no cuadrar con lo realmente
+// registrado (viajes cancelados, agregados después, etc.).
+const getViajesDetalleRenta = (det) =>
+  det.vale_renta_viajes?.length > 0
+    ? det.vale_renta_viajes.length
+    : Number(det.numero_viajes || 0);
+
 const getViajesVale = (vale) => {
   if (vale.tipo_vale === "renta") {
-    return Number(vale.vale_renta_detalle?.[0]?.numero_viajes ?? 0);
+    return (vale.vale_renta_detalle ?? []).reduce(
+      (sum, det) => sum + getViajesDetalleRenta(det),
+      0
+    );
   }
   return (vale.vale_material_detalles ?? []).reduce((sum, det) => {
     const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
@@ -181,12 +194,17 @@ const calcularKpisDeVales = (lista) => {
   for (const vale of lista) {
     if (vale._tipo === "renta") {
       totalRenta++;
-      const d = vale.vale_renta_detalle?.[0];
-      if (d) {
+      // Un vale de renta puede tener más de una fila de detalle (varios
+      // equipos/materiales dentro del mismo vale) — se recorren todas, no
+      // solo la primera, igual que en material.
+      for (const d of vale.vale_renta_detalle ?? []) {
         totalHoras   += Number(d.total_horas || 0);
         totalDias    += Number(d.total_dias  || 0);
         importeTotal += Number(d.costo_total || 0);
-        const numViajes = Number(d.numero_viajes || 0);
+        // Viajes registrados: se prefiere el conteo real de vale_renta_viajes
+        // (el ledger) sobre numero_viajes (lo declarado al crear el vale, que
+        // puede no cuadrar con lo realmente registrado).
+        const numViajes = getViajesDetalleRenta(d);
         totalViajes  += numViajes;
         viajesRenta  += numViajes;
 
@@ -210,16 +228,15 @@ const calcularKpisDeVales = (lista) => {
         }
         // Estimado: capacidad del camión × número de viajes
         const capRenta = Number(vale.vehiculos?.capacidad_m3 ?? 0);
-        m3RentaEstimado += capRenta * Number(d.numero_viajes || 0);
+        m3RentaEstimado += capRenta * numViajes;
         // Eficiencia: horas por viaje si la renta es por hora; días por viaje si es por día
         const horas = Number(d.total_horas || 0);
         const dias  = Number(d.total_dias  || 0);
-        const viajes = Number(d.numero_viajes || 0);
-        if (horas > 0 && viajes > 0) {
-          rentaHrsXViajeSuma += horas / viajes;
+        if (horas > 0 && numViajes > 0) {
+          rentaHrsXViajeSuma += horas / numViajes;
           rentaHrsXViajeCount++;
-        } else if (dias > 0 && viajes > 0) {
-          rentaDiasXViajeSuma += dias / viajes;
+        } else if (dias > 0 && numViajes > 0) {
+          rentaDiasXViajeSuma += dias / numViajes;
           rentaDiasXViajeCount++;
         }
       }

@@ -12,7 +12,7 @@
  */
 
 // 1. React
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 
 // 2. Hooks personalizados
 import { useAuth } from "./useAuth";
@@ -32,9 +32,24 @@ const getWeekKey = (fechaStr) => {
 };
 
 // ── Helper: coincidencia con filtro multi-selección (arreglo vacío = todos) ──
-const matchesFiltro = (filtroArr, value) => {
+// modo "excluir" invierte la coincidencia (NOT IN en vez de IN). Con arreglo
+// vacío nunca filtra, sin importar el modo (excluir nada equivale a no filtrar).
+const matchesFiltro = (filtroArr, value, modo = "incluir") => {
   if (!filtroArr || filtroArr.length === 0) return true;
-  return filtroArr.some((v) => String(v) === String(value));
+  const coincide = filtroArr.some((v) => String(v) === String(value));
+  return modo === "excluir" ? !coincide : coincide;
+};
+
+// ── Helper: comparación de fecha (YYYY-MM-DD, zona CDMX) contra rango ──────
+const fechaEnRango = (fechaStr, desde, hasta) => {
+  if (!fechaStr) return false;
+  if (!desde && !hasta) return true;
+  const fechaDia = new Date(fechaStr).toLocaleDateString("en-CA", {
+    timeZone: "America/Mexico_City",
+  });
+  if (desde && fechaDia < desde) return false;
+  if (hasta && fechaDia > hasta) return false;
+  return true;
 };
 
 // ── Agregación de material por obra desde vales reales (tabla `vales`) ──────
@@ -42,7 +57,7 @@ const matchesFiltro = (filtroArr, value) => {
 // nivel detalle. Tipo 3 (corte) toma volumen_real_m3 y cuenta tickets; el resto
 // suma volumen de vale_material_viajes, y si no hay viajes (Tipo 2 asfáltico o
 // vale recién emitido) usa volumen_real_m3 y, en su defecto, cantidad_pedida_m3.
-const agregarObraMaterialReal = (valesMaterial, filtroMaterial, filtroBanco) => {
+const agregarObraMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, modoMaterial = "incluir", modoBanco = "incluir") => {
   const obraMap = {};
   valesMaterial.forEach((vale) => {
     const obraId = vale.obras?.id_obra;
@@ -61,8 +76,8 @@ const agregarObraMaterialReal = (valesMaterial, filtroMaterial, filtroBanco) => 
       const nombreMat = det.material?.material || "Sin clasificar";
       const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
 
-      if (!matchesFiltro(filtroMaterial, nombreMat)) return;
-      if (!matchesFiltro(filtroBanco, det.id_banco)) return;
+      if (!matchesFiltro(filtroMaterial, nombreMat, modoMaterial)) return;
+      if (!matchesFiltro(filtroBanco, det.id_banco, modoBanco)) return;
 
       if (!obraMap[obraId].matMap[nombreMat]) {
         obraMap[obraId].matMap[nombreMat] = {
@@ -137,6 +152,19 @@ const agregarObraRentaReal = (valesRenta) => {
   return Object.values(obraMap).sort((a, b) => b.subtotalSinIva - a.subtotalSinIva);
 };
 
+// ── Precio por viaje / m³ aprox. de renta a partir de capacidad del vehículo ──
+// No existe m³ ni costo por viaje capturado en BD para renta, se deriva de
+// capacidad_m3 (vehículo) × viajes (mismo criterio que tablaViajesRentaPorEquipo).
+const derivarPrecioRenta = ({ capacidadSuma, capacidadCount, importeTotal, viajes }) => {
+  const capacidadPromedio = capacidadCount > 0 ? capacidadSuma / capacidadCount : null;
+  const precioPorViaje = viajes > 0 ? importeTotal / viajes : null;
+  return {
+    capacidadPromedio,
+    precioPorViaje,
+    precioAproxM3: precioPorViaje != null && capacidadPromedio ? precioPorViaje / capacidadPromedio : null,
+  };
+};
+
 export const useEstadisticasGlobales = () => {
   // Detectar perfil de usuario
   const { userProfile } = useAuth();
@@ -145,7 +173,11 @@ export const useEstadisticasGlobales = () => {
   const idObrasAsignadas = userProfile?.id_obras_asignadas || [];
 
   // 1. Estados base
-  const [loading, setLoading] = useState(true);
+  // Carga perezosa: nada se pide al montar la página — cada dominio se marca
+  // "cargado" la primera vez que alguna sección que lo necesita se despliega
+  // (ver garantizarEstadisticas/garantizarTiempoReal/garantizarPresupuestos).
+  const [loading, setLoading] = useState(false);
+  const [estadisticasCargadas, setEstadisticasCargadas] = useState(false);
   const [error, setError] = useState(null);
   const [rawConciliaciones, setRawConciliaciones] = useState([]);
   const [rawVales, setRawVales] = useState([]);
@@ -156,15 +188,23 @@ export const useEstadisticasGlobales = () => {
   // Estados de presupuesto
   const [presupuestosMaterial, setPresupuestosMaterial] = useState([]);
   const [presupuestosRenta,    setPresupuestosRenta]    = useState([]);
-  const [loadingPresupuestos,  setLoadingPresupuestos]  = useState(true);
+  const [loadingPresupuestos,  setLoadingPresupuestos]  = useState(false);
+  const [presupuestosCargados, setPresupuestosCargados] = useState(false);
 
   // Estados del desglose por obra en tiempo real (directo de vales, sin conciliaciones)
   const [rawValesTiempoReal, setRawValesTiempoReal] = useState([]);
-  const [loadingTiempoReal,  setLoadingTiempoReal]  = useState(true);
+  const [loadingTiempoReal,  setLoadingTiempoReal]  = useState(false);
+  const [tiempoRealCargado,  setTiempoRealCargado]  = useState(false);
   const [errorTiempoReal,    setErrorTiempoReal]    = useState(null);
-  // Periodo local de esta sección: "hoy" (default) | "ayer" | "semana"
+  // Periodo local de esta sección: "hoy" (default) | "ayer" | "semana" | "rango"
   const [periodoTiempoReal, setPeriodoTiempoReal] = useState("hoy");
   const [semanaTiempoReal,  setSemanaTiempoReal]  = useState(() => getWeekKey(new Date().toISOString()));
+  const [rangoTiempoRealDesde, setRangoTiempoRealDesde] = useState(null);
+  const [rangoTiempoRealHasta, setRangoTiempoRealHasta] = useState(null);
+
+  // Rango de fechas opcional para "Volumen Acumulado" (histórico por defecto)
+  const [rangoAcumuladoDesde, setRangoAcumuladoDesde] = useState(null);
+  const [rangoAcumuladoHasta, setRangoAcumuladoHasta] = useState(null);
 
   // 2. Estado de filtros
   const [filtros, setFiltrosState] = useState({
@@ -175,6 +215,17 @@ export const useEstadisticasGlobales = () => {
     idSindicato: [],
     material: [],
     idBanco: [],
+  });
+
+  // 2b. Modo por categoría: "incluir" (IN, por defecto) o "excluir" (NOT IN)
+  const [modosFiltro, setModosFiltro] = useState({
+    mes: "incluir",
+    semana: "incluir",
+    idObra: "incluir",
+    idEmpresa: "incluir",
+    idSindicato: "incluir",
+    material: "incluir",
+    idBanco: "incluir",
   });
 
   // 3. Fetch principal
@@ -295,6 +346,7 @@ export const useEstadisticasGlobales = () => {
             .select(`
               id_vale, id_obra, id_empresa,
               obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa)),
+              vehiculos:id_vehiculo (id_vehiculo, capacidad_m3),
               vale_renta_detalle (
                 id_vale_renta_detalle, hora_inicio, total_horas, total_dias, numero_viajes, costo_total,
                 material:id_material (id_material, material),
@@ -313,6 +365,7 @@ export const useEstadisticasGlobales = () => {
         setValeRentaAConciliacion({});
       }
 
+      setEstadisticasCargadas(true);
     } catch (err) {
       console.error("Error en fetchEstadisticas:", err);
       setError(err.message);
@@ -321,8 +374,13 @@ export const useEstadisticasGlobales = () => {
     }
   }, [esResidente, idObrasAsignadas]);
 
-  // 4. Effect inicial
-  useEffect(() => { fetchEstadisticas(); }, [fetchEstadisticas]);
+  // 4. Carga perezosa: solo dispara la consulta la primera vez que alguna
+  // sección que la necesita se despliega. Ignora llamadas repetidas mientras
+  // ya está cargada o en curso.
+  const garantizarEstadisticas = useCallback(() => {
+    if (estadisticasCargadas || loading) return Promise.resolve();
+    return fetchEstadisticas();
+  }, [estadisticasCargadas, loading, fetchEstadisticas]);
 
   // 5. Fetch presupuestos (independiente de conciliaciones)
   const fetchPresupuestos = useCallback(async () => {
@@ -362,6 +420,7 @@ export const useEstadisticasGlobales = () => {
       if (eRenta) throw eRenta;
       setPresupuestosMaterial(pMat || []);
       setPresupuestosRenta(pRenta || []);
+      setPresupuestosCargados(true);
     } catch (err) {
       console.error("Error en fetchPresupuestos:", err);
     } finally {
@@ -369,7 +428,10 @@ export const useEstadisticasGlobales = () => {
     }
   }, [esResidente, idObrasAsignadas]);
 
-  useEffect(() => { fetchPresupuestos(); }, []);
+  const garantizarPresupuestos = useCallback(() => {
+    if (presupuestosCargados || loadingPresupuestos) return Promise.resolve();
+    return fetchPresupuestos();
+  }, [presupuestosCargados, loadingPresupuestos, fetchPresupuestos]);
 
   // ── Fetch independiente: vales en tiempo real para "Desglose por Obra" ──
   // No pasa por conciliaciones/conciliacion_vales. Incluye vales aún no
@@ -383,8 +445,9 @@ export const useEstadisticasGlobales = () => {
       let queryValesTR = supabase
         .from("vales")
         .select(`
-          id_vale, tipo_vale, estado, fecha_creacion, id_obra, id_empresa,
+          id_vale, tipo_vale, estado, fecha_creacion, id_obra, id_empresa, id_vehiculo,
           obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa)),
+          vehiculos:id_vehiculo (id_vehiculo, capacidad_m3),
           operadores:id_operador (id_operador, id_sindicato),
           vale_material_detalles (
             id_detalle_material, volumen_real_m3, cantidad_pedida_m3, costo_total, id_banco,
@@ -413,6 +476,7 @@ export const useEstadisticasGlobales = () => {
 
       if (error) throw error;
       setRawValesTiempoReal(data || []);
+      setTiempoRealCargado(true);
     } catch (err) {
       console.error("Error en fetchValesTiempoReal:", err);
       setErrorTiempoReal(err.message);
@@ -422,7 +486,10 @@ export const useEstadisticasGlobales = () => {
     }
   }, [esResidente, idObrasAsignadas]);
 
-  useEffect(() => { fetchValesTiempoReal(); }, [fetchValesTiempoReal]);
+  const garantizarTiempoReal = useCallback(() => {
+    if (tiempoRealCargado || loadingTiempoReal) return Promise.resolve();
+    return fetchValesTiempoReal();
+  }, [tiempoRealCargado, loadingTiempoReal, fetchValesTiempoReal]);
 
   const seleccionarPeriodoTiempoReal = useCallback((periodo) => {
     setPeriodoTiempoReal(periodo);
@@ -465,11 +532,14 @@ export const useEstadisticasGlobales = () => {
   const opcionesObras = useMemo(() => {
     const map = {};
     rawVales.forEach((v) => {
-      if (v.obras) map[v.obras.id_obra] = v.obras.obra;
+      if (v.obras) map[v.obras.id_obra] = { obra: v.obras.obra, cc: v.obras.cc ?? null };
     });
     return Object.entries(map)
-      .map(([id, nombre]) => ({ id, nombre }))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+      .map(([id, { obra, cc }]) => ({
+        id,
+        nombre: cc != null ? `CC ${cc} · ${obra}` : obra,
+      }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { numeric: true }));
   }, [rawVales]);
 
   const opcionesEmpresas = useMemo(() => {
@@ -520,26 +590,26 @@ export const useEstadisticasGlobales = () => {
       if (vale.id_obra === 14 || Number(vale.id_empresa) === 4) return false;
       const conc = valeAConciliacion[vale.id_vale];
 
-      if (!matchesFiltro(filtros.mes, conc?.fecha_generacion?.substring(0, 7))) return false;
-      if (!matchesFiltro(filtros.semana, getWeekKey(conc?.fecha_generacion))) return false;
-      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
-      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
-      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato)) return false;
+      if (!matchesFiltro(filtros.mes, conc?.fecha_generacion?.substring(0, 7), modosFiltro.mes)) return false;
+      if (!matchesFiltro(filtros.semana, getWeekKey(conc?.fecha_generacion), modosFiltro.semana)) return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra, modosFiltro.idObra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa, modosFiltro.idEmpresa)) return false;
+      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato, modosFiltro.idSindicato)) return false;
 
       return true;
     });
-  }, [rawVales, filtros, valeAConciliacion]);
+  }, [rawVales, filtros, modosFiltro, valeAConciliacion]);
 
   // ── Función de agregación (reutilizable) ───────────────────────────
-  const agregarPorMaterial = useCallback((vales, filtroMaterial, filtroBanco) => {
+  const agregarPorMaterial = useCallback((vales, filtroMaterial, filtroBanco, modoMaterial = "incluir", modoBanco = "incluir") => {
     const stats = {};
     vales.forEach((vale) => {
       (vale.vale_material_detalles || []).forEach((det) => {
         const nombre = det.material?.material || "Sin clasificar";
         const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
 
-        if (!matchesFiltro(filtroMaterial, nombre)) return;
-        if (!matchesFiltro(filtroBanco, det.id_banco)) return;
+        if (!matchesFiltro(filtroMaterial, nombre, modoMaterial)) return;
+        if (!matchesFiltro(filtroBanco, det.id_banco, modoBanco)) return;
 
         if (!stats[nombre]) {
           stats[nombre] = { material: nombre, m3Total: 0, valesIds: new Set(), totalViajes: 0, importeIVA: 0 };
@@ -572,18 +642,18 @@ export const useEstadisticasGlobales = () => {
 
   // ── Tabla material filtrada ─────────────────────────────────────────
   const tablaMaterial = useMemo(
-    () => agregarPorMaterial(valesFiltrados, filtros.material, filtros.idBanco),
-    [valesFiltrados, filtros.material, filtros.idBanco, agregarPorMaterial]
+    () => agregarPorMaterial(valesFiltrados, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco),
+    [valesFiltrados, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco, agregarPorMaterial]
   );
 
   // ── Resumen KPIs ────────────────────────────────────────────────────
   const resumen = useMemo(() => {
     let concsFiltradas = rawConciliaciones.filter((c) => c.id_obra !== 14 && Number(c.id_empresa) !== 4);
-    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.mes, c.fecha_generacion?.substring(0, 7)));
-    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.semana, getWeekKey(c.fecha_generacion)));
-    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idObra, c.id_obra));
-    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idEmpresa, c.id_empresa));
-    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idSindicato, c.id_sindicato));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.mes, c.fecha_generacion?.substring(0, 7), modosFiltro.mes));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.semana, getWeekKey(c.fecha_generacion), modosFiltro.semana));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idObra, c.id_obra, modosFiltro.idObra));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idEmpresa, c.id_empresa, modosFiltro.idEmpresa));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idSindicato, c.id_sindicato, modosFiltro.idSindicato));
 
     let totalHorasRenta = 0;
     let totalDiasRenta = 0;
@@ -611,6 +681,11 @@ export const useEstadisticasGlobales = () => {
     filtros.idObra,
     filtros.idEmpresa,
     filtros.idSindicato,
+    modosFiltro.mes,
+    modosFiltro.semana,
+    modosFiltro.idObra,
+    modosFiltro.idEmpresa,
+    modosFiltro.idSindicato,
     tablaMaterial,
   ]);
 
@@ -626,9 +701,9 @@ export const useEstadisticasGlobales = () => {
   // ── Series de tiempo (gráfica) ─ respeta filtros excepto mes/semana ─
   const seriesTiempo = useMemo(() => {
     const valesSinTiempo = rawVales.filter((vale) => {
-      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
-      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
-      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato)) return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra, modosFiltro.idObra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa, modosFiltro.idEmpresa)) return false;
+      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato, modosFiltro.idSindicato)) return false;
       return true;
     });
 
@@ -644,8 +719,8 @@ export const useEstadisticasGlobales = () => {
         const mat = det.material?.material || "Sin clasificar";
         const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
 
-        if (!matchesFiltro(filtros.material, mat)) return;
-        if (!matchesFiltro(filtros.idBanco, det.id_banco)) return;
+        if (!matchesFiltro(filtros.material, mat, modosFiltro.material)) return;
+        if (!matchesFiltro(filtros.idBanco, det.id_banco, modosFiltro.idBanco)) return;
 
         let m3 = 0;
         if (tipoId === 3) {
@@ -675,7 +750,7 @@ export const useEstadisticasGlobales = () => {
     });
 
     return { data, materiales: topMateriales };
-  }, [rawVales, filtros, valeAConciliacion]);
+  }, [rawVales, filtros, modosFiltro, valeAConciliacion]);
 
   // ── Helper: nombre completo de persona ─────────────────────────────
   const nombrePersona = (p) => p ? `${p.nombre || ""} ${p.primer_apellido || ""}`.trim() : "Sin nombre";
@@ -683,10 +758,10 @@ export const useEstadisticasGlobales = () => {
   // ── Helper: filtra detalles por material/banco activos ─────────────
   const detsFiltrados = useCallback((detalles) =>
     (detalles || []).filter((det) => {
-      if (!matchesFiltro(filtros.material, det.material?.material)) return false;
-      if (!matchesFiltro(filtros.idBanco, det.id_banco)) return false;
+      if (!matchesFiltro(filtros.material, det.material?.material, modosFiltro.material)) return false;
+      if (!matchesFiltro(filtros.idBanco, det.id_banco, modosFiltro.idBanco)) return false;
       return true;
-    }), [filtros.material, filtros.idBanco]);
+    }), [filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco]);
 
   // ── Top Residentes (creadores de vales) ────────────────────────────
   const topResidentes = useMemo(() => {
@@ -828,8 +903,8 @@ export const useEstadisticasGlobales = () => {
         const nombreMat = det.material?.material || "Sin clasificar";
         const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
 
-        if (!matchesFiltro(filtros.material, nombreMat)) return;
-        if (!matchesFiltro(filtros.idBanco, det.id_banco)) return;
+        if (!matchesFiltro(filtros.material, nombreMat, modosFiltro.material)) return;
+        if (!matchesFiltro(filtros.idBanco, det.id_banco, modosFiltro.idBanco)) return;
 
         if (!obraMap[obraId].matMap[nombreMat]) {
           obraMap[obraId].matMap[nombreMat] = {
@@ -877,7 +952,7 @@ export const useEstadisticasGlobales = () => {
         return { obra, cc, empresa, materiales, subtotal };
       })
       .sort((a, b) => b.subtotal.m3Total - a.subtotal.m3Total);
-  }, [valesFiltrados, filtros.material, filtros.idBanco]);
+  }, [valesFiltrados, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco]);
 
   // ── Desglose por obra en TIEMPO REAL (directo de vales, sin conciliaciones) ──
   // Usa fecha_creacion del vale (no fecha_generacion de conciliación). El periodo
@@ -896,13 +971,14 @@ export const useEstadisticasGlobales = () => {
       if (periodoTiempoReal === "hoy" && fechaValeStr !== hoyStr) return false;
       if (periodoTiempoReal === "ayer" && fechaValeStr !== ayerStr) return false;
       if (periodoTiempoReal === "semana" && getWeekKey(vale.fecha_creacion) !== semanaTiempoReal) return false;
+      if (periodoTiempoReal === "rango" && !fechaEnRango(vale.fecha_creacion, rangoTiempoRealDesde, rangoTiempoRealHasta)) return false;
 
-      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
-      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
-      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato)) return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra, modosFiltro.idObra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa, modosFiltro.idEmpresa)) return false;
+      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato, modosFiltro.idSindicato)) return false;
       return true;
     });
-  }, [rawValesTiempoReal, filtros, periodoTiempoReal, semanaTiempoReal]);
+  }, [rawValesTiempoReal, filtros, modosFiltro, periodoTiempoReal, semanaTiempoReal, rangoTiempoRealDesde, rangoTiempoRealHasta]);
 
   const valesTiempoRealMaterial = useMemo(
     () => valesTiempoRealFiltrados.filter((v) => v.tipo_vale === "material"),
@@ -937,8 +1013,8 @@ export const useEstadisticasGlobales = () => {
         const nombreMat = det.material?.material || "Sin clasificar";
         const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
 
-        if (!matchesFiltro(filtros.material, nombreMat)) return;
-        if (!matchesFiltro(filtros.idBanco, det.id_banco)) return;
+        if (!matchesFiltro(filtros.material, nombreMat, modosFiltro.material)) return;
+        if (!matchesFiltro(filtros.idBanco, det.id_banco, modosFiltro.idBanco)) return;
 
         if (!obraMap[obraId].matMap[nombreMat]) {
           obraMap[obraId].matMap[nombreMat] = {
@@ -992,7 +1068,7 @@ export const useEstadisticasGlobales = () => {
         return { obra, cc, empresa, materiales, subtotal };
       })
       .sort((a, b) => b.subtotal.m3Total - a.subtotal.m3Total);
-  }, [valesTiempoRealMaterial, filtros.material, filtros.idBanco]);
+  }, [valesTiempoRealMaterial, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco]);
 
   // ── Tabla renta agrupada por obra (tiempo real) ─────────────────────
   // Importe SIN IVA ni retención: la retención 4% solo se calcula a nivel
@@ -1008,6 +1084,7 @@ export const useEstadisticasGlobales = () => {
           cc: vale.obras?.cc ?? null,
           empresa: vale.obras?.empresas?.empresa || null,
           vales: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, subtotalSinIva: 0,
+          capacidadSuma: 0, capacidadCount: 0,
         };
       }
       const o = obraMap[obraId];
@@ -1019,9 +1096,23 @@ export const useEstadisticasGlobales = () => {
         o.totalDias  += Number(det.total_dias  || 0);
         o.totalHoras += Number(det.total_horas || 0);
         o.subtotalSinIva += Number(det.costo_total || 0);
+        if (vale.vehiculos?.capacidad_m3 != null) {
+          o.capacidadSuma += Number(vale.vehiculos.capacidad_m3);
+          o.capacidadCount += 1;
+        }
       });
     });
-    return Object.values(obraMap).sort((a, b) => b.subtotalSinIva - a.subtotalSinIva);
+    return Object.values(obraMap)
+      .map((row) => ({
+        ...row,
+        ...derivarPrecioRenta({
+          capacidadSuma: row.capacidadSuma,
+          capacidadCount: row.capacidadCount,
+          importeTotal: row.subtotalSinIva,
+          viajes: row.totalViajes,
+        }),
+      }))
+      .sort((a, b) => b.subtotalSinIva - a.subtotalSinIva);
   }, [valesTiempoRealRenta]);
 
   // ── Vales acumulados (histórico total, sin filtro de periodo) ───────
@@ -1031,23 +1122,25 @@ export const useEstadisticasGlobales = () => {
   const valesAcumuladoMaterial = useMemo(
     () => rawValesTiempoReal.filter((vale) => {
       if (vale.tipo_vale !== "material") return false;
-      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
-      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
-      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato)) return false;
+      if (!fechaEnRango(vale.fecha_creacion, rangoAcumuladoDesde, rangoAcumuladoHasta)) return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra, modosFiltro.idObra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa, modosFiltro.idEmpresa)) return false;
+      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato, modosFiltro.idSindicato)) return false;
       return true;
     }),
-    [rawValesTiempoReal, filtros]
+    [rawValesTiempoReal, filtros, modosFiltro, rangoAcumuladoDesde, rangoAcumuladoHasta]
   );
 
   const valesAcumuladoRenta = useMemo(
     () => rawValesTiempoReal.filter((vale) => {
       if (vale.tipo_vale !== "renta") return false;
-      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
-      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
-      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato)) return false;
+      if (!fechaEnRango(vale.fecha_creacion, rangoAcumuladoDesde, rangoAcumuladoHasta)) return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra, modosFiltro.idObra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa, modosFiltro.idEmpresa)) return false;
+      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato, modosFiltro.idSindicato)) return false;
       return true;
     }),
-    [rawValesTiempoReal, filtros]
+    [rawValesTiempoReal, filtros, modosFiltro, rangoAcumuladoDesde, rangoAcumuladoHasta]
   );
 
   // ── Mapa: id_conciliacion (renta) → total de viajes ─────────────────
@@ -1067,16 +1160,34 @@ export const useEstadisticasGlobales = () => {
     return map;
   }, [rawValesRenta, valeRentaAConciliacion]);
 
+  // ── Mapa: id_conciliacion (renta) → suma/conteo de capacidad_m3 del vehículo ──
+  const capacidadPorConciliacionRenta = useMemo(() => {
+    const map = {};
+    rawValesRenta.forEach((vale) => {
+      const conc = valeRentaAConciliacion[vale.id_vale];
+      if (!conc) return;
+      if (!map[conc.id_conciliacion]) map[conc.id_conciliacion] = { capacidadSuma: 0, capacidadCount: 0 };
+      const m = map[conc.id_conciliacion];
+      (vale.vale_renta_detalle || []).forEach(() => {
+        if (vale.vehiculos?.capacidad_m3 != null) {
+          m.capacidadSuma += Number(vale.vehiculos.capacidad_m3);
+          m.capacidadCount += 1;
+        }
+      });
+    });
+    return map;
+  }, [rawValesRenta, valeRentaAConciliacion]);
+
   // ── Tabla renta agrupada por obra ───────────────────────────────────
   const tablaRentaPorObra = useMemo(() => {
     let concsFiltradas = rawConciliaciones.filter(
       (c) => c.tipo_conciliacion === "renta" && c.id_obra !== 14 && Number(c.id_empresa) !== 4
     );
-    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.mes, c.fecha_generacion?.substring(0, 7)));
-    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.semana, getWeekKey(c.fecha_generacion)));
-    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idObra, c.id_obra));
-    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idEmpresa, c.id_empresa));
-    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idSindicato, c.id_sindicato));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.mes, c.fecha_generacion?.substring(0, 7), modosFiltro.mes));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.semana, getWeekKey(c.fecha_generacion), modosFiltro.semana));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idObra, c.id_obra, modosFiltro.idObra));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idEmpresa, c.id_empresa, modosFiltro.idEmpresa));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idSindicato, c.id_sindicato, modosFiltro.idSindicato));
 
     const map = {};
     concsFiltradas.forEach((c) => {
@@ -1092,6 +1203,8 @@ export const useEstadisticasGlobales = () => {
           totalDias: 0,
           totalHoras: 0,
           importeTotal: 0,
+          capacidadSuma: 0,
+          capacidadCount: 0,
           conciliacionesArr: [],
         };
       }
@@ -1100,32 +1213,47 @@ export const useEstadisticasGlobales = () => {
       map[obraId].totalDias  += Number(c.total_dias  || 0);
       map[obraId].totalHoras += Number(c.total_horas || 0);
       map[obraId].importeTotal += Number(c.total_final || 0);
+      const cap = capacidadPorConciliacionRenta[c.id_conciliacion];
+      if (cap) {
+        map[obraId].capacidadSuma += cap.capacidadSuma;
+        map[obraId].capacidadCount += cap.capacidadCount;
+      }
       map[obraId].conciliacionesArr.push(c);
     });
 
-    return Object.values(map).sort((a, b) => b.importeTotal - a.importeTotal);
-  }, [rawConciliaciones, filtros, viajesPorConciliacionRenta]);
+    return Object.values(map)
+      .map((row) => ({
+        ...row,
+        ...derivarPrecioRenta({
+          capacidadSuma: row.capacidadSuma,
+          capacidadCount: row.capacidadCount,
+          importeTotal: row.importeTotal,
+          viajes: row.totalViajes,
+        }),
+      }))
+      .sort((a, b) => b.importeTotal - a.importeTotal);
+  }, [rawConciliaciones, filtros, modosFiltro, viajesPorConciliacionRenta, capacidadPorConciliacionRenta]);
 
   // ── Presupuestos filtrados ─────────────────────────────────────────
   const presupuestosMaterialFiltrados = useMemo(
     () => presupuestosMaterial.filter(
       (p) =>
-        matchesFiltro(filtros.idObra, p.id_obra) &&
-        matchesFiltro(filtros.idEmpresa, p.obras?.empresas?.id_empresa) &&
-        matchesFiltro(filtros.material, p.material?.material) &&
+        matchesFiltro(filtros.idObra, p.id_obra, modosFiltro.idObra) &&
+        matchesFiltro(filtros.idEmpresa, p.obras?.empresas?.id_empresa, modosFiltro.idEmpresa) &&
+        matchesFiltro(filtros.material, p.material?.material, modosFiltro.material) &&
         Number(p.obras?.empresas?.id_empresa) !== 4
     ),
-    [presupuestosMaterial, filtros.idObra, filtros.idEmpresa, filtros.material]
+    [presupuestosMaterial, filtros.idObra, filtros.idEmpresa, filtros.material, modosFiltro.idObra, modosFiltro.idEmpresa, modosFiltro.material]
   );
 
   const presupuestosRentaFiltrados = useMemo(
     () => presupuestosRenta.filter(
       (p) =>
-        matchesFiltro(filtros.idObra, p.id_obra) &&
-        matchesFiltro(filtros.idEmpresa, p.obras?.empresas?.id_empresa) &&
+        matchesFiltro(filtros.idObra, p.id_obra, modosFiltro.idObra) &&
+        matchesFiltro(filtros.idEmpresa, p.obras?.empresas?.id_empresa, modosFiltro.idEmpresa) &&
         Number(p.obras?.empresas?.id_empresa) !== 4
     ),
-    [presupuestosRenta, filtros.idObra, filtros.idEmpresa]
+    [presupuestosRenta, filtros.idObra, filtros.idEmpresa, modosFiltro.idObra, modosFiltro.idEmpresa]
   );
 
   // ── Mapas de presupuesto para cruce O(1) con el acumulado histórico ──
@@ -1169,8 +1297,8 @@ export const useEstadisticasGlobales = () => {
         const idMaterial = det.material?.id_material ?? null;
         const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
 
-        if (!matchesFiltro(filtros.material, nombreMat)) return;
-        if (!matchesFiltro(filtros.idBanco, det.id_banco)) return;
+        if (!matchesFiltro(filtros.material, nombreMat, modosFiltro.material)) return;
+        if (!matchesFiltro(filtros.idBanco, det.id_banco, modosFiltro.idBanco)) return;
 
         if (!obraMap[obraId].matMap[nombreMat]) {
           obraMap[obraId].matMap[nombreMat] = {
@@ -1233,7 +1361,7 @@ export const useEstadisticasGlobales = () => {
         return { obra, cc, empresa, materiales, subtotal };
       })
       .sort((a, b) => b.subtotal.m3Total - a.subtotal.m3Total);
-  }, [valesAcumuladoMaterial, filtros.material, filtros.idBanco, presupuestoMaterialMap]);
+  }, [valesAcumuladoMaterial, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco, presupuestoMaterialMap]);
 
   // ── Tabla renta agrupada por obra (acumulado histórico) ────────────
   // Importe SIN IVA ni retención, igual que tablaObraRentaTiempoReal.
@@ -1248,6 +1376,7 @@ export const useEstadisticasGlobales = () => {
           cc: vale.obras?.cc ?? null,
           empresa: vale.obras?.empresas?.empresa || null,
           vales: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, subtotalSinIva: 0,
+          capacidadSuma: 0, capacidadCount: 0,
         };
       }
       const o = obraMap[obraId];
@@ -1259,6 +1388,10 @@ export const useEstadisticasGlobales = () => {
         o.totalDias  += Number(det.total_dias  || 0);
         o.totalHoras += Number(det.total_horas || 0);
         o.subtotalSinIva += Number(det.costo_total || 0);
+        if (vale.vehiculos?.capacidad_m3 != null) {
+          o.capacidadSuma += Number(vale.vehiculos.capacidad_m3);
+          o.capacidadCount += 1;
+        }
       });
     });
     return Object.entries(obraMap)
@@ -1268,6 +1401,12 @@ export const useEstadisticasGlobales = () => {
           ...row,
           montoPresupuestado,
           pctPresupuesto: montoPresupuestado ? (row.subtotalSinIva / montoPresupuestado) * 100 : null,
+          ...derivarPrecioRenta({
+            capacidadSuma: row.capacidadSuma,
+            capacidadCount: row.capacidadCount,
+            importeTotal: row.subtotalSinIva,
+            viajes: row.totalViajes,
+          }),
         };
       })
       .sort((a, b) => b.subtotalSinIva - a.subtotalSinIva);
@@ -1280,14 +1419,14 @@ export const useEstadisticasGlobales = () => {
   const valesReporteFiltrados = useMemo(
     () =>
       rawValesTiempoReal.filter((vale) => {
-        if (!matchesFiltro(filtros.mes, vale.fecha_creacion?.substring(0, 7))) return false;
-        if (!matchesFiltro(filtros.semana, getWeekKey(vale.fecha_creacion))) return false;
-        if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
-        if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
-        if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato)) return false;
+        if (!matchesFiltro(filtros.mes, vale.fecha_creacion?.substring(0, 7), modosFiltro.mes)) return false;
+        if (!matchesFiltro(filtros.semana, getWeekKey(vale.fecha_creacion), modosFiltro.semana)) return false;
+        if (!matchesFiltro(filtros.idObra, vale.id_obra, modosFiltro.idObra)) return false;
+        if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa, modosFiltro.idEmpresa)) return false;
+        if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato, modosFiltro.idSindicato)) return false;
         return true;
       }),
-    [rawValesTiempoReal, filtros]
+    [rawValesTiempoReal, filtros, modosFiltro]
   );
 
   const tablaObraMaterialReporte = useMemo(
@@ -1295,9 +1434,11 @@ export const useEstadisticasGlobales = () => {
       agregarObraMaterialReal(
         valesReporteFiltrados.filter((v) => v.tipo_vale === "material"),
         filtros.material,
-        filtros.idBanco
+        filtros.idBanco,
+        modosFiltro.material,
+        modosFiltro.idBanco
       ),
-    [valesReporteFiltrados, filtros.material, filtros.idBanco]
+    [valesReporteFiltrados, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco]
   );
 
   const tablaObraRentaReporte = useMemo(
@@ -1325,8 +1466,8 @@ export const useEstadisticasGlobales = () => {
   // Ignora filtro mes/semana para mostrar la evolución histórica completa
   const seriesTiempoRenta = useMemo(() => {
     const valesFilt = rawValesRenta.filter((vale) => {
-      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
-      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra, modosFiltro.idObra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa, modosFiltro.idEmpresa)) return false;
       return true;
     });
 
@@ -1338,7 +1479,7 @@ export const useEstadisticasGlobales = () => {
       if (!conc?.fecha_generacion) return;
       // El sindicato de un vale de renta vive en la conciliación (rawValesRenta
       // no trae operador); sin esto el filtro Sindicato no afecta esta gráfica.
-      if (!matchesFiltro(filtros.idSindicato, conc?.id_sindicato)) return;
+      if (!matchesFiltro(filtros.idSindicato, conc?.id_sindicato, modosFiltro.idSindicato)) return;
       const mes = conc.fecha_generacion.substring(0, 7);
 
       (vale.vale_renta_detalle || []).forEach((det) => {
@@ -1366,19 +1507,19 @@ export const useEstadisticasGlobales = () => {
     });
 
     return { data, equipos };
-  }, [rawValesRenta, valeRentaAConciliacion, filtros.idObra, filtros.idEmpresa, filtros.idSindicato]);
+  }, [rawValesRenta, valeRentaAConciliacion, filtros.idObra, filtros.idEmpresa, filtros.idSindicato, modosFiltro.idObra, modosFiltro.idEmpresa, modosFiltro.idSindicato]);
 
   // ── Tabla viajes de renta agrupada por obra → equipo (respeta todos los filtros) ──
   const tablaViajesRentaPorEquipo = useMemo(() => {
     const valesFilt = rawValesRenta.filter((vale) => {
       if (vale.id_obra === 14 || Number(vale.id_empresa) === 4) return false;
       const conc = valeRentaAConciliacion[vale.id_vale];
-      if (!matchesFiltro(filtros.mes, conc?.fecha_generacion?.substring(0, 7))) return false;
-      if (!matchesFiltro(filtros.semana, getWeekKey(conc?.fecha_generacion))) return false;
-      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
-      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
+      if (!matchesFiltro(filtros.mes, conc?.fecha_generacion?.substring(0, 7), modosFiltro.mes)) return false;
+      if (!matchesFiltro(filtros.semana, getWeekKey(conc?.fecha_generacion), modosFiltro.semana)) return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra, modosFiltro.idObra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa, modosFiltro.idEmpresa)) return false;
       // Sindicato desde la conciliación (rawValesRenta no trae operador).
-      if (!matchesFiltro(filtros.idSindicato, conc?.id_sindicato)) return false;
+      if (!matchesFiltro(filtros.idSindicato, conc?.id_sindicato, modosFiltro.idSindicato)) return false;
       return true;
     });
 
@@ -1394,28 +1535,69 @@ export const useEstadisticasGlobales = () => {
       (vale.vale_renta_detalle || []).forEach((det) => {
         const equipo = det.material?.material || "Sin clasificar";
         if (!obraMap[obraId].equipos[equipo]) {
-          obraMap[obraId].equipos[equipo] = { equipo, viajes: 0, totalDias: 0, totalHoras: 0 };
+          obraMap[obraId].equipos[equipo] = {
+            equipo, viajes: 0, totalDias: 0, totalHoras: 0,
+            importeTotal: 0, capacidadSuma: 0, capacidadCount: 0,
+          };
         }
         const s = obraMap[obraId].equipos[equipo];
+        // Viajes registrados: se prefiere el conteo real de vale_renta_viajes
+        // (el ledger, igual que en material); numero_viajes es solo lo
+        // declarado al crear el vale y puede no cuadrar con lo registrado.
         s.viajes += det.vale_renta_viajes?.length > 0
           ? det.vale_renta_viajes.length
           : (det.numero_viajes || 1);
         s.totalDias  += Number(det.total_dias  || 0);
         s.totalHoras += Number(det.total_horas || 0);
+        s.importeTotal += Number(det.costo_total || 0);
+        // La capacidad depende del vehículo (placas) rentado, no del detalle:
+        // vale_renta_detalle.capacidad_m3 casi nunca se captura.
+        if (vale.vehiculos?.capacidad_m3 != null) {
+          s.capacidadSuma += Number(vale.vehiculos.capacidad_m3);
+          s.capacidadCount += 1;
+        }
       });
     });
 
+    // Importe por viaje = costo_total del vale (o subtotal) entre el número
+    // de viajes registrados — no existe un importe capturado por viaje
+    // individual en BD, el costo de renta siempre es del vale/detalle.
+    // Precio aprox. por m³ = ese importe por viaje entre la capacidad
+    // promedio del vehículo — una tarifa efectiva de renta normalizada por
+    // volumen, para poder comparar equipos de distinta capacidad entre sí.
+    const conDerivados = (s) => {
+      const capacidadPromedio = s.capacidadCount > 0 ? s.capacidadSuma / s.capacidadCount : null;
+      const importePorViaje = s.viajes > 0 ? s.importeTotal / s.viajes : null;
+      return {
+        ...s,
+        capacidadPromedio,
+        importePorViaje,
+        precioAproxM3: importePorViaje != null && capacidadPromedio
+          ? importePorViaje / capacidadPromedio
+          : null,
+      };
+    };
+
     return Object.values(obraMap)
       .map(({ obra, cc, equipos }) => {
-        const equiposList = Object.values(equipos).sort((a, b) => b.viajes - a.viajes);
-        const subtotal = equiposList.reduce(
-          (acc, e) => ({ viajes: acc.viajes + e.viajes, totalDias: acc.totalDias + e.totalDias, totalHoras: acc.totalHoras + e.totalHoras }),
-          { viajes: 0, totalDias: 0, totalHoras: 0 }
+        const equiposList = Object.values(equipos)
+          .map(conDerivados)
+          .sort((a, b) => b.viajes - a.viajes);
+        const subtotalBase = equiposList.reduce(
+          (acc, e) => ({
+            viajes: acc.viajes + e.viajes,
+            totalDias: acc.totalDias + e.totalDias,
+            totalHoras: acc.totalHoras + e.totalHoras,
+            importeTotal: acc.importeTotal + e.importeTotal,
+            capacidadSuma: acc.capacidadSuma + e.capacidadSuma,
+            capacidadCount: acc.capacidadCount + e.capacidadCount,
+          }),
+          { viajes: 0, totalDias: 0, totalHoras: 0, importeTotal: 0, capacidadSuma: 0, capacidadCount: 0 }
         );
-        return { obra, cc, equipos: equiposList, subtotal };
+        return { obra, cc, equipos: equiposList, subtotal: conDerivados(subtotalBase) };
       })
       .sort((a, b) => b.subtotal.viajes - a.subtotal.viajes);
-  }, [rawValesRenta, valeRentaAConciliacion, filtros]);
+  }, [rawValesRenta, valeRentaAConciliacion, filtros, modosFiltro]);
 
   // ── Estadísticas de un periodo dado (mes o semana) con filtros activos ──
   const getPeriodoStats = useCallback((mesVal, semanaVal) => {
@@ -1424,13 +1606,13 @@ export const useEstadisticasGlobales = () => {
       const conc = valeAConciliacion[vale.id_vale];
       if (mesVal && conc?.fecha_generacion?.substring(0, 7) !== mesVal) return false;
       if (semanaVal && getWeekKey(conc?.fecha_generacion) !== semanaVal) return false;
-      if (!matchesFiltro(filtros.idObra, vale.id_obra)) return false;
-      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa)) return false;
-      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato)) return false;
+      if (!matchesFiltro(filtros.idObra, vale.id_obra, modosFiltro.idObra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa, modosFiltro.idEmpresa)) return false;
+      if (!matchesFiltro(filtros.idSindicato, vale.operadores?.id_sindicato, modosFiltro.idSindicato)) return false;
       return true;
     });
 
-    const matStats = agregarPorMaterial(valesPeriodo, filtros.material, filtros.idBanco);
+    const matStats = agregarPorMaterial(valesPeriodo, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco);
     const m3Total = matStats.reduce((s, r) => s + r.m3Total, 0);
     const importeTotal = matStats.reduce((s, r) => s + r.importeIVA, 0);
 
@@ -1441,9 +1623,9 @@ export const useEstadisticasGlobales = () => {
     if (semanaVal) {
       concsPeriodo = concsPeriodo.filter((c) => getWeekKey(c.fecha_generacion) === semanaVal);
     }
-    concsPeriodo = concsPeriodo.filter((c) => matchesFiltro(filtros.idObra, c.id_obra));
-    concsPeriodo = concsPeriodo.filter((c) => matchesFiltro(filtros.idEmpresa, c.id_empresa));
-    concsPeriodo = concsPeriodo.filter((c) => matchesFiltro(filtros.idSindicato, c.id_sindicato));
+    concsPeriodo = concsPeriodo.filter((c) => matchesFiltro(filtros.idObra, c.id_obra, modosFiltro.idObra));
+    concsPeriodo = concsPeriodo.filter((c) => matchesFiltro(filtros.idEmpresa, c.id_empresa, modosFiltro.idEmpresa));
+    concsPeriodo = concsPeriodo.filter((c) => matchesFiltro(filtros.idSindicato, c.id_sindicato, modosFiltro.idSindicato));
 
     let totalHorasRenta = 0;
     let totalDiasRenta = 0;
@@ -1461,7 +1643,7 @@ export const useEstadisticasGlobales = () => {
       totalDiasRenta,
       totalConciliaciones: concsPeriodo.length,
     };
-  }, [rawVales, rawConciliaciones, valeAConciliacion, filtros, agregarPorMaterial]);
+  }, [rawVales, rawConciliaciones, valeAConciliacion, filtros, modosFiltro, agregarPorMaterial]);
 
   // ── Comparativa contra el periodo anterior (mes o semana según filtro activo) ──
   const comparativaPeriodoAnterior = useMemo(() => {
@@ -1513,9 +1695,34 @@ export const useEstadisticasGlobales = () => {
       mes: [], semana: [], idObra: [], idEmpresa: [],
       idSindicato: [], material: [], idBanco: [],
     });
+    setModosFiltro({
+      mes: "incluir", semana: "incluir", idObra: "incluir", idEmpresa: "incluir",
+      idSindicato: "incluir", material: "incluir", idBanco: "incluir",
+    });
+  }, []);
+
+  // Alterna Incluir ⇄ Excluir para una categoría de filtro.
+  const toggleModoFiltro = useCallback((key) => {
+    setModosFiltro((prev) => ({
+      ...prev,
+      [key]: prev[key] === "excluir" ? "incluir" : "excluir",
+    }));
   }, []);
 
   const hayFiltrosActivos = Object.values(filtros).some((arr) => arr.length > 0);
+
+  // ── Rango de fechas: "Desglose — Hoy" ───────────────────────────────
+  const seleccionarRangoTiempoReal = useCallback((desde, hasta) => {
+    setRangoTiempoRealDesde(desde || null);
+    setRangoTiempoRealHasta(hasta || null);
+    setPeriodoTiempoReal("rango");
+  }, []);
+
+  // ── Rango de fechas: "Volumen Acumulado" (opcional, histórico por defecto) ──
+  const seleccionarRangoAcumulado = useCallback((desde, hasta) => {
+    setRangoAcumuladoDesde(desde || null);
+    setRangoAcumuladoHasta(hasta || null);
+  }, []);
 
   return {
     loading,
@@ -1525,11 +1732,20 @@ export const useEstadisticasGlobales = () => {
     ultimaConciliacion,
     fetchEstadisticas,
     valeAConciliacion,
+    // Carga perezosa por dominio
+    estadisticasCargadas,
+    tiempoRealCargado,
+    presupuestosCargados,
+    garantizarEstadisticas,
+    garantizarTiempoReal,
+    garantizarPresupuestos,
     // Filtros
     filtros,
     toggleFiltro,
     resetFiltros,
     hayFiltrosActivos,
+    modosFiltro,
+    toggleModoFiltro,
     opcionesMeses,
     opcionesSemanas,
     opcionesObras,
@@ -1541,6 +1757,7 @@ export const useEstadisticasGlobales = () => {
     seriesTiempo,
     seriesTiempoRenta,
     tablaViajesRentaPorEquipo,
+    derivarPrecioRenta,
     // Análisis avanzado
     topResidentes,
     topChecadores,
@@ -1557,12 +1774,18 @@ export const useEstadisticasGlobales = () => {
     semanaTiempoReal,
     seleccionarSemanaTiempoReal,
     opcionesSemanasTiempoReal,
+    rangoTiempoRealDesde,
+    rangoTiempoRealHasta,
+    seleccionarRangoTiempoReal,
     loadingTiempoReal,
     errorTiempoReal,
     fetchValesTiempoReal,
     tablaObraMaterialTiempoReal,
     tablaObraRentaTiempoReal,
     // Volumen acumulado histórico por obra (sin filtro de periodo) + % vs presupuesto
+    rangoAcumuladoDesde,
+    rangoAcumuladoHasta,
+    seleccionarRangoAcumulado,
     tablaObraMaterialAcumulado,
     tablaObraRentaAcumulado,
     // Fuente del reporte PDF: vales reales agrupados por los chips globales

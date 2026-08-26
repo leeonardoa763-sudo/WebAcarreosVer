@@ -422,25 +422,22 @@
   line-height: 1.5;
 }
 
-/* ── Filtros compactos ───────────────────────────────────────────── */
+/* ── Filtros de sección ──────────────────────────────────────────── */
+/* Franja de filtros propia de cada sección colapsable (ya no hay barra
+   global): vive como primer hijo del body, con el mismo tratamiento visual
+   que otras franjas internas (ej. .eg__tabla-subseccion). */
 .eg__filtros-wrap {
-  margin-bottom: 22px;
+  padding: 12px 28px;
+  margin-bottom: 16px;
+  background: #F7F9FC;
+  border-bottom: 1.5px solid rgba(0, 78, 137, 0.08);
 }
 
-/* Sticky: se pega al tope cuando el usuario hace scroll */
-.eg__filtros-wrap--sticky {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: rgba(238, 242, 247, 0.92);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  margin-left: -32px;
-  margin-right: -32px;
-  padding: 10px 32px 8px;
-  border-bottom: 1px solid rgba(0, 78, 137, 0.08);
-  margin-bottom: 18px;
-  box-shadow: 0 4px 20px rgba(0, 78, 137, 0.06);
+/* Dentro de un body con padding propio (--pad) el wrap ya tiene inset del
+   contenedor — se cancela para que la franja llegue a los bordes de la
+   tarjeta, igual que el resto de las franjas internas. */
+.eg__col-body--pad > .eg__filtros-wrap {
+  margin: -22px -24px 16px;
 }
 
 /* Barra de disparadores */
@@ -580,6 +577,45 @@
   color: var(--eg-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.eg__filtro-lista-head-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Switch Incluir / Excluir por categoría */
+.eg__filtro-modo {
+  display: inline-flex;
+  border-radius: 20px;
+  background: rgba(0, 78, 137, 0.06);
+  padding: 2px;
+}
+
+.eg__filtro-modo-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--eg-muted);
+  padding: 4px 10px;
+  border-radius: 16px;
+  transition: all 0.15s ease;
+}
+
+.eg__filtro-modo-btn--activo {
+  background: var(--eg-secondary);
+  color: #fff;
+}
+
+.eg__filtro-modo-btn--excluir.eg__filtro-modo-btn--activo {
+  background: var(--eg-primary);
 }
 
 .eg__filtro-lista-limpiar {
@@ -940,6 +976,66 @@
 .eg__periodo-btn--activo {
   background: var(--eg-primary);
   color: #fff;
+}
+
+/* ── Rango de fechas (Hoy: dentro del header oscuro · Acumulado: en el body) ── */
+.eg__rango-fechas {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.eg__rango-fechas-input {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  padding: 4px 7px;
+  color-scheme: dark;
+}
+
+.eg__rango-fechas-sep {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+}
+
+.eg__rango-fechas-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--eg-muted);
+}
+
+.eg__rango-fechas-limpiar {
+  border: none;
+  background: none;
+  color: var(--eg-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Outfit', system-ui, sans-serif;
+}
+
+.eg__rango-fechas-limpiar:hover {
+  text-decoration: underline;
+}
+
+/* Variante dentro del body (fondo claro): texto e input oscuros */
+.eg__rango-fechas--acumulado {
+  margin: 10px 28px 0;
+}
+
+.eg__rango-fechas--acumulado .eg__rango-fechas-input {
+  color: var(--eg-text);
+  background: var(--eg-surface);
+  border: 1.5px solid rgba(0, 78, 137, 0.16);
+  color-scheme: light;
+}
+
+.eg__rango-fechas--acumulado .eg__rango-fechas-sep {
+  color: var(--eg-muted);
 }
 
 .eg__periodo-select {

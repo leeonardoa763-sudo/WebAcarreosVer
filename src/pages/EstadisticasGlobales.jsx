@@ -12,7 +12,7 @@
  */
 
 // 1. React
-import { useMemo, useState, useRef, Fragment } from "react";
+import { useMemo, useState, useRef, useEffect, Fragment } from "react";
 
 // 2. Iconos
 import {
@@ -197,8 +197,9 @@ const KpiCard = ({ icon: Icon, label, value, sublabel, colorClass, loading }) =>
 
 // ── Filter Panel (opciones de la categoría abierta, multi-selección) ──
 // Lista con checkboxes: se pueden marcar varias opciones a la vez. El botón
-// "Limpiar" (onSelect(null)) deja la categoría en "todos".
-const FilterPanel = ({ opciones, valoresActivos, onSelect }) => {
+// "Limpiar" (onSelect(null)) deja la categoría en "todos". El switch Incluir/
+// Excluir invierte la lógica de todo el arreglo seleccionado (IN ⇄ NOT IN).
+const FilterPanel = ({ opciones, valoresActivos, onSelect, modo, onToggleModo }) => {
   if (!opciones || opciones.length === 0) return null;
   const activos = valoresActivos || [];
   return (
@@ -209,15 +210,35 @@ const FilterPanel = ({ opciones, valoresActivos, onSelect }) => {
             ? `${activos.length} seleccionada${activos.length === 1 ? "" : "s"}`
             : "Selecciona una o varias opciones"}
         </span>
-        {activos.length > 0 && (
-          <button
-            type="button"
-            className="eg__filtro-lista-limpiar"
-            onClick={() => onSelect(null)}
-          >
-            Limpiar
-          </button>
-        )}
+        <div className="eg__filtro-lista-head-right">
+          {onToggleModo && (
+            <div className="eg__filtro-modo" role="group" aria-label="Incluir o excluir selección">
+              <button
+                type="button"
+                className={`eg__filtro-modo-btn${modo !== "excluir" ? " eg__filtro-modo-btn--activo" : ""}`}
+                onClick={() => modo === "excluir" && onToggleModo()}
+              >
+                Incluir
+              </button>
+              <button
+                type="button"
+                className={`eg__filtro-modo-btn eg__filtro-modo-btn--excluir${modo === "excluir" ? " eg__filtro-modo-btn--activo" : ""}`}
+                onClick={() => modo !== "excluir" && onToggleModo()}
+              >
+                Excluir
+              </button>
+            </div>
+          )}
+          {activos.length > 0 && (
+            <button
+              type="button"
+              className="eg__filtro-lista-limpiar"
+              onClick={() => onSelect(null)}
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
       </div>
       <div className="eg__filtro-lista-opciones">
         {opciones.map((op) => {
@@ -240,6 +261,75 @@ const FilterPanel = ({ opciones, valoresActivos, onSelect }) => {
           );
         })}
       </div>
+    </div>
+  );
+};
+
+// ── Filtros de una sección (subconjunto de categorías relevante a ella) ──
+// Vive dentro del body de cada SeccionColapsable. Las categorías comparten el
+// mismo estado global de filtros/modosFiltro — solo cambia qué chips se
+// muestran según lo que esa sección realmente usa.
+const FiltrosSeccion = ({ categorias, categoriaAbierta, onToggleCategoria, onSelect, modosFiltro, onToggleModo }) => {
+  const visibles = categorias.filter((c) => c.opciones.length > 0);
+  if (visibles.length === 0) return null;
+
+  const hayActivosAqui = visibles.some((c) => c.valoresActivos.length > 0);
+  const categoriaActual = categoriaAbierta ? visibles.find((c) => c.key === categoriaAbierta) : null;
+
+  return (
+    <div className="eg__filtros-wrap">
+      <div className="eg__filtros-bar">
+        <SlidersHorizontal size={13} className="eg__filtros-bar-icon" />
+        {visibles.map((cat) => {
+          const isOpen = categoriaAbierta === cat.key;
+          const isActivo = cat.valoresActivos.length > 0;
+          const esExcluir = modosFiltro[cat.key] === "excluir";
+          return (
+            <button
+              key={cat.key}
+              className={[
+                "eg__filtro-trigger",
+                isActivo ? "eg__filtro-trigger--activo" : "",
+                isOpen ? "eg__filtro-trigger--abierto" : "",
+              ].join(" ")}
+              onClick={() => onToggleCategoria(cat.key)}
+            >
+              <span className="eg__filtro-trigger-label">
+                {esExcluir && isActivo ? `Sin ${cat.label.toLowerCase()}` : cat.label}
+              </span>
+              {isActivo && (
+                <span className="eg__filtro-trigger-val">{cat.valorLabel}</span>
+              )}
+              <ChevronDown
+                size={11}
+                className={`eg__filtro-chevron${isOpen ? " eg__filtro-chevron--open" : ""}`}
+              />
+            </button>
+          );
+        })}
+        {hayActivosAqui && (
+          <button
+            className="eg__filtros-clear"
+            onClick={() => {
+              visibles.forEach((c) => { if (c.valoresActivos.length > 0) onSelect(c.key, null); });
+              onToggleCategoria(null);
+            }}
+            title="Limpiar filtros de esta sección"
+          >
+            <X size={12} />
+          </button>
+        )}
+      </div>
+
+      {categoriaActual && categoriaActual.opciones.length > 0 && (
+        <FilterPanel
+          opciones={categoriaActual.opciones}
+          valoresActivos={categoriaActual.valoresActivos}
+          onSelect={(v) => onSelect(categoriaActual.key, v)}
+          modo={modosFiltro[categoriaActual.key]}
+          onToggleModo={() => onToggleModo(categoriaActual.key)}
+        />
+      )}
     </div>
   );
 };
@@ -351,14 +441,25 @@ const GraficaViajesRenta = ({ seriesTiempoRenta, tablaViajesRentaPorEquipo, load
 
   if (!data || data.length === 0) return null;
 
-  const totales = tablaViajesRentaPorEquipo.reduce(
+  const totalesBase = tablaViajesRentaPorEquipo.reduce(
     (acc, obraRow) => ({
-      viajes:     acc.viajes     + obraRow.subtotal.viajes,
-      totalDias:  acc.totalDias  + obraRow.subtotal.totalDias,
-      totalHoras: acc.totalHoras + obraRow.subtotal.totalHoras,
+      viajes:         acc.viajes         + obraRow.subtotal.viajes,
+      totalDias:      acc.totalDias      + obraRow.subtotal.totalDias,
+      totalHoras:     acc.totalHoras     + obraRow.subtotal.totalHoras,
+      importeTotal:   acc.importeTotal   + obraRow.subtotal.importeTotal,
+      capacidadSuma:  acc.capacidadSuma  + obraRow.subtotal.capacidadSuma,
+      capacidadCount: acc.capacidadCount + obraRow.subtotal.capacidadCount,
     }),
-    { viajes: 0, totalDias: 0, totalHoras: 0 }
+    { viajes: 0, totalDias: 0, totalHoras: 0, importeTotal: 0, capacidadSuma: 0, capacidadCount: 0 }
   );
+  const totales = {
+    ...totalesBase,
+    capacidadPromedio: totalesBase.capacidadCount > 0 ? totalesBase.capacidadSuma / totalesBase.capacidadCount : null,
+    importePorViaje: totalesBase.viajes > 0 ? totalesBase.importeTotal / totalesBase.viajes : null,
+  };
+  totales.precioAproxM3 = totales.importePorViaje != null && totales.capacidadPromedio
+    ? totales.importePorViaje / totales.capacidadPromedio
+    : null;
 
   return (
     <div className="eg__chart-section">
@@ -431,13 +532,16 @@ const GraficaViajesRenta = ({ seriesTiempoRenta, tablaViajesRentaPorEquipo, load
                 <th>Viajes</th>
                 <th>Días</th>
                 <th>Horas</th>
+                <th>Capacidad Prom.</th>
+                <th>Importe / Viaje</th>
+                <th>Precio Aprox. /m³</th>
               </tr>
             </thead>
             <tbody>
               {tablaViajesRentaPorEquipo.map((obraRow) => (
                 <Fragment key={obraRow.obra}>
                   <tr className="eg__tabla-obra-header">
-                    <td colSpan={4}>
+                    <td colSpan={7}>
                       <span className="eg__tabla-obra-label">
                         {obraRow.cc != null && (
                           <span className="eg__tabla-obra-cc">CC {obraRow.cc}</span>
@@ -460,6 +564,9 @@ const GraficaViajesRenta = ({ seriesTiempoRenta, tablaViajesRentaPorEquipo, load
                       <td>{formatNum(eq.viajes)}</td>
                       <td>{formatNum(eq.totalDias, 1)}</td>
                       <td>{formatNum(eq.totalHoras, 1)}</td>
+                      <td>{eq.capacidadPromedio != null ? `${formatNum(eq.capacidadPromedio, 2)} m³` : "—"}</td>
+                      <td className="eg__importe-cell">{eq.importePorViaje != null ? formatMXN(eq.importePorViaje) : "—"}</td>
+                      <td className="eg__importe-cell">{eq.precioAproxM3 != null ? formatMXN(eq.precioAproxM3) : "—"}</td>
                     </tr>
                   ))}
                   {obraRow.equipos.length > 1 && (
@@ -468,6 +575,9 @@ const GraficaViajesRenta = ({ seriesTiempoRenta, tablaViajesRentaPorEquipo, load
                       <td>{formatNum(obraRow.subtotal.viajes)}</td>
                       <td>{formatNum(obraRow.subtotal.totalDias, 1)}</td>
                       <td>{formatNum(obraRow.subtotal.totalHoras, 1)}</td>
+                      <td>{obraRow.subtotal.capacidadPromedio != null ? `${formatNum(obraRow.subtotal.capacidadPromedio, 2)} m³` : "—"}</td>
+                      <td className="eg__importe-cell">{obraRow.subtotal.importePorViaje != null ? formatMXN(obraRow.subtotal.importePorViaje) : "—"}</td>
+                      <td className="eg__importe-cell">{obraRow.subtotal.precioAproxM3 != null ? formatMXN(obraRow.subtotal.precioAproxM3) : "—"}</td>
                     </tr>
                   )}
                 </Fragment>
@@ -480,6 +590,9 @@ const GraficaViajesRenta = ({ seriesTiempoRenta, tablaViajesRentaPorEquipo, load
                   <td>{formatNum(totales.viajes)}</td>
                   <td>{formatNum(totales.totalDias, 1)}</td>
                   <td>{formatNum(totales.totalHoras, 1)}</td>
+                  <td>{totales.capacidadPromedio != null ? `${formatNum(totales.capacidadPromedio, 2)} m³` : "—"}</td>
+                  <td className="eg__importe-cell">{totales.importePorViaje != null ? formatMXN(totales.importePorViaje) : "—"}</td>
+                  <td className="eg__importe-cell">{totales.precioAproxM3 != null ? formatMXN(totales.precioAproxM3) : "—"}</td>
                 </tr>
               </tfoot>
             )}
@@ -1028,11 +1141,20 @@ const EstadisticasGlobales = () => {
     tablaMaterial,
     ultimaConciliacion,
     fetchEstadisticas,
+    fetchValesTiempoReal,
+    fetchPresupuestos,
     valeAConciliacion,
+    estadisticasCargadas,
+    tiempoRealCargado,
+    presupuestosCargados,
+    garantizarEstadisticas,
+    garantizarTiempoReal,
+    garantizarPresupuestos,
     filtros,
     toggleFiltro,
-    resetFiltros,
     hayFiltrosActivos,
+    modosFiltro,
+    toggleModoFiltro,
     opcionesMeses,
     opcionesSemanas,
     opcionesObras,
@@ -1043,6 +1165,7 @@ const EstadisticasGlobales = () => {
     seriesTiempo,
     seriesTiempoRenta,
     tablaViajesRentaPorEquipo,
+    derivarPrecioRenta,
     topResidentes,
     topChecadores,
     topPlacas,
@@ -1056,10 +1179,16 @@ const EstadisticasGlobales = () => {
     semanaTiempoReal,
     seleccionarSemanaTiempoReal,
     opcionesSemanasTiempoReal,
+    rangoTiempoRealDesde,
+    rangoTiempoRealHasta,
+    seleccionarRangoTiempoReal,
     loadingTiempoReal,
     errorTiempoReal,
     tablaObraMaterialTiempoReal,
     tablaObraRentaTiempoReal,
+    rangoAcumuladoDesde,
+    rangoAcumuladoHasta,
+    seleccionarRangoAcumulado,
     tablaObraMaterialAcumulado,
     tablaObraRentaAcumulado,
     tablaObraMaterialReporte,
@@ -1080,6 +1209,13 @@ const EstadisticasGlobales = () => {
   // 3b. Modal de Reporte Diario
   const [mostrarReporteDiario, setMostrarReporteDiario] = useState(false);
 
+  // 3c. Acción pendiente de que terminen de cargar los dominios necesarios
+  // ("pdf" | "reporte-diario" | null). Los datos derivados del hook (resumen,
+  // tablas, etc.) solo se actualizan en el siguiente render después de que un
+  // fetch resuelve, así que la acción real se dispara desde un efecto que
+  // observa las banderas *Cargado/*Cargadas, no justo después del await.
+  const [pendingAccion, setPendingAccion] = useState(null);
+
   // 4. Exportación de reporte PDF
   const [exportando, setExportando] = useState(false);
 
@@ -1093,11 +1229,26 @@ const EstadisticasGlobales = () => {
 
   // 6. Estado de secciones colapsables. Todas inician colapsadas (cerradas)
   // en cada carga — solo se muestran los encabezados; expandir/plegar es solo
-  // para la sesión actual.
+  // para la sesión actual. Cada sección dispara la carga perezosa del/los
+  // dominio(s) de datos que necesita la PRIMERA vez que se despliega.
   const [seccionesAbiertas, setSeccionesAbiertas] = useState({});
   const seccionAbierta = (secId) => !!seccionesAbiertas[secId];
+  const CARGA_POR_SECCION = {
+    resumen: [garantizarEstadisticas],
+    desglose: [garantizarEstadisticas],
+    hoy: [garantizarTiempoReal],
+    acumulado: [garantizarTiempoReal, garantizarPresupuestos],
+    presupuestos: [garantizarPresupuestos],
+    "grafica-material": [garantizarEstadisticas],
+    "viajes-renta": [garantizarEstadisticas],
+    "analisis-avanzado": [garantizarEstadisticas],
+  };
   const toggleSeccion = (secId) =>
-    setSeccionesAbiertas((prev) => ({ ...prev, [secId]: !prev[secId] }));
+    setSeccionesAbiertas((prev) => {
+      const abrir = !prev[secId];
+      if (abrir) (CARGA_POR_SECCION[secId] || []).forEach((fn) => fn());
+      return { ...prev, [secId]: abrir };
+    });
 
   const handleMaterialClick = (obraNombre, mat) => {
     const concMap = {};
@@ -1121,13 +1272,29 @@ const EstadisticasGlobales = () => {
   const toggleCategoria = (key) =>
     setCategoriaAbierta((prev) => (prev === key ? null : key));
 
+  // El PDF necesita los 3 dominios (algunos pueden no haberse cargado todavía
+  // si el usuario no desplegó ninguna sección relacionada). Solo se dispara
+  // la carga aquí; la generación real ocurre en el efecto de abajo, una vez
+  // que las tablas derivadas del hook ya reflejan los datos frescos.
   const handleExportarPDF = () => {
-    try {
-      setExportando(true);
+    setExportando(true);
+    garantizarEstadisticas();
+    garantizarTiempoReal();
+    garantizarPresupuestos();
+    setPendingAccion("pdf");
+  };
 
+  useEffect(() => {
+    if (pendingAccion !== "pdf") return;
+    if (!(estadisticasCargadas && tiempoRealCargado && presupuestosCargados)) return;
+
+    try {
       const filtrosActivos = categoriasConfig
         .filter((c) => c.valoresActivos.length > 0 && c.key !== "mes" && c.key !== "semana")
-        .map((c) => ({ label: c.label, value: c.valorLabel }));
+        .map((c) => ({
+          label: modosFiltro[c.key] === "excluir" ? `${c.label} (excluye)` : c.label,
+          value: c.valorLabel,
+        }));
 
       const periodoLabel = filtros.mes.length > 0
         ? filtros.mes.map(formatMesChip).join(", ")
@@ -1178,8 +1345,10 @@ const EstadisticasGlobales = () => {
       console.error("Error al exportar reporte PDF:", err);
     } finally {
       setExportando(false);
+      setPendingAccion(null);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAccion, estadisticasCargadas, tiempoRealCargado, presupuestosCargados]);
 
   const handleExportarImagen = async () => {
     if (!desgloseObraRef.current) return;
@@ -1205,6 +1374,29 @@ const EstadisticasGlobales = () => {
     } finally {
       setExportandoImagenAcumulado(false);
     }
+  };
+
+  // Reporte Diario necesita el acumulado histórico + presupuestos (tiempoReal +
+  // presupuestos): dispara la carga y abre el modal solo cuando ya están listos.
+  const handleAbrirReporteDiario = () => {
+    garantizarTiempoReal();
+    garantizarPresupuestos();
+    setPendingAccion("reporte-diario");
+  };
+
+  useEffect(() => {
+    if (pendingAccion !== "reporte-diario") return;
+    if (!(tiempoRealCargado && presupuestosCargados)) return;
+    setMostrarReporteDiario(true);
+    setPendingAccion(null);
+  }, [pendingAccion, tiempoRealCargado, presupuestosCargados]);
+
+  // Refresca solo los dominios que ya se cargaron alguna vez (no tiene caso
+  // pedir datos de una sección que el usuario nunca ha desplegado).
+  const handleActualizar = () => {
+    if (estadisticasCargadas) fetchEstadisticas();
+    if (tiempoRealCargado) fetchValesTiempoReal();
+    if (presupuestosCargados) fetchPresupuestos();
   };
 
   // 3. Totales de tablas
@@ -1236,20 +1428,29 @@ const EstadisticasGlobales = () => {
     [tablaObraMaterial]
   );
 
-  const totalesRenta = useMemo(
-    () =>
-      tablaRentaPorObra.reduce(
-        (acc, row) => ({
-          conciliaciones: acc.conciliaciones + row.conciliaciones,
-          totalViajes:    acc.totalViajes    + row.totalViajes,
-          totalDias:      acc.totalDias      + row.totalDias,
-          totalHoras:     acc.totalHoras     + row.totalHoras,
-          importeTotal:   acc.importeTotal   + row.importeTotal,
-        }),
-        { conciliaciones: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, importeTotal: 0 }
-      ),
-    [tablaRentaPorObra]
-  );
+  const totalesRenta = useMemo(() => {
+    const t = tablaRentaPorObra.reduce(
+      (acc, row) => ({
+        conciliaciones: acc.conciliaciones + row.conciliaciones,
+        totalViajes:    acc.totalViajes    + row.totalViajes,
+        totalDias:      acc.totalDias      + row.totalDias,
+        totalHoras:     acc.totalHoras     + row.totalHoras,
+        importeTotal:   acc.importeTotal   + row.importeTotal,
+        capacidadSuma:  acc.capacidadSuma  + (row.capacidadSuma || 0),
+        capacidadCount: acc.capacidadCount + (row.capacidadCount || 0),
+      }),
+      { conciliaciones: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, importeTotal: 0, capacidadSuma: 0, capacidadCount: 0 }
+    );
+    return {
+      ...t,
+      ...derivarPrecioRenta({
+        capacidadSuma: t.capacidadSuma,
+        capacidadCount: t.capacidadCount,
+        importeTotal: t.importeTotal,
+        viajes: t.totalViajes,
+      }),
+    };
+  }, [tablaRentaPorObra, derivarPrecioRenta]);
 
   const totalesTablaObraTiempoReal = useMemo(
     () =>
@@ -1265,20 +1466,29 @@ const EstadisticasGlobales = () => {
     [tablaObraMaterialTiempoReal]
   );
 
-  const totalesRentaTiempoReal = useMemo(
-    () =>
-      tablaObraRentaTiempoReal.reduce(
-        (acc, row) => ({
-          vales:          acc.vales          + row.vales,
-          totalViajes:    acc.totalViajes    + row.totalViajes,
-          totalDias:      acc.totalDias      + row.totalDias,
-          totalHoras:     acc.totalHoras     + row.totalHoras,
-          subtotalSinIva: acc.subtotalSinIva + row.subtotalSinIva,
-        }),
-        { vales: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, subtotalSinIva: 0 }
-      ),
-    [tablaObraRentaTiempoReal]
-  );
+  const totalesRentaTiempoReal = useMemo(() => {
+    const t = tablaObraRentaTiempoReal.reduce(
+      (acc, row) => ({
+        vales:          acc.vales          + row.vales,
+        totalViajes:    acc.totalViajes    + row.totalViajes,
+        totalDias:      acc.totalDias      + row.totalDias,
+        totalHoras:     acc.totalHoras     + row.totalHoras,
+        subtotalSinIva: acc.subtotalSinIva + row.subtotalSinIva,
+        capacidadSuma:  acc.capacidadSuma  + (row.capacidadSuma || 0),
+        capacidadCount: acc.capacidadCount + (row.capacidadCount || 0),
+      }),
+      { vales: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, subtotalSinIva: 0, capacidadSuma: 0, capacidadCount: 0 }
+    );
+    return {
+      ...t,
+      ...derivarPrecioRenta({
+        capacidadSuma: t.capacidadSuma,
+        capacidadCount: t.capacidadCount,
+        importeTotal: t.subtotalSinIva,
+        viajes: t.totalViajes,
+      }),
+    };
+  }, [tablaObraRentaTiempoReal, derivarPrecioRenta]);
 
   const totalesTablaObraAcumulado = useMemo(() => {
     const t = tablaObraMaterialAcumulado.reduce(
@@ -1304,12 +1514,22 @@ const EstadisticasGlobales = () => {
         totalHoras:         acc.totalHoras         + row.totalHoras,
         subtotalSinIva:     acc.subtotalSinIva     + row.subtotalSinIva,
         montoPresupuestado: acc.montoPresupuestado + (row.montoPresupuestado || 0),
+        capacidadSuma:      acc.capacidadSuma      + (row.capacidadSuma || 0),
+        capacidadCount:     acc.capacidadCount     + (row.capacidadCount || 0),
       }),
-      { vales: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, subtotalSinIva: 0, montoPresupuestado: 0 }
+      { vales: 0, totalViajes: 0, totalDias: 0, totalHoras: 0, subtotalSinIva: 0, montoPresupuestado: 0, capacidadSuma: 0, capacidadCount: 0 }
     );
     t.pctPresupuesto = t.montoPresupuestado ? (t.subtotalSinIva / t.montoPresupuestado) * 100 : null;
-    return t;
-  }, [tablaObraRentaAcumulado]);
+    return {
+      ...t,
+      ...derivarPrecioRenta({
+        capacidadSuma: t.capacidadSuma,
+        capacidadCount: t.capacidadCount,
+        importeTotal: t.subtotalSinIva,
+        viajes: t.totalViajes,
+      }),
+    };
+  }, [tablaObraRentaAcumulado, derivarPrecioRenta]);
 
   // Totales de las tablas del reporte PDF (vales reales por filtros globales)
   const totalesReporteMaterial = useMemo(
@@ -1391,9 +1611,9 @@ const EstadisticasGlobales = () => {
     return base.map((c) => ({ ...c, valorLabel: buildValorLabel(c.opciones, c.valoresActivos) }));
   }, [filtros, opcionesMeses, opcionesSemanas, opcionesObras, opcionesEmpresas, opcionesSindicatos, opcionesMateriales, opcionesBancos]);
 
-  const categoriaActual = categoriaAbierta
-    ? categoriasConfig.find((c) => c.key === categoriaAbierta)
-    : null;
+  // Subconjunto de categoriasConfig relevante a una sección, en el orden dado.
+  const buildCategorias = (keys) =>
+    keys.map((k) => categoriasConfig.find((c) => c.key === k)).filter(Boolean);
 
   // 5. Skeleton de tabla
   const renderSkeletonRows = () =>
@@ -1435,10 +1655,11 @@ const EstadisticasGlobales = () => {
         <div className="eg__header-actions">
           <button
             className="eg__report-btn"
-            onClick={() => setMostrarReporteDiario(true)}
+            onClick={handleAbrirReporteDiario}
+            disabled={pendingAccion === "reporte-diario"}
           >
             <CalendarDays size={14} />
-            Reporte Diario
+            {pendingAccion === "reporte-diario" ? "Cargando…" : "Reporte Diario"}
           </button>
           <button
             className="eg__export-btn"
@@ -1450,8 +1671,8 @@ const EstadisticasGlobales = () => {
           </button>
           <button
             className={`eg__refresh-btn${loading ? " eg__refresh-btn--loading" : ""}`}
-            onClick={fetchEstadisticas}
-            disabled={loading}
+            onClick={handleActualizar}
+            disabled={loading || !(estadisticasCargadas || tiempoRealCargado || presupuestosCargados)}
           >
             <RefreshCw size={14} />
             Actualizar
@@ -1486,60 +1707,6 @@ const EstadisticasGlobales = () => {
         </div>
       )}
 
-      {/* ── Filtros compactos (sticky) ────────────────────────── */}
-      {!error && !loading && (
-        <div className="eg__filtros-wrap eg__filtros-wrap--sticky">
-          {/* Barra de disparadores */}
-          <div className="eg__filtros-bar">
-            <SlidersHorizontal size={13} className="eg__filtros-bar-icon" />
-            {categoriasConfig
-              .filter((c) => c.opciones.length > 0)
-              .map((cat) => {
-                const isOpen = categoriaAbierta === cat.key;
-                const isActivo = cat.valoresActivos.length > 0;
-                return (
-                  <button
-                    key={cat.key}
-                    className={[
-                      "eg__filtro-trigger",
-                      isActivo  ? "eg__filtro-trigger--activo" : "",
-                      isOpen    ? "eg__filtro-trigger--abierto" : "",
-                    ].join(" ")}
-                    onClick={() => toggleCategoria(cat.key)}
-                  >
-                    <span className="eg__filtro-trigger-label">{cat.label}</span>
-                    {isActivo && (
-                      <span className="eg__filtro-trigger-val">{cat.valorLabel}</span>
-                    )}
-                    <ChevronDown
-                      size={11}
-                      className={`eg__filtro-chevron${isOpen ? " eg__filtro-chevron--open" : ""}`}
-                    />
-                  </button>
-                );
-              })}
-            {hayFiltrosActivos && (
-              <button
-                className="eg__filtros-clear"
-                onClick={() => { resetFiltros(); setCategoriaAbierta(null); }}
-                title="Limpiar todos los filtros"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-
-          {/* Panel de opciones */}
-          {categoriaActual && categoriaActual.opciones.length > 0 && (
-            <FilterPanel
-              opciones={categoriaActual.opciones}
-              valoresActivos={categoriaActual.valoresActivos}
-              onSelect={(v) => toggleFiltro(categoriaActual.key, v)}
-            />
-          )}
-        </div>
-      )}
-
       {/* ── KPI Cards ─────────────────────────────────────────── */}
       {!error && (
         <SeccionColapsable
@@ -1550,6 +1717,14 @@ const EstadisticasGlobales = () => {
           onToggle={toggleSeccion}
           bodyClassName="eg__col-body--pad"
         >
+        <FiltrosSeccion
+          categorias={buildCategorias(["mes", "semana", "idObra", "idEmpresa", "idSindicato", "material", "idBanco"])}
+          categoriaAbierta={categoriaAbierta}
+          onToggleCategoria={toggleCategoria}
+          onSelect={toggleFiltro}
+          modosFiltro={modosFiltro}
+          onToggleModo={toggleModoFiltro}
+        />
         <div className="eg__kpi-grid">
           <KpiCard
             icon={Package}
@@ -1612,6 +1787,14 @@ const EstadisticasGlobales = () => {
             )
           }
         >
+          <FiltrosSeccion
+            categorias={buildCategorias(["mes", "semana", "idObra", "idEmpresa", "idSindicato", "material", "idBanco"])}
+            categoriaAbierta={categoriaAbierta}
+            onToggleCategoria={toggleCategoria}
+            onSelect={toggleFiltro}
+            modosFiltro={modosFiltro}
+            onToggleModo={toggleModoFiltro}
+          />
           {/* ─ Sub-sección material ─ */}
           <div className="eg__tabla-subseccion">
             <span className="eg__tabla-subseccion__label">
@@ -1732,12 +1915,14 @@ const EstadisticasGlobales = () => {
                       <th>Días</th>
                       <th>Horas</th>
                       <th>Importe</th>
+                      <th>Precio / Viaje</th>
+                      <th>Precio Aprox. /m³</th>
                     </tr>
                   </thead>
                   <tbody>
                     {tablaRentaPorObra.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="eg__empty">
+                        <td colSpan={7} className="eg__empty">
                           {hayFiltrosActivos
                             ? "Sin renta para los filtros seleccionados."
                             : "Sin conciliaciones de renta."}
@@ -1766,6 +1951,12 @@ const EstadisticasGlobales = () => {
                           <td>{formatNum(row.totalDias, 1)}</td>
                           <td>{formatNum(row.totalHoras, 1)}</td>
                           <td className="eg__importe-cell">{formatMXN(row.importeTotal)}</td>
+                          <td className="eg__importe-cell">
+                            {row.precioPorViaje != null ? formatMXN(row.precioPorViaje) : "—"}
+                          </td>
+                          <td className="eg__importe-cell">
+                            {row.precioAproxM3 != null ? formatMXN(row.precioAproxM3) : "—"}
+                          </td>
                         </tr>
                       ))
                     )}
@@ -1779,6 +1970,12 @@ const EstadisticasGlobales = () => {
                         <td>{formatNum(totalesRenta.totalHoras, 1)}</td>
                         <td className="eg__importe-cell">
                           {formatMXN(totalesRenta.importeTotal)}
+                        </td>
+                        <td className="eg__importe-cell">
+                          {totalesRenta.precioPorViaje != null ? formatMXN(totalesRenta.precioPorViaje) : "—"}
+                        </td>
+                        <td className="eg__importe-cell">
+                          {totalesRenta.precioAproxM3 != null ? formatMXN(totalesRenta.precioAproxM3) : "—"}
                         </td>
                       </tr>
                     </tfoot>
@@ -1842,11 +2039,35 @@ const EstadisticasGlobales = () => {
                     ))}
                   </select>
                 )}
+                <button
+                  className={`eg__periodo-btn${periodoTiempoReal === "rango" ? " eg__periodo-btn--activo" : ""}`}
+                  onClick={() => seleccionarRangoTiempoReal(rangoTiempoRealDesde, rangoTiempoRealHasta)}
+                  title="Rango de fechas personalizado"
+                >
+                  Rango
+                </button>
+                {periodoTiempoReal === "rango" && (
+                  <div className="eg__rango-fechas">
+                    <input
+                      type="date"
+                      className="eg__rango-fechas-input"
+                      value={rangoTiempoRealDesde || ""}
+                      onChange={(e) => seleccionarRangoTiempoReal(e.target.value, rangoTiempoRealHasta)}
+                    />
+                    <span className="eg__rango-fechas-sep">–</span>
+                    <input
+                      type="date"
+                      className="eg__rango-fechas-input"
+                      value={rangoTiempoRealHasta || ""}
+                      onChange={(e) => seleccionarRangoTiempoReal(rangoTiempoRealDesde, e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
               <button
                 className="eg__export-img-btn"
                 onClick={handleExportarImagen}
-                disabled={loadingTiempoReal || !!errorTiempoReal || exportandoImagen}
+                disabled={loadingTiempoReal || !tiempoRealCargado || !!errorTiempoReal || exportandoImagen}
               >
                 <ImageIcon size={13} />
                 {exportandoImagen ? "Generando…" : "Exportar imagen"}
@@ -1854,6 +2075,14 @@ const EstadisticasGlobales = () => {
             </>
           }
         >
+          <FiltrosSeccion
+            categorias={buildCategorias(["idObra", "idEmpresa", "idSindicato", "material", "idBanco"])}
+            categoriaAbierta={categoriaAbierta}
+            onToggleCategoria={toggleCategoria}
+            onSelect={toggleFiltro}
+            modosFiltro={modosFiltro}
+            onToggleModo={toggleModoFiltro}
+          />
           <p className="eg__tabla-subnota">
             Incluye vales emitidos, verificados y conciliados aún no incluidos en un
             reporte oficial (no incluye borradores ni cancelados). El importe de
@@ -1982,12 +2211,14 @@ const EstadisticasGlobales = () => {
                         <th>Días</th>
                         <th>Horas</th>
                         <th>Subtotal (sin IVA)</th>
+                        <th>Precio / Viaje</th>
+                        <th>Precio Aprox. /m³</th>
                       </tr>
                     </thead>
                     <tbody>
                       {tablaObraRentaTiempoReal.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="eg__empty">
+                          <td colSpan={8} className="eg__empty">
                             Sin renta para el periodo y filtros seleccionados.
                           </td>
                         </tr>
@@ -2010,6 +2241,12 @@ const EstadisticasGlobales = () => {
                             <td>{formatNum(row.totalDias, 1)}</td>
                             <td>{formatNum(row.totalHoras, 1)}</td>
                             <td className="eg__importe-cell">{formatMXN(row.subtotalSinIva)}</td>
+                            <td className="eg__importe-cell">
+                              {row.precioPorViaje != null ? formatMXN(row.precioPorViaje) : "—"}
+                            </td>
+                            <td className="eg__importe-cell">
+                              {row.precioAproxM3 != null ? formatMXN(row.precioAproxM3) : "—"}
+                            </td>
                           </tr>
                         ))
                       )}
@@ -2024,6 +2261,12 @@ const EstadisticasGlobales = () => {
                           <td>{formatNum(totalesRentaTiempoReal.totalHoras, 1)}</td>
                           <td className="eg__importe-cell">
                             {formatMXN(totalesRentaTiempoReal.subtotalSinIva)}
+                          </td>
+                          <td className="eg__importe-cell">
+                            {totalesRentaTiempoReal.precioPorViaje != null ? formatMXN(totalesRentaTiempoReal.precioPorViaje) : "—"}
+                          </td>
+                          <td className="eg__importe-cell">
+                            {totalesRentaTiempoReal.precioAproxM3 != null ? formatMXN(totalesRentaTiempoReal.precioAproxM3) : "—"}
                           </td>
                         </tr>
                       </tfoot>
@@ -2056,13 +2299,21 @@ const EstadisticasGlobales = () => {
             <button
               className="eg__export-img-btn"
               onClick={handleExportarImagenAcumulado}
-              disabled={loadingTiempoReal || loadingPresupuestos || !!errorTiempoReal || exportandoImagenAcumulado}
+              disabled={loadingTiempoReal || loadingPresupuestos || !tiempoRealCargado || !presupuestosCargados || !!errorTiempoReal || exportandoImagenAcumulado}
             >
               <ImageIcon size={13} />
               {exportandoImagenAcumulado ? "Generando…" : "Exportar imagen"}
             </button>
           }
         >
+          <FiltrosSeccion
+            categorias={buildCategorias(["idObra", "idEmpresa", "idSindicato", "material", "idBanco"])}
+            categoriaAbierta={categoriaAbierta}
+            onToggleCategoria={toggleCategoria}
+            onSelect={toggleFiltro}
+            modosFiltro={modosFiltro}
+            onToggleModo={toggleModoFiltro}
+          />
           <p className="eg__tabla-subnota">
             Volumen histórico total ejecutado (todos los vales emitidos, verificados
             y conciliados desde el inicio, sin contar cancelados ni borradores). El
@@ -2070,6 +2321,32 @@ const EstadisticasGlobales = () => {
             compara lo ejecutado contra lo asignado por obra en{" "}
             <code>presupuesto_material_obra</code> / <code>presupuesto_renta_obra</code>.
           </p>
+
+          <div className="eg__rango-fechas eg__rango-fechas--acumulado">
+            <span className="eg__rango-fechas-label">Filtrar por fecha (opcional):</span>
+            <input
+              type="date"
+              className="eg__rango-fechas-input"
+              value={rangoAcumuladoDesde || ""}
+              onChange={(e) => seleccionarRangoAcumulado(e.target.value, rangoAcumuladoHasta)}
+            />
+            <span className="eg__rango-fechas-sep">–</span>
+            <input
+              type="date"
+              className="eg__rango-fechas-input"
+              value={rangoAcumuladoHasta || ""}
+              onChange={(e) => seleccionarRangoAcumulado(rangoAcumuladoDesde, e.target.value)}
+            />
+            {(rangoAcumuladoDesde || rangoAcumuladoHasta) && (
+              <button
+                type="button"
+                className="eg__rango-fechas-limpiar"
+                onClick={() => seleccionarRangoAcumulado(null, null)}
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
 
           {errorTiempoReal && (
             <div className="eg__empty">
@@ -2202,13 +2479,15 @@ const EstadisticasGlobales = () => {
                         <th>Días</th>
                         <th>Horas</th>
                         <th>Subtotal (sin IVA)</th>
+                        <th>Precio / Viaje</th>
+                        <th>Precio Aprox. /m³</th>
                         <th>% Presupuesto</th>
                       </tr>
                     </thead>
                     <tbody>
                       {tablaObraRentaAcumulado.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="eg__empty">
+                          <td colSpan={9} className="eg__empty">
                             Sin renta para los filtros seleccionados.
                           </td>
                         </tr>
@@ -2231,6 +2510,12 @@ const EstadisticasGlobales = () => {
                             <td>{formatNum(row.totalDias, 1)}</td>
                             <td>{formatNum(row.totalHoras, 1)}</td>
                             <td className="eg__importe-cell">{formatMXN(row.subtotalSinIva)}</td>
+                            <td className="eg__importe-cell">
+                              {row.precioPorViaje != null ? formatMXN(row.precioPorViaje) : "—"}
+                            </td>
+                            <td className="eg__importe-cell">
+                              {row.precioAproxM3 != null ? formatMXN(row.precioAproxM3) : "—"}
+                            </td>
                             <td className={`eg__pct-cell ${pctCellClass(row.pctPresupuesto)}`}>
                               {formatPct(row.pctPresupuesto)}
                             </td>
@@ -2248,6 +2533,12 @@ const EstadisticasGlobales = () => {
                           <td>{formatNum(totalesRentaAcumulado.totalHoras, 1)}</td>
                           <td className="eg__importe-cell">
                             {formatMXN(totalesRentaAcumulado.subtotalSinIva)}
+                          </td>
+                          <td className="eg__importe-cell">
+                            {totalesRentaAcumulado.precioPorViaje != null ? formatMXN(totalesRentaAcumulado.precioPorViaje) : "—"}
+                          </td>
+                          <td className="eg__importe-cell">
+                            {totalesRentaAcumulado.precioAproxM3 != null ? formatMXN(totalesRentaAcumulado.precioAproxM3) : "—"}
                           </td>
                           <td className={`eg__pct-cell ${pctCellClass(totalesRentaAcumulado.pctPresupuesto)}`}>
                             {formatPct(totalesRentaAcumulado.pctPresupuesto)}
@@ -2273,6 +2564,14 @@ const EstadisticasGlobales = () => {
           onToggle={toggleSeccion}
           bodyClassName="eg__col-body--pad"
         >
+          <FiltrosSeccion
+            categorias={buildCategorias(["idObra", "idEmpresa", "material"])}
+            categoriaAbierta={categoriaAbierta}
+            onToggleCategoria={toggleCategoria}
+            onSelect={toggleFiltro}
+            modosFiltro={modosFiltro}
+            onToggleModo={toggleModoFiltro}
+          />
           <SeccionPresupuestos
             materialRows={presupuestosMaterialFiltrados}
             rentaRows={presupuestosRentaFiltrados}
@@ -2292,6 +2591,14 @@ const EstadisticasGlobales = () => {
           abierta={seccionAbierta("grafica-material")}
           onToggle={toggleSeccion}
         >
+          <FiltrosSeccion
+            categorias={buildCategorias(["idObra", "idEmpresa", "idSindicato", "material", "idBanco"])}
+            categoriaAbierta={categoriaAbierta}
+            onToggleCategoria={toggleCategoria}
+            onSelect={toggleFiltro}
+            modosFiltro={modosFiltro}
+            onToggleModo={toggleModoFiltro}
+          />
           <GraficaTiempo
             seriesTiempo={seriesTiempo}
             loading={loading}
@@ -2309,6 +2616,14 @@ const EstadisticasGlobales = () => {
           abierta={seccionAbierta("viajes-renta")}
           onToggle={toggleSeccion}
         >
+          <FiltrosSeccion
+            categorias={buildCategorias(["mes", "semana", "idObra", "idEmpresa", "idSindicato"])}
+            categoriaAbierta={categoriaAbierta}
+            onToggleCategoria={toggleCategoria}
+            onSelect={toggleFiltro}
+            modosFiltro={modosFiltro}
+            onToggleModo={toggleModoFiltro}
+          />
           <GraficaViajesRenta
             seriesTiempoRenta={seriesTiempoRenta}
             tablaViajesRentaPorEquipo={tablaViajesRentaPorEquipo}
@@ -2319,7 +2634,7 @@ const EstadisticasGlobales = () => {
       )}
 
       {/* ── Análisis Avanzado ─────────────────────────────────── */}
-      {!error && !loading && (
+      {!error && (
         <SeccionColapsable
           id="analisis-avanzado"
           titulo="Análisis de Operación"
@@ -2328,15 +2643,27 @@ const EstadisticasGlobales = () => {
           onToggle={toggleSeccion}
           bodyClassName="eg__col-body--pad"
         >
-          <SeccionAnalisisAvanzado
-            horasPico={horasPico}
-            viajesPorVale={viajesPorVale}
-            topResidentes={topResidentes}
-            topChecadores={topChecadores}
-            topPlacas={topPlacas}
-            rendimientoPorMaterial={rendimientoPorMaterial}
-            mostrarEncabezado={false}
+          <FiltrosSeccion
+            categorias={buildCategorias(["mes", "semana", "idObra", "idEmpresa", "idSindicato", "material", "idBanco"])}
+            categoriaAbierta={categoriaAbierta}
+            onToggleCategoria={toggleCategoria}
+            onSelect={toggleFiltro}
+            modosFiltro={modosFiltro}
+            onToggleModo={toggleModoFiltro}
           />
+          {loading ? (
+            <div className="eg__chart-skeleton" />
+          ) : (
+            <SeccionAnalisisAvanzado
+              horasPico={horasPico}
+              viajesPorVale={viajesPorVale}
+              topResidentes={topResidentes}
+              topChecadores={topChecadores}
+              topPlacas={topPlacas}
+              rendimientoPorMaterial={rendimientoPorMaterial}
+              mostrarEncabezado={false}
+            />
+          )}
         </SeccionColapsable>
       )}
 
