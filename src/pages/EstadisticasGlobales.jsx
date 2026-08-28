@@ -335,8 +335,9 @@ const FiltrosSeccion = ({ categorias, categoriaAbierta, onToggleCategoria, onSel
 };
 
 // ── Gráfica Material vs Tiempo ─────────────────────────────────────
-const GraficaTiempo = ({ seriesTiempo, loading, mostrarEncabezado = true }) => {
-  const { data, materiales } = seriesTiempo;
+const GraficaTiempo = ({ seriesTiempo, loading, mostrarEncabezado = true, modo = "m3", onModoChange }) => {
+  const { data, dataViajes, materiales } = seriesTiempo;
+  const [materialActivo, setMaterialActivo] = useState(null);
 
   if (loading) {
     return (
@@ -348,23 +349,64 @@ const GraficaTiempo = ({ seriesTiempo, loading, mostrarEncabezado = true }) => {
 
   if (!data || data.length === 0) return null;
 
+  const dataModo = modo === "viajes" ? dataViajes : data;
+  const unidad = modo === "viajes" ? "viajes" : "m³";
+
+  // Si el material seleccionado ya no existe en el set actual (cambiaron
+  // filtros), lo ignoramos en vez de dejar la gráfica vacía.
+  const activo = materialActivo && materiales.includes(materialActivo) ? materialActivo : null;
+  const materialesVisibles = activo ? [activo] : materiales;
+  const handleLegendClick = (entry) => {
+    setMaterialActivo((actual) => (actual === entry.value ? null : entry.value));
+  };
+
   return (
     <div className="eg__chart-section">
       {mostrarEncabezado && (
         <div className="eg__chart-header">
           <div className="eg__chart-header-left">
             <div className="eg__chart-eyebrow">
-              <BarChart2 size={13} />
+              <TrendingUp size={13} />
               Evolución histórica
             </div>
             <h2 className="eg__chart-title">Material vs Tiempo</h2>
           </div>
-          <span className="eg__chart-subtitle">m³ transportados por mes · Top {materiales.length} materiales</span>
+          <span className="eg__chart-subtitle">
+            {activo
+              ? `${activo} · ${unidad} por mes (escala propia)`
+              : `${unidad} por mes · ${materiales.length} materiales`}
+          </span>
         </div>
       )}
+      <div className="eg__chart-toolbar">
+        <div className="eg__chart-modo-switch" role="group" aria-label="Métrica de la gráfica">
+          <button
+            type="button"
+            className={modo === "m3" ? "eg__chart-modo-switch__btn eg__chart-modo-switch__btn--active" : "eg__chart-modo-switch__btn"}
+            onClick={() => onModoChange?.("m3")}
+          >
+            m³
+          </button>
+          <button
+            type="button"
+            className={modo === "viajes" ? "eg__chart-modo-switch__btn eg__chart-modo-switch__btn--active" : "eg__chart-modo-switch__btn"}
+            onClick={() => onModoChange?.("viajes")}
+          >
+            Viajes
+          </button>
+        </div>
+        {activo && (
+          <button type="button" className="eg__chart-reset-pill" onClick={() => setMaterialActivo(null)}>
+            <X size={12} /> Ver todos los materiales
+          </button>
+        )}
+      </div>
       <div className="eg__chart-wrap">
+        {/* domain "auto" recalcula la escala del eje Y solo con las líneas
+            renderizadas, así que al aislar un material la gráfica queda con
+            su propia escala automáticamente. */}
         <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={data} margin={{ top: 12, right: 28, left: -8, bottom: 0 }} barCategoryGap="30%">
+          <LineChart data={dataModo} margin={{ top: 12, right: 28, left: -8, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 4" stroke="rgba(0,78,137,0.07)" vertical={false} />
             <XAxis
               dataKey="mes"
@@ -375,6 +417,8 @@ const GraficaTiempo = ({ seriesTiempo, loading, mostrarEncabezado = true }) => {
               dy={6}
             />
             <YAxis
+              domain={[0, "auto"]}
+              allowDecimals={modo === "m3"}
               tick={{ fontSize: 10.5, fontFamily: "Outfit, system-ui, sans-serif", fill: "#64748B" }}
               tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
               axisLine={false}
@@ -382,7 +426,7 @@ const GraficaTiempo = ({ seriesTiempo, loading, mostrarEncabezado = true }) => {
               width={40}
             />
             <Tooltip
-              formatter={(v, name) => [`${Number(v).toLocaleString("es-MX")} m³`, name]}
+              formatter={(v, name) => [`${Number(v).toLocaleString("es-MX")} ${unidad}`, name]}
               labelFormatter={formatMesToolTip}
               contentStyle={{
                 background: "#ffffff",
@@ -394,23 +438,47 @@ const GraficaTiempo = ({ seriesTiempo, loading, mostrarEncabezado = true }) => {
               }}
               itemStyle={{ fontFamily: "Barlow Condensed, system-ui, sans-serif", fontSize: 13 }}
               labelStyle={{ fontWeight: 700, color: "#1A2332", marginBottom: 4 }}
-              cursor={{ fill: "rgba(0,78,137,0.04)" }}
+              cursor={{ stroke: "rgba(0,78,137,0.25)", strokeWidth: 1, strokeDasharray: "4 4" }}
             />
             <Legend
-              wrapperStyle={{ fontSize: 11.5, fontFamily: "Outfit, system-ui, sans-serif", paddingTop: 16 }}
-              iconType="square"
+              payload={materiales.map((mat, i) => ({
+                value: mat,
+                id: mat,
+                type: "circle",
+                color: DOT_COLORS[i % DOT_COLORS.length],
+              }))}
+              onClick={handleLegendClick}
+              wrapperStyle={{ fontSize: 11.5, fontFamily: "Outfit, system-ui, sans-serif", paddingTop: 16, cursor: "pointer" }}
+              iconType="circle"
               iconSize={8}
+              formatter={(value) => (
+                <span
+                  style={{
+                    opacity: activo && activo !== value ? 0.4 : 1,
+                    fontWeight: activo === value ? 700 : 500,
+                  }}
+                >
+                  {value}
+                </span>
+              )}
             />
-            {materiales.map((mat, i) => (
-              <Bar
-                key={mat}
-                dataKey={mat}
-                stackId="stack"
-                fill={DOT_COLORS[i % DOT_COLORS.length]}
-                radius={i === materiales.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-              />
-            ))}
-          </BarChart>
+            {materialesVisibles.map((mat) => {
+              const i = materiales.indexOf(mat);
+              return (
+                <Line
+                  key={mat}
+                  type="monotone"
+                  dataKey={mat}
+                  name={mat}
+                  stroke={DOT_COLORS[i % DOT_COLORS.length]}
+                  strokeWidth={2.5}
+                  dot={{ r: 3.5, strokeWidth: 0, fill: DOT_COLORS[i % DOT_COLORS.length] }}
+                  activeDot={{ r: 5.5, strokeWidth: 2, stroke: "#fff" }}
+                  isAnimationActive={!activo}
+                />
+              );
+            })}
+          </LineChart>
         </ResponsiveContainer>
       </div>
     </div>
@@ -1164,6 +1232,8 @@ const EstadisticasGlobales = () => {
     opcionesBancos,
     seriesTiempo,
     seriesTiempoRenta,
+    seriesImporteTiempo,
+    seriesCamionesRentaTiempo,
     tablaViajesRentaPorEquipo,
     derivarPrecioRenta,
     topResidentes,
@@ -1193,6 +1263,10 @@ const EstadisticasGlobales = () => {
     tablaObraRentaAcumulado,
     tablaObraMaterialReporte,
     tablaObraRentaReporte,
+    tablaBancoMaterialReporte,
+    ahorroEstimado,
+    serieConciliacionesPorMes,
+    conciliacionesPorObraTipo,
     loadingPresupuestos,
     presupuestosMaterialFiltrados,
     presupuestosRentaFiltrados,
@@ -1202,6 +1276,10 @@ const EstadisticasGlobales = () => {
 
   // 2. Categoría abierta en el panel de filtros
   const [categoriaAbierta, setCategoriaAbierta] = useState(null);
+
+  // 2b. Métrica activa de la gráfica Material vs Tiempo ("m3" | "viajes") —
+  // controla tanto la gráfica interactiva como la sección del PDF exportado.
+  const [modoGraficaTiempo, setModoGraficaTiempo] = useState("m3");
 
   // 3. Modal de conciliaciones por material
   const [modalMaterial, setModalMaterial] = useState(null);
@@ -1320,6 +1398,13 @@ const EstadisticasGlobales = () => {
       const periodoTablasLabel =
         filtros.mes.length > 0 || filtros.semana.length > 0 ? periodoLabel : null;
 
+      // Lista de conciliaciones vinculadas de la sección de Ahorro: solo
+      // tiene sentido cuando hay obra(s) puntuales en el filtro — con el
+      // reporte global (sin obra) se omite en vez de listar todo el sistema.
+      const bloquesObraConciliaciones = filtros.idObra
+        .map((id) => conciliacionesPorObraTipo[id])
+        .filter(Boolean);
+
       generarPDFReporteEstadisticas({
         filtrosActivos,
         periodoLabel,
@@ -1329,8 +1414,14 @@ const EstadisticasGlobales = () => {
         comparativaPeriodoAnterior,
         periodoAnteriorLabel,
         tablaObraMaterial: tablaObraMaterialReporte,
+        tablaBancoMaterial: tablaBancoMaterialReporte,
         tablaRentaPorObra: tablaObraRentaReporte,
         totalesRenta: totalesReporteRenta,
+        tablaViajesRentaPorEquipo,
+        seriesImporteTiempo,
+        seriesCamionesRentaTiempo,
+        seriesTiempo,
+        modoGraficaTiempo,
         presupuestosMaterial: presupuestosMaterialFiltrados,
         presupuestosRenta: presupuestosRentaFiltrados,
         hayAlertaPresupuesto,
@@ -1340,6 +1431,9 @@ const EstadisticasGlobales = () => {
         horaPico: horaPicoDestacada.viajes > 0 ? horaPicoDestacada : null,
         mejorRendimiento: rendimientoPorMaterial[0] || null,
         ultimaConciliacion,
+        ahorroEstimado,
+        serieConciliacionesPorMes,
+        bloquesObraConciliaciones,
       });
     } catch (err) {
       console.error("Error al exportar reporte PDF:", err);
@@ -2587,7 +2681,11 @@ const EstadisticasGlobales = () => {
         <SeccionColapsable
           id="grafica-material"
           titulo="Material vs Tiempo"
-          subtitulo="Evolución histórica · m³ transportados por mes"
+          subtitulo={
+            modoGraficaTiempo === "viajes"
+              ? "Evolución histórica · viajes registrados por mes"
+              : "Evolución histórica · m³ transportados por mes"
+          }
           abierta={seccionAbierta("grafica-material")}
           onToggle={toggleSeccion}
         >
@@ -2601,6 +2699,8 @@ const EstadisticasGlobales = () => {
           />
           <GraficaTiempo
             seriesTiempo={seriesTiempo}
+            modo={modoGraficaTiempo}
+            onModoChange={setModoGraficaTiempo}
             loading={loading}
             mostrarEncabezado={false}
           />

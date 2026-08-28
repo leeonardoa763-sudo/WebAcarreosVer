@@ -40,6 +40,22 @@ const matchesFiltro = (filtroArr, value, modo = "incluir") => {
   return modo === "excluir" ? !coincide : coincide;
 };
 
+// ── Orden y nombre de los tipos de material (ver CLAUDE.md, "Tipos de material") ──
+const ORDEN_TIPOS_MATERIAL = [1, 2, 3];
+const NOMBRE_TIPO_FALLBACK = { 1: "Materiales Pétreos", 2: "Base Asfáltica", 3: "Tepetate / Corte" };
+
+// ── Ahorro vs. proceso anterior en papel ─────────────────────────────
+// Ticket térmico impreso en campo (reemplaza el talonario físico). Costo
+// derivado de una compra real: 3 cajas de rollos térmicos × $200 = $600,
+// para los vales de "149 Desnivel" (id_obra 16) y "146 Lat del Desnivel"
+// (id_obra 15) — 2838 vales no cancelados de esas 2 obras a la fecha de
+// este cálculo. vales.impresiones_ticket confirma 1 ticket por vale
+// (encabezado), no por viaje dentro del vale.
+const COSTO_TICKET_TERMICO = 600 / 2838; // ≈ $0.2114 por vale
+const COSTO_VALE_VIEJO_MATERIAL = 2; // $ por viaje (talonario de papel)
+const COSTO_VALE_VIEJO_RENTA = 2; // $ por vale de renta (talonario de papel)
+const COSTO_CONCILIACION_VIEJA = 1; // $ por copia de conciliación en papel
+
 // ── Helper: comparación de fecha (YYYY-MM-DD, zona CDMX) contra rango ──────
 const fechaEnRango = (fechaStr, desde, hasta) => {
   if (!fechaStr) return false;
@@ -55,8 +71,9 @@ const fechaEnRango = (fechaStr, desde, hasta) => {
 // ── Agregación de material por obra desde vales reales (tabla `vales`) ──────
 // Compartida por las tablas del reporte PDF. Respeta filtro material/banco a
 // nivel detalle. Tipo 3 (corte) toma volumen_real_m3 y cuenta tickets; el resto
-// suma volumen de vale_material_viajes, y si no hay viajes (Tipo 2 asfáltico o
-// vale recién emitido) usa volumen_real_m3 y, en su defecto, cantidad_pedida_m3.
+// suma volumen de vale_material_viajes, y si no hay viajes (Tipo 2 asfáltico)
+// usa volumen_real_m3. Solo cuenta volumen REAL capturado — un vale sin
+// captura aún (recién emitido) suma 0, igual que en el Excel exportado.
 const agregarObraMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, modoMaterial = "incluir", modoBanco = "incluir") => {
   const obraMap = {};
   valesMaterial.forEach((vale) => {
@@ -75,13 +92,14 @@ const agregarObraMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mod
     (vale.vale_material_detalles || []).forEach((det) => {
       const nombreMat = det.material?.material || "Sin clasificar";
       const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
+      const tipoNombre = det.material?.tipo_de_material?.tipo_de_material || null;
 
       if (!matchesFiltro(filtroMaterial, nombreMat, modoMaterial)) return;
       if (!matchesFiltro(filtroBanco, det.id_banco, modoBanco)) return;
 
       if (!obraMap[obraId].matMap[nombreMat]) {
         obraMap[obraId].matMap[nombreMat] = {
-          material: nombreMat, m3Total: 0, valesIds: new Set(), totalViajes: 0, importeIVA: 0,
+          material: nombreMat, tipoId: tipoId ?? null, tipoNombre, m3Total: 0, valesIds: new Set(), totalViajes: 0, importeIVA: 0,
         };
       }
       const s = obraMap[obraId].matMap[nombreMat];
@@ -89,17 +107,19 @@ const agregarObraMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mod
       s.importeIVA += Number(det.costo_total || 0) * 1.16;
 
       if (tipoId === 3) {
-        s.m3Total += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
-        const tickets = vale.tickets_material?.length || 0;
-        s.totalViajes += tickets > 0 ? tickets : 1;
+        s.m3Total += Number(det.volumen_real_m3 || 0);
+        s.totalViajes += vale.tickets_material?.length || 0;
       } else {
         const viajes = det.vale_material_viajes || [];
         if (viajes.length > 0) {
           viajes.forEach((v) => { s.m3Total += Number(v.volumen_m3 || 0); });
+          s.totalViajes += viajes.length;
         } else {
-          s.m3Total += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
+          // Tipo 2 (Base/Carpeta Asfáltica): 1 vale = 1 viaje capturado directo
+          // en el detalle, sin filas en vale_material_viajes → usar volumen_real_m3.
+          s.m3Total += Number(det.volumen_real_m3 || 0);
+          s.totalViajes += (det.volumen_real_m3 != null || det.costo_total != null) ? 1 : 0;
         }
-        s.totalViajes += viajes.length > 0 ? viajes.length : 1;
       }
     });
   });
@@ -121,6 +141,125 @@ const agregarObraMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mod
       return { obra, cc, empresa, materiales, subtotal };
     })
     .sort((a, b) => b.subtotal.m3Total - a.subtotal.m3Total);
+};
+
+// ── Sindicato cuyas tarifas se reportan en "Tarifas por KM por Banco" ───────
+// Las demás (p.ej. datos de prueba como "GRUPO GEEM") se omiten de esa tabla
+// a petición explícita — el resto de la sección (m³, viajes, importe por
+// banco/material) no se ve afectado, solo el desglose de tarifas.
+const SINDICATO_TARIFAS_REPORTE = "CTM";
+
+// ── Agregación de material por banco desde vales reales (tabla `vales`) ─────
+// Igual que agregarObraMaterialReal pero agrupando tipo de material → banco →
+// material (desglose de qué materiales salieron de cada banco) en vez de
+// obra → material. Banco/distancia/precio/costo se resuelven por viaje con el
+// patrón viaje.*_override ?? viaje.* ?? detalle.* (ver calcularTotalesPorBanco.js
+// y CLAUDE.md raíz, "El banco se puede cambiar por viaje"). A diferencia de
+// calcularTotalesPorBanco.js (limitado a Tipo 1/2 de una sola conciliación),
+// aquí se incluyen los 3 tipos y todo el periodo filtrado del reporte.
+const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, modoMaterial = "incluir", modoBanco = "incluir") => {
+  const tipoMap = {};
+
+  valesMaterial.forEach((vale) => {
+    (vale.vale_material_detalles || []).forEach((det) => {
+      const nombreMat = det.material?.material || "Sin clasificar";
+      const tipoId = det.material?.tipo_de_material?.id_tipo_de_material ?? null;
+      const tipoNombre = det.material?.tipo_de_material?.tipo_de_material || NOMBRE_TIPO_FALLBACK[tipoId] || "Sin clasificar";
+      const esSindicatoTarifas = (det.sindicatos?.sindicato || "")
+        .toUpperCase()
+        .includes(SINDICATO_TARIFAS_REPORTE);
+
+      if (!matchesFiltro(filtroMaterial, nombreMat, modoMaterial)) return;
+      if (!matchesFiltro(filtroBanco, det.id_banco, modoBanco)) return;
+
+      if (!tipoMap[tipoId]) {
+        tipoMap[tipoId] = { tipoId, tipoNombre, bancoMap: {} };
+      }
+
+      const viajes = det.vale_material_viajes || [];
+      const registros = viajes.length > 0
+        ? viajes.map((v) => ({
+            banco: v.bancos_override?.banco ?? det.bancos?.banco ?? "Sin banco",
+            m3: Number(v.volumen_m3 ?? 0),
+            distanciaKm: Number(v.distancia_km_override ?? det.distancia_km ?? 0),
+            importe: Number(
+              v.costo_viaje_override ??
+                v.costo_viaje ??
+                Number(v.volumen_m3 ?? 0) * Number(v.precio_m3_override ?? v.precio_m3 ?? det.precio_m3 ?? 0)
+            ) * 1.16,
+            tarifa: v.precios_material ?? det.precios_material ?? null,
+          }))
+        : [{
+            banco: det.bancos?.banco ?? "Sin banco",
+            m3: Number(det.volumen_real_m3 ?? 0),
+            distanciaKm: Number(det.distancia_km ?? 0),
+            importe: Number(det.costo_total ?? 0) * 1.16,
+            tarifa: det.precios_material ?? null,
+          }];
+
+      registros.forEach(({ banco, m3, distanciaKm, importe, tarifa }) => {
+        const bMap = tipoMap[tipoId].bancoMap;
+        if (!bMap[banco]) {
+          bMap[banco] = {
+            banco, viajes: 0, m3Total: 0, importeIVA: 0, sumaDistancias: 0,
+            tarifasMap: new Map(), materialMap: {},
+          };
+        }
+        bMap[banco].viajes += 1;
+        bMap[banco].m3Total += m3;
+        bMap[banco].importeIVA += importe;
+        bMap[banco].sumaDistancias += distanciaKm;
+        if (esSindicatoTarifas && tarifa?.id_precios_material != null) {
+          bMap[banco].tarifasMap.set(tarifa.id_precios_material, tarifa);
+        }
+
+        const mMap = bMap[banco].materialMap;
+        if (!mMap[nombreMat]) {
+          mMap[nombreMat] = { material: nombreMat, viajes: 0, m3Total: 0, importeIVA: 0, sumaDistancias: 0 };
+        }
+        mMap[nombreMat].viajes += 1;
+        mMap[nombreMat].m3Total += m3;
+        mMap[nombreMat].importeIVA += importe;
+        mMap[nombreMat].sumaDistancias += distanciaKm;
+      });
+    });
+  });
+
+  return Object.values(tipoMap)
+    .map(({ tipoId, tipoNombre, bancoMap }) => {
+      const bancos = Object.values(bancoMap)
+        .map(({ materialMap, tarifasMap, ...b }) => ({
+          ...b,
+          distanciaKmProm: b.viajes > 0 ? b.sumaDistancias / b.viajes : 0,
+          precioM3Prom: b.m3Total > 0 ? b.importeIVA / 1.16 / b.m3Total : 0,
+          // Tarifas (precios_material) realmente usadas en viajes de sindicato
+          // CTM en este banco — puede haber más de una si surte varios
+          // materiales o si la tarifa cambió dentro del periodo del reporte.
+          tarifas: Array.from(tarifasMap.values()),
+          materiales: Object.values(materialMap)
+            .map((m) => ({
+              ...m,
+              distanciaKmProm: m.viajes > 0 ? m.sumaDistancias / m.viajes : 0,
+              precioM3Prom: m.m3Total > 0 ? m.importeIVA / 1.16 / m.m3Total : 0,
+            }))
+            .sort((a, c) => c.m3Total - a.m3Total),
+        }))
+        .sort((a, b) => b.m3Total - a.m3Total);
+      const subtotal = bancos.reduce(
+        (acc, b) => ({
+          viajes: acc.viajes + b.viajes,
+          m3Total: acc.m3Total + b.m3Total,
+          importeIVA: acc.importeIVA + b.importeIVA,
+        }),
+        { viajes: 0, m3Total: 0, importeIVA: 0 }
+      );
+      return { tipoId, tipoNombre, bancos, subtotal };
+    })
+    .sort((a, b) => {
+      const ia = a.tipoId != null ? ORDEN_TIPOS_MATERIAL.indexOf(a.tipoId) : -1;
+      const ib = b.tipoId != null ? ORDEN_TIPOS_MATERIAL.indexOf(b.tipoId) : -1;
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
 };
 
 // ── Agregación de renta por obra desde vales reales (tabla `vales`) ─────────
@@ -300,7 +439,7 @@ export const useEstadisticasGlobales = () => {
                 bancos:id_banco (id_banco, banco),
                 material:id_material (
                   id_material, material,
-                  tipo_de_material:id_tipo_de_material (id_tipo_de_material)
+                  tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)
                 ),
                 vale_material_viajes (
                   id_viaje, volumen_m3, hora_registro, id_persona_registro,
@@ -391,7 +530,10 @@ export const useEstadisticasGlobales = () => {
         .select(`
           id, id_obra, id_material, m3_presupuestados, m3_consumidos,
           obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa)),
-          material:id_material (id_material, material)
+          material:id_material (
+            id_material, material,
+            tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)
+          )
         `)
         .eq("activo", true)
         .neq("id_obra", 14);
@@ -450,12 +592,29 @@ export const useEstadisticasGlobales = () => {
           vehiculos:id_vehiculo (id_vehiculo, capacidad_m3),
           operadores:id_operador (id_operador, id_sindicato),
           vale_material_detalles (
-            id_detalle_material, volumen_real_m3, cantidad_pedida_m3, costo_total, id_banco,
+            id_detalle_material, volumen_real_m3, costo_total, id_banco,
+            distancia_km, precio_m3, id_precios_material, id_sindicato,
+            bancos:id_banco (id_banco, banco),
+            sindicatos:id_sindicato (id_sindicato, sindicato),
             material:id_material (
               id_material, material,
-              tipo_de_material:id_tipo_de_material (id_tipo_de_material)
+              tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)
             ),
-            vale_material_viajes (id_viaje, volumen_m3)
+            precios_material:id_precios_material (
+              id_precios_material, numero_de_intervalos,
+              primer_km, km_sub_int1, limite_int1, km_sub_int2, limite_int2
+            ),
+            vale_material_viajes (
+              id_viaje, volumen_m3,
+              precio_m3, costo_viaje, id_precios_material,
+              id_banco_override, distancia_km_override,
+              precio_m3_override, costo_viaje_override,
+              bancos_override:id_banco_override (id_banco, banco),
+              precios_material:id_precios_material (
+                id_precios_material, numero_de_intervalos,
+                primer_km, km_sub_int1, limite_int1, km_sub_int2, limite_int2
+              )
+            )
           ),
           tickets_material (id_ticket),
           vale_renta_detalle (
@@ -541,6 +700,69 @@ export const useEstadisticasGlobales = () => {
       }))
       .sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { numeric: true }));
   }, [rawVales]);
+
+  // ── Conciliaciones por obra, agrupadas por tipo de material y, dentro de
+  // cada tipo, por material puntual (para la lista de vínculos de la
+  // sección de Ahorro del PDF) — todo el histórico, sin filtro de
+  // mes/semana (igual que Material vs Tiempo/Tendencias, ver línea ~1246),
+  // porque la idea es listar "todas las conciliaciones de la obra".
+  // Material sale de `rawVales`/`valeAConciliacion` (solo vales de material
+  // que sí pertenecen a una conciliación); renta sale directo de
+  // `rawConciliaciones` y no tiene material, va en su propio grupo "Renta"
+  // sin subdivisión. Forma: { [obraId]: { obraNombre, grupos: { [tipoNombre]:
+  // { [materialNombre]: [{folio, fecha, numero}] } } } }. ─────────────────
+  const conciliacionesPorObraTipo = useMemo(() => {
+    const resultado = {};
+    const addItem = (obraId, obraNombre, tipoNombre, materialNombre, folio, fecha) => {
+      if (!obraId || !folio) return;
+      if (!resultado[obraId]) resultado[obraId] = { obraNombre, grupos: {} };
+      if (!resultado[obraId].grupos[tipoNombre]) resultado[obraId].grupos[tipoNombre] = {};
+      const materialKey = materialNombre || tipoNombre;
+      if (!resultado[obraId].grupos[tipoNombre][materialKey]) resultado[obraId].grupos[tipoNombre][materialKey] = [];
+      resultado[obraId].grupos[tipoNombre][materialKey].push({ folio, fecha });
+    };
+
+    // Material: agrupar por conciliación los pares (tipo, material) que toca.
+    const paresPorConciliacion = {};
+    rawVales.forEach((vale) => {
+      const conc = valeAConciliacion[vale.id_vale];
+      if (!conc || conc.tipo_conciliacion !== "material") return;
+      if (!paresPorConciliacion[conc.id_conciliacion]) {
+        paresPorConciliacion[conc.id_conciliacion] = { conc, pares: new Set() };
+      }
+      (vale.vale_material_detalles || []).forEach((det) => {
+        const tipoNombre = det.material?.tipo_de_material?.tipo_de_material;
+        const materialNombre = det.material?.material;
+        if (tipoNombre && materialNombre) {
+          paresPorConciliacion[conc.id_conciliacion].pares.add(`${tipoNombre} ${materialNombre}`);
+        }
+      });
+    });
+    Object.values(paresPorConciliacion).forEach(({ conc, pares }) => {
+      pares.forEach((par) => {
+        const [tipoNombre, materialNombre] = par.split(" ");
+        addItem(conc.id_obra, conc.obras?.obra || "Sin obra", tipoNombre, materialNombre, conc.folio, conc.fecha_generacion);
+      });
+    });
+
+    // Renta: sin material, un solo grupo "Renta" sin subdivisión.
+    rawConciliaciones
+      .filter((c) => c.tipo_conciliacion === "renta")
+      .forEach((c) => addItem(c.id_obra, c.obras?.obra || "Sin obra", "Renta", null, c.folio, c.fecha_generacion));
+
+    // Ordenar cada lista de material por fecha y numerar (el número es el
+    // que se muestra/enlaza en el PDF, reinicia en 1 por cada material).
+    Object.values(resultado).forEach((obraBlock) => {
+      Object.values(obraBlock.grupos).forEach((materialesMap) => {
+        Object.values(materialesMap).forEach((lista) => {
+          lista.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+          lista.forEach((item, i) => { item.numero = i + 1; });
+        });
+      });
+    });
+
+    return resultado;
+  }, [rawVales, valeAConciliacion, rawConciliaciones]);
 
   const opcionesEmpresas = useMemo(() => {
     const map = {};
@@ -689,6 +911,41 @@ export const useEstadisticasGlobales = () => {
     tablaMaterial,
   ]);
 
+  // ── Conciliaciones por mes (para la sección de Ahorro del PDF) ──────
+  // Mismo criterio de filtrado que `resumen.totalConciliaciones` — respeta
+  // mes/semana/obra/empresa/sindicato.
+  const serieConciliacionesPorMes = useMemo(() => {
+    let concsFiltradas = rawConciliaciones.filter((c) => c.id_obra !== 14 && Number(c.id_empresa) !== 4);
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.mes, c.fecha_generacion?.substring(0, 7), modosFiltro.mes));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.semana, getWeekKey(c.fecha_generacion), modosFiltro.semana));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idObra, c.id_obra, modosFiltro.idObra));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idEmpresa, c.id_empresa, modosFiltro.idEmpresa));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idSindicato, c.id_sindicato, modosFiltro.idSindicato));
+
+    const porMes = {};
+    concsFiltradas.forEach((c) => {
+      if (!c.fecha_generacion) return;
+      const mes = c.fecha_generacion.substring(0, 7);
+      porMes[mes] = (porMes[mes] || 0) + 1;
+    });
+
+    const meses = Object.keys(porMes).sort();
+    if (meses.length === 0) return { data: [] };
+
+    // Rellenar meses sin conciliaciones entre el primero y el último.
+    const [anioIni, mesIni] = meses[0].split("-").map(Number);
+    const [anioFin, mesFin] = meses[meses.length - 1].split("-").map(Number);
+    const data = [];
+    let y = anioIni, m = mesIni;
+    while (y < anioFin || (y === anioFin && m <= mesFin)) {
+      const key = `${y}-${String(m).padStart(2, "0")}`;
+      data.push({ mes: key, conciliaciones: porMes[key] || 0 });
+      m += 1;
+      if (m > 12) { m = 1; y += 1; }
+    }
+    return { data };
+  }, [rawConciliaciones, filtros, modosFiltro]);
+
   // ── Última conciliación ─────────────────────────────────────────────
   const ultimaConciliacion = useMemo(() => {
     return rawConciliaciones.reduce(
@@ -709,6 +966,7 @@ export const useEstadisticasGlobales = () => {
 
     const byMesMat = {};
     const totalPorMat = {};
+    const tipoPorMat = {};
 
     valesSinTiempo.forEach((vale) => {
       const conc = valeAConciliacion[vale.id_vale];
@@ -717,39 +975,109 @@ export const useEstadisticasGlobales = () => {
 
       (vale.vale_material_detalles || []).forEach((det) => {
         const mat = det.material?.material || "Sin clasificar";
-        const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
+        const tipoId = det.material?.tipo_de_material?.id_tipo_de_material ?? null;
+        const tipoNombre = det.material?.tipo_de_material?.tipo_de_material || null;
 
         if (!matchesFiltro(filtros.material, mat, modosFiltro.material)) return;
         if (!matchesFiltro(filtros.idBanco, det.id_banco, modosFiltro.idBanco)) return;
 
+        if (!tipoPorMat[mat]) tipoPorMat[mat] = { tipoId, tipoNombre };
+
         let m3 = 0;
+        let viajes = 0;
         if (tipoId === 3) {
           m3 = Number(det.volumen_real_m3 || 0);
+          viajes = vale.tickets_material?.length || 0;
         } else {
-          (det.vale_material_viajes || []).forEach((v) => { m3 += Number(v.volumen_m3 || 0); });
+          const vjs = det.vale_material_viajes || [];
+          if (vjs.length > 0) {
+            vjs.forEach((v) => { m3 += Number(v.volumen_m3 || 0); });
+            viajes = vjs.length;
+          } else {
+            // Tipo 2 (Base/Carpeta Asfáltica): 1 vale = 1 viaje capturado
+            // directo en el detalle, sin filas en vale_material_viajes.
+            m3 = Number(det.volumen_real_m3 || 0);
+            viajes = (det.volumen_real_m3 != null || det.costo_total != null) ? 1 : 0;
+          }
         }
 
         if (!byMesMat[mes]) byMesMat[mes] = {};
-        byMesMat[mes][mat] = (byMesMat[mes][mat] || 0) + m3;
-        totalPorMat[mat] = (totalPorMat[mat] || 0) + m3;
+        if (!byMesMat[mes][mat]) byMesMat[mes][mat] = { m3: 0, viajes: 0 };
+        byMesMat[mes][mat].m3 += m3;
+        byMesMat[mes][mat].viajes += viajes;
+
+        if (!totalPorMat[mat]) totalPorMat[mat] = 0;
+        totalPorMat[mat] += m3;
       });
     });
 
-    const meses = Object.keys(byMesMat).sort();
-    const topMateriales = Object.entries(totalPorMat)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
+    const mesesConDatos = Object.keys(byMesMat).sort();
+    // Todos los materiales con movimiento, sin recorte por volumen — un
+    // top global por m³ dejaba fuera categorías de menor volumen (p.ej.
+    // Base Asfáltica) frente a Materiales Pétreos aunque tuvieran actividad.
+    // Se agrupan por tipo (1 Pétreos, 2 Base Asfáltica, 3 Tepetate/Corte) y,
+    // dentro de cada tipo, por volumen descendente.
+    const materialesOrdenados = Object.entries(totalPorMat)
+      .sort((a, b) => {
+        const tipoA = tipoPorMat[a[0]]?.tipoId ?? null;
+        const tipoB = tipoPorMat[b[0]]?.tipoId ?? null;
+        const rankA = tipoA != null ? ORDEN_TIPOS_MATERIAL.indexOf(tipoA) : -1;
+        const rankB = tipoB != null ? ORDEN_TIPOS_MATERIAL.indexOf(tipoB) : -1;
+        const ordenA = rankA === -1 ? 99 : rankA;
+        const ordenB = rankB === -1 ? 99 : rankB;
+        if (ordenA !== ordenB) return ordenA - ordenB;
+        return b[1] - a[1];
+      })
       .map(([mat]) => mat);
+
+    // Agrupa la lista ya ordenada por tipo, para que el PDF pueda dibujar un
+    // encabezado por tipo (los materiales del mismo tipo quedan contiguos
+    // gracias al orden de arriba).
+    const gruposTipoMateriales = [];
+    materialesOrdenados.forEach((mat) => {
+      const info = tipoPorMat[mat] || {};
+      const tipoId = info.tipoId ?? null;
+      const tipoNombre = info.tipoNombre || NOMBRE_TIPO_FALLBACK[tipoId] || "Sin clasificar";
+      const ultimo = gruposTipoMateriales[gruposTipoMateriales.length - 1];
+      if (ultimo && ultimo.tipoId === tipoId) {
+        ultimo.materiales.push(mat);
+      } else {
+        gruposTipoMateriales.push({ tipoId, tipoNombre, materiales: [mat] });
+      }
+    });
+
+    // Rellena los meses sin movimiento con 0 entre el primero y el último con
+    // datos, para que el eje X refleje huecos reales en vez de mostrarlos
+    // como si fueran consecutivos (ej. abr-may-jul se veía seguido sin jun).
+    const meses = [];
+    if (mesesConDatos.length > 0) {
+      const [y0, m0] = mesesConDatos[0].split("-").map(Number);
+      const [y1, m1] = mesesConDatos[mesesConDatos.length - 1].split("-").map(Number);
+      let y = y0, m = m0;
+      while (y < y1 || (y === y1 && m <= m1)) {
+        meses.push(`${y}-${String(m).padStart(2, "0")}`);
+        m += 1;
+        if (m > 12) { m = 1; y += 1; }
+      }
+    }
 
     const data = meses.map((mes) => {
       const row = { mes };
-      topMateriales.forEach((mat) => {
-        row[mat] = Math.round((byMesMat[mes]?.[mat] || 0) * 100) / 100;
+      materialesOrdenados.forEach((mat) => {
+        row[mat] = Math.round((byMesMat[mes]?.[mat]?.m3 || 0) * 100) / 100;
       });
       return row;
     });
 
-    return { data, materiales: topMateriales };
+    const dataViajes = meses.map((mes) => {
+      const row = { mes };
+      materialesOrdenados.forEach((mat) => {
+        row[mat] = byMesMat[mes]?.[mat]?.viajes || 0;
+      });
+      return row;
+    });
+
+    return { data, dataViajes, materiales: materialesOrdenados, gruposTipoMateriales };
   }, [rawVales, filtros, modosFiltro, valeAConciliacion]);
 
   // ── Helper: nombre completo de persona ─────────────────────────────
@@ -777,7 +1105,13 @@ export const useEstadisticasGlobales = () => {
         if (tipoId === 3) {
           map[nombre].m3Total += Number(det.volumen_real_m3 || 0);
         } else {
-          (det.vale_material_viajes || []).forEach((v) => { map[nombre].m3Total += Number(v.volumen_m3 || 0); });
+          const viajes = det.vale_material_viajes || [];
+          if (viajes.length > 0) {
+            viajes.forEach((v) => { map[nombre].m3Total += Number(v.volumen_m3 || 0); });
+          } else {
+            // Tipo 2 (Base/Carpeta Asfáltica): volumen directo en el detalle.
+            map[nombre].m3Total += Number(det.volumen_real_m3 || 0);
+          }
         }
       });
     });
@@ -817,8 +1151,16 @@ export const useEstadisticasGlobales = () => {
           map[placas].viajes += vale.tickets_material?.length || 0;
           map[placas].m3Total += Number(det.volumen_real_m3 || 0);
         } else {
-          map[placas].viajes += det.vale_material_viajes?.length || 0;
-          (det.vale_material_viajes || []).forEach((v) => { map[placas].m3Total += Number(v.volumen_m3 || 0); });
+          const viajes = det.vale_material_viajes || [];
+          if (viajes.length > 0) {
+            map[placas].viajes += viajes.length;
+            viajes.forEach((v) => { map[placas].m3Total += Number(v.volumen_m3 || 0); });
+          } else {
+            // Tipo 2 (Base/Carpeta Asfáltica): 1 vale = 1 viaje capturado
+            // directo en el detalle, sin filas en vale_material_viajes.
+            map[placas].viajes += (det.volumen_real_m3 != null || det.costo_total != null) ? 1 : 0;
+            map[placas].m3Total += Number(det.volumen_real_m3 || 0);
+          }
         }
       });
     });
@@ -1025,26 +1367,20 @@ export const useEstadisticasGlobales = () => {
         s.valesIds.add(vale.id_vale);
         s.importeIVA += Number(det.costo_total || 0) * 1.16;
 
-        // Vales recién emitidos aún sin viajes/tickets registrados no tienen
-        // volumen real todavía — usamos cantidad_pedida_m3 (lo solicitado al
-        // crear el vale) como estimado, igual que useDashboardAnalytics.js.
-        // Un vale siempre representa al menos un viaje, aunque todavía no se
-        // haya registrado el ticket/viaje individual.
         if (tipoId === 3) {
-          s.m3Total += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
-          const tickets = vale.tickets_material?.length || 0;
-          s.totalViajes += tickets > 0 ? tickets : 1;
+          s.m3Total += Number(det.volumen_real_m3 || 0);
+          s.totalViajes += vale.tickets_material?.length || 0;
         } else {
           const viajes = det.vale_material_viajes || [];
           if (viajes.length > 0) {
             viajes.forEach((v) => { s.m3Total += Number(v.volumen_m3 || 0); });
+            s.totalViajes += viajes.length;
           } else {
-            // Tipo 2 (asfáltico) captura el volumen directo en el detalle (sin
-            // filas en vale_material_viajes) → volumen_real_m3. Vales recién
-            // emitidos sin captura aún caen a cantidad_pedida_m3 como estimado.
-            s.m3Total += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
+            // Tipo 2 (Base/Carpeta Asfáltica): 1 vale = 1 viaje capturado directo
+            // en el detalle, sin filas en vale_material_viajes → usar volumen_real_m3.
+            s.m3Total += Number(det.volumen_real_m3 || 0);
+            s.totalViajes += (det.volumen_real_m3 != null || det.costo_total != null) ? 1 : 0;
           }
-          s.totalViajes += viajes.length > 0 ? viajes.length : 1;
         }
       });
     });
@@ -1310,20 +1646,19 @@ export const useEstadisticasGlobales = () => {
         s.importeIVA += Number(det.costo_total || 0) * 1.16;
 
         if (tipoId === 3) {
-          s.m3Total += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
-          const tickets = vale.tickets_material?.length || 0;
-          s.totalViajes += tickets > 0 ? tickets : 1;
+          s.m3Total += Number(det.volumen_real_m3 || 0);
+          s.totalViajes += vale.tickets_material?.length || 0;
         } else {
           const viajes = det.vale_material_viajes || [];
           if (viajes.length > 0) {
             viajes.forEach((v) => { s.m3Total += Number(v.volumen_m3 || 0); });
+            s.totalViajes += viajes.length;
           } else {
-            // Tipo 2 (asfáltico) captura el volumen directo en el detalle (sin
-            // filas en vale_material_viajes) → volumen_real_m3. Vales recién
-            // emitidos sin captura aún caen a cantidad_pedida_m3 como estimado.
-            s.m3Total += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
+            // Tipo 2 (Base/Carpeta Asfáltica): 1 vale = 1 viaje capturado directo
+            // en el detalle, sin filas en vale_material_viajes → usar volumen_real_m3.
+            s.m3Total += Number(det.volumen_real_m3 || 0);
+            s.totalViajes += (det.volumen_real_m3 != null || det.costo_total != null) ? 1 : 0;
           }
-          s.totalViajes += viajes.length > 0 ? viajes.length : 1;
         }
       });
     });
@@ -1447,6 +1782,49 @@ export const useEstadisticasGlobales = () => {
     [valesReporteFiltrados]
   );
 
+  const tablaBancoMaterialReporte = useMemo(
+    () =>
+      agregarBancoMaterialReal(
+        valesReporteFiltrados.filter((v) => v.tipo_vale === "material"),
+        filtros.material,
+        filtros.idBanco,
+        modosFiltro.material,
+        modosFiltro.idBanco
+      ),
+    [valesReporteFiltrados, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco]
+  );
+
+  // ── Ahorro estimado vs. proceso anterior en papel ────────────────────
+  // `valesReporteFiltrados` ya excluye cancelado/borrador a nivel de query
+  // (fetchValesTiempoReal, .not("estado", "in", "(borrador,cancelado)")).
+  const ahorroEstimado = useMemo(() => {
+    const materialVales = valesReporteFiltrados.filter((v) => v.tipo_vale === "material");
+    const rentaVales = valesReporteFiltrados.filter((v) => v.tipo_vale === "renta");
+
+    const totalViajesMaterial = materialVales.reduce((acc, vale) => {
+      return acc + (vale.vale_material_detalles || []).reduce((sum, det) => {
+        if (det.material?.tipo_de_material?.id_tipo_de_material === 3) {
+          return sum + (vale.tickets_material?.length || 0);
+        }
+        const viajes = det.vale_material_viajes || [];
+        return sum + (viajes.length > 0 ? viajes.length : ((det.volumen_real_m3 != null || det.costo_total != null) ? 1 : 0));
+      }, 0);
+    }, 0);
+    const totalValesMaterial = materialVales.length;
+    const totalValesRenta = rentaVales.length;
+    const totalConciliaciones = resumen?.totalConciliaciones || 0;
+
+    const ahorroMaterial = (totalViajesMaterial * COSTO_VALE_VIEJO_MATERIAL) - (totalValesMaterial * COSTO_TICKET_TERMICO);
+    const ahorroRenta = (totalValesRenta * COSTO_VALE_VIEJO_RENTA) - (totalValesRenta * COSTO_TICKET_TERMICO);
+    const ahorroConciliaciones = totalConciliaciones * COSTO_CONCILIACION_VIEJA;
+
+    return {
+      totalViajesMaterial, totalValesMaterial, totalValesRenta, totalConciliaciones,
+      ahorroMaterial, ahorroRenta, ahorroConciliaciones,
+      ahorroTotal: ahorroMaterial + ahorroRenta + ahorroConciliaciones,
+    };
+  }, [valesReporteFiltrados, resumen]);
+
   const hayAlertaPresupuesto = useMemo(
     () =>
       presupuestosMaterialFiltrados.some(
@@ -1507,6 +1885,58 @@ export const useEstadisticasGlobales = () => {
     });
 
     return { data, equipos };
+  }, [rawValesRenta, valeRentaAConciliacion, filtros.idObra, filtros.idEmpresa, filtros.idSindicato, modosFiltro.idObra, modosFiltro.idEmpresa, modosFiltro.idSindicato]);
+
+  // ── Importe de Renta gastado por mes (desde conciliaciones de renta) ──
+  // Ignora filtro mes/semana para mostrar la evolución histórica completa,
+  // igual que seriesTiempoRenta. Usa total_final de la conciliación (ya
+  // incluye IVA y retención). Solo renta — el importe de material ya tiene
+  // su propia gráfica (Material vs Tiempo).
+  const seriesImporteTiempo = useMemo(() => {
+    let concsFiltradas = rawConciliaciones.filter(
+      (c) => c.tipo_conciliacion === "renta" && c.id_obra !== 14 && Number(c.id_empresa) !== 4
+    );
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idObra, c.id_obra, modosFiltro.idObra));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idEmpresa, c.id_empresa, modosFiltro.idEmpresa));
+    concsFiltradas = concsFiltradas.filter((c) => matchesFiltro(filtros.idSindicato, c.id_sindicato, modosFiltro.idSindicato));
+
+    const byMes = {};
+    concsFiltradas.forEach((c) => {
+      const mes = c.fecha_generacion?.substring(0, 7);
+      if (!mes) return;
+      byMes[mes] = (byMes[mes] || 0) + Number(c.total_final || 0);
+    });
+
+    const meses = Object.keys(byMes).sort();
+    const data = meses.map((mes) => ({ mes, importeRenta: Math.round(byMes[mes] * 100) / 100 }));
+
+    return { data };
+  }, [rawConciliaciones, filtros.idObra, filtros.idEmpresa, filtros.idSindicato, modosFiltro.idObra, modosFiltro.idEmpresa, modosFiltro.idSindicato]);
+
+  // ── Camiones rentados por mes ────────────────────────────────────────
+  // Cuenta TODOS los vales de renta por mes de conciliación (no solo
+  // vehículos únicos) — un vale es un camión rentado, así que el conteo
+  // debe cuadrar con el número de vales de renta del mes.
+  const seriesCamionesRentaTiempo = useMemo(() => {
+    const valesFilt = rawValesRenta.filter((vale) => {
+      if (!matchesFiltro(filtros.idObra, vale.id_obra, modosFiltro.idObra)) return false;
+      if (!matchesFiltro(filtros.idEmpresa, vale.obras?.empresas?.id_empresa, modosFiltro.idEmpresa)) return false;
+      return true;
+    });
+
+    const byMes = {};
+    valesFilt.forEach((vale) => {
+      const conc = valeRentaAConciliacion[vale.id_vale];
+      if (!conc?.fecha_generacion) return;
+      if (!matchesFiltro(filtros.idSindicato, conc?.id_sindicato, modosFiltro.idSindicato)) return;
+      const mes = conc.fecha_generacion.substring(0, 7);
+      byMes[mes] = (byMes[mes] || 0) + 1;
+    });
+
+    const meses = Object.keys(byMes).sort();
+    const data = meses.map((mes) => ({ mes, camiones: byMes[mes] }));
+
+    return { data };
   }, [rawValesRenta, valeRentaAConciliacion, filtros.idObra, filtros.idEmpresa, filtros.idSindicato, modosFiltro.idObra, modosFiltro.idEmpresa, modosFiltro.idSindicato]);
 
   // ── Tabla viajes de renta agrupada por obra → equipo (respeta todos los filtros) ──
@@ -1661,10 +2091,6 @@ export const useEstadisticasGlobales = () => {
       actualKey = filtros.mes[0];
       const idx = opcionesMeses.indexOf(actualKey);
       anteriorKey = idx >= 0 ? opcionesMeses[idx + 1] || null : null;
-    } else if (filtros.mes.length === 0 && filtros.semana.length === 0 && opcionesMeses.length >= 2) {
-      modo = "mes";
-      actualKey = opcionesMeses[0];
-      anteriorKey = opcionesMeses[1];
     }
 
     if (!anteriorKey) return null;
@@ -1756,6 +2182,8 @@ export const useEstadisticasGlobales = () => {
     // Gráficas
     seriesTiempo,
     seriesTiempoRenta,
+    seriesImporteTiempo,
+    seriesCamionesRentaTiempo,
     tablaViajesRentaPorEquipo,
     derivarPrecioRenta,
     // Análisis avanzado
@@ -1791,6 +2219,11 @@ export const useEstadisticasGlobales = () => {
     // Fuente del reporte PDF: vales reales agrupados por los chips globales
     tablaObraMaterialReporte,
     tablaObraRentaReporte,
+    tablaBancoMaterialReporte,
+    // Ahorro estimado vs. proceso anterior en papel (sección final del PDF)
+    ahorroEstimado,
+    serieConciliacionesPorMes,
+    conciliacionesPorObraTipo,
     // Presupuestos
     loadingPresupuestos,
     presupuestosMaterialFiltrados,

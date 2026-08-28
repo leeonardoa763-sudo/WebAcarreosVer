@@ -38,6 +38,12 @@ const COLOR_SUCCESS = "#059669";
 const COLOR_WARNING = "#D97706";
 const COLOR_DANGER = "#DC2626";
 
+// ── Ahorro vs. proceso anterior en papel ─────────────────────────────
+// El cálculo (costo viejo de talonario vs. costo nuevo de ticket térmico)
+// ya viene resuelto en `ahorroEstimado` desde useEstadisticasGlobales.js —
+// aquí solo se arma el vínculo al QR de cada conciliación.
+const BASE_URL_CONCILIACION = "https://web-acarreos.vercel.app"; // mismo dominio que el QR de conciliaciones
+
 // ── Helpers ───────────────────────────────────────────────────────
 const hexToRgb = (hex) => {
   const v = hex.replace("#", "");
@@ -88,6 +94,13 @@ const formatearFechaHoraGeneracion = () =>
     timeZone: "America/Mexico_City",
   });
 
+const formatearMesCorto = (mesKey) => {
+  if (!mesKey) return "";
+  const [year, month] = mesKey.split("-");
+  const d = new Date(Number(year), Number(month) - 1, 1);
+  return d.toLocaleDateString("es-MX", { month: "short" }).replace(".", "").toUpperCase();
+};
+
 const formatearFechaCorte = (ts) => {
   if (!ts) return "—";
   return new Date(ts).toLocaleDateString("es-MX", {
@@ -118,6 +131,50 @@ const formatearObraCompleta = (empresa, cc, obra) => {
   if (cc != null) partes.push(`CC ${cc}`);
   partes.push(obra || "Sin obra");
   return partes.join(" · ");
+};
+
+// ── Agrupar materiales por tipo (Pétreos / Base Asfáltica / Tepetate-Corte) ──
+const ORDEN_TIPOS_MATERIAL = [1, 2, 3];
+const NOMBRE_TIPO_FALLBACK = { 1: "Materiales Pétreos", 2: "Base Asfáltica", 3: "Tepetate / Corte" };
+
+const agruparMaterialesPorTipo = (materiales) => {
+  const grupos = {};
+  materiales.forEach((m) => {
+    const key = m.tipoId ?? "sin-tipo";
+    if (!grupos[key]) {
+      grupos[key] = {
+        tipoId: m.tipoId ?? null,
+        tipoNombre: m.tipoNombre || NOMBRE_TIPO_FALLBACK[m.tipoId] || "Sin clasificar",
+        items: [],
+      };
+    }
+    grupos[key].items.push(m);
+  });
+  return Object.values(grupos).sort((a, b) => {
+    const ia = a.tipoId != null ? ORDEN_TIPOS_MATERIAL.indexOf(a.tipoId) : -1;
+    const ib = b.tipoId != null ? ORDEN_TIPOS_MATERIAL.indexOf(b.tipoId) : -1;
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+};
+
+// ── Agrupar filas de presupuesto por obra ────────────────────────────
+const agruparPresupuestoPorObra = (arr) => {
+  const obraMap = {};
+  arr.forEach((p) => {
+    const obraId = p.obras?.id_obra ?? formatearObraCompleta(p.obras?.empresas?.empresa, p.obras?.cc, p.obras?.obra);
+    if (!obraMap[obraId]) {
+      obraMap[obraId] = {
+        empresa: p.obras?.empresas?.empresa || null,
+        cc: p.obras?.cc ?? null,
+        obra: p.obras?.obra || "Sin obra",
+        items: [],
+      };
+    }
+    obraMap[obraId].items.push(p);
+  });
+  return Object.values(obraMap).sort((a, b) =>
+    formatearObraCompleta(a.empresa, a.cc, a.obra).localeCompare(formatearObraCompleta(b.empresa, b.cc, b.obra))
+  );
 };
 
 const calcularSemaforo = (consumido, presupuestado) => {
@@ -274,18 +331,22 @@ const dibujarTablaMaterial = (doc, yPosInicial, tablaObraMaterial, totalesTablaO
     } else if (opts.fillSubtotal) {
       setFill(doc, "#EFF3EE");
       doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
+    } else if (opts.fillTipo) {
+      setFill(doc, "#F5F7FA");
+      doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
     } else if (rowIndex % 2 === 1) {
       setFill(doc, COLOR_ROW_ALT);
       doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
     }
 
     doc.setFont("helvetica", opts.bold ? "bold" : "normal");
-    doc.setFontSize(8);
+    doc.setFontSize(opts.sub ? 7 : 8);
+    if (opts.tipoHeader || opts.sub) setTextColor(doc, COLOR_GRAY);
     let x = MARGIN_LEFT;
     columnas.forEach((col, i) => {
       const textX = col.align === "right" ? x + col.width - 2 : x + 2;
       if (i === 0 && opts.span) {
-        doc.text(ajustarTexto(doc, cells[0], USABLE_WIDTH - 4), MARGIN_LEFT + 2, yPos + 4.2);
+        doc.text(ajustarTexto(doc, cells[0], USABLE_WIDTH - 4), MARGIN_LEFT + (opts.indent ?? 2), yPos + 4.2);
       } else {
         const raw = String(cells[i] ?? "");
         const texto = col.align === "left" ? ajustarTexto(doc, raw, col.width - 4) : raw;
@@ -293,6 +354,7 @@ const dibujarTablaMaterial = (doc, yPosInicial, tablaObraMaterial, totalesTablaO
       }
       x += col.width;
     });
+    if (opts.tipoHeader || opts.sub) setTextColor(doc, COLOR_TEXT);
 
     yPos += rowHeight;
     rowIndex += 1;
@@ -302,14 +364,20 @@ const dibujarTablaMaterial = (doc, yPosInicial, tablaObraMaterial, totalesTablaO
     const obraLabel = formatearObraCompleta(obraRow.empresa, obraRow.cc, obraRow.obra);
     drawRow([obraLabel, "", "", "", ""], { fillHeader: true, bold: true, span: true });
 
-    obraRow.materiales.forEach((mat) => {
-      drawRow([
-        `  ${mat.material}`,
-        `${formatearNumero(mat.m3Total, 2)} m³`,
-        formatearNumero(mat.valesCount),
-        formatearNumero(mat.totalViajes),
-        formatearMoneda(mat.importeIVA),
-      ]);
+    const gruposPorTipo = agruparMaterialesPorTipo(obraRow.materiales);
+    gruposPorTipo.forEach((grupo) => {
+      drawRow([grupo.tipoNombre.toUpperCase(), "", "", "", ""], {
+        fillTipo: true, bold: true, span: true, tipoHeader: true, indent: 4,
+      });
+      grupo.items.forEach((mat) => {
+        drawRow([
+          `  ${mat.material}`,
+          `${formatearNumero(mat.m3Total, 2)} m³`,
+          formatearNumero(mat.valesCount),
+          formatearNumero(mat.totalViajes),
+          formatearMoneda(mat.importeIVA),
+        ], { sub: true });
+      });
     });
 
     if (obraRow.materiales.length > 1) {
@@ -329,6 +397,399 @@ const dibujarTablaMaterial = (doc, yPosInicial, tablaObraMaterial, totalesTablaO
     formatearNumero(totalesTablaObra.valesCount),
     formatearNumero(totalesTablaObra.totalViajes),
     formatearMoneda(totalesTablaObra.importeIVA),
+  ], { fillHeader: true, bold: true });
+
+  return yPos + 6;
+};
+
+// ── Gráfica: barras horizontales de m³ por banco ─────────────────────
+// No existe otro tipo de gráfica de barras en este archivo (solo mini line
+// charts) — mismo lenguaje visual que dibujarKpis/dibujarComparativa.
+const dibujarBarrasBancos = (doc, x, yPosInicial, width, bancos, colorHex, maxBarras = 8) => {
+  const datos = (bancos || []).slice(0, maxBarras);
+  if (datos.length === 0) return yPosInicial;
+
+  let yPos = yPosInicial;
+  const maxVal = Math.max(...datos.map((b) => b.m3Total), 1);
+  const labelWidth = 38;
+  const barAreaWidth = width - labelWidth - 22;
+  const barHeight = 4.5;
+  const gap = 1.8;
+
+  datos.forEach((b) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    setTextColor(doc, COLOR_TEXT);
+    doc.text(ajustarTexto(doc, b.banco, labelWidth - 2), x, yPos + barHeight - 1);
+
+    const barW = Math.max((b.m3Total / maxVal) * barAreaWidth, 0.5);
+    setFill(doc, "#E8EEF4");
+    doc.rect(x + labelWidth, yPos, barAreaWidth, barHeight, "F");
+    setFill(doc, colorHex);
+    doc.rect(x + labelWidth, yPos, barW, barHeight, "F");
+
+    doc.setFontSize(6.5);
+    setTextColor(doc, COLOR_GRAY);
+    doc.text(`${formatearNumero(b.m3Total, 1)} m³`, x + labelWidth + barAreaWidth + 2, yPos + barHeight - 1);
+
+    yPos += barHeight + gap;
+  });
+
+  setTextColor(doc, COLOR_TEXT);
+  return yPos + 2;
+};
+
+// ── Tabla: Material por Banco (distancia, precio/m³ e importe, agrupado
+// por tipo de material) ───────────────────────────────────────────────
+// Banco/distancia/precio/costo ya vienen resueltos por viaje con el patrón
+// viaje.*_override ?? viaje.* ?? detalle.* (ver agregarBancoMaterialReal en
+// useEstadisticasGlobales.js) — esta función solo dibuja lo que recibe.
+const dibujarSeccionBancoMaterial = (doc, yPosInicial, tablaBancoMaterial) => {
+  let yPos = dibujarTituloSeccion(doc, yPosInicial, "Material por Banco");
+
+  const columnas = [
+    { label: "BANCO", width: 55, align: "left" },
+    { label: "M³ TOTAL", width: 25, align: "right" },
+    { label: "VIAJES", width: 20, align: "right" },
+    { label: "DIST. PROM (KM)", width: 30, align: "right" },
+    { label: "PRECIO PROM/M³", width: 30, align: "right" },
+    { label: "IMPORTE + IVA", width: 25, align: "right" },
+  ];
+
+  if (!tablaBancoMaterial || tablaBancoMaterial.length === 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    setTextColor(doc, COLOR_GRAY);
+    doc.text("Sin datos de banco para los filtros seleccionados.", MARGIN_LEFT, yPos + 5);
+    setTextColor(doc, COLOR_TEXT);
+    return yPos + 12;
+  }
+
+  yPos = dibujarEncabezadoColumnas(doc, yPos, columnas);
+
+  const rowHeight = 6;
+  let rowIndex = 0;
+
+  const drawRow = (cells, opts = {}) => {
+    yPos = checkPageBreak(doc, yPos, rowHeight, PAGE_HEIGHT, MARGIN_BOTTOM);
+    if (yPos === 12) {
+      yPos = dibujarEncabezadoColumnas(doc, yPos, columnas);
+    }
+
+    if (opts.fillHeader) {
+      setFill(doc, "#E8EEF4");
+      doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
+    } else if (opts.fillSubtotal) {
+      setFill(doc, "#EFF3EE");
+      doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
+    } else if (rowIndex % 2 === 1) {
+      setFill(doc, COLOR_ROW_ALT);
+      doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
+    }
+
+    doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+    doc.setFontSize(opts.sub ? 7 : 8);
+    if (opts.sub) setTextColor(doc, COLOR_GRAY);
+    let x = MARGIN_LEFT;
+    columnas.forEach((col, i) => {
+      const textX = col.align === "right" ? x + col.width - 2 : x + 2;
+      if (i === 0 && opts.span) {
+        doc.text(ajustarTexto(doc, cells[0], USABLE_WIDTH - 4), MARGIN_LEFT + (opts.indent ?? 2), yPos + 4.2);
+      } else {
+        const raw = String(cells[i] ?? "");
+        const texto = col.align === "left" ? ajustarTexto(doc, raw, col.width - 4) : raw;
+        doc.text(texto, textX, yPos + 4.2, { align: col.align === "right" ? "right" : "left" });
+      }
+      x += col.width;
+    });
+    if (opts.sub) setTextColor(doc, COLOR_TEXT);
+
+    yPos += rowHeight;
+    rowIndex += 1;
+  };
+
+  const totalGeneral = { viajes: 0, m3Total: 0, importeIVA: 0 };
+  const chartRowHeight = 4.5 + 1.8;
+  const alturaGraficaDe = (grupo) => Math.min(grupo.bancos.length, 8) * chartRowHeight + 4;
+  const filasBancosDe = (grupo) =>
+    grupo.bancos.reduce((acc, b) => acc + 1 + b.materiales.length, 0);
+
+  tablaBancoMaterial.forEach((grupo) => {
+    // Reservar el espacio de la tabla del grupo (header + bancos + desglose
+    // de materiales + subtotal) más su gráfica como un solo bloque, para que
+    // no se separen en páginas distintas (la gráfica quedaría huérfana, sin
+    // la tabla que la explica).
+    const alturaGrupo =
+      rowHeight * (1 + filasBancosDe(grupo) + (grupo.bancos.length > 1 ? 1 : 0)) +
+      4 + alturaGraficaDe(grupo) + 4;
+    yPos = checkPageBreak(doc, yPos, alturaGrupo, PAGE_HEIGHT, MARGIN_BOTTOM);
+    if (yPos === 12) {
+      yPos = dibujarEncabezadoColumnas(doc, yPos, columnas);
+    }
+
+    drawRow([grupo.tipoNombre.toUpperCase(), "", "", "", "", ""], {
+      fillHeader: true, bold: true, span: true,
+    });
+
+    grupo.bancos.forEach((b) => {
+      drawRow([
+        `  ${b.banco}`,
+        `${formatearNumero(b.m3Total, 2)} m³`,
+        formatearNumero(b.viajes),
+        formatearNumero(b.distanciaKmProm, 1),
+        formatearMoneda(b.precioM3Prom),
+        formatearMoneda(b.importeIVA),
+      ], { bold: true });
+
+      b.materiales.forEach((m) => {
+        drawRow([
+          `      ${m.material}`,
+          `${formatearNumero(m.m3Total, 2)} m³`,
+          formatearNumero(m.viajes),
+          formatearNumero(m.distanciaKmProm, 1),
+          formatearMoneda(m.precioM3Prom),
+          formatearMoneda(m.importeIVA),
+        ], { sub: true });
+      });
+    });
+
+    if (grupo.bancos.length > 1) {
+      drawRow([
+        "  Subtotal",
+        `${formatearNumero(grupo.subtotal.m3Total, 2)} m³`,
+        formatearNumero(grupo.subtotal.viajes),
+        "",
+        "",
+        formatearMoneda(grupo.subtotal.importeIVA),
+      ], { fillSubtotal: true, bold: true });
+    }
+
+    totalGeneral.viajes += grupo.subtotal.viajes;
+    totalGeneral.m3Total += grupo.subtotal.m3Total;
+    totalGeneral.importeIVA += grupo.subtotal.importeIVA;
+
+    // Gráfica de m³ por banco de este tipo, debajo de su tabla (el bloque
+    // completo ya se reservó arriba, este checkPageBreak es solo por si la
+    // estimación de alturaGrupo se quedó corta).
+    yPos = checkPageBreak(doc, yPos, alturaGraficaDe(grupo), PAGE_HEIGHT, MARGIN_BOTTOM);
+    yPos += 2;
+    const colorIdx = grupo.tipoId != null ? ORDEN_TIPOS_MATERIAL.indexOf(grupo.tipoId) : -1;
+    yPos = dibujarBarrasBancos(
+      doc, MARGIN_LEFT, yPos, USABLE_WIDTH, grupo.bancos,
+      COLORES_MATERIALES_PDF[(colorIdx === -1 ? 0 : colorIdx) % COLORES_MATERIALES_PDF.length]
+    );
+    yPos += 2;
+  });
+
+  drawRow([
+    "TOTAL",
+    `${formatearNumero(totalGeneral.m3Total, 2)} m³`,
+    formatearNumero(totalGeneral.viajes),
+    "",
+    "",
+    formatearMoneda(totalGeneral.importeIVA),
+  ], { fillHeader: true, bold: true });
+
+  yPos += 6;
+  yPos = dibujarTablaTarifasBanco(doc, yPos, tablaBancoMaterial);
+
+  return yPos;
+};
+
+// ── Tabla: Tarifas por KM por Banco (por banco, agrupado por tipo de
+// material; una fila por tarifa realmente usada en el periodo — puede haber
+// más de una por banco si surte varios materiales o si la tarifa cambió
+// dentro del rango del reporte) ───────────────────────────────────────
+// Solo se muestran 1er km y tarifa subsecuente (el resto de los tramos de
+// precios_material casi no se usa). Solo incluye tarifas de sindicato CTM
+// (SINDICATO_TARIFAS_REPORTE en useEstadisticasGlobales.js) — otros
+// sindicatos (p.ej. datos de prueba) se omiten de esta tabla.
+const dibujarTablaTarifasBanco = (doc, yPosInicial, tablaBancoMaterial) => {
+  let yPos = dibujarTituloSeccion(doc, yPosInicial, "Tarifas por KM por Banco (Sindicato CTM)");
+
+  const columnas = [
+    { label: "BANCO", width: 85, align: "left" },
+    { label: "1ER KM ($/M³)", width: 50, align: "right" },
+    { label: "TARIFA SUBSECUENTE", width: 50, align: "right" },
+  ];
+
+  const grupos = (tablaBancoMaterial || [])
+    .map((grupo) => ({ ...grupo, bancos: grupo.bancos.filter((b) => b.tarifas.length > 0) }))
+    .filter((grupo) => grupo.bancos.length > 0);
+
+  if (grupos.length === 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    setTextColor(doc, COLOR_GRAY);
+    doc.text("Sin datos de tarifas para los filtros seleccionados.", MARGIN_LEFT, yPos + 5);
+    setTextColor(doc, COLOR_TEXT);
+    return yPos + 12;
+  }
+
+  yPos = dibujarEncabezadoColumnas(doc, yPos, columnas);
+  const rowHeight = 6;
+  let rowIndex = 0;
+
+  const drawRow = (cells, opts = {}) => {
+    yPos = checkPageBreak(doc, yPos, rowHeight, PAGE_HEIGHT, MARGIN_BOTTOM);
+    if (yPos === 12) {
+      yPos = dibujarEncabezadoColumnas(doc, yPos, columnas);
+    }
+
+    if (opts.fillHeader) {
+      setFill(doc, "#E8EEF4");
+      doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
+    } else if (rowIndex % 2 === 1) {
+      setFill(doc, COLOR_ROW_ALT);
+      doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
+    }
+
+    doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+    doc.setFontSize(opts.bold ? 8 : 7.5);
+    if (opts.span) {
+      doc.text(ajustarTexto(doc, cells[0], USABLE_WIDTH - 4), MARGIN_LEFT + 2, yPos + 4.2);
+    } else {
+      let x = MARGIN_LEFT;
+      columnas.forEach((col, i) => {
+        const textX = col.align === "right" ? x + col.width - 2 : x + 2;
+        const raw = String(cells[i] ?? "");
+        const texto = col.align === "left" ? ajustarTexto(doc, raw, col.width - 4) : raw;
+        doc.text(texto, textX, yPos + 4.2, { align: col.align === "right" ? "right" : "left" });
+        x += col.width;
+      });
+    }
+
+    yPos += rowHeight;
+    rowIndex += 1;
+  };
+
+  grupos.forEach((grupo) => {
+    drawRow([grupo.tipoNombre.toUpperCase()], { fillHeader: true, bold: true, span: true });
+
+    grupo.bancos.forEach((b) => {
+      b.tarifas.forEach((t, i) => {
+        drawRow([
+          i === 0 ? `  ${b.banco}` : "",
+          t.primer_km != null ? formatearMoneda(t.primer_km) : "—",
+          t.km_sub_int1 != null ? formatearMoneda(t.km_sub_int1) : "—",
+        ]);
+      });
+    });
+  });
+
+  return yPos + 6;
+};
+
+// ── Tabla: Renta de Equipo — Precio por Viaje y m³ ───────────────────
+// Usa tablaViajesRentaPorEquipo (obra → equipo, con precio derivado de la
+// capacidad del vehículo — ver derivarPrecioRenta en useEstadisticasGlobales).
+// m³ Aprox. Acarreado = viajes × capacidad promedio del vehículo: no existe
+// volumen capturado en BD para renta, es una estimación para dimensionar el
+// movimiento de material transportado en equipo rentado.
+const dibujarTablaRentaPrecios = (doc, yPosInicial, tablaViajesRentaPorEquipo) => {
+  const filas = (tablaViajesRentaPorEquipo || []).filter((obraRow) => obraRow.equipos?.length > 0);
+  if (filas.length === 0) return yPosInicial;
+
+  let yPos = dibujarTituloSeccion(doc, yPosInicial, "Renta de Equipo — Precio por Viaje y m³");
+
+  const columnas = [
+    { label: "EQUIPO", width: 45, align: "left" },
+    { label: "VIAJES", width: 20, align: "right" },
+    { label: "CAP. PROM.", width: 30, align: "right" },
+    { label: "PRECIO / VIAJE", width: 35, align: "right" },
+    { label: "PRECIO APROX. /M³", width: 30, align: "right" },
+    { label: "M³ APROX.", width: 25, align: "right" },
+  ];
+
+  yPos = dibujarEncabezadoColumnas(doc, yPos, columnas);
+
+  const rowHeight = 6;
+  let rowIndex = 0;
+
+  const drawRow = (cells, opts = {}) => {
+    yPos = checkPageBreak(doc, yPos, rowHeight, PAGE_HEIGHT, MARGIN_BOTTOM);
+    if (yPos === 12) {
+      yPos = dibujarEncabezadoColumnas(doc, yPos, columnas);
+    }
+
+    if (opts.fillHeader) {
+      setFill(doc, "#E8EEF4");
+      doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
+    } else if (opts.fillSubtotal) {
+      setFill(doc, "#EFF3EE");
+      doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
+    } else if (rowIndex % 2 === 1) {
+      setFill(doc, COLOR_ROW_ALT);
+      doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
+    }
+
+    doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+    doc.setFontSize(8);
+    let x = MARGIN_LEFT;
+    columnas.forEach((col, i) => {
+      const textX = col.align === "right" ? x + col.width - 2 : x + 2;
+      if (i === 0 && opts.span) {
+        doc.text(ajustarTexto(doc, cells[0], USABLE_WIDTH - 4), MARGIN_LEFT + (opts.indent ?? 2), yPos + 4.2);
+      } else {
+        const raw = String(cells[i] ?? "");
+        const texto = col.align === "left" ? ajustarTexto(doc, raw, col.width - 4) : raw;
+        doc.text(texto, textX, yPos + 4.2, { align: col.align === "right" ? "right" : "left" });
+      }
+      x += col.width;
+    });
+
+    yPos += rowHeight;
+    rowIndex += 1;
+  };
+
+  const totalesGeneral = { viajes: 0, capacidadSuma: 0, capacidadCount: 0, importeTotal: 0, m3Aprox: 0 };
+
+  filas.forEach((obraRow) => {
+    drawRow([formatearObraCompleta(obraRow.empresa, obraRow.cc, obraRow.obra), "", "", "", "", ""], {
+      fillHeader: true, bold: true, span: true,
+    });
+
+    obraRow.equipos.forEach((eq) => {
+      const m3Aprox = eq.capacidadPromedio != null ? eq.viajes * eq.capacidadPromedio : null;
+      drawRow([
+        `  ${eq.equipo}`,
+        formatearNumero(eq.viajes),
+        eq.capacidadPromedio != null ? `${formatearNumero(eq.capacidadPromedio, 2)} m³` : "—",
+        eq.importePorViaje != null ? formatearMoneda(eq.importePorViaje) : "—",
+        eq.precioAproxM3 != null ? formatearMoneda(eq.precioAproxM3) : "—",
+        m3Aprox != null ? `${formatearNumero(m3Aprox, 2)} m³` : "—",
+      ]);
+      totalesGeneral.viajes += eq.viajes;
+      totalesGeneral.capacidadSuma += eq.capacidadSuma || 0;
+      totalesGeneral.capacidadCount += eq.capacidadCount || 0;
+      totalesGeneral.importeTotal += eq.importeTotal || 0;
+      if (m3Aprox != null) totalesGeneral.m3Aprox += m3Aprox;
+    });
+
+    if (obraRow.equipos.length > 1) {
+      const sub = obraRow.subtotal;
+      const subM3Aprox = sub.capacidadPromedio != null ? sub.viajes * sub.capacidadPromedio : null;
+      drawRow([
+        "  Subtotal",
+        formatearNumero(sub.viajes),
+        sub.capacidadPromedio != null ? `${formatearNumero(sub.capacidadPromedio, 2)} m³` : "—",
+        sub.importePorViaje != null ? formatearMoneda(sub.importePorViaje) : "—",
+        sub.precioAproxM3 != null ? formatearMoneda(sub.precioAproxM3) : "—",
+        subM3Aprox != null ? `${formatearNumero(subM3Aprox, 2)} m³` : "—",
+      ], { fillSubtotal: true, bold: true });
+    }
+  });
+
+  const capPromGeneral = totalesGeneral.capacidadCount > 0 ? totalesGeneral.capacidadSuma / totalesGeneral.capacidadCount : null;
+  const precioViajeGeneral = totalesGeneral.viajes > 0 ? totalesGeneral.importeTotal / totalesGeneral.viajes : null;
+  const precioM3General = precioViajeGeneral != null && capPromGeneral ? precioViajeGeneral / capPromGeneral : null;
+  drawRow([
+    "TOTAL",
+    formatearNumero(totalesGeneral.viajes),
+    capPromGeneral != null ? `${formatearNumero(capPromGeneral, 2)} m³` : "—",
+    precioViajeGeneral != null ? formatearMoneda(precioViajeGeneral) : "—",
+    precioM3General != null ? formatearMoneda(precioM3General) : "—",
+    `${formatearNumero(totalesGeneral.m3Aprox, 2)} m³`,
   ], { fillHeader: true, bold: true });
 
   return yPos + 6;
@@ -493,23 +954,85 @@ const dibujarPresupuestos = (doc, yPosInicial, presupuestosMaterial, presupuesto
     yPos += 6;
 
     const columnasMat = [
-      { label: "OBRA", width: 62, align: "left" },
-      { label: "MATERIAL", width: 42, align: "left" },
-      { label: "CONSUMIDO m³", width: 28, align: "right" },
-      { label: "PRESUPUESTADO m³", width: 28, align: "right" },
-      { label: "% USO", width: 25, align: "right" },
+      { label: "MATERIAL", width: 72, align: "left" },
+      { label: "CONSUMIDO m³", width: 38, align: "right" },
+      { label: "PRESUPUESTADO m³", width: 38, align: "right" },
+      { label: "% USO", width: 37, align: "right" },
     ];
     yPos = dibujarEncabezadoColumnas(doc, yPos, columnasMat);
 
-    ordenarPorObra(presupuestosMaterialUsados).forEach((p, i) => {
-      const sem = calcularSemaforo(p.m3_consumidos, p.m3_presupuestados);
-      drawSemaforoRow(columnasMat, [
-        formatearObraCompleta(p.obras?.empresas?.empresa, p.obras?.cc, p.obras?.obra),
-        p.material?.material || "—",
-        `${formatearNumero(p.m3_consumidos, 1)} m³`,
-        `${formatearNumero(p.m3_presupuestados, 1)} m³`,
-        sem.pctLabel,
-      ], 4, sem.color, { rowIndexOdd: i % 2 === 1 });
+    let rowIndexMat = 0;
+    const drawFilaMat = (cells, opts = {}) => {
+      yPos = checkPageBreak(doc, yPos, rowHeight, PAGE_HEIGHT, MARGIN_BOTTOM);
+      if (yPos === 12) {
+        yPos = dibujarEncabezadoColumnas(doc, yPos, columnasMat);
+      }
+      if (opts.fillHeader) {
+        setFill(doc, "#E8EEF4");
+        doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
+      } else if (opts.fillTipo) {
+        setFill(doc, "#F5F7FA");
+        doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
+      } else if (rowIndexMat % 2 === 1) {
+        setFill(doc, COLOR_ROW_ALT);
+        doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
+      }
+
+      doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+      doc.setFontSize(8);
+      if (opts.tipoHeader) setTextColor(doc, COLOR_GRAY);
+      let x = MARGIN_LEFT;
+      columnasMat.forEach((col, i) => {
+        const textX = col.align === "right" ? x + col.width - 2 : x + 2;
+        if (i === 0 && opts.span) {
+          doc.text(ajustarTexto(doc, cells[0], USABLE_WIDTH - 4), MARGIN_LEFT + (opts.indent ?? 2), yPos + 4.2);
+        } else {
+          if (opts.pctIndex === i) {
+            setTextColor(doc, opts.pctColor);
+            doc.setFont("helvetica", "bold");
+          }
+          const raw = String(cells[i] ?? "");
+          const texto = col.align === "left" ? ajustarTexto(doc, raw, col.width - 4) : raw;
+          doc.text(texto, textX, yPos + 4.2, { align: col.align === "right" ? "right" : "left" });
+          if (opts.pctIndex === i) {
+            setTextColor(doc, opts.tipoHeader ? COLOR_GRAY : COLOR_TEXT);
+            doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+          }
+        }
+        x += col.width;
+      });
+      if (opts.tipoHeader) setTextColor(doc, COLOR_TEXT);
+
+      yPos += rowHeight;
+      rowIndexMat += 1;
+    };
+
+    const presupuestosConTipo = presupuestosMaterialUsados.map((p) => ({
+      ...p,
+      tipoId: p.material?.tipo_de_material?.id_tipo_de_material ?? null,
+      tipoNombre: p.material?.tipo_de_material?.tipo_de_material || null,
+    }));
+
+    agruparPresupuestoPorObra(presupuestosConTipo).forEach((obraGrupo) => {
+      drawFilaMat([formatearObraCompleta(obraGrupo.empresa, obraGrupo.cc, obraGrupo.obra), "", "", ""], {
+        fillHeader: true, bold: true, span: true,
+      });
+
+      agruparMaterialesPorTipo(obraGrupo.items).forEach((grupoTipo) => {
+        drawFilaMat([grupoTipo.tipoNombre.toUpperCase(), "", "", ""], {
+          fillTipo: true, bold: true, span: true, tipoHeader: true, indent: 4,
+        });
+
+        grupoTipo.items.forEach((p) => {
+          const sem = calcularSemaforo(p.m3_consumidos, p.m3_presupuestados);
+          drawFilaMat([
+            `  ${p.material?.material || "—"}`,
+            `${formatearNumero(p.m3_consumidos, 1)} m³`,
+            `${formatearNumero(p.m3_presupuestados, 1)} m³`,
+            sem.pctLabel,
+          ], { pctIndex: 3, pctColor: sem.color });
+        });
+      });
     });
 
     yPos += 5;
@@ -588,6 +1111,308 @@ const dibujarPieDePagina = (doc, ultimaConciliacion) => {
   setTextColor(doc, COLOR_TEXT);
 };
 
+// ── Mini gráfica de línea (Material vs Tiempo, small multiples) ────────
+const COLORES_MATERIALES_PDF = [COLOR_ORANGE, COLOR_BLUE, COLOR_GREEN, COLOR_AMBER, "#8B5CF6"];
+
+const dibujarMiniLineChart = (doc, x, y, width, height, titulo, valores, meses, colorHex, modo = "m3", formatearValorPersonalizado = null) => {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  setTextColor(doc, COLOR_TEXT);
+  doc.text(ajustarTexto(doc, titulo, width - 4), x + 2, y + 5);
+
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.2);
+  doc.rect(x, y, width, height);
+
+  const maxVal = Math.max(...valores, 0);
+  const chartX = x + 13;
+  const chartY = y + 14;
+  const chartW = width - 17;
+  const chartH = height - 26;
+
+  if (maxVal <= 0 || meses.length === 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    setTextColor(doc, COLOR_GRAY);
+    doc.text("Sin datos en el periodo", x + width / 2, y + height / 2, { align: "center" });
+    setTextColor(doc, COLOR_TEXT);
+    return;
+  }
+
+  const decimales = modo === "viajes" ? 0 : (maxVal >= 10 ? 0 : 1);
+  const fmt = formatearValorPersonalizado || ((v) => formatearNumero(v, decimales));
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5.5);
+  setTextColor(doc, COLOR_GRAY);
+  doc.text(fmt(maxVal), chartX - 2, chartY + 1.5, { align: "right" });
+  doc.text(fmt(0), chartX - 2, chartY + chartH, { align: "right" });
+
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.15);
+  doc.line(chartX, chartY + chartH, chartX + chartW, chartY + chartH);
+
+  const n = meses.length;
+  const stepX = n > 1 ? chartW / (n - 1) : 0;
+  const puntos = valores.map((v, i) => ({
+    px: chartX + (n > 1 ? i * stepX : chartW / 2),
+    py: chartY + chartH - (Math.max(v, 0) / maxVal) * chartH,
+    v,
+  }));
+
+  const { r, g, b } = hexToRgb(colorHex);
+  doc.setDrawColor(r, g, b);
+  doc.setLineWidth(0.5);
+  for (let i = 0; i < puntos.length - 1; i++) {
+    doc.line(puntos[i].px, puntos[i].py, puntos[i + 1].px, puntos[i + 1].py);
+  }
+  setFill(doc, colorHex);
+  puntos.forEach((p) => doc.circle(p.px, p.py, 0.55, "F"));
+
+  // Etiqueta de valor en cada punto — arriba si hay espacio, si no abajo
+  // para no salirse del marco cuando el punto está pegado al techo.
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(4.8);
+  setTextColor(doc, COLOR_TEXT);
+  puntos.forEach((p) => {
+    const hayEspacioArriba = p.py - chartY > 3.5;
+    const labelY = hayEspacioArriba ? p.py - 1.6 : p.py + 3.6;
+    doc.text(fmt(p.v), p.px, labelY, { align: "center" });
+  });
+
+  // Etiquetas de mes: todas, no solo la primera y la última. Si hay muchos
+  // meses se saltan algunos para que no se encimen, conservando siempre el
+  // primero y el último.
+  const pasoMes = n > 6 ? Math.ceil(n / 6) : 1;
+  doc.setFontSize(5);
+  setTextColor(doc, COLOR_GRAY);
+  meses.forEach((mes, i) => {
+    if (i !== 0 && i !== n - 1 && i % pasoMes !== 0) return;
+    const align = i === 0 ? "left" : i === n - 1 ? "right" : "center";
+    doc.text(formatearMesCorto(mes), puntos[i].px, chartY + chartH + 4.5, { align });
+  });
+
+  setTextColor(doc, COLOR_TEXT);
+};
+
+// ── Sección: Material vs Tiempo (una mini gráfica por material, agrupada
+// por tipo — Pétreos / Base Asfáltica / Tepetate-Corte, igual que la tabla
+// de Material Movido por Obra) ───────────────────────────────────────
+const dibujarSeccionMaterialVsTiempo = (doc, yPosInicial, seriesTiempo, modo) => {
+  const { data, dataViajes, gruposTipoMateriales } = seriesTiempo || {};
+  const fuente = modo === "viajes" ? dataViajes : data;
+  const meses = (fuente || []).map((row) => row.mes);
+
+  if (!gruposTipoMateriales || gruposTipoMateriales.length === 0 || meses.length === 0) return yPosInicial;
+
+  const unidadLabel = modo === "viajes" ? "Viajes por Mes" : "m³ por Mes";
+  let yPos = dibujarTituloSeccion(doc, yPosInicial, `Material vs Tiempo — ${unidadLabel}`);
+
+  const cols = 2;
+  const gap = 4;
+  const chartWidth = (USABLE_WIDTH - gap * (cols - 1)) / cols;
+  const chartHeight = 44;
+  const alturaEncabezadoTipo = 9;
+
+  gruposTipoMateriales.forEach((grupo) => {
+    yPos = checkPageBreak(doc, yPos, alturaEncabezadoTipo + chartHeight + gap, PAGE_HEIGHT, MARGIN_BOTTOM);
+
+    setFill(doc, "#F5F7FA");
+    doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, 6, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    setTextColor(doc, COLOR_GRAY);
+    doc.text(grupo.tipoNombre.toUpperCase(), MARGIN_LEFT + 2, yPos + 4.2);
+    setTextColor(doc, COLOR_TEXT);
+    yPos += alturaEncabezadoTipo;
+
+    for (let i = 0; i < grupo.materiales.length; i += cols) {
+      const filaMateriales = grupo.materiales.slice(i, i + cols);
+      yPos = checkPageBreak(doc, yPos, chartHeight + gap, PAGE_HEIGHT, MARGIN_BOTTOM);
+
+      filaMateriales.forEach((mat, colIdx) => {
+        const x = MARGIN_LEFT + colIdx * (chartWidth + gap);
+        const idxEnGrupo = grupo.materiales.indexOf(mat);
+        const valores = fuente.map((row) => Number(row[mat] || 0));
+        dibujarMiniLineChart(
+          doc, x, yPos, chartWidth, chartHeight, mat, valores, meses,
+          COLORES_MATERIALES_PDF[idxEnGrupo % COLORES_MATERIALES_PDF.length], modo
+        );
+      });
+
+      yPos += chartHeight + gap;
+    }
+
+    yPos += 2;
+  });
+
+  return yPos + 4;
+};
+
+// ── Sección: Tendencias — Importe Gastado y Camiones Rentados por Mes ──
+// Ignoran el filtro mes/semana (igual que Material vs Tiempo) para mostrar
+// la evolución histórica completa.
+const dibujarSeccionTendencias = (doc, yPosInicial, seriesImporteTiempo, seriesCamionesRentaTiempo) => {
+  const dataImporte = seriesImporteTiempo?.data || [];
+  const dataCamiones = seriesCamionesRentaTiempo?.data || [];
+  if (dataImporte.length === 0 && dataCamiones.length === 0) return yPosInicial;
+
+  let yPos = dibujarTituloSeccion(doc, yPosInicial, "Tendencias — Importe Gastado y Renta de Equipo");
+
+  const chartHeight = 48;
+
+  if (dataImporte.length > 0) {
+    yPos = checkPageBreak(doc, yPos, chartHeight + 4, PAGE_HEIGHT, MARGIN_BOTTOM);
+    dibujarMiniLineChart(
+      doc, MARGIN_LEFT, yPos, USABLE_WIDTH, chartHeight,
+      "Importe Gastado en Renta de Equipo por Mes",
+      dataImporte.map((d) => d.importeRenta),
+      dataImporte.map((d) => d.mes),
+      COLOR_ORANGE, "importe", formatearMonedaCorta
+    );
+    yPos += chartHeight + 6;
+  }
+
+  if (dataCamiones.length > 0) {
+    yPos = checkPageBreak(doc, yPos, chartHeight + 4, PAGE_HEIGHT, MARGIN_BOTTOM);
+    dibujarMiniLineChart(
+      doc, MARGIN_LEFT, yPos, USABLE_WIDTH, chartHeight,
+      "Camiones Rentados por Mes",
+      dataCamiones.map((d) => d.camiones),
+      dataCamiones.map((d) => d.mes),
+      COLOR_GREEN, "viajes"
+    );
+    yPos += chartHeight + 6;
+  }
+
+  return yPos + 2;
+};
+
+// ── Lista de conciliaciones vinculadas, agrupada por material, en columnas
+// (relleno por columna: con 3 columnas y 11 items → col1: 1-4, col2: 5-8,
+// col3: 9-11). Cada número es un vínculo clickeable que abre la misma
+// página pública a la que lleva el QR de esa conciliación. `label` es el
+// nombre del material (null para omitir el subtítulo, caso "Renta" que no
+// se subdivide por material). ─────────────────────────────────────────
+const dibujarListaConciliacionesColumnas = (doc, yPosInicial, label, items, cols = 3) => {
+  if (!items || items.length === 0) return yPosInicial;
+
+  const rowHeight = 5;
+  const colWidth = USABLE_WIDTH / cols;
+  const rows = Math.ceil(items.length / cols);
+  const alturaLabel = label ? 5 : 1;
+  const alturaGrupo = alturaLabel + rows * rowHeight;
+
+  let yPos = checkPageBreak(doc, yPosInicial, alturaGrupo, PAGE_HEIGHT, MARGIN_BOTTOM);
+
+  if (label) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(7);
+    setTextColor(doc, COLOR_GRAY);
+    doc.text(label, MARGIN_LEFT + 2, yPos);
+    setTextColor(doc, COLOR_TEXT);
+  }
+  yPos += alturaLabel;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  setTextColor(doc, COLOR_BLUE);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = c * rows + r;
+      if (idx >= items.length) continue;
+      const item = items[idx];
+      const x = MARGIN_LEFT + c * colWidth;
+      const y = yPos + r * rowHeight;
+      doc.textWithLink(String(item.numero), x, y, {
+        url: `${BASE_URL_CONCILIACION}/conciliacion/${item.folio}`,
+      });
+    }
+  }
+  setTextColor(doc, COLOR_TEXT);
+
+  return yPos + rows * rowHeight + 3;
+};
+
+// ── Sección: Ahorro Estimado vs. Proceso Anterior en Papel ────────────
+const dibujarSeccionAhorro = (doc, yPosInicial, ahorroEstimado, serieConciliacionesPorMes, bloquesObraConciliaciones) => {
+  if (!ahorroEstimado) return yPosInicial;
+
+  let yPos = dibujarTituloSeccion(doc, yPosInicial, "Ahorro Estimado vs. Proceso Anterior en Papel");
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  setTextColor(doc, COLOR_GRAY);
+  doc.text(
+    "Comparación estimada: $2 por vale de papel (talonario) contra el costo real del ticket térmico impreso en campo. Conciliaciones: $1 por copia en papel evitada.",
+    MARGIN_LEFT, yPos, { maxWidth: USABLE_WIDTH }
+  );
+  setTextColor(doc, COLOR_TEXT);
+  yPos += 8;
+
+  const kpis = [
+    { label: "Ahorro Material", value: formatearMonedaCorta(ahorroEstimado.ahorroMaterial), sublabel: formatearMoneda(ahorroEstimado.ahorroMaterial), color: COLOR_TEAL },
+    { label: "Ahorro Renta", value: formatearMonedaCorta(ahorroEstimado.ahorroRenta), sublabel: formatearMoneda(ahorroEstimado.ahorroRenta), color: COLOR_GREEN },
+    { label: "Ahorro Conciliaciones", value: formatearMonedaCorta(ahorroEstimado.ahorroConciliaciones), sublabel: formatearMoneda(ahorroEstimado.ahorroConciliaciones), color: COLOR_AMBER },
+    { label: "Ahorro Total", value: formatearMonedaCorta(ahorroEstimado.ahorroTotal), sublabel: formatearMoneda(ahorroEstimado.ahorroTotal), color: COLOR_ORANGE },
+  ];
+  yPos = dibujarKpis(doc, yPos, kpis);
+
+  const dataConc = serieConciliacionesPorMes?.data || [];
+  if (dataConc.length > 0) {
+    const chartHeight = 48;
+    yPos = checkPageBreak(doc, yPos, chartHeight + 4, PAGE_HEIGHT, MARGIN_BOTTOM);
+    dibujarMiniLineChart(
+      doc, MARGIN_LEFT, yPos, USABLE_WIDTH, chartHeight,
+      "Conciliaciones Generadas por Mes",
+      dataConc.map((d) => d.conciliaciones),
+      dataConc.map((d) => d.mes),
+      COLOR_BLUE, "viajes"
+    );
+    yPos += chartHeight + 6;
+  }
+
+  if (bloquesObraConciliaciones && bloquesObraConciliaciones.length > 0) {
+    bloquesObraConciliaciones.forEach((bloque) => {
+      yPos = checkPageBreak(doc, yPos, 14, PAGE_HEIGHT, MARGIN_BOTTOM);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      setTextColor(doc, COLOR_SECONDARY);
+      doc.text(`Conciliaciones — ${bloque.obraNombre}`, MARGIN_LEFT, yPos);
+      setTextColor(doc, COLOR_TEXT);
+      yPos += 6;
+
+      const nombresTipos = Object.keys(bloque.grupos).sort((a, b) => {
+        if (a === "Renta") return 1;
+        if (b === "Renta") return -1;
+        return a.localeCompare(b);
+      });
+      nombresTipos.forEach((tipoNombre) => {
+        yPos = checkPageBreak(doc, yPos, 10, PAGE_HEIGHT, MARGIN_BOTTOM);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.5);
+        setTextColor(doc, COLOR_GRAY);
+        doc.text(tipoNombre.toUpperCase(), MARGIN_LEFT, yPos);
+        setTextColor(doc, COLOR_TEXT);
+        yPos += 5;
+
+        const materiales = bloque.grupos[tipoNombre];
+        const nombresMateriales = Object.keys(materiales).sort((a, b) => a.localeCompare(b));
+        nombresMateriales.forEach((materialNombre) => {
+          // "Renta" no se subdivide por material — su única clave repite el
+          // nombre del tipo, así que se omite el subtítulo en ese caso.
+          const label = materialNombre === tipoNombre ? null : materialNombre;
+          yPos = dibujarListaConciliacionesColumnas(doc, yPos, label, materiales[materialNombre]);
+        });
+        yPos += 2;
+      });
+      yPos += 3;
+    });
+  }
+
+  return yPos;
+};
+
 // ── Generador principal ──────────────────────────────────────────────
 export const generarPDFReporteEstadisticas = (datos) => {
   const {
@@ -599,8 +1424,14 @@ export const generarPDFReporteEstadisticas = (datos) => {
     comparativaPeriodoAnterior,
     periodoAnteriorLabel,
     tablaObraMaterial = [],
+    tablaBancoMaterial = [],
     tablaRentaPorObra = [],
     totalesRenta,
+    tablaViajesRentaPorEquipo = [],
+    seriesImporteTiempo,
+    seriesCamionesRentaTiempo,
+    seriesTiempo,
+    modoGraficaTiempo = "m3",
     presupuestosMaterial = [],
     presupuestosRenta = [],
     hayAlertaPresupuesto = false,
@@ -610,6 +1441,9 @@ export const generarPDFReporteEstadisticas = (datos) => {
     horaPico,
     mejorRendimiento,
     ultimaConciliacion,
+    ahorroEstimado,
+    serieConciliacionesPorMes,
+    bloquesObraConciliaciones = [],
   } = datos;
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
@@ -688,10 +1522,39 @@ export const generarPDFReporteEstadisticas = (datos) => {
   yPos = checkPageBreak(doc, yPos, 20, PAGE_HEIGHT, MARGIN_BOTTOM);
   yPos = dibujarTablaMaterial(doc, yPos, tablaObraMaterial, totalesTablaObra, periodoTablasLabel);
 
+  // ── Material por Banco (distancia, precio/m³, importe, agrupado por tipo)
+  // — siempre en página nueva, igual que Tendencias/Presupuestos, para no
+  // partir sus tablas y gráficas contra el final de "Material Movido por Obra" ──
+  if (tablaBancoMaterial.length > 0) {
+    doc.addPage();
+    yPos = 12;
+    yPos = dibujarSeccionBancoMaterial(doc, yPos, tablaBancoMaterial);
+  }
+
+  // ── Material vs Tiempo (una mini gráfica por material) ──
+  if (seriesTiempo) {
+    yPos = checkPageBreak(doc, yPos, 20, PAGE_HEIGHT, MARGIN_BOTTOM);
+    yPos = dibujarSeccionMaterialVsTiempo(doc, yPos, seriesTiempo, modoGraficaTiempo);
+  }
+
   // ── Tabla renta ──
   if (tablaRentaPorObra.length > 0) {
     yPos = checkPageBreak(doc, yPos, 20, PAGE_HEIGHT, MARGIN_BOTTOM);
     yPos = dibujarTablaRenta(doc, yPos, tablaRentaPorObra, totalesRenta, periodoTablasLabel);
+  }
+
+  // ── Renta de Equipo — Precio por Viaje y m³ (análisis derivado de la
+  // capacidad del vehículo) ──
+  if (tablaViajesRentaPorEquipo.length > 0) {
+    yPos = checkPageBreak(doc, yPos, 20, PAGE_HEIGHT, MARGIN_BOTTOM);
+    yPos = dibujarTablaRentaPrecios(doc, yPos, tablaViajesRentaPorEquipo);
+  }
+
+  // ── Tendencias: Importe Gastado y Camiones Rentados por Mes ──
+  if ((seriesImporteTiempo?.data?.length > 0) || (seriesCamionesRentaTiempo?.data?.length > 0)) {
+    doc.addPage();
+    yPos = 12;
+    yPos = dibujarSeccionTendencias(doc, yPos, seriesImporteTiempo, seriesCamionesRentaTiempo);
   }
 
   // ── Datos destacados ──
@@ -710,7 +1573,12 @@ export const generarPDFReporteEstadisticas = (datos) => {
   // ── Control de presupuesto (siempre en página nueva) ──
   doc.addPage();
   yPos = 12;
-  dibujarPresupuestos(doc, yPos, presupuestosMaterial, presupuestosRenta, hayAlertaPresupuesto);
+  yPos = dibujarPresupuestos(doc, yPos, presupuestosMaterial, presupuestosRenta, hayAlertaPresupuesto);
+
+  // ── Ahorro estimado vs. proceso anterior en papel (siempre en página nueva) ──
+  doc.addPage();
+  yPos = 12;
+  dibujarSeccionAhorro(doc, yPos, ahorroEstimado, serieConciliacionesPorMes, bloquesObraConciliaciones);
 
   dibujarPieDePagina(doc, ultimaConciliacion);
 
