@@ -185,6 +185,17 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
               <div className="tabla-vales__material">
                 <Package size={14} aria-hidden="true" />
                 <span>{detalle.material?.material || "N/A"}</span>
+                {detalle.es_viaje_ajuste && (
+                  <span
+                    className="tabla-vales__badge-ajuste"
+                    title={`Viaje de ajuste: se cobra la capacidad del camión (${
+                      detalle.capacidad_m3 ?? "—"
+                    } m³), no el volumen real entregado (${formatearVolumen(detalle.volumen_real_m3)})`}
+                  >
+                    <Truck size={11} aria-hidden="true" />
+                    Ajuste — capacidad
+                  </span>
+                )}
               </div>
             </td>
             <td>{detalle.bancos?.banco || "N/A"}</td>

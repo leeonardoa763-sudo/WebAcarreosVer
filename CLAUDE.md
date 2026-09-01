@@ -173,7 +173,7 @@ Excepciones declaradas por la app (ver "Registros fuera de lo normal"): `registr
 
 ### Columnas clave en `vale_material_detalles`
 
-`id_detalle_material`, `capacidad_m3`, `distancia_km`, `cantidad_pedida_m3`, `peso_ton`, `volumen_real_m3`, `precio_m3`, `costo_total`, `folio_banco`, `requisicion`, `notas_adicionales`, `foto_omitida`, `motivo_sin_foto_codigo`, `motivo_sin_foto_texto`
+`id_detalle_material`, `capacidad_m3`, `distancia_km`, `cantidad_pedida_m3`, `peso_ton`, `volumen_real_m3`, `precio_m3`, `costo_total`, `folio_banco`, `folio_vale_fisico`, `requisicion`, `notas_adicionales`, `es_viaje_ajuste`, `foto_omitida`, `motivo_sin_foto_codigo`, `motivo_sin_foto_texto`
 
 ### Columnas en `tickets_material`
 
@@ -206,7 +206,20 @@ reporta el banco con el que se creó el vale, no en el que se cargó. El alias d
 `bancos_override` en todo el repo (web y app).
 
 El Tipo 2 es la excepción: 1 vale = 1 viaje capturado en el propio detalle, sin fila en
-`vale_material_viajes`.
+`vale_material_viajes`. La cantidad se captura directo en `volumen_real_m3` (m³), **no**
+se convierte desde `peso_ton` como en Tipo 1.
+
+**Viaje de ajuste (Tipo 2, `es_viaje_ajuste`).** Cuando una carga es el sobrante de un
+camión (ej. quedan 2.5 m³ de un camión con capacidad 17 m³, normalmente el último viaje
+de la obra), al operador se le paga la capacidad del camión, no el volumen real
+entregado. El Administrador marca esto en `ModalEditarVale` → `PanelDetalleTipo2`; al
+activar el checkbox, `costo_total` se recalcula con `capacidad_m3` en vez de
+`volumen_real_m3` (ver `calcularCostoTotalTipo2` en `useEditarValeViajes.js`).
+`volumen_real_m3` **nunca** se toca — sigue siendo la cantidad real entregada, usada en
+reportes/dashboards para saber cuánto material se colocó en obra. Conciliaciones,
+reportes y exports ya leen `costo_total` (pago) y `volumen_real_m3` (cantidad real) como
+campos independientes en todo el repo, así que el ajuste se refleja en conciliación sin
+tocar ese código.
 
 ### Fórmulas de precio
 
@@ -248,6 +261,13 @@ umbral es exclusivo de la app (`appAcarreos/src/utils/tiempoEntreViajes.js`).
 - Ojo con los dos niveles: los tipos 1 y 3 las guardan por viaje; el tipo 2
   (base asfáltica) y la renta, que no generan filas en `vale_material_viajes`,
   las guardan en el detalle.
+- **`recolectarExcepciones` también incluye `es_viaje_ajuste`** (ver "Viaje de
+  ajuste" arriba) aunque no sea una excepción declarada por la app — es la
+  única que la web escribe. Vive en un tercer arreglo (`ajustes`) junto a
+  `anticipados` y `sinFoto`; `AvisoExcepciones` los pinta todos en el mismo
+  bloque ámbar. `useAutorizacion.js` no lo agrega a sus alertas (solo lee
+  `anticipados`/`sinFoto` por nombre) — si se quiere ahí también, hay que
+  sumarlo a mano en `detectarAlertasIntraVale`.
 
 ### Rentas
 

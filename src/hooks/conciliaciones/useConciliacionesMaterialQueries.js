@@ -88,8 +88,10 @@ export const useConciliacionesMaterialQueries = () => {
               peso_ton,
               volumen_real_m3,
               folio_banco,
+              folio_vale_fisico,
               precio_m3,
               costo_total,
+              es_viaje_ajuste,
               tarifa_primer_km,
               tarifa_subsecuente,
               material:id_material (

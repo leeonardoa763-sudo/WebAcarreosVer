@@ -18,7 +18,11 @@
 import { AlertTriangle } from "lucide-react";
 
 // 2. Utils
-import { textoAnticipado, textoSinFoto } from "../../utils/excepcionesVale";
+import {
+  textoAnticipado,
+  textoSinFoto,
+  textoAjuste,
+} from "../../utils/excepcionesVale";
 
 // 3. Estilos
 import "../../styles/aviso-excepciones.css";
@@ -26,7 +30,7 @@ import "../../styles/aviso-excepciones.css";
 const AvisoExcepciones = ({ excepciones, compacto = false }) => {
   if (!excepciones?.total) return null;
 
-  const { anticipados, sinFoto, total } = excepciones;
+  const { anticipados, sinFoto, ajustes = [], total } = excepciones;
 
   return (
     <div className={`aev ${compacto ? "aev--compacto" : ""}`}>
@@ -49,6 +53,11 @@ const AvisoExcepciones = ({ excepciones, compacto = false }) => {
         {sinFoto.map((exc) => (
           <li key={exc.clave} className="aev__linea">
             {textoSinFoto(exc)}
+          </li>
+        ))}
+        {ajustes.map((exc) => (
+          <li key={exc.clave} className="aev__linea">
+            {textoAjuste(exc)}
           </li>
         ))}
       </ul>

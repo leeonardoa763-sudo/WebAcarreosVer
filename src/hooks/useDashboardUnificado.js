@@ -405,7 +405,7 @@ export const useDashboardUnificado = () => {
           ),
           vale_material_detalles (
             id_detalle_material, capacidad_m3, distancia_km, cantidad_pedida_m3,
-            peso_ton, volumen_real_m3, precio_m3, costo_total,
+            peso_ton, volumen_real_m3, precio_m3, costo_total, es_viaje_ajuste,
             folio_banco, folio_vale_fisico, requisicion, notas_adicionales,
             tarifa_primer_km, tarifa_subsecuente, es_planta_asfaltos,
             foto_omitida, motivo_sin_foto_codigo, motivo_sin_foto_texto,

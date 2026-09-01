@@ -227,7 +227,8 @@ const DetalleMaterial = ({ vale, valeEditable, onAbrirEditar, pesosEspecificos }
         Detalles de Material
       </h4>
 
-      {/* Excepciones declaradas en la app (registro apresurado / sin foto).
+      {/* Excepciones declaradas en la app (registro apresurado / sin foto) +
+          viajes de ajuste marcados por Administrador (es_viaje_ajuste).
           Va antes de las tablas para que se lea antes del viaje por viaje. */}
       <AvisoExcepciones excepciones={recolectarExcepciones(vale)} />
 

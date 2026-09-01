@@ -83,6 +83,12 @@ const PDFConciliacionMaterialPetreo = ({
   const totalesPorBanco = calcularTotalesPorBanco(todosLosVales);
   const hayVariosBancos = totalesPorBanco.length > 1;
 
+  // Viajes de ajuste (Tipo 2): se cobra capacidad_m3, no volumen_real_m3 —
+  // se marcan con "*" en Importe y se explica al pie de la tabla.
+  const hayAjustes = todosLosVales.some((vale) =>
+    vale.vale_material_detalles.some((d) => d.es_viaje_ajuste),
+  );
+
   // Extraer tarifas del primer detalle disponible (todo el archivo usa las mismas)
   let tarifaPrimerKm = null;
   let tarifaSubsecuente = null;
@@ -222,6 +228,7 @@ const PDFConciliacionMaterialPetreo = ({
                             ${formatearNumero(detalle.precio_m3 || 0)}
                           </Text>
                           <Text style={materialPetreoStyles.colImporte}>
+                            {detalle.es_viaje_ajuste ? "* " : ""}
                             {formatearNumero(detalle.costo_total)}
                           </Text>
                         </View>
@@ -343,6 +350,13 @@ const PDFConciliacionMaterialPetreo = ({
             );
           })}
         </View>
+
+        {hayAjustes && (
+          <Text style={{ fontSize: 7, color: "#92400e", marginTop: 3 }}>
+            * Viaje de ajuste: se cobró la capacidad del camión, no el volumen
+            real entregado (el volumen real queda registrado en el vale).
+          </Text>
+        )}
 
         {/* TOTALES */}
         <View style={sharedStyles.totalesSection}>

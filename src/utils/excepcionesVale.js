@@ -6,6 +6,13 @@
  * viajes sin foto de evidencia. En ambos casos la app exige un motivo, y este
  * modulo traduce lo guardado en BD al mismo texto que ve el checador.
  *
+ * Tambien incluye "viaje de ajuste" (es_viaje_ajuste), que a diferencia de las
+ * anteriores NO viene de la app — la marca el Administrador desde el modal de
+ * edicion web (Tipo 2 sin fila en vale_material_viajes) cuando una carga es el
+ * sobrante de un camion y se le paga la capacidad, no el volumen real. Se
+ * incluye en este mismo aviso porque es igual de relevante para quien revisa
+ * el vale: algo fuera de lo normal que necesita explicacion visible.
+ *
  * Espejo de la parte de presentacion de appAcarreos/src/utils/tiempoEntreViajes.js.
  * Los CODIGOS deben quedar identicos a los de la app — son lo que se guarda en
  * BD y lo que permite agrupar despues. Las etiquetas dicen lo mismo pero aqui van
@@ -17,6 +24,7 @@
  *   - vale_material_viajes  → tipos 1 y 3, un registro por viaje
  *   - vale_material_detalles / vale_renta_detalle → solo foto_omitida, porque el
  *     tipo 2 (base asfaltica) y la renta no generan filas de viaje
+ *   - es_viaje_ajuste vive solo en vale_material_detalles (Tipo 2)
  *
  * Dependencias: ninguna
  * Usado en: AvisoExcepciones.jsx, ListaViajesMaterial.jsx, ModalValeDetalle.jsx
@@ -93,6 +101,18 @@ const mapSinFoto = (origen, clave, numeroViaje = null) => ({
 });
 
 /**
+ * Normaliza un viaje de ajuste (Tipo 2, es_viaje_ajuste): no tiene
+ * codigo/motivo como las excepciones de la app, siempre es el mismo hecho —
+ * se cobro la capacidad del camion, no el volumen real entregado.
+ */
+const mapAjuste = (detalle, i) => ({
+  clave: `aj-det-${detalle.id_detalle_material ?? i}`,
+  capacidad: detalle.capacidad_m3 != null ? Number(detalle.capacidad_m3) : null,
+  volumenReal:
+    detalle.volumen_real_m3 != null ? Number(detalle.volumen_real_m3) : null,
+});
+
+/**
  * Recolecta todas las excepciones de un vale, de los dos niveles.
  *
  * Tolera vales que llegan sin viajes cargados o sin las columnas nuevas (vales
@@ -100,13 +120,14 @@ const mapSinFoto = (origen, clave, numeroViaje = null) => ({
  * devuelve los arreglos vacios en vez de fallar.
  *
  * @param {object} vale fila de vales con detalles anidados
- * @returns {{ anticipados: Array, sinFoto: Array, total: number }}
+ * @returns {{ anticipados: Array, sinFoto: Array, ajustes: Array, total: number }}
  */
 export const recolectarExcepciones = (vale) => {
   const anticipados = [];
   const sinFoto = [];
+  const ajustes = [];
 
-  if (!vale) return { anticipados, sinFoto, total: 0 };
+  if (!vale) return { anticipados, sinFoto, ajustes, total: 0 };
 
   // Las claves llevan el indice del detalle porque no todos los select piden
   // id_detalle_material / id_vale_renta_detalle, y sin el la clave colisionaria
@@ -125,6 +146,9 @@ export const recolectarExcepciones = (vale) => {
     if (detalle.foto_omitida) {
       sinFoto.push(mapSinFoto(detalle, `sf-det-${i}`));
     }
+    if (detalle.es_viaje_ajuste) {
+      ajustes.push(mapAjuste(detalle, i));
+    }
   });
 
   (vale.vale_renta_detalle ?? []).forEach((detalle, i) => {
@@ -136,7 +160,12 @@ export const recolectarExcepciones = (vale) => {
   anticipados.sort((a, b) => (a.numeroViaje ?? 0) - (b.numeroViaje ?? 0));
   sinFoto.sort((a, b) => (a.numeroViaje ?? 0) - (b.numeroViaje ?? 0));
 
-  return { anticipados, sinFoto, total: anticipados.length + sinFoto.length };
+  return {
+    anticipados,
+    sinFoto,
+    ajustes,
+    total: anticipados.length + sinFoto.length + ajustes.length,
+  };
 };
 
 /** Prefijo de la linea: "Viaje 3" o "Vale" cuando la excepcion es del detalle. */
@@ -184,3 +213,14 @@ export const textoAnticipado = (exc) => {
 /** Linea completa de un viaje sin foto de evidencia. */
 export const textoSinFoto = (exc) =>
   `${prefijo(exc)}: sin foto de evidencia — ${motivoLegible(exc)}`;
+
+/**
+ * Linea completa de un viaje de ajuste (Tipo 2).
+ * Ej: "Vale: viaje de ajuste — se cobró la capacidad del camión (17.000 m³),
+ *      no el volumen real entregado (2.500 m³)"
+ */
+export const textoAjuste = (exc) => {
+  const capacidad = exc.capacidad != null ? `${exc.capacidad.toFixed(3)} m³` : "la capacidad del camión";
+  const volumen = exc.volumenReal != null ? `${exc.volumenReal.toFixed(3)} m³` : "el volumen real";
+  return `Vale: viaje de ajuste — se cobró ${capacidad}, no ${volumen} entregado`;
+};

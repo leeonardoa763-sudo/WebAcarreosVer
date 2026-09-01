@@ -215,10 +215,6 @@ const VistaPreviewMaterial = ({ conciliacion, valesAgrupados }) => {
    ======================================== */
 
 const TablaMaterialPetreo = ({ valesAgrupados }) => {
-  console.log(
-    "[TablaMaterialPetreo] valesAgrupados:",
-    JSON.stringify(valesAgrupados, null, 2),
-  );
   return (
     <div className="preview-pdf__table">
       <table>
@@ -272,7 +268,17 @@ const TablaMaterialPetreo = ({ valesAgrupados }) => {
                           </td>
                           <td>{vale.folio}</td>
                           <td>{detalle.folio_banco || "—"}</td>
-                          <td>{detalle.material?.material || "N/A"}</td>
+                          <td>
+                            {detalle.material?.material || "N/A"}
+                            {detalle.es_viaje_ajuste && (
+                              <span
+                                className="preview-pdf__badge-ajuste"
+                                title={`Viaje de ajuste: se cobra la capacidad del camión (${detalle.capacidad_m3 ?? "—"} m³), no el volumen real entregado`}
+                              >
+                                Ajuste
+                              </span>
+                            )}
+                          </td>
                           <td>{detalle.bancos?.banco || "N/A"}</td>
                           <td className="text-center">
                             {Number(detalle.distancia_km).toFixed(1)}

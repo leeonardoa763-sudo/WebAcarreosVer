@@ -206,6 +206,7 @@ export const useVerificacion = () => {
             volumen_real_m3,
             precio_m3,
             costo_total,
+            es_viaje_ajuste,
             foto_omitida,
             motivo_sin_foto_codigo,
             motivo_sin_foto_texto,

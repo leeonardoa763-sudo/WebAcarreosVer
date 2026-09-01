@@ -5,7 +5,15 @@
  *
  * Responsabilidades:
  * - Cargar datos del detalle y sus viajes
- * - Tipo 1 y 2: editar peso_ton → recalcula volumen_m3 y costo_viaje
+ * - Tipo 1 y 2 (con viajes): editar peso_ton → recalcula volumen_m3 y costo_viaje
+ * - Tipo 2 sin fila en vale_material_viajes (1 vale = 1 carga): editar
+ *   volumen_real_m3/folio_vale_fisico/es_viaje_ajuste directo en el detalle
+ *   → recalcula costo_total (ver editarCampoDetalleTipo2). La cantidad se
+ *   captura directo en m³, no se convierte desde toneladas.
+ *   es_viaje_ajuste (viaje de ajuste/sobrante): al activarlo, costo_total se
+ *   cobra con capacidad_m3 (capacidad del camión) en vez de volumen_real_m3
+ *   — el operador cobra la capacidad, pero volumen_real_m3 nunca se toca
+ *   porque es la cantidad real que se necesita para reportes de obra.
  * - Tipo 3: editar volumen_m3 directo, banco y distancia por viaje (overrides)
  *           → recalcula precio_m3_override y costo_viaje_override
  * - Guardar cambios (UPDATE/INSERT/DELETE) en vale_material_viajes
@@ -70,6 +78,19 @@ const calcularVolumenM3 = (peso_ton, peso_especifico) => {
  */
 const calcularCostoViaje = (volumen_m3, precio_m3) => {
   return Math.round(Number(volumen_m3) * Number(precio_m3) * 100) / 100;
+};
+
+/**
+ * Calcula costo_total de un detalle Tipo 2 sin viajes, respetando
+ * es_viaje_ajuste: si está activo se cobra capacidad_m3 (capacidad del
+ * camión) en vez de volumen_real_m3 (cantidad real entregada). El volumen
+ * real nunca se toca — solo cambia qué cantidad se usa para el costo.
+ */
+const calcularCostoTotalTipo2 = (detalle) => {
+  const cantidadBase = detalle.es_viaje_ajuste
+    ? Number(detalle.capacidad_m3 || 0)
+    : Number(detalle.volumen_real_m3 || 0);
+  return calcularCostoViaje(cantidadBase, detalle.precio_m3 || 0);
 };
 
 // ─── Hook principal ───────────────────────────────────────────────────────────
@@ -153,9 +174,11 @@ export const useEditarValeViajes = () => {
           cantidad_pedida_m3,
           peso_ton,
           volumen_real_m3,
+          es_viaje_ajuste,
           precio_m3,
           costo_total,
           folio_banco,
+          folio_vale_fisico,
           requisicion,
           notas_adicionales,
           id_precios_material,
@@ -423,6 +446,9 @@ export const useEditarValeViajes = () => {
   const editarDistanciaDetalle = useCallback(
     (nueva_distancia) => {
       const dist = Number(nueva_distancia);
+      // Tipo 2 sin fila en vale_material_viajes: no hay viajes que recalcular,
+      // el costo vive directo en el detalle.
+      const esTipo2SinViajes = tipoMaterial === 2 && viajes.length === 0;
 
       setDetalle((prev) => {
         if (!prev) return prev;
@@ -431,36 +457,78 @@ export const useEditarValeViajes = () => {
           prev.tarifa_primer_km,
           prev.tarifa_subsecuente,
         );
-        return { ...prev, distancia_km: dist, precio_m3: nuevoPrecio };
+        const actualizado = {
+          ...prev,
+          distancia_km: dist,
+          precio_m3: nuevoPrecio,
+        };
+        if (esTipo2SinViajes) {
+          actualizado.costo_total = calcularCostoTotalTipo2(actualizado);
+        }
+        return actualizado;
       });
 
-      setViajes((prev) =>
-        prev.map((viaje) => {
-          const nuevoPrecioViaje = calcularPrecioM3(
-            dist,
-            viaje.tarifa_primer_km || detalle?.tarifa_primer_km,
-            viaje.tarifa_subsecuente || detalle?.tarifa_subsecuente,
-          );
-          const nuevoCosto = calcularCostoViaje(
-            viaje.volumen_m3,
-            nuevoPrecioViaje,
-          );
-          return {
-            ...viaje,
-            precio_m3: nuevoPrecioViaje,
-            costo_viaje: nuevoCosto,
-          };
-        }),
-      );
+      if (!esTipo2SinViajes) {
+        setViajes((prev) =>
+          prev.map((viaje) => {
+            const nuevoPrecioViaje = calcularPrecioM3(
+              dist,
+              viaje.tarifa_primer_km || detalle?.tarifa_primer_km,
+              viaje.tarifa_subsecuente || detalle?.tarifa_subsecuente,
+            );
+            const nuevoCosto = calcularCostoViaje(
+              viaje.volumen_m3,
+              nuevoPrecioViaje,
+            );
+            return {
+              ...viaje,
+              precio_m3: nuevoPrecioViaje,
+              costo_viaje: nuevoCosto,
+            };
+          }),
+        );
 
-      setViajesEditados((prev) => {
-        const nuevo = new Set(prev);
-        viajes.forEach((v) => nuevo.add(v.id_viaje));
-        return nuevo;
-      });
+        setViajesEditados((prev) => {
+          const nuevo = new Set(prev);
+          viajes.forEach((v) => nuevo.add(v.id_viaje));
+          return nuevo;
+        });
+      }
     },
-    [detalle, viajes],
+    [detalle, viajes, tipoMaterial],
   );
+
+  // ── Tipo 2 sin viajes: edición directa del detalle (volumen/folio/ajuste) ──
+
+  /**
+   * Edita un campo del detalle para vales Tipo 2 sin fila en
+   * vale_material_viajes (1 vale = 1 carga capturada en el detalle).
+   *
+   * - volumen_real_m3   → recalcula costo_total (m³ es la cantidad capturada
+   *                        directo para este tipo, no se convierte desde ton).
+   *                        Si es_viaje_ajuste está activo, costo_total sigue
+   *                        cobrando capacidad_m3 — el volumen editado solo
+   *                        actualiza la cantidad real, no el pago.
+   * - es_viaje_ajuste   → viaje de ajuste/sobrante: recalcula costo_total
+   *                        usando capacidad_m3 (al operador se le paga la
+   *                        capacidad del camión, no la cantidad real)
+   * - folio_vale_fisico → solo actualiza texto
+   *
+   * @param {string} campo
+   * @param {string|number|boolean} valor
+   */
+  const editarCampoDetalleTipo2 = useCallback((campo, valor) => {
+    setDetalle((prev) => {
+      if (!prev) return prev;
+      const actualizado = { ...prev, [campo]: valor };
+
+      if (campo === "volumen_real_m3" || campo === "es_viaje_ajuste") {
+        actualizado.costo_total = calcularCostoTotalTipo2(actualizado);
+      }
+
+      return actualizado;
+    });
+  }, []);
 
   // ── Edición de campos del detalle (material, banco) ────────────────────────
 
@@ -627,10 +695,21 @@ export const useEditarValeViajes = () => {
    *
    * Tipo 1 y 2: suma peso_ton, volumen_m3, costo_viaje
    * Tipo 3:     suma volumen_m3, y usa costo_viaje_override ?? costo_viaje
+   * Tipo 2 sin fila en vale_material_viajes: no hay nada que sumar — los
+   * totales viven directo en el detalle (ver editarCampoDetalleTipo2).
    *
    * @returns {{ peso_ton: number, volumen_real_m3: number, costo_total: number }}
    */
   const calcularTotalesDetalle = useCallback(() => {
+    if (tipoMaterial === 2 && viajes.length === 0) {
+      return {
+        peso_ton: Math.round(Number(detalle?.peso_ton || 0) * 1000) / 1000,
+        volumen_real_m3:
+          Math.round(Number(detalle?.volumen_real_m3 || 0) * 1000) / 1000,
+        costo_total: Math.round(Number(detalle?.costo_total || 0) * 100) / 100,
+      };
+    }
+
     const viajesActivos = viajes.filter(
       (v) => !viajesAEliminar.has(v.id_viaje),
     );
@@ -659,7 +738,7 @@ export const useEditarValeViajes = () => {
       volumen_real_m3: Math.round(volumen_real_m3 * 1000) / 1000,
       costo_total: Math.round(costo_total * 100) / 100,
     };
-  }, [viajes, viajesAEliminar, tipoMaterial]);
+  }, [viajes, viajesAEliminar, tipoMaterial, detalle]);
 
   // ── Guardar todos los cambios ─────────────────────────────────────────────
 
@@ -839,6 +918,14 @@ export const useEditarValeViajes = () => {
         if (!esTipo3) {
           camposDetalle.peso_ton = totales.peso_ton;
         }
+        // Tipo 2 sin fila en vale_material_viajes: el folio físico y el flag
+        // de viaje de ajuste se editan directo en el detalle (no hay viaje
+        // donde guardarlos)
+        if (tipoMaterial === 2 && viajes.length === 0) {
+          camposDetalle.folio_vale_fisico =
+            (detalle.folio_vale_fisico || "").trim() || null;
+          camposDetalle.es_viaje_ajuste = !!detalle.es_viaje_ajuste;
+        }
 
         const { error: errorDetalle } = await supabase
           .from("vale_material_detalles")
@@ -906,7 +993,10 @@ export const useEditarValeViajes = () => {
     (detalle && detalleOriginal && (
       detalle.id_material !== detalleOriginal.id_material ||
       detalle.id_banco !== detalleOriginal.id_banco ||
-      detalle.distancia_km !== detalleOriginal.distancia_km
+      detalle.distancia_km !== detalleOriginal.distancia_km ||
+      detalle.volumen_real_m3 !== detalleOriginal.volumen_real_m3 ||
+      !!detalle.es_viaje_ajuste !== !!detalleOriginal.es_viaje_ajuste ||
+      (detalle.folio_vale_fisico || "") !== (detalleOriginal.folio_vale_fisico || "")
     ));
 
   return {
@@ -937,6 +1027,7 @@ export const useEditarValeViajes = () => {
     cargarDetalle,
     editarCampoViaje,
     editarDistanciaDetalle,
+    editarCampoDetalleTipo2,
     editarMaterialDetalle,
     editarBancoDetalle,
     agregarViaje,

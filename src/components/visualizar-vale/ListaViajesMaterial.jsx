@@ -87,6 +87,9 @@ const ListaViajesMaterial = ({
             const bancoEfectivo = getBancoEfectivo(viaje);
             const distanciaEfectiva = getDistanciaEfectiva(viaje);
             const costoEfectivo = getCostoEfectivo(viaje);
+            // Viaje de ajuste (Tipo 2): se cobra la capacidad del camión, no
+            // el volumen real entregado — ver CLAUDE.md "Viaje de ajuste".
+            const esAjuste = viaje._esFallback && detalle.es_viaje_ajuste;
 
             const fotoUrl = (!viaje._esFallback && viaje.foto_evidencia_url)
               ? viaje.foto_evidencia_url
@@ -145,6 +148,15 @@ const ListaViajesMaterial = ({
                     {tieneOverride && (
                       <span className="tipo-material-badge" style={{ background: "#fef3c7", color: "#92400e" }}>
                         Override
+                      </span>
+                    )}
+                    {esAjuste && (
+                      <span
+                        className="tipo-material-badge"
+                        style={{ background: "#fef3c7", color: "#92400e" }}
+                        title={`Se cobra la capacidad del camión (${formatearVolumen(capacidadMostrar)}), no el volumen real entregado`}
+                      >
+                        Ajuste — capacidad
                       </span>
                     )}
                     {viaje.registro_anticipado && (
@@ -303,9 +315,19 @@ const ListaViajesMaterial = ({
                   {/* Importe del viaje */}
                   {mostrarPrecios && costoEfectivo > 0 && (
                     <div className="viaje-item__costo">
-                      <span className="viaje-item__costo-label">Importe viaje</span>
+                      <span className="viaje-item__costo-label">
+                        Importe viaje{esAjuste ? " (capacidad)" : ""}
+                      </span>
                       <span className="viaje-item__costo-valor">{formatearMoneda(costoEfectivo)}</span>
                     </div>
+                  )}
+
+                  {esAjuste && (
+                    <p className="viaje-item__ajuste-nota">
+                      Viaje de ajuste: se cobró la capacidad del camión
+                      ({formatearVolumen(capacidadMostrar)}), no el volumen real
+                      entregado ({formatearVolumen(volumenMostrar)}).
+                    </p>
                   )}
                 </div>
 

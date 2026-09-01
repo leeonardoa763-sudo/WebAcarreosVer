@@ -3,8 +3,12 @@
  *
  * Tabla editable de viajes internos para vales de material tipo 1, 2 y 3.
  *
- * Tipo 1 y 2: edición de toneladas, folio físico y distancia del detalle.
- *             Recálculo automático de m3 y costo.
+ * Tipo 1 y 2 (con viajes): edición de toneladas, folio físico y distancia
+ *             del detalle. Recálculo automático de m3 y costo.
+ * Tipo 2 sin fila en vale_material_viajes (1 vale = 1 carga): panel de
+ *             edición directa del detalle (volumen m³ + folio físico) en vez
+ *             de tabla — no hay viajes que agregar/eliminar. La cantidad se
+ *             captura directo en m³, no se convierte desde toneladas.
  * Tipo 3:     edición de volumen_m3 directo, banco override, distancia override
  *             por viaje. Recálculo automático de precio_m3_override y costo.
  *
@@ -477,6 +481,97 @@ const FilaViajeT3 = ({
   );
 };
 
+// ─── Sub-componente: panel tipo 2 sin viajes (1 vale = 1 carga) ──────────────
+
+/**
+ * Panel de edición directa para vales Tipo 2 (Base Asfáltica) que no tienen
+ * fila en vale_material_viajes. La app captura una sola carga por vale, así
+ * que aquí se edita el detalle directamente en vez de una tabla de viajes.
+ */
+const PanelDetalleTipo2 = ({ detalle, onEditarCampoDetalle }) => {
+  const esAjuste = !!detalle.es_viaje_ajuste;
+
+  return (
+    <div className="tev__tipo2-panel">
+      <div className="tev__tipo2-grid">
+        <div className="tev__campo-grupo">
+          <label className="tev__campo-label" htmlFor="tev-tipo2-folio">
+            Folio físico
+          </label>
+          <input
+            id="tev-tipo2-folio"
+            type="text"
+            className="tev__input"
+            value={detalle.folio_vale_fisico ?? ""}
+            onChange={(e) =>
+              onEditarCampoDetalle("folio_vale_fisico", e.target.value)
+            }
+            placeholder="Ej. 331250"
+            maxLength={30}
+          />
+        </div>
+
+        <div className="tev__campo-grupo">
+          <label className="tev__campo-label" htmlFor="tev-tipo2-volumen">
+            Volumen real m³
+          </label>
+          <div className="tev__input-group">
+            <input
+              id="tev-tipo2-volumen"
+              type="number"
+              className="tev__input tev__input--destacado"
+              value={detalle.volumen_real_m3 ?? ""}
+              onChange={(e) =>
+                onEditarCampoDetalle("volumen_real_m3", e.target.value)
+              }
+              placeholder="0.000"
+              step="0.001"
+              min="0"
+            />
+            <span className="tev__input-suffix">m³</span>
+          </div>
+        </div>
+
+        <div className="tev__campo-grupo">
+          <span className="tev__campo-label">Precio/m³</span>
+          <span className="tev__valor">{fmtMoneda(detalle.precio_m3)}</span>
+        </div>
+
+        <div className="tev__campo-grupo">
+          <span className="tev__campo-label">
+            Costo {esAjuste && <span className="tev__tipo2-costo-tag">capacidad</span>}
+          </span>
+          <span className="tev__costo">{fmtMoneda(detalle.costo_total)}</span>
+        </div>
+      </div>
+
+      <label className="tev__tipo2-ajuste" htmlFor="tev-tipo2-ajuste">
+        <input
+          id="tev-tipo2-ajuste"
+          type="checkbox"
+          checked={esAjuste}
+          onChange={(e) =>
+            onEditarCampoDetalle("es_viaje_ajuste", e.target.checked)
+          }
+        />
+        <span>
+          Viaje de ajuste — cobrar capacidad del camión
+          {detalle.capacidad_m3 ? ` (${fmt3(detalle.capacidad_m3)} m³)` : ""}
+        </span>
+      </label>
+
+      {esAjuste && (
+        <p className="tev__tipo2-ajuste-nota">
+          <Info size={13} />
+          Al operador se le paga la capacidad del camión, no el volumen real
+          entregado. El volumen real ({fmt3(detalle.volumen_real_m3)} m³) se
+          conserva para saber cuánto material se colocó en obra.
+        </p>
+      )}
+    </div>
+  );
+};
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 const TablaEditarViajes = ({
@@ -490,6 +585,7 @@ const TablaEditarViajes = ({
   loading,
   onEditarCampoViaje,
   onEditarDistanciaDetalle,
+  onEditarCampoDetalleTipo2,
   onAgregarViaje,
   onEliminarViaje,
   onCancelarEliminacion,
@@ -500,6 +596,9 @@ const TablaEditarViajes = ({
   const [distanciaInput, setDistanciaInput] = useState("");
 
   const esTipo3 = tipoMaterial === 3;
+  // Tipo 2 sin fila en vale_material_viajes: 1 vale = 1 carga capturada
+  // directo en el detalle — no hay tabla de viajes que mostrar.
+  const esTipo2SinViajes = tipoMaterial === 2 && viajes.length === 0;
 
   const handleIniciarEditarDistancia = () => {
     setDistanciaInput(String(detalle?.distancia_km ?? ""));
@@ -628,6 +727,12 @@ const TablaEditarViajes = ({
               opcionales — se usan para calcular un precio diferente al del
               detalle.
             </span>
+          ) : esTipo2SinViajes ? (
+            <span>
+              Base Asfáltica: 1 vale = 1 carga. Edita el volumen m³ y el folio
+              físico directamente abajo — no hay viajes individuales que
+              agregar o eliminar.
+            </span>
           ) : (
             <span>
               Editar la distancia recalcula el precio/m³ y el costo de todos los
@@ -637,8 +742,17 @@ const TablaEditarViajes = ({
         </div>
       </div>
 
+      {/* ── Tipo 2 sin viajes: panel de edición directa del detalle ────── */}
+      {esTipo2SinViajes && (
+        <PanelDetalleTipo2
+          detalle={detalle}
+          onEditarCampoDetalle={onEditarCampoDetalleTipo2}
+        />
+      )}
+
       {/* ── Tabla de viajes ───────────────────────────────────────────── */}
-      <div className="tev__tabla-wrapper">
+      {!esTipo2SinViajes && (
+        <div className="tev__tabla-wrapper">
         <table className="tev__tabla">
           <thead>
             {esTipo3 ? (
@@ -759,22 +873,25 @@ const TablaEditarViajes = ({
           )}
         </table>
       </div>
+      )}
 
-      {/* ── Botón agregar viaje ───────────────────────────────────────── */}
-      <div className="tev__footer">
-        <button
-          type="button"
-          className="tev__btn-agregar"
-          onClick={onAgregarViaje}
-        >
-          <Plus size={16} />
-          Agregar viaje
-        </button>
+      {/* ── Botón agregar viaje — no aplica a Tipo 2 sin viajes (1:1) ───── */}
+      {!esTipo2SinViajes && (
+        <div className="tev__footer">
+          <button
+            type="button"
+            className="tev__btn-agregar"
+            onClick={onAgregarViaje}
+          >
+            <Plus size={16} />
+            Agregar viaje
+          </button>
 
-        <span className="tev__footer-hint">
-          Los cambios no se guardan hasta presionar "Guardar cambios"
-        </span>
-      </div>
+          <span className="tev__footer-hint">
+            Los cambios no se guardan hasta presionar "Guardar cambios"
+          </span>
+        </div>
+      )}
     </div>
   );
 };

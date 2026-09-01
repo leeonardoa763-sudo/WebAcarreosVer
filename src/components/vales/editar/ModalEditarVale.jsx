@@ -250,6 +250,7 @@ const ModalEditarVale = ({
     cargarDetalle,
     editarCampoViaje,
     editarDistanciaDetalle,
+    editarCampoDetalleTipo2,
     editarMaterialDetalle,
     editarBancoDetalle,
     agregarViaje,
@@ -458,6 +459,7 @@ const ModalEditarVale = ({
                 loading={loading}
                 onEditarCampoViaje={editarCampoViaje}
                 onEditarDistanciaDetalle={editarDistanciaDetalle}
+                onEditarCampoDetalleTipo2={editarCampoDetalleTipo2}
                 onAgregarViaje={agregarViaje}
                 onEliminarViaje={eliminarViaje}
                 onCancelarEliminacion={cancelarEliminacion}
