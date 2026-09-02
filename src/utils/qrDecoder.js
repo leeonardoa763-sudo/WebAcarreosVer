@@ -42,7 +42,7 @@ export const decodeQRFromCanvas = (canvas) => {
 export const extractFolioFromQRData = (qrData) => {
   try {
     // Buscar patrón de folio en la URL
-    const folioPattern = /vale\/([A-Z]{2}-\d{3}-\d{5})/i;
+    const folioPattern = /vale\/([A-Z]{2,3}-\d{3}-\d{5})/i;
     const match = qrData.match(folioPattern);
 
     if (match && match[1]) {
@@ -50,7 +50,7 @@ export const extractFolioFromQRData = (qrData) => {
     }
 
     // Si no encuentra el patrón, intentar extraer cualquier folio
-    const anyFolioPattern = /([A-Z]{2}-\d{3}-\d{5})/i;
+    const anyFolioPattern = /([A-Z]{2,3}-\d{3}-\d{5})/i;
     const anyMatch = qrData.match(anyFolioPattern);
 
     if (anyMatch && anyMatch[1]) {

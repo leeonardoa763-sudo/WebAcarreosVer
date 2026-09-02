@@ -23,7 +23,7 @@ import { supabase } from "../config/supabase";
 import { useAuth } from "./useAuth";
 
 // 4. Utils
-import { extractFolioFromPDF, convertPDFToImage } from "../utils/pdfExtractor";
+import { extractFolioFromPDF, convertPDFToImages } from "../utils/pdfExtractor";
 import { extractFolioFromQR } from "../utils/qrDecoder";
 
 export const useVerificacion = () => {
@@ -111,24 +111,36 @@ export const useVerificacion = () => {
         };
       }
 
-      // MÉTODO 2: Intentar extraer folio por QR (2x y luego 3x si falla)
+      // MÉTODO 2: Intentar extraer folio por QR
+      // Se recorren TODAS las páginas: en vales con muchos viajes el QR
+      // queda en la última página, no en la primera. Si falla, se reintenta
+      // con más resolución.
       console.log("OCR falló, intentando decodificar QR...");
-      const imageResult = await convertPDFToImage(file, 2.0);
 
-      if (!imageResult.success) {
-        throw new Error(
-          "No se pudo procesar el PDF. Contacte al administrador."
-        );
-      }
+      let qrResult = { success: false };
 
-      let qrResult = await extractFolioFromQR(imageResult.canvas);
+      for (const escala of [2.0, 3.0, 4.0]) {
+        const imagesResult = await convertPDFToImages(file, escala);
 
-      if (!qrResult.success) {
-        console.log("QR falló a escala 2x, reintentando a 3x...");
-        const imageResult3x = await convertPDFToImage(file, 3.0);
-        if (imageResult3x.success) {
-          qrResult = await extractFolioFromQR(imageResult3x.canvas);
+        if (!imagesResult.success) {
+          throw new Error(
+            "No se pudo procesar el PDF. Contacte al administrador."
+          );
         }
+
+        for (let i = 0; i < imagesResult.canvases.length; i++) {
+          const intento = await extractFolioFromQR(imagesResult.canvases[i]);
+          if (intento.success) {
+            console.log(
+              `QR encontrado en página ${i + 1} (escala ${escala}x)`
+            );
+            qrResult = intento;
+            break;
+          }
+        }
+
+        if (qrResult.success) break;
+        console.log(`QR falló a escala ${escala}x`);
       }
 
       if (qrResult.success) {

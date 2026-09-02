@@ -77,26 +77,34 @@ export const extractFolioFromText = (text) => {
 };
 
 /**
- * Convertir primera página del PDF a imagen (Canvas)
+ * Renderizar una página del PDF a un Canvas
+ */
+const renderPageToCanvas = async (page, scale) => {
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+
+  await page.render({
+    canvasContext: context,
+    viewport: viewport,
+  }).promise;
+
+  return canvas;
+};
+
+/**
+ * Convertir una página del PDF a imagen (Canvas)
  * Necesario para decodificar QR
  */
-export const convertPDFToImage = async (file, scale = 2.0) => {
+export const convertPDFToImage = async (file, scale = 2.0, pageNumber = 1) => {
   try {
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    const page = await pdf.getPage(1); // Primera página
-
-    const viewport = page.getViewport({ scale });
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
-
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-
-    await page.render({
-      canvasContext: context,
-      viewport: viewport,
-    }).promise;
+    const pdf = await getDocument({ data: arrayBuffer }).promise;
+    const page = await pdf.getPage(pageNumber);
+    const canvas = await renderPageToCanvas(page, scale);
 
     return { success: true, canvas };
   } catch (error) {
@@ -106,18 +114,54 @@ export const convertPDFToImage = async (file, scale = 2.0) => {
 };
 
 /**
+ * Convertir TODAS las páginas del PDF a imágenes (Canvas)
+ *
+ * Los vales largos (muchos viajes registrados) se paginan y el QR queda
+ * en la última página. Por eso el QR debe buscarse en todas, no solo en la
+ * primera.
+ *
+ * Retorna: { success, canvases: Canvas[], error }
+ */
+export const convertPDFToImages = async (file, scale = 2.0) => {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await getDocument({ data: arrayBuffer }).promise;
+
+    const canvases = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      canvases.push(await renderPageToCanvas(page, scale));
+    }
+
+    return { success: true, canvases };
+  } catch (error) {
+    console.error("Error en convertPDFToImages:", error);
+    return { success: false, error: error.message, canvases: [] };
+  }
+};
+
+/**
  * Extraer folio Y texto completo del PDF
+ *
+ * Recorre TODAS las páginas: en vales con muchos viajes el bloque final
+ * (leyenda "COPIA BLANCO", QR, firma) cae en la segunda página y las
+ * validaciones de estructura la necesitan.
+ *
  * Retorna: { success, folio, textoCompleto, error }
  */
 export const extractFolioFromPDF = async (file) => {
   try {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await getDocument({ data: arrayBuffer }).promise;
-    const page = await pdf.getPage(1);
-    const textContent = await page.getTextContent();
 
-    // Extraer TODO el texto
-    const textoCompleto = textContent.items.map((item) => item.str).join(" ");
+    // Extraer TODO el texto de todas las páginas
+    let textoCompleto = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      textoCompleto +=
+        textContent.items.map((item) => item.str).join(" ") + "\n";
+    }
 
     // Buscar folio en el texto.
     // pdf.js parte el folio del encabezado en varios items ("CD" + "-149-02038")
