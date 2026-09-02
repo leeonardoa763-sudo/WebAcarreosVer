@@ -10,10 +10,17 @@
  *   Viajes material  1 fila por viaje         FK  Folio + Detalle
  *   Viajes renta     1 fila por viaje         FK  Folio
  *
- * Se separan porque una sola tabla obliga a repetir los datos del vale en cada
- * viaje y a dejar en blanco todo lo que no aplica: las columnas de renta vacías
- * en las filas de material, las de material vacías en las de renta, y los
- * totales del vale vacíos en todas menos la primera. Cada hoja aquí está llena.
+ * Se separan porque una sola tabla obliga a dejar en blanco todo lo que no
+ * aplica: las columnas de renta vacías en las filas de material, las de
+ * material vacías en las de renta, y los totales del vale vacíos en todas menos
+ * la primera. Cada hoja aquí está llena.
+ *
+ * Lo que sí se repite en todas las hojas son los datos de identificación del
+ * vale (folio, tipo, estado, empresa, CC, obra, fecha, operador, placas,
+ * sindicato) y, en las hojas de viajes, los del detalle del que cuelgan
+ * (material, tipo de material, banco pedido / equipo rentado). Son columnas
+ * llenas en cada fila, así que no reintroducen huecos, y evitan tener que
+ * cruzar a mano contra la hoja Vales para filtrar por obra o por sindicato.
  *
  * Cada hoja suma por su cuenta el total del vale: el importe de la hoja Vales,
  * el de Material por detalle y el de Viajes material por viaje dan la misma
@@ -154,10 +161,39 @@ const getImporteVale = (vale) => {
 const esRentaPorDia = (detalle) =>
   detalle.es_renta_por_dia || Number(detalle.total_dias ?? 0) > 0;
 
+// ─── Datos generales del vale (repetidos en todas las hojas) ────────────────
+
+/**
+ * Columnas de identificación del vale que abren todas las hojas. Se duplican a
+ * propósito: sin ellas, filtrar los viajes de una obra o de un sindicato obliga
+ * a cruzar folio por folio contra la hoja Vales.
+ *
+ * No incluye "Capacidad m³" ni "Banco": esos nombres ya los usan las hojas de
+ * detalle con otro significado (la capacidad del detalle, el banco efectivo del
+ * viaje) y repetirlos aquí colapsaría las dos columnas en una sola.
+ */
+const datosGeneralesVale = (vale) => ({
+  Folio: texto(vale.folio),
+  Tipo: ETIQUETAS_TIPO[vale._tipo] ?? texto(vale._tipo),
+  Estado: ETIQUETAS_ESTADO[vale.estado] ?? texto(vale.estado),
+  Empresa: texto(vale.obras?.empresas?.empresa ?? vale.obras?.empresas?.sufijo),
+  CC: texto(vale.obras?.cc),
+  Obra: texto(vale.obras?.obra),
+  Fecha: fechaExcel(getFechaEfectiva(vale)),
+  Operador: texto(vale.operadores?.nombre_completo),
+  Placas: texto(vale.vehiculos?.placas),
+  Sindicato: texto(vale.operadores?.sindicatos?.sindicato),
+});
+
+// Formato de las columnas generales; se mezcla en el de cada hoja.
+const FORMATOS_GENERALES = {
+  Fecha: FMT_FECHA,
+};
+
 // ─── Hoja "Vales" ───────────────────────────────────────────────────────────
 
 const FORMATOS_VALES = {
-  Fecha: FMT_FECHA,
+  ...FORMATOS_GENERALES,
   "Fecha creación": FMT_FECHA,
   "Hora creación": FMT_HORA,
   "Fecha completado": FMT_FECHA,
@@ -171,19 +207,8 @@ const filaVale = (vale, viajesRegistrados) => {
   const conciliacion = getDatosConciliacion(vale);
 
   return {
-    Folio: texto(vale.folio),
-    Tipo: ETIQUETAS_TIPO[vale._tipo] ?? texto(vale._tipo),
-    Estado: ETIQUETAS_ESTADO[vale.estado] ?? texto(vale.estado),
-    Empresa: texto(
-      vale.obras?.empresas?.empresa ?? vale.obras?.empresas?.sufijo,
-    ),
-    CC: texto(vale.obras?.cc),
-    Obra: texto(vale.obras?.obra),
-    Fecha: fechaExcel(getFechaEfectiva(vale)),
-    Operador: texto(vale.operadores?.nombre_completo),
-    Placas: texto(vale.vehiculos?.placas),
+    ...datosGeneralesVale(vale),
     "Capacidad m³": num(vale.vehiculos?.capacidad_m3),
-    Sindicato: texto(vale.operadores?.sindicatos?.sindicato),
     "Viajes registrados": viajesRegistrados,
     Importe: getImporteVale(vale),
 
@@ -214,12 +239,13 @@ const filaVale = (vale, viajesRegistrados) => {
 // ─── Hoja "Material" ────────────────────────────────────────────────────────
 
 const FORMATOS_MATERIAL = {
+  ...FORMATOS_GENERALES,
   "Precio m³": FMT_MONEDA,
   Importe: FMT_MONEDA,
 };
 
 const filaDetalleMaterial = (vale, det, numeroDetalle) => ({
-  Folio: texto(vale.folio),
+  ...datosGeneralesVale(vale),
   Detalle: numeroDetalle,
   Material: texto(det.material?.material),
   "Tipo material": texto(det.material?.tipo_de_material?.tipo_de_material),
@@ -245,6 +271,7 @@ const filaDetalleMaterial = (vale, det, numeroDetalle) => ({
 // ─── Hoja "Renta" ───────────────────────────────────────────────────────────
 
 const FORMATOS_RENTA = {
+  ...FORMATOS_GENERALES,
   "Costo/día": FMT_MONEDA,
   "Costo/hr": FMT_MONEDA,
   Importe: FMT_MONEDA,
@@ -256,7 +283,7 @@ const filaDetalleRenta = (vale, det) => {
   const porDia = esRentaPorDia(det);
 
   return {
-    Folio: texto(vale.folio),
+    ...datosGeneralesVale(vale),
     "Equipo / Material": texto(det.material?.material),
     Cobro: porDia ? "Por día" : "Por hora",
     Días: porDia ? num(det.total_dias) : "",
@@ -278,15 +305,22 @@ const filaDetalleRenta = (vale, det) => {
 // ─── Hoja "Viajes material" ─────────────────────────────────────────────────
 
 const FORMATOS_VIAJES_MATERIAL = {
+  ...FORMATOS_GENERALES,
   "Fecha registro": FMT_FECHA,
   "Hora registro": FMT_HORA,
   "Precio m³": FMT_MONEDA,
   Importe: FMT_MONEDA,
 };
 
-const filaViajeMaterial = (vale, viaje) => ({
-  Folio: texto(vale.folio),
+// `det` es el detalle del que cuelga el viaje: sus datos se repiten en la fila
+// para que la hoja se pueda filtrar por material o por banco pedido sin volver
+// a la hoja Material.
+const filaViajeMaterial = (vale, det, viaje) => ({
+  ...datosGeneralesVale(vale),
   Detalle: viaje.detalle,
+  Material: texto(det.material?.material),
+  "Tipo material": texto(det.material?.tipo_de_material?.tipo_de_material),
+  "Banco pedido": texto(det.bancos?.banco),
   Viaje: num(viaje.numero),
   Banco: texto(viaje.banco),
   "Cambio de banco": siNo(viaje.cambioDeBanco),
@@ -327,7 +361,7 @@ const filasViajesDeDetalle = (vale, det, numeroDetalle, tickets) => {
 
   if (viajes.length > 0) {
     return viajes.map((v) =>
-      filaViajeMaterial(vale, {
+      filaViajeMaterial(vale, det, {
         detalle: numeroDetalle,
         numero: v.numero_viaje,
         banco: getBancoViaje(v, det),
@@ -356,7 +390,7 @@ const filasViajesDeDetalle = (vale, det, numeroDetalle, tickets) => {
     return [...tickets.values()]
       .sort((a, b) => (a.numero_ticket ?? 0) - (b.numero_ticket ?? 0))
       .map((ticket) =>
-        filaViajeMaterial(vale, {
+        filaViajeMaterial(vale, det, {
           detalle: numeroDetalle,
           numero: ticket.numero_ticket,
           banco: det.bancos?.banco,
@@ -374,7 +408,7 @@ const filasViajesDeDetalle = (vale, det, numeroDetalle, tickets) => {
   // viajes esté completo y el conteo del vale cuadre.
   if (tipoId === 2) {
     return [
-      filaViajeMaterial(vale, {
+      filaViajeMaterial(vale, det, {
         detalle: numeroDetalle,
         numero: 1,
         banco: det.bancos?.banco,
@@ -402,6 +436,7 @@ const filasViajesDeDetalle = (vale, det, numeroDetalle, tickets) => {
 // ─── Hoja "Viajes renta" ────────────────────────────────────────────────────
 
 const FORMATOS_VIAJES_RENTA = {
+  ...FORMATOS_GENERALES,
   "Fecha registro": FMT_FECHA,
   "Hora registro": FMT_HORA,
 };
@@ -444,7 +479,9 @@ const filasViajesRenta = (vale) => {
   return [...porNumero.values()]
     .sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0))
     .map((v) => ({
-      Folio: texto(vale.folio),
+      ...datosGeneralesVale(vale),
+      "Equipo rentado": texto(materialPedido),
+      Cobro: esRentaPorDia(det) ? "Por día" : "Por hora",
       Viaje: num(v.numero),
       "Material descargado": texto(v.material ?? materialPedido),
       "Banco de descarga": texto(v.banco),
@@ -458,6 +495,7 @@ const filasViajesRenta = (vale) => {
 // ─── Hoja "Desverificaciones" ───────────────────────────────────────────────
 
 const FORMATOS_DESVERIFICACIONES = {
+  ...FORMATOS_GENERALES,
   "Fecha solicitud": FMT_FECHA,
   "Hora solicitud": FMT_HORA,
   "Fecha respuesta": FMT_FECHA,
@@ -470,8 +508,8 @@ const FORMATOS_DESVERIFICACIONES = {
  */
 const filasDesverificaciones = (vale) =>
   (vale.solicitudes_desverificacion ?? []).map((s) => ({
-    Folio: texto(vale.folio),
-    Estado: texto(s.estado),
+    ...datosGeneralesVale(vale),
+    "Estado solicitud": texto(s.estado),
     "Sindicato requerido": texto(s.sindicatos?.sindicato),
     Solicitó: nombrePersona(s.persona_solicitante),
     "Fecha solicitud": fechaExcel(s.fecha_solicitud),
