@@ -3,10 +3,12 @@
  *
  * Genera el reporte PDF de Estadísticas Globales (KPIs, comparativa vs
  * periodo anterior, material movido por obra, renta por obra, control
- * de presupuesto y datos destacados) respetando los filtros activos
- * de la página.
+ * de presupuesto, datos destacados e indicadores de eficiencia/oportunidad)
+ * respetando los filtros activos de la página.
  *
- * Dependencias: jspdf, ./conciliaciones/pdfHelpers (checkPageBreak)
+ * Dependencias: jspdf, ./conciliaciones/pdfHelpers (checkPageBreak),
+ * ./interpretacionIndicadores (textos de los indicadores de eficiencia,
+ * compartidos con EstadisticasGlobales.jsx para no decir cosas distintas)
  * Usado en: EstadisticasGlobales.jsx
  */
 
@@ -15,6 +17,12 @@ import { jsPDF } from "jspdf";
 
 // 2. Utils
 import { checkPageBreak } from "./conciliaciones/pdfHelpers";
+import {
+  INDICE_POSICION_OBRA,
+  FLETE_EVITADO_FLOTA_PROPIA,
+  VIABILIDAD_FLOTA_PROPIA,
+  RENTA_NO_APROVECHADA,
+} from "./interpretacionIndicadores";
 
 // ── Layout ────────────────────────────────────────────────────────
 const PAGE_WIDTH = 215.9;
@@ -1413,6 +1421,411 @@ const dibujarSeccionAhorro = (doc, yPosInicial, ahorroEstimado, serieConciliacio
   return yPos;
 };
 
+// ── Párrafo con salto de línea automático (splitTextToSize de jsPDF) ────
+const dibujarParrafo = (doc, x, yPosInicial, texto, maxWidth, opts = {}) => {
+  const { fontSize = 7.5, color = COLOR_GRAY, lineHeight = 3.6 } = opts;
+  let yPos = yPosInicial;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(fontSize);
+  setTextColor(doc, color);
+  const lineas = doc.splitTextToSize(texto, maxWidth);
+  lineas.forEach((linea) => {
+    yPos = checkPageBreak(doc, yPos, lineHeight, PAGE_HEIGHT, MARGIN_BOTTOM);
+    doc.text(linea, x, yPos);
+    yPos += lineHeight;
+  });
+  setTextColor(doc, COLOR_TEXT);
+  return yPos;
+};
+
+// ── Fila de chips KPI (label + valor), mismo lenguaje visual que
+// dibujarComparativa pero sin delta/color por defecto — un color por chip
+// es opcional (ej. nivel Alto/Medio/Bajo en rojo/ámbar/verde) ───────────
+const dibujarChipsKpi = (doc, yPosInicial, chips) => {
+  if (!chips || chips.length === 0) return yPosInicial;
+  const gap = 3;
+  const boxWidth = (USABLE_WIDTH - gap * (chips.length - 1)) / chips.length;
+  const boxHeight = 14;
+  let yPos = checkPageBreak(doc, yPosInicial, boxHeight + 2, PAGE_HEIGHT, MARGIN_BOTTOM);
+
+  chips.forEach((chip, i) => {
+    const x = MARGIN_LEFT + i * (boxWidth + gap);
+    setFill(doc, COLOR_ROW_ALT);
+    doc.roundedRect(x, yPos, boxWidth, boxHeight, 1.2, 1.2, "F");
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    setTextColor(doc, COLOR_GRAY);
+    doc.text(chip.label, x + 3, yPos + 5, { maxWidth: boxWidth - 6 });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    setTextColor(doc, chip.color || COLOR_TEXT);
+    doc.text(String(chip.value), x + 3, yPos + 11.5, { maxWidth: boxWidth - 6 });
+  });
+
+  setTextColor(doc, COLOR_TEXT);
+  return yPos + boxHeight + 5;
+};
+
+// ── Tabla genérica compacta (header + filas alternadas). Cada celda puede
+// ser un valor plano o `[texto, colorHex]` para pintar solo esa celda (ej.
+// % del índice de un banco dominante en rojo) ───────────────────────────
+const dibujarTablaGenerica = (doc, yPosInicial, columnas, filas, emptyMsg) => {
+  let yPos = yPosInicial;
+
+  if (!filas || filas.length === 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    setTextColor(doc, COLOR_GRAY);
+    doc.text(emptyMsg, MARGIN_LEFT, yPos + 4);
+    setTextColor(doc, COLOR_TEXT);
+    return yPos + 10;
+  }
+
+  yPos = dibujarEncabezadoColumnas(doc, yPos, columnas);
+  const rowHeight = 6;
+  let rowIndex = 0;
+
+  filas.forEach((cells) => {
+    yPos = checkPageBreak(doc, yPos, rowHeight, PAGE_HEIGHT, MARGIN_BOTTOM);
+    if (yPos === 12) {
+      yPos = dibujarEncabezadoColumnas(doc, yPos, columnas);
+    }
+    if (rowIndex % 2 === 1) {
+      setFill(doc, COLOR_ROW_ALT);
+      doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    let x = MARGIN_LEFT;
+    columnas.forEach((col, i) => {
+      const textX = col.align === "right" ? x + col.width - 2 : x + 2;
+      const rawCell = cells[i];
+      const cellColor = Array.isArray(rawCell) ? rawCell[1] : null;
+      const raw = String((Array.isArray(rawCell) ? rawCell[0] : rawCell) ?? "");
+      if (cellColor) { setTextColor(doc, cellColor); doc.setFont("helvetica", "bold"); }
+      const texto = col.align === "left" ? ajustarTexto(doc, raw, col.width - 4) : raw;
+      doc.text(texto, textX, yPos + 4.2, { align: col.align === "right" ? "right" : "left" });
+      if (cellColor) { setTextColor(doc, COLOR_TEXT); doc.setFont("helvetica", "normal"); }
+      x += col.width;
+    });
+
+    yPos += rowHeight;
+    rowIndex += 1;
+  });
+
+  return yPos + 4;
+};
+
+// ── Encabezado de tarjeta por obra (obra + línea de valor destacado) ────
+const dibujarEncabezadoObra = (doc, yPosInicial, obraLabel, valorDestacado) => {
+  let yPos = checkPageBreak(doc, yPosInicial, 12, PAGE_HEIGHT, MARGIN_BOTTOM);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  setTextColor(doc, COLOR_SECONDARY);
+  doc.text(obraLabel, MARGIN_LEFT, yPos + 4);
+  setTextColor(doc, COLOR_TEXT);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text(valorDestacado, MARGIN_LEFT, yPos + 9, { maxWidth: USABLE_WIDTH });
+  return yPos + 12;
+};
+
+// ── Indicador: Índice de Posición de la Obra ────────────────────────────
+const NIVEL_COLOR_PDF = { alto: COLOR_DANGER, medio: COLOR_WARNING, bajo: COLOR_SUCCESS };
+const NIVEL_LABEL_PDF = { alto: "Alto", medio: "Medio", bajo: "Bajo" };
+
+const dibujarSeccionIndicePosicion = (doc, yPosInicial, indicePosicionObra) => {
+  let yPos = dibujarTituloSeccion(doc, yPosInicial, INDICE_POSICION_OBRA.titulo);
+  yPos = dibujarParrafo(doc, MARGIN_LEFT, yPos, INDICE_POSICION_OBRA.descripcion, USABLE_WIDTH) + 3;
+
+  if (!indicePosicionObra || indicePosicionObra.length === 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    setTextColor(doc, COLOR_GRAY);
+    doc.text("Sin datos suficientes para calcular el índice de posición en este filtro.", MARGIN_LEFT, yPos + 4);
+    setTextColor(doc, COLOR_TEXT);
+    return yPos + 12;
+  }
+
+  const columnasBanco = [
+    { label: "BANCO", width: 55, align: "left" },
+    { label: "M³", width: 25, align: "right" },
+    { label: "% VOL.", width: 22, align: "right" },
+    { label: "DISTANCIA", width: 28, align: "right" },
+    { label: "VIAJES", width: 22, align: "right" },
+    { label: "% DEL ÍNDICE", width: 28, align: "right" },
+  ];
+  const columnasMaterial = [
+    { label: "MATERIAL", width: 55, align: "left" },
+    { label: "M³", width: 30, align: "right" },
+    { label: "PRECIO FLETE PROM/M³", width: 45, align: "right" },
+    { label: "RANGO DE PRECIO", width: 50, align: "right" },
+  ];
+
+  indicePosicionObra.forEach((o) => {
+    yPos = dibujarEncabezadoObra(
+      doc, yPos,
+      formatearObraCompleta(o.empresa, o.cc, o.obra),
+      `${formatearNumero(o.m3Total, 0)} m³ transportados`
+    );
+
+    const chips = [];
+    if (o.tendenciaMensual && o.tendenciaMensual.length >= 2) {
+      const primero = o.tendenciaMensual[0];
+      const ultimo = o.tendenciaMensual[o.tendenciaMensual.length - 1];
+      const delta = ultimo.indice - primero.indice;
+      const empeora = delta > primero.indice * 0.05;
+      const mejora = delta < -primero.indice * 0.05;
+      chips.push({
+        label: `Tendencia (${o.tendenciaMensual.length} meses)`,
+        value: `${delta > 0 ? "+" : ""}${formatearNumero(delta, 1)} km`,
+        color: empeora ? COLOR_DANGER : mejora ? COLOR_SUCCESS : COLOR_GRAY,
+      });
+    }
+    if (o.distanciaMinKm != null) {
+      chips.push({ label: "Rango km", value: `${formatearNumero(o.distanciaMinKm, 0)}–${formatearNumero(o.distanciaMaxKm, 0)}` });
+    }
+    chips.push({ label: "Índice", value: `${formatearNumero(o.indicePosicion, 1)} km` });
+    chips.push({ label: "Nivel", value: NIVEL_LABEL_PDF[o.nivel] || "—", color: NIVEL_COLOR_PDF[o.nivel] });
+    yPos = dibujarChipsKpi(doc, yPos, chips);
+
+    const filasBanco = (o.bancos || []).map((b) => [
+      b.banco,
+      `${formatearNumero(b.m3, 0)} m³`,
+      `${formatearNumero(b.pctVol, 1)}%`,
+      `${formatearNumero(b.distanciaKm, 1)} km`,
+      formatearNumero(b.viajes, 0),
+      [`${formatearNumero(b.aportaIndice, 1)}%${b.dominante ? " !" : ""}`, b.dominante ? COLOR_DANGER : null],
+    ]);
+    yPos = dibujarTablaGenerica(doc, yPos, columnasBanco, filasBanco, "Sin bancos con distancia registrada.");
+
+    if (o.bancoDominante) {
+      yPos = dibujarParrafo(doc, MARGIN_LEFT, yPos, INDICE_POSICION_OBRA.notaBancoDominante, USABLE_WIDTH, { fontSize: 7, color: COLOR_WARNING }) + 2;
+    }
+
+    const filasMaterial = (o.materiales || []).map((m) => [
+      m.material,
+      `${formatearNumero(m.m3, 0)} m³`,
+      m.precioFleteM3 != null ? formatearMoneda(m.precioFleteM3) : "—",
+      m.precioMin === m.precioMax ? formatearMoneda(m.precioMin) : `${formatearMoneda(m.precioMin)} – ${formatearMoneda(m.precioMax)}`,
+    ]);
+    yPos = dibujarTablaGenerica(doc, yPos, columnasMaterial, filasMaterial, "Sin precio de flete registrado para estos materiales.");
+
+    yPos += 4;
+  });
+
+  return dibujarParrafo(doc, MARGIN_LEFT, yPos, INDICE_POSICION_OBRA.nota, USABLE_WIDTH, { fontSize: 7 }) + 4;
+};
+
+// ── Indicador: Flete Evitado por Flota Propia (GRUPO GEEM) ──────────────
+const dibujarSeccionFleteEvitado = (doc, yPosInicial, fleteEvitadoFlotaPropia) => {
+  let yPos = dibujarTituloSeccion(doc, yPosInicial, FLETE_EVITADO_FLOTA_PROPIA.titulo);
+  yPos = dibujarParrafo(doc, MARGIN_LEFT, yPos, FLETE_EVITADO_FLOTA_PROPIA.descripcion, USABLE_WIDTH) + 3;
+
+  if (!fleteEvitadoFlotaPropia || fleteEvitadoFlotaPropia.length === 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    setTextColor(doc, COLOR_GRAY);
+    doc.text("Sin viajes de GRUPO GEEM (flota propia) en este filtro.", MARGIN_LEFT, yPos + 4);
+    setTextColor(doc, COLOR_TEXT);
+    return yPos + 12;
+  }
+
+  const columnasRutas = [
+    { label: "BANCO", width: 45, align: "left" },
+    { label: "MATERIAL", width: 40, align: "left" },
+    { label: "M³", width: 25, align: "right" },
+    { label: "DISTANCIA", width: 25, align: "right" },
+    { label: "VIAJES", width: 20, align: "right" },
+    { label: "VALOR TARIFA SINDICATO", width: 30, align: "right" },
+  ];
+
+  fleteEvitadoFlotaPropia.forEach((o) => {
+    yPos = dibujarEncabezadoObra(
+      doc, yPos,
+      formatearObraCompleta(o.empresa, o.cc, o.obra),
+      `${formatearMoneda(o.valorTotalSindicato)} evitados`
+    );
+
+    const chips = [
+      { label: "Del Volumen de la Obra", value: o.pctVolumenObra != null ? `${formatearNumero(o.pctVolumenObra, 1)}%` : "—" },
+      { label: "Viajes GEEM", value: formatearNumero(o.viajesGeem, 0) },
+      { label: "Camiones GEEM", value: formatearNumero(o.camionesGeemDistintos, 0) },
+    ];
+    if (o.viajesGeemPlanta > 0) {
+      chips.push({ label: "A Planta Asfaltos", value: `${formatearNumero(o.pctPlanta, 0)}%` });
+    }
+    yPos = dibujarChipsKpi(doc, yPos, chips);
+
+    const filasRutas = (o.rutas || []).map((r) => [
+      r.banco,
+      r.material,
+      `${formatearNumero(r.m3, 0)} m³`,
+      `${formatearNumero(r.distanciaKm, 1)} km`,
+      formatearNumero(r.viajes, 0),
+      formatearMoneda(r.valorSindicato),
+    ]);
+    yPos = dibujarTablaGenerica(doc, yPos, columnasRutas, filasRutas, "Sin rutas de GEEM registradas.");
+
+    if (o.viajesPorMes && o.viajesPorMes.length > 1) {
+      const chartHeight = 40;
+      yPos = checkPageBreak(doc, yPos, chartHeight + 4, PAGE_HEIGHT, MARGIN_BOTTOM);
+      dibujarMiniLineChart(
+        doc, MARGIN_LEFT, yPos, USABLE_WIDTH, chartHeight,
+        "Uso mensual de GEEM",
+        o.viajesPorMes.map((v) => v.viajes),
+        o.viajesPorMes.map((v) => v.mes),
+        COLOR_BLUE, "viajes"
+      );
+      yPos += chartHeight + 4;
+    }
+
+    yPos += 3;
+  });
+
+  return dibujarParrafo(doc, MARGIN_LEFT, yPos, FLETE_EVITADO_FLOTA_PROPIA.nota, USABLE_WIDTH, { fontSize: 7 }) + 4;
+};
+
+// ── Indicador: ¿Se justifica comprar un camión? ─────────────────────────
+const dibujarSeccionViabilidadFlota = (doc, yPosInicial, topCamionerosPorObra, camionesPorDia) => {
+  let yPos = dibujarTituloSeccion(doc, yPosInicial, VIABILIDAD_FLOTA_PROPIA.titulo);
+  yPos = dibujarParrafo(doc, MARGIN_LEFT, yPos, VIABILIDAD_FLOTA_PROPIA.descripcionTopCamioneros, USABLE_WIDTH) + 3;
+
+  if (!topCamionerosPorObra || topCamionerosPorObra.length === 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    setTextColor(doc, COLOR_GRAY);
+    doc.text("Sin placas de sindicato con viajes de material en este filtro.", MARGIN_LEFT, yPos + 4);
+    setTextColor(doc, COLOR_TEXT);
+    return yPos + 12;
+  }
+
+  const columnasTop = [
+    { label: "PLACA", width: 28, align: "left" },
+    { label: "OPERADOR", width: 52, align: "left" },
+    { label: "VIAJES", width: 20, align: "right" },
+    { label: "M³", width: 20, align: "right" },
+    { label: "VIAJES/DÍA", width: 25, align: "right" },
+    { label: "PAGADO (AHORRO SI PROPIO)", width: 40, align: "right" },
+  ];
+
+  topCamionerosPorObra.forEach((o) => {
+    const camiones = (camionesPorDia || []).find((c) => c.obra === o.obra && c.cc === o.cc) || null;
+    const mejor = o.top?.[0];
+
+    yPos = dibujarEncabezadoObra(
+      doc, yPos,
+      formatearObraCompleta(o.empresa, o.cc, o.obra),
+      mejor ? `${mejor.placas} — top camión, ${formatearMoneda(mejor.importe)} pagados` : "Sin placas de sindicato en este filtro"
+    );
+
+    const chips = [];
+    if (camiones) {
+      chips.push({ label: "Camiones/día Prom.", value: formatearNumero(camiones.promedioCamionesDia, 1) });
+      chips.push({ label: "Máx. Camiones/día", value: formatearNumero(camiones.maxCamionesDia, 0) });
+    }
+    if (o.promedioViajesPorDiaObra != null) {
+      chips.push({ label: "Viajes/día Prom. Camión", value: formatearNumero(o.promedioViajesPorDiaObra, 1) });
+    }
+    chips.push({ label: `Pagado — Camión Prom. (${o.totalPlacas})`, value: formatearMonedaCorta(o.promedioImportePorCamion) });
+    yPos = dibujarChipsKpi(doc, yPos, chips);
+
+    const filasTop = (o.top || []).map((p) => [
+      p.placas,
+      p.operador,
+      formatearNumero(p.viajes, 0),
+      `${formatearNumero(p.m3, 0)} m³`,
+      p.viajesPorDia != null ? formatearNumero(p.viajesPorDia, 1) : "—",
+      formatearMoneda(p.importe),
+    ]);
+    yPos = dibujarTablaGenerica(doc, yPos, columnasTop, filasTop, "Sin placas de sindicato con viajes en este filtro.");
+
+    yPos += 3;
+  });
+
+  return dibujarParrafo(doc, MARGIN_LEFT, yPos, VIABILIDAD_FLOTA_PROPIA.nota, USABLE_WIDTH, { fontSize: 7 }) + 4;
+};
+
+// ── Indicador: Jornada de Renta No Aprovechada ──────────────────────────
+const COLOR_RANGO_RENTA_PDF = {
+  desperdiciado: COLOR_DANGER,
+  pocaEficiencia: COLOR_WARNING,
+  buenaEficiencia: COLOR_SUCCESS,
+  ideal: COLOR_SUCCESS,
+};
+
+const dibujarSeccionRentaNoAprovechada = (doc, yPosInicial, rentaNoAprovechada) => {
+  let yPos = dibujarTituloSeccion(doc, yPosInicial, RENTA_NO_APROVECHADA.titulo);
+  yPos = dibujarParrafo(doc, MARGIN_LEFT, yPos, RENTA_NO_APROVECHADA.descripcion, USABLE_WIDTH) + 3;
+
+  if (!rentaNoAprovechada || rentaNoAprovechada.length === 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    setTextColor(doc, COLOR_GRAY);
+    doc.text("Sin vales de renta con días y viajes registrados en este filtro.", MARGIN_LEFT, yPos + 4);
+    setTextColor(doc, COLOR_TEXT);
+    return yPos + 12;
+  }
+
+  const columnasRango = [
+    { label: "ESPECTRO", width: 42, align: "left" },
+    { label: "VIAJES/DÍA", width: 28, align: "left" },
+    { label: "VALES", width: 25, align: "right" },
+    { label: "% DE VALES", width: 30, align: "right" },
+    { label: "INVERTIDO", width: 40, align: "right" },
+    { label: "CON NOTA", width: 20, align: "right" },
+  ];
+
+  rentaNoAprovechada.forEach((o) => {
+    yPos = dibujarEncabezadoObra(
+      doc, yPos,
+      formatearObraCompleta(o.empresa, o.cc, o.obra),
+      `${formatearMoneda(o.totalDesperdiciado)} desperdiciados`
+    );
+
+    const chips = [
+      { label: "Vales de Renta", value: formatearNumero(o.totalVales, 0) },
+      { label: "Invertido en Renta", value: formatearMonedaCorta(o.totalImporte) },
+    ];
+    yPos = dibujarChipsKpi(doc, yPos, chips);
+
+    const filasRango = (o.rangos || []).map((r) => [
+      [`${r.label}${r.key === "ideal" ? " *" : ""}`, COLOR_RANGO_RENTA_PDF[r.key]],
+      r.rango,
+      formatearNumero(r.count, 0),
+      `${formatearNumero(r.pctVales, 1)}%`,
+      formatearMoneda(r.importe),
+      r.valesConNota?.length > 0 ? formatearNumero(r.valesConNota.length, 0) : "—",
+    ]);
+    yPos = dibujarTablaGenerica(doc, yPos, columnasRango, filasRango, "Sin vales de renta en este filtro.");
+
+    yPos += 3;
+  });
+
+  return dibujarParrafo(doc, MARGIN_LEFT, yPos, RENTA_NO_APROVECHADA.nota, USABLE_WIDTH, { fontSize: 7 }) + 4;
+};
+
+// ── Sección: Indicadores de Eficiencia y Oportunidad (los 4 bloques de
+// arriba, en el mismo orden que la tarjeta colapsable "eficiencia" en la
+// página) ────────────────────────────────────────────────────────────
+const dibujarSeccionIndicadoresEficiencia = (
+  doc, yPosInicial,
+  indicePosicionObra, fleteEvitadoFlotaPropia, topCamionerosPorObra, camionesPorDia, rentaNoAprovechada
+) => {
+  let yPos = yPosInicial;
+  yPos = dibujarSeccionIndicePosicion(doc, yPos, indicePosicionObra);
+  yPos = checkPageBreak(doc, yPos, 24, PAGE_HEIGHT, MARGIN_BOTTOM);
+  yPos = dibujarSeccionFleteEvitado(doc, yPos, fleteEvitadoFlotaPropia);
+  yPos = checkPageBreak(doc, yPos, 24, PAGE_HEIGHT, MARGIN_BOTTOM);
+  yPos = dibujarSeccionViabilidadFlota(doc, yPos, topCamionerosPorObra, camionesPorDia);
+  yPos = checkPageBreak(doc, yPos, 24, PAGE_HEIGHT, MARGIN_BOTTOM);
+  yPos = dibujarSeccionRentaNoAprovechada(doc, yPos, rentaNoAprovechada);
+  return yPos;
+};
+
 // ── Generador principal ──────────────────────────────────────────────
 export const generarPDFReporteEstadisticas = (datos) => {
   const {
@@ -1444,6 +1857,11 @@ export const generarPDFReporteEstadisticas = (datos) => {
     ahorroEstimado,
     serieConciliacionesPorMes,
     bloquesObraConciliaciones = [],
+    indicePosicionObra = [],
+    fleteEvitadoFlotaPropia = [],
+    camionesPorDia = [],
+    topCamionerosPorObra = [],
+    rentaNoAprovechada = [],
   } = datos;
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
@@ -1578,7 +1996,21 @@ export const generarPDFReporteEstadisticas = (datos) => {
   // ── Ahorro estimado vs. proceso anterior en papel (siempre en página nueva) ──
   doc.addPage();
   yPos = 12;
-  dibujarSeccionAhorro(doc, yPos, ahorroEstimado, serieConciliacionesPorMes, bloquesObraConciliaciones);
+  yPos = dibujarSeccionAhorro(doc, yPos, ahorroEstimado, serieConciliacionesPorMes, bloquesObraConciliaciones);
+
+  // ── Indicadores de Eficiencia y Oportunidad (siempre en página nueva) ──
+  const hayIndicadoresEficiencia =
+    indicePosicionObra.length > 0 ||
+    fleteEvitadoFlotaPropia.length > 0 ||
+    topCamionerosPorObra.length > 0 ||
+    rentaNoAprovechada.length > 0;
+  if (hayIndicadoresEficiencia) {
+    doc.addPage();
+    yPos = 12;
+    dibujarSeccionIndicadoresEficiencia(
+      doc, yPos, indicePosicionObra, fleteEvitadoFlotaPropia, topCamionerosPorObra, camionesPorDia, rentaNoAprovechada
+    );
+  }
 
   dibujarPieDePagina(doc, ultimaConciliacion);
 

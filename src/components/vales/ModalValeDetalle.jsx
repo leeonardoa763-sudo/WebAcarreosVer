@@ -57,6 +57,7 @@ import {
   bancoDeViaje,
 } from "../../utils/rentaMaterial";
 import { getAlertaConfig } from "../../utils/alertasVale";
+import { tarifaRentaEfectiva } from "../../utils/tarifaRentaEfectiva";
 import {
   recolectarExcepciones,
   etiquetaMotivo,
@@ -550,8 +551,9 @@ const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
           const costoTotal = Number(detalle.costo_total || 0);
           const totalHoras = Number(detalle.total_horas || 0);
           const totalDias = Number(detalle.total_dias || 0);
-          const costoHr = Number(detalle.precios_renta?.costo_hr || 0);
-          const costoDia = Number(detalle.precios_renta?.costo_dia || 0);
+          const tarifa = tarifaRentaEfectiva(detalle);
+          const costoHr = Number(tarifa.costo_hr || 0);
+          const costoDia = Number(tarifa.costo_dia || 0);
           const esRentaPorDia = totalDias > 0;
           const viajesOrdenados = [...(detalle.vale_renta_viajes || [])].sort((a, b) => a.numero_viaje - b.numero_viaje);
 

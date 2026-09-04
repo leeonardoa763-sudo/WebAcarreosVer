@@ -19,6 +19,9 @@ import { Document, Page, View, Text, Font, Image } from "@react-pdf/renderer";
 import { sharedStyles } from "../shared/styles/sharedStyles";
 import { rentaStyles } from "../shared/styles/rentaStyles";
 
+// Utils
+import { tarifaRentaEfectiva } from "../../tarifaRentaEfectiva";
+
 // Registrar fuentes
 Font.register({
   family: "Roboto",
@@ -231,9 +234,10 @@ const PDFConciliacionRenta = ({ conciliacion, valesAgrupados, totales, qrDataUrl
             Object.values(valesAgrupados).some((grupo) =>
               grupo.vales.some((vale) =>
                 vale.vale_renta_detalle.some((detalle) => {
-                  if (detalle.precios_renta) {
-                    tarifaPorDia = detalle.precios_renta.costo_dia || 0;
-                    tarifaPorHora = detalle.precios_renta.costo_hr || 0;
+                  const tarifa = tarifaRentaEfectiva(detalle);
+                  if (tarifa.costo_dia != null || tarifa.costo_hr != null) {
+                    tarifaPorDia = tarifa.costo_dia || 0;
+                    tarifaPorHora = tarifa.costo_hr || 0;
                     return true;
                   }
                   return false;

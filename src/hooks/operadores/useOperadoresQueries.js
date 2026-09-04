@@ -180,6 +180,8 @@ const construirQueryBase = (tipoVale) => {
               id_sindicato,
               sindicato
             ),
+            costo_hr_aplicado,
+            costo_dia_aplicado,
             precios_renta:id_precios_renta (
               id_precios_renta,
               costo_hr,

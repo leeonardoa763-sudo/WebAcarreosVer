@@ -39,6 +39,7 @@ import {
 
 // 5. Utils
 import { formatearMoneda, formatearFolio } from "../../../utils/formatters";
+import { tarifaRentaEfectiva } from "../../../utils/tarifaRentaEfectiva";
 
 // 6. Componentes
 import TablaEditarViajesRenta from "./TablaEditarViajesRenta";
@@ -184,7 +185,7 @@ const ModalEditarValeRenta = ({
     );
   }
 
-  const { costo_dia, costo_hr } = detalle?.precios_renta || {};
+  const { costo_dia, costo_hr } = tarifaRentaEfectiva(detalle);
   const materialNombre = detalle?.material?.material || "Sin material";
 
   // ── Render principal ───────────────────────────────────────────────────────

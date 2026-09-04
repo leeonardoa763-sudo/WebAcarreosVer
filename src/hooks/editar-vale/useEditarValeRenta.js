@@ -19,6 +19,9 @@ import { useState, useCallback } from "react";
 // 2. Config
 import { supabase } from "../../config/supabase";
 
+// 3. Utils
+import { tarifaRentaEfectiva } from "../../utils/tarifaRentaEfectiva";
+
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 /**
@@ -131,6 +134,8 @@ export const useEditarValeRenta = () => {
           costo_total,
           hora_inicio,
           hora_fin,
+          costo_hr_aplicado,
+          costo_dia_aplicado,
           precios_renta:id_precios_renta (
             id_precios_renta,
             costo_hr,
@@ -309,8 +314,9 @@ export const useEditarValeRenta = () => {
    * Costo calculado en tiempo real para mostrar en el modal
    */
   const costoPreview = (() => {
-    if (!detalle?.precios_renta) return null;
-    const { costo_dia, costo_hr } = detalle.precios_renta;
+    if (!detalle) return null;
+    const { costo_dia, costo_hr } = tarifaRentaEfectiva(detalle);
+    if (costo_dia == null && costo_hr == null) return null;
     return calcularCosto(
       opcionSeleccionada,
       totalHorasInput,
@@ -404,7 +410,10 @@ export const useEditarValeRenta = () => {
         }
 
         // 4. Payload de vale_renta_detalle (tipo de renta + conteo de viajes)
-        const { costo_dia, costo_hr } = detalle.precios_renta || {};
+        // Tarifa realmente aplicada al vale (obra si existía, si no la del
+        // sindicato) — nunca el default del sindicato a secas, o un vale con
+        // tarifa de obra se reprecia mal al editar horas/días.
+        const { costo_dia, costo_hr } = tarifaRentaEfectiva(detalle);
         const numeroViajesFinal = viajes.filter(
           (v) => !viajesAEliminar.has(v.id_viaje),
         ).length;

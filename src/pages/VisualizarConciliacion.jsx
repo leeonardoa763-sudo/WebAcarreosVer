@@ -724,6 +724,7 @@ const VisualizarConciliacion = () => {
                   longitud_completado,
                   distancia_obra_metros,
                   material:id_material (material),
+                  costo_hr_aplicado, costo_dia_aplicado,
                   precios_renta:id_precios_renta (costo_hr, costo_dia),
                   vale_renta_viajes (
                     id_viaje,

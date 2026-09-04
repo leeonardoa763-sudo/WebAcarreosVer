@@ -1466,6 +1466,19 @@
   letter-spacing: 0.06em;
 }
 
+/* Tendencia mensual del índice: delta primer mes → último mes (no un
+   sparkline — a este tamaño una línea sola no comunica nada). */
+.eg__tendencia-val {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: help;
+}
+
+.eg__tendencia-val--mal    { color: #DC2626; }
+.eg__tendencia-val--bien   { color: #059669; }
+.eg__tendencia-val--neutra { color: var(--eg-muted); }
+
 /* Chart wrap padding */
 .eg__avanzado-chart-wrap {
   padding: 14px 16px 10px 8px;
@@ -1545,6 +1558,158 @@
   color: var(--eg-muted) !important;
   font-size: 13px !important;
   background: transparent !important;
+}
+
+/* ── Botón de notas + modal (Renta No Aprovechada) ─────────────────── */
+.eg__notas-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 100px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.1);
+  color: #B45309;
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+
+.eg__notas-btn:hover {
+  background: rgba(245, 158, 11, 0.18);
+}
+
+.eg__notas-btn--vacio {
+  cursor: default;
+  border-color: transparent;
+  background: transparent;
+  color: var(--eg-muted);
+  font-weight: 500;
+}
+
+.eg__notas-btn--vacio:hover {
+  background: transparent;
+}
+
+.eg__notas-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 24, 45, 0.5);
+  backdrop-filter: blur(3px);
+  z-index: 1150;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.eg__notas-modal {
+  background: var(--eg-surface);
+  border-radius: var(--eg-r-lg);
+  box-shadow: var(--eg-shadow-lg);
+  width: 100%;
+  max-width: 520px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.eg__notas-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, #0A1F3D 0%, var(--eg-secondary) 100%);
+}
+
+.eg__notas-modal-eyebrow {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.65);
+  margin-bottom: 2px;
+}
+
+.eg__notas-modal-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.eg__notas-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.eg__notas-modal-close:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.eg__notas-modal-body {
+  padding: 14px 18px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.eg__notas-item {
+  padding: 10px 12px;
+  border-radius: var(--eg-r-sm);
+  background: #F7F9FC;
+  border: 1px solid var(--eg-border);
+}
+
+.eg__notas-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+
+.eg__notas-item-folio {
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--eg-secondary);
+}
+
+.eg__notas-item-monto {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #B45309;
+  white-space: nowrap;
+}
+
+.eg__notas-item-meta {
+  display: block;
+  font-size: 11px;
+  color: var(--eg-muted);
+  margin-bottom: 6px;
+}
+
+.eg__notas-item-texto {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--eg-text);
+  white-space: pre-wrap;
 }
 
 /* ── Resumen por material (encima de la gráfica) ─────────────────── */

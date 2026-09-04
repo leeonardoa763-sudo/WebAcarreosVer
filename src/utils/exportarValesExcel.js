@@ -39,6 +39,7 @@ import {
   MOTIVOS_ANTICIPADO,
   MOTIVOS_SIN_FOTO,
 } from "./excepcionesVale";
+import { tarifaRentaEfectiva } from "./tarifaRentaEfectiva";
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
 
@@ -281,6 +282,7 @@ const FORMATOS_RENTA = {
 
 const filaDetalleRenta = (vale, det) => {
   const porDia = esRentaPorDia(det);
+  const tarifa = tarifaRentaEfectiva(det);
 
   return {
     ...datosGeneralesVale(vale),
@@ -288,8 +290,8 @@ const filaDetalleRenta = (vale, det) => {
     Cobro: porDia ? "Por día" : "Por hora",
     Días: porDia ? num(det.total_dias) : "",
     Horas: porDia ? "" : num(det.total_horas),
-    "Costo/día": porDia ? num(det.precios_renta?.costo_dia) : "",
-    "Costo/hr": porDia ? "" : num(det.precios_renta?.costo_hr),
+    "Costo/día": porDia ? num(tarifa.costo_dia) : "",
+    "Costo/hr": porDia ? "" : num(tarifa.costo_hr),
     Importe: num(det.costo_total),
     "Capacidad m³": num(det.capacidad_m3),
     "Viajes declarados": num(det.numero_viajes),

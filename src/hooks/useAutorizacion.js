@@ -105,6 +105,7 @@ const SELECT_AUTORIZACION = `
     notas_adicionales, es_renta_por_dia,
     foto_omitida, motivo_sin_foto_codigo, motivo_sin_foto_texto,
     material:id_material (id_material, material),
+    costo_hr_aplicado, costo_dia_aplicado,
     precios_renta:id_precios_renta (costo_hr, costo_dia),
     vale_renta_viajes (id_viaje, numero_viaje, hora_registro)
   ),

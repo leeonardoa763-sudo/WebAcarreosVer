@@ -28,6 +28,7 @@ import {
   formatearDuracion,
   formatearMoneda,
 } from "../../utils/formatters";
+import { tarifaRentaEfectiva } from "../../utils/tarifaRentaEfectiva";
 import { recolectarExcepciones } from "../../utils/excepcionesVale";
 import AvisoExcepciones from "../vales/AvisoExcepciones";
 
@@ -191,14 +192,17 @@ const BatchResults = ({
       0,
     );
 
-    const detalles = vale.vale_renta_detalle.map((d) => ({
-      material: d.material?.material ?? "Sin especificar",
-      cantidad,
-      totalViajes,
-      costoPorHr: d.precios_renta?.costo_hr,
-      costoPorDia: d.precios_renta?.costo_dia,
-      costo: Number(d.costo_total ?? 0),
-    }));
+    const detalles = vale.vale_renta_detalle.map((d) => {
+      const tarifa = tarifaRentaEfectiva(d);
+      return {
+        material: d.material?.material ?? "Sin especificar",
+        cantidad,
+        totalViajes,
+        costoPorHr: tarifa.costo_hr,
+        costoPorDia: tarifa.costo_dia,
+        costo: Number(d.costo_total ?? 0),
+      };
+    });
 
     return { detalles, costoTotal };
   };

@@ -121,6 +121,8 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                 material:id_material (
                   material
                 ),
+                costo_hr_aplicado,
+                costo_dia_aplicado,
                 precios_renta:id_precios_renta (
                   costo_hr,
                   costo_dia

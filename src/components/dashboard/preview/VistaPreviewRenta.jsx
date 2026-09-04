@@ -18,6 +18,7 @@ import {
   formatearFechaCorta,
   formatearMoneda,
 } from "../../../utils/formatters";
+import { tarifaRentaEfectiva } from "../../../utils/tarifaRentaEfectiva";
 
 const VistaPreviewRenta = ({ conciliacion, valesAgrupados }) => {
   // Calcular totales generales
@@ -244,9 +245,10 @@ const obtenerTarifas = (valesAgrupados) => {
   Object.values(valesAgrupados).some((grupo) =>
     grupo.vales.some((vale) =>
       vale.vale_renta_detalle.some((detalle) => {
-        if (detalle.precios_renta) {
-          tarifaPorDia = detalle.precios_renta.costo_dia || 0;
-          tarifaPorHora = detalle.precios_renta.costo_hr || 0;
+        const tarifa = tarifaRentaEfectiva(detalle);
+        if (tarifa.costo_dia != null || tarifa.costo_hr != null) {
+          tarifaPorDia = tarifa.costo_dia || 0;
+          tarifaPorHora = tarifa.costo_hr || 0;
           return true;
         }
         return false;

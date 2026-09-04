@@ -31,6 +31,8 @@ import {
   Truck,
   Activity,
   TrendingUp,
+  TrendingDown,
+  Minus,
   Award,
   ChevronRight,
   Package,
@@ -61,6 +63,7 @@ import {
 
 // 4. Hooks
 import { useEstadisticasGlobales } from "../hooks/useEstadisticasGlobales";
+import { useIndicadoresEficiencia } from "../hooks/useIndicadoresEficiencia";
 
 // 5. Componentes
 import ModalReporteDiario from "../components/estadisticas/ModalReporteDiario";
@@ -68,6 +71,12 @@ import ModalReporteDiario from "../components/estadisticas/ModalReporteDiario";
 // 6. Utils
 import { generarPDFReporteEstadisticas } from "../utils/exportarReporteEstadisticas";
 import { exportarElementoComoImagen } from "../utils/exportarImagen";
+import {
+  INDICE_POSICION_OBRA,
+  FLETE_EVITADO_FLOTA_PROPIA,
+  VIABILIDAD_FLOTA_PROPIA,
+  RENTA_NO_APROVECHADA,
+} from "../utils/interpretacionIndicadores";
 
 // 7. Estilos
 import "../styles/estadisticas-globales.css";
@@ -168,6 +177,22 @@ const formatObraCompleta = (obra) => {
   if (obra.cc != null) partes.push(`CC ${obra.cc}`);
   partes.push(obra.obra || "Sin obra");
   return partes.join(" · ");
+};
+
+// ── Badge de nivel (Alto/Medio/Bajo) para los indicadores de eficiencia ─────
+// `invertido`: en la mayoría de los indicadores "Alto" es malo (rojo); en
+// aprovechamiento de ruta es al revés (Alto = ruta bien exprimida = verde).
+const nivelBadge = (nivel, invertido = false) => {
+  if (!nivel) return <span className="eg__pct-cell eg__pct-cell--none">—</span>;
+  const colorPorNivel = invertido
+    ? { alto: "green", medio: "yellow", bajo: "red" }
+    : { alto: "red", medio: "yellow", bajo: "green" };
+  const labelPorNivel = { alto: "Alto", medio: "Medio", bajo: "Bajo" };
+  return (
+    <span className={`eg__pct-cell eg__pct-cell--${colorPorNivel[nivel]}`}>
+      {labelPorNivel[nivel]}
+    </span>
+  );
 };
 
 // ── KPI Card ───────────────────────────────────────────────────────
@@ -802,6 +827,431 @@ const TopTable = ({ rows, cols, emptyMsg }) => (
   </div>
 );
 
+// ── Tarjeta de Índice de Posición por obra ──────────────────────────
+// Una tarjeta por obra (no una fila más en una tabla grande): el número
+// agregado va arriba junto con el rango de distancia usado y la tendencia
+// mensual (si hay ≥3 meses de historia); abajo, un toggle entre el desglose
+// por banco (qué tanto pesa cada uno en el índice, no solo en el volumen) y
+// por material (precio de flete promedio ponderado por m³).
+const TarjetaIndicePosicionObra = ({ datos }) => {
+  const [vista, setVista] = useState("banco");
+  const obraLabel = [datos.empresa, datos.cc != null ? `CC ${datos.cc}` : null, datos.obra]
+    .filter(Boolean)
+    .join(" · ");
+
+  const filasBanco = datos.bancos.map((b) => ({
+    banco: b.banco,
+    m3: b.m3,
+    pctVol: b.pctVol,
+    distanciaKm: b.distanciaKm,
+    viajes: b.viajes,
+    aportaIndiceCell: (
+      <span className={b.dominante ? "eg__pct-cell eg__pct-cell--red" : ""}>
+        {formatNum(b.aportaIndice, 1)}%{b.dominante ? " ⚠" : ""}
+      </span>
+    ),
+  }));
+
+  const filasMaterial = datos.materiales.map((m) => ({
+    material: m.material,
+    m3: m.m3,
+    precioFleteM3: m.precioFleteM3,
+    rango: m.precioMin === m.precioMax ? formatMXN(m.precioMin) : `${formatMXN(m.precioMin)} – ${formatMXN(m.precioMax)}`,
+  }));
+
+  return (
+    <div className="eg__avanzado-card">
+      <div className="eg__avanzado-card-header">
+        <div className="eg__avanzado-card-left">
+          <span className="eg__avanzado-card-eyebrow"><Target size={11} /> {obraLabel}</span>
+          <h3 className="eg__avanzado-card-title">{formatNum(datos.m3Total, 0)} m³ transportados</h3>
+        </div>
+        <div className="eg__avanzado-kpis">
+          {datos.tendenciaMensual && datos.tendenciaMensual.length >= 2 && (() => {
+            const primero = datos.tendenciaMensual[0];
+            const ultimo = datos.tendenciaMensual[datos.tendenciaMensual.length - 1];
+            const delta = ultimo.indice - primero.indice;
+            // Umbral chico para no marcar como tendencia un ruido de <5%.
+            const empeora = delta > primero.indice * 0.05;
+            const mejora = delta < -primero.indice * 0.05;
+            const Icono = empeora ? TrendingUp : mejora ? TrendingDown : Minus;
+            return (
+              <div className="eg__avanzado-kpi" title={`${formatNum(primero.indice, 1)} km (${formatMesChip(primero.mes)}) → ${formatNum(ultimo.indice, 1)} km (${formatMesChip(ultimo.mes)})`}>
+                <span
+                  className={
+                    "eg__avanzado-kpi-val eg__tendencia-val" +
+                    (empeora ? " eg__tendencia-val--mal" : mejora ? " eg__tendencia-val--bien" : " eg__tendencia-val--neutra")
+                  }
+                >
+                  <Icono size={15} strokeWidth={2.5} />
+                  {delta > 0 ? "+" : ""}{formatNum(delta, 1)} km
+                </span>
+                <span className="eg__avanzado-kpi-label">
+                  {empeora ? "Empeoró" : mejora ? "Mejoró" : "Estable"} · {datos.tendenciaMensual.length} meses
+                </span>
+              </div>
+            );
+          })()}
+          {datos.distanciaMinKm != null && (
+            <div className="eg__avanzado-kpi">
+              <span className="eg__avanzado-kpi-val">{formatNum(datos.distanciaMinKm, 0)}–{formatNum(datos.distanciaMaxKm, 0)}</span>
+              <span className="eg__avanzado-kpi-label">Rango km</span>
+            </div>
+          )}
+          <div className="eg__avanzado-kpi">
+            <span className="eg__avanzado-kpi-val">{formatNum(datos.indicePosicion, 1)} km</span>
+            <span className="eg__avanzado-kpi-label">Índice</span>
+          </div>
+          <div className="eg__avanzado-kpi">
+            {nivelBadge(datos.nivel)}
+            <span className="eg__avanzado-kpi-label">Nivel</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="eg__chart-toolbar" style={{ padding: "10px 16px 0" }}>
+        <div className="eg__chart-modo-switch" role="group" aria-label="Ver desglose por banco o por material">
+          <button
+            type="button"
+            className={vista === "banco" ? "eg__chart-modo-switch__btn eg__chart-modo-switch__btn--active" : "eg__chart-modo-switch__btn"}
+            onClick={() => setVista("banco")}
+          >
+            Por Banco
+          </button>
+          <button
+            type="button"
+            className={vista === "material" ? "eg__chart-modo-switch__btn eg__chart-modo-switch__btn--active" : "eg__chart-modo-switch__btn"}
+            onClick={() => setVista("material")}
+          >
+            Por Material
+          </button>
+        </div>
+      </div>
+
+      {vista === "banco" ? (
+        <TopTable
+          rows={filasBanco}
+          emptyMsg="Sin bancos con distancia registrada"
+          cols={[
+            { key: "banco", label: "Banco" },
+            { key: "m3", label: "m³", numeric: true, format: (v) => formatNum(v, 0) },
+            { key: "pctVol", label: "% Vol.", numeric: true, format: (v) => `${formatNum(v, 1)}%` },
+            { key: "distanciaKm", label: "Distancia", numeric: true, format: (v) => `${formatNum(v, 1)} km` },
+            { key: "viajes", label: "Viajes", numeric: true, format: (v) => formatNum(v, 0) },
+            { key: "aportaIndiceCell", label: "% del Índice", numeric: true },
+          ]}
+        />
+      ) : (
+        <TopTable
+          rows={filasMaterial}
+          emptyMsg="Sin precio de flete registrado para estos materiales"
+          cols={[
+            { key: "material", label: "Material" },
+            { key: "m3", label: "m³", numeric: true, format: (v) => formatNum(v, 0) },
+            { key: "precioFleteM3", label: "Precio Flete Prom./m³", numeric: true, format: (v) => (v != null ? formatMXN(v) : "—") },
+            { key: "rango", label: "Rango de Precio" },
+          ]}
+        />
+      )}
+
+      {datos.bancoDominante && (
+        <p className="eg__avanzado-card-sub" style={{ padding: "10px 16px 16px" }}>
+          {INDICE_POSICION_OBRA.notaBancoDominante}
+        </p>
+      )}
+    </div>
+  );
+};
+
+// ── Tarjeta de Flete Evitado por obra (GRUPO GEEM) ──────────────────
+// El importe pagado a GEEM en el sistema ($1/km) es un valor técnico, no
+// real — no se muestra. El único monto es el valor completo a tarifa de
+// sindicato, que es directamente lo evitado.
+const TarjetaFleteEvitadoObra = ({ datos }) => {
+  const obraLabel = [datos.empresa, datos.cc != null ? `CC ${datos.cc}` : null, datos.obra]
+    .filter(Boolean)
+    .join(" · ");
+
+  const filasRutas = datos.rutas.map((r) => ({
+    banco: r.banco,
+    material: r.material,
+    m3: r.m3,
+    viajes: r.viajes,
+    distanciaKm: r.distanciaKm,
+    valorSindicato: r.valorSindicato,
+  }));
+
+  return (
+    <div className="eg__avanzado-card">
+      <div className="eg__avanzado-card-header">
+        <div className="eg__avanzado-card-left">
+          <span className="eg__avanzado-card-eyebrow"><Truck size={11} /> {obraLabel}</span>
+          <h3 className="eg__avanzado-card-title">{formatMXN(datos.valorTotalSindicato)} evitados</h3>
+        </div>
+        <div className="eg__avanzado-kpis">
+          <div className="eg__avanzado-kpi">
+            <span className="eg__avanzado-kpi-val">{datos.pctVolumenObra != null ? `${formatNum(datos.pctVolumenObra, 1)}%` : "—"}</span>
+            <span className="eg__avanzado-kpi-label">Del Volumen de la Obra</span>
+          </div>
+          <div className="eg__avanzado-kpi">
+            <span className="eg__avanzado-kpi-val">{formatNum(datos.viajesGeem, 0)}</span>
+            <span className="eg__avanzado-kpi-label">Viajes GEEM</span>
+          </div>
+          <div className="eg__avanzado-kpi">
+            <span className="eg__avanzado-kpi-val">{formatNum(datos.camionesGeemDistintos, 0)}</span>
+            <span className="eg__avanzado-kpi-label">Camiones GEEM</span>
+          </div>
+          {datos.viajesGeemPlanta > 0 && (
+            <div className="eg__avanzado-kpi">
+              <span className="eg__avanzado-kpi-val">{formatNum(datos.pctPlanta, 0)}%</span>
+              <span className="eg__avanzado-kpi-label">A Planta Asfaltos</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <TopTable
+        rows={filasRutas}
+        emptyMsg="Sin rutas de GEEM registradas"
+        cols={[
+          { key: "banco", label: "Banco" },
+          { key: "material", label: "Material" },
+          { key: "m3", label: "m³", numeric: true, format: (v) => formatNum(v, 0) },
+          { key: "distanciaKm", label: "Distancia", numeric: true, format: (v) => `${formatNum(v, 1)} km` },
+          { key: "viajes", label: "Viajes", numeric: true, format: (v) => formatNum(v, 0) },
+          { key: "valorSindicato", label: "Valor a Tarifa Sindicato", numeric: true, format: (v) => formatMXN(v) },
+        ]}
+      />
+
+      {datos.viajesPorMes.length > 1 && (
+        <div style={{ padding: "4px 16px 16px" }}>
+          <span className="eg__avanzado-card-eyebrow" style={{ marginBottom: 4, display: "inline-flex" }}>
+            <CalendarDays size={11} /> Uso mensual de GEEM
+          </span>
+          <ResponsiveContainer width="100%" height={160}>
+            <LineChart data={datos.viajesPorMes} margin={{ top: 8, right: 20, left: -8, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 4" stroke="rgba(0,78,137,0.07)" vertical={false} />
+              <XAxis
+                dataKey="mes"
+                tickFormatter={formatMesEjeX}
+                tick={{ fontSize: 10, fontFamily: "Outfit, system-ui, sans-serif", fill: "#64748B" }}
+                axisLine={false}
+                tickLine={false}
+                dy={6}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 10, fontFamily: "Outfit, system-ui, sans-serif", fill: "#64748B" }}
+                axisLine={false}
+                tickLine={false}
+                width={28}
+              />
+              <Tooltip
+                formatter={(v) => [`${v} viajes`, "GEEM"]}
+                labelFormatter={formatMesToolTip}
+                contentStyle={tooltipStyle}
+                labelStyle={{ fontWeight: 700, color: "#1A2332", marginBottom: 4 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="viajes"
+                stroke="#004E89"
+                strokeWidth={2.5}
+                dot={{ r: 3.5, strokeWidth: 0, fill: "#004E89" }}
+                activeDot={{ r: 5.5, strokeWidth: 2, stroke: "#fff" }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Tarjeta "¿Se justifica comprar un camión?" por obra ─────────────
+// Combina camiones activos/día (toda la flota) con el ranking de placas de
+// sindicato (excluye GEEM) — el importe pagado a la placa top simula el
+// ahorro de haberla tenido como camión propio.
+const TarjetaViabilidadFlotaObra = ({ camiones, topCamioneros }) => {
+  const obraLabel = [topCamioneros.empresa, topCamioneros.cc != null ? `CC ${topCamioneros.cc}` : null, topCamioneros.obra]
+    .filter(Boolean)
+    .join(" · ");
+  const mejor = topCamioneros.top[0];
+
+  const filasTop = topCamioneros.top.map((p) => ({
+    placas: p.placas,
+    operador: p.operador,
+    viajes: p.viajes,
+    m3: p.m3,
+    viajesPorDia: p.viajesPorDia,
+    importe: p.importe,
+  }));
+
+  return (
+    <div className="eg__avanzado-card">
+      <div className="eg__avanzado-card-header">
+        <div className="eg__avanzado-card-left">
+          <span className="eg__avanzado-card-eyebrow"><Package size={11} /> {obraLabel}</span>
+          <h3 className="eg__avanzado-card-title">
+            {mejor ? `${mejor.placas} — top camión, ${formatMXN(mejor.importe)} pagados` : "Sin placas de sindicato en este filtro"}
+          </h3>
+        </div>
+        <div className="eg__avanzado-kpis">
+          {camiones && (
+            <>
+              <div className="eg__avanzado-kpi">
+                <span className="eg__avanzado-kpi-val">{formatNum(camiones.promedioCamionesDia, 1)}</span>
+                <span className="eg__avanzado-kpi-label">Camiones/día Prom.</span>
+              </div>
+              <div className="eg__avanzado-kpi">
+                <span className="eg__avanzado-kpi-val">{formatNum(camiones.maxCamionesDia, 0)}</span>
+                <span className="eg__avanzado-kpi-label">Máx. Camiones/día</span>
+              </div>
+            </>
+          )}
+          {topCamioneros.promedioViajesPorDiaObra != null && (
+            <div className="eg__avanzado-kpi">
+              <span className="eg__avanzado-kpi-val">{formatNum(topCamioneros.promedioViajesPorDiaObra, 1)}</span>
+              <span className="eg__avanzado-kpi-label">Viajes/día Prom. Camión</span>
+            </div>
+          )}
+          <div className="eg__avanzado-kpi">
+            <span className="eg__avanzado-kpi-val">{formatMXN(topCamioneros.promedioImportePorCamion)}</span>
+            <span className="eg__avanzado-kpi-label">Pagado — Camión Prom. ({topCamioneros.totalPlacas})</span>
+          </div>
+        </div>
+      </div>
+
+      <TopTable
+        rows={filasTop}
+        emptyMsg="Sin placas de sindicato con viajes en este filtro"
+        cols={[
+          { key: "placas", label: "Placa" },
+          { key: "operador", label: "Operador" },
+          { key: "viajes", label: "Viajes", numeric: true, format: (v) => formatNum(v, 0) },
+          { key: "m3", label: "m³", numeric: true, format: (v) => formatNum(v, 0) },
+          { key: "viajesPorDia", label: "Viajes/día", numeric: true, format: (v) => (v != null ? formatNum(v, 1) : "—") },
+          { key: "importe", label: "Pagado (ahorro si fuera propio)", numeric: true, format: (v) => formatMXN(v) },
+        ]}
+      />
+    </div>
+  );
+};
+
+// ── Tarjeta de Jornada de Renta No Aprovechada por obra ─────────────
+// Cada vale de renta se clasifica por su propio ritmo (viajes ÷ días) en un
+// espectro de eficiencia — ver calcularRentaNoAprovechada en
+// useIndicadoresEficiencia.js. Solo el espectro "Desperdiciado" (1-3
+// viajes/día) cuenta como dinero perdido (el costo completo del vale); los
+// demás son señal de eficiencia, no de pérdida. Cuando algún vale de un
+// espectro trae nota del checador/operador, un botón la muestra.
+const COLOR_RANGO_RENTA = {
+  desperdiciado: "red",
+  pocaEficiencia: "yellow",
+  buenaEficiencia: "green",
+  ideal: "green",
+};
+
+const TarjetaRentaNoAprovechadaObra = ({ datos }) => {
+  const [notasAbiertas, setNotasAbiertas] = useState(null);
+  const obraLabel = [datos.empresa, datos.cc != null ? `CC ${datos.cc}` : null, datos.obra]
+    .filter(Boolean)
+    .join(" · ");
+
+  const filasRangos = datos.rangos.map((r) => ({
+    label: (
+      <span className={`eg__pct-cell eg__pct-cell--${COLOR_RANGO_RENTA[r.key]}`}>
+        {r.label}{r.key === "ideal" ? " ★" : ""}
+      </span>
+    ),
+    rango: r.rango,
+    count: r.count,
+    pctVales: r.pctVales,
+    importe: r.importe,
+    notasCell: r.valesConNota.length > 0 ? (
+      <button
+        type="button"
+        className="eg__notas-btn"
+        onClick={() => setNotasAbiertas(r)}
+        title="Ver notas de estos vales"
+      >
+        <FileText size={12} /> {r.valesConNota.length}
+      </button>
+    ) : (
+      <span className="eg__notas-btn eg__notas-btn--vacio">—</span>
+    ),
+  }));
+
+  return (
+    <div className="eg__avanzado-card">
+      <div className="eg__avanzado-card-header">
+        <div className="eg__avanzado-card-left">
+          <span className="eg__avanzado-card-eyebrow"><Clock size={11} /> {obraLabel}</span>
+          <h3 className="eg__avanzado-card-title">{formatMXN(datos.totalDesperdiciado)} desperdiciados</h3>
+        </div>
+        <div className="eg__avanzado-kpis">
+          <div className="eg__avanzado-kpi">
+            <span className="eg__avanzado-kpi-val">{formatNum(datos.totalVales, 0)}</span>
+            <span className="eg__avanzado-kpi-label">Vales de Renta</span>
+          </div>
+          <div className="eg__avanzado-kpi">
+            <span className="eg__avanzado-kpi-val">{formatMXN(datos.totalImporte)}</span>
+            <span className="eg__avanzado-kpi-label">Invertido en Renta</span>
+          </div>
+        </div>
+      </div>
+
+      <TopTable
+        rows={filasRangos}
+        emptyMsg="Sin vales de renta en este filtro"
+        cols={[
+          { key: "label", label: "Espectro" },
+          { key: "rango", label: "Viajes/día" },
+          { key: "count", label: "Vales", numeric: true, format: (v) => formatNum(v, 0) },
+          { key: "pctVales", label: "% de Vales", numeric: true, format: (v) => `${formatNum(v, 1)}%` },
+          { key: "importe", label: "Invertido", numeric: true, format: (v) => formatMXN(v) },
+          { key: "notasCell", label: "Notas", numeric: true },
+        ]}
+      />
+
+      {notasAbiertas && (
+        <div
+          className="eg__notas-overlay"
+          onClick={(ev) => { if (ev.target === ev.currentTarget) setNotasAbiertas(null); }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="eg__notas-modal">
+            <div className="eg__notas-modal-header">
+              <div>
+                <span className="eg__notas-modal-eyebrow">{obraLabel}</span>
+                <h4 className="eg__notas-modal-title">{notasAbiertas.label} ({notasAbiertas.rango}) — Notas</h4>
+              </div>
+              <button className="eg__notas-modal-close" onClick={() => setNotasAbiertas(null)} aria-label="Cerrar">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="eg__notas-modal-body">
+              {notasAbiertas.valesConNota.map((v, i) => (
+                <div key={i} className="eg__notas-item">
+                  <div className="eg__notas-item-head">
+                    <span className="eg__notas-item-folio">{v.folio || `Vale #${v.idVale}`}</span>
+                    <span className="eg__notas-item-monto">{formatMXN(v.importe)}</span>
+                  </div>
+                  <span className="eg__notas-item-meta">
+                    {v.equipo} · {formatNum(v.viajesPorDiaReal, 1)} viajes/día · {formatNum(v.totalDias, 1)} días rentados
+                  </span>
+                  <p className="eg__notas-item-texto">{v.nota}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Sección Análisis Avanzado ──────────────────────────────────────
 const SeccionPresupuestos = ({ materialRows, rentaRows, hayAlerta, loading, mostrarEncabezado = true }) => {
   const obrasMaterial = useMemo(() => {
@@ -1230,6 +1680,7 @@ const EstadisticasGlobales = () => {
     opcionesSindicatos,
     opcionesMateriales,
     opcionesBancos,
+    opcionesTipoMaterial,
     seriesTiempo,
     seriesTiempoRenta,
     seriesImporteTiempo,
@@ -1261,6 +1712,7 @@ const EstadisticasGlobales = () => {
     seleccionarRangoAcumulado,
     tablaObraMaterialAcumulado,
     tablaObraRentaAcumulado,
+    valesReporteFiltrados,
     tablaObraMaterialReporte,
     tablaObraRentaReporte,
     tablaBancoMaterialReporte,
@@ -1273,6 +1725,18 @@ const EstadisticasGlobales = () => {
     hayAlertaPresupuesto,
     comparativaPeriodoAnterior,
   } = useEstadisticasGlobales();
+
+  // 1b. Indicadores de eficiencia/oportunidad (posición, flota propia, renta)
+  // — reusa valesReporteFiltrados, no vuelve a pedir vales.
+  const {
+    indicePosicionObra,
+    fleteEvitadoFlotaPropia,
+    camionesPorDia,
+    topCamionerosPorObra,
+    rentaNoAprovechada,
+    indicadoresEficienciaCargados,
+    garantizarIndicadoresEficiencia,
+  } = useIndicadoresEficiencia(valesReporteFiltrados, filtros.idTipoMaterial, modosFiltro.idTipoMaterial);
 
   // 2. Categoría abierta en el panel de filtros
   const [categoriaAbierta, setCategoriaAbierta] = useState(null);
@@ -1320,6 +1784,7 @@ const EstadisticasGlobales = () => {
     "grafica-material": [garantizarEstadisticas],
     "viajes-renta": [garantizarEstadisticas],
     "analisis-avanzado": [garantizarEstadisticas],
+    eficiencia: [garantizarTiempoReal, garantizarIndicadoresEficiencia],
   };
   const toggleSeccion = (secId) =>
     setSeccionesAbiertas((prev) => {
@@ -1359,12 +1824,13 @@ const EstadisticasGlobales = () => {
     garantizarEstadisticas();
     garantizarTiempoReal();
     garantizarPresupuestos();
+    garantizarIndicadoresEficiencia();
     setPendingAccion("pdf");
   };
 
   useEffect(() => {
     if (pendingAccion !== "pdf") return;
-    if (!(estadisticasCargadas && tiempoRealCargado && presupuestosCargados)) return;
+    if (!(estadisticasCargadas && tiempoRealCargado && presupuestosCargados && indicadoresEficienciaCargados)) return;
 
     try {
       const filtrosActivos = categoriasConfig
@@ -1434,6 +1900,11 @@ const EstadisticasGlobales = () => {
         ahorroEstimado,
         serieConciliacionesPorMes,
         bloquesObraConciliaciones,
+        indicePosicionObra,
+        fleteEvitadoFlotaPropia,
+        camionesPorDia,
+        topCamionerosPorObra,
+        rentaNoAprovechada,
       });
     } catch (err) {
       console.error("Error al exportar reporte PDF:", err);
@@ -1442,7 +1913,7 @@ const EstadisticasGlobales = () => {
       setPendingAccion(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingAccion, estadisticasCargadas, tiempoRealCargado, presupuestosCargados]);
+  }, [pendingAccion, estadisticasCargadas, tiempoRealCargado, presupuestosCargados, indicadoresEficienciaCargados]);
 
   const handleExportarImagen = async () => {
     if (!desgloseObraRef.current) return;
@@ -1701,9 +2172,14 @@ const EstadisticasGlobales = () => {
         opciones: opcionesBancos,
         valoresActivos: filtros.idBanco,
       },
+      {
+        key: "idTipoMaterial", label: "Tipo de Material",
+        opciones: opcionesTipoMaterial,
+        valoresActivos: filtros.idTipoMaterial,
+      },
     ];
     return base.map((c) => ({ ...c, valorLabel: buildValorLabel(c.opciones, c.valoresActivos) }));
-  }, [filtros, opcionesMeses, opcionesSemanas, opcionesObras, opcionesEmpresas, opcionesSindicatos, opcionesMateriales, opcionesBancos]);
+  }, [filtros, opcionesMeses, opcionesSemanas, opcionesObras, opcionesEmpresas, opcionesSindicatos, opcionesMateriales, opcionesBancos, opcionesTipoMaterial]);
 
   // Subconjunto de categoriasConfig relevante a una sección, en el orden dado.
   const buildCategorias = (keys) =>
@@ -2763,6 +3239,137 @@ const EstadisticasGlobales = () => {
               rendimientoPorMaterial={rendimientoPorMaterial}
               mostrarEncabezado={false}
             />
+          )}
+        </SeccionColapsable>
+      )}
+
+      {/* ── Indicadores de Eficiencia y Oportunidad ───────────────── */}
+      {!error && (
+        <SeccionColapsable
+          id="eficiencia"
+          titulo="Indicadores de Eficiencia y Oportunidad"
+          subtitulo="Comparaciones de banco, ruta y renta — más allá de lo descriptivo"
+          abierta={seccionAbierta("eficiencia")}
+          onToggle={toggleSeccion}
+          bodyClassName="eg__col-body--pad"
+        >
+          <FiltrosSeccion
+            categorias={buildCategorias(["mes", "semana", "idObra", "idEmpresa", "idSindicato", "idTipoMaterial"])}
+            categoriaAbierta={categoriaAbierta}
+            onToggleCategoria={toggleCategoria}
+            onSelect={toggleFiltro}
+            modosFiltro={modosFiltro}
+            onToggleModo={toggleModoFiltro}
+          />
+          <div className="eg__avanzado-card">
+            <div className="eg__avanzado-card-header">
+              <div className="eg__avanzado-card-left">
+                <span className="eg__avanzado-card-eyebrow"><Target size={11} /> Posición vs. bancos</span>
+                <h3 className="eg__avanzado-card-title">{INDICE_POSICION_OBRA.titulo}</h3>
+              </div>
+            </div>
+            <p className="eg__avanzado-card-sub" style={{ padding: "0 16px 16px" }}>
+              {INDICE_POSICION_OBRA.descripcion}
+            </p>
+          </div>
+
+          {indicePosicionObra.length === 0 ? (
+            <div className="eg__avanzado-card">
+              <p className="eg__top-empty" style={{ padding: 20 }}>
+                Sin datos suficientes para calcular el índice de posición en este filtro.
+              </p>
+            </div>
+          ) : (
+            indicePosicionObra.map((o, idx) => (
+              <TarjetaIndicePosicionObra key={`${o.obra}-${o.cc}-${idx}`} datos={o} />
+            ))
+          )}
+
+          {/* Flete Evitado por Flota Propia */}
+          <div className="eg__avanzado-card">
+            <div className="eg__avanzado-card-header">
+              <div className="eg__avanzado-card-left">
+                <span className="eg__avanzado-card-eyebrow"><Truck size={11} /> Flota propia</span>
+                <h3 className="eg__avanzado-card-title">{FLETE_EVITADO_FLOTA_PROPIA.titulo}</h3>
+              </div>
+            </div>
+            <p className="eg__avanzado-card-sub" style={{ padding: "0 16px 16px" }}>{FLETE_EVITADO_FLOTA_PROPIA.descripcion}</p>
+          </div>
+
+          {fleteEvitadoFlotaPropia.length === 0 ? (
+            <div className="eg__avanzado-card">
+              <p className="eg__top-empty" style={{ padding: 20 }}>
+                Sin viajes de GRUPO GEEM (flota propia) en este filtro.
+              </p>
+            </div>
+          ) : (
+            <>
+              {fleteEvitadoFlotaPropia.map((o, idx) => (
+                <TarjetaFleteEvitadoObra key={`${o.obra}-${o.cc}-${idx}`} datos={o} />
+              ))}
+              <div className="eg__avanzado-card">
+                <p className="eg__avanzado-card-sub" style={{ padding: "16px" }}>{FLETE_EVITADO_FLOTA_PROPIA.nota}</p>
+              </div>
+            </>
+          )}
+
+          {/* ¿Se justifica comprar un camión? */}
+          <div className="eg__avanzado-card">
+            <div className="eg__avanzado-card-header">
+              <div className="eg__avanzado-card-left">
+                <span className="eg__avanzado-card-eyebrow"><Package size={11} /> Justificación de flota</span>
+                <h3 className="eg__avanzado-card-title">{VIABILIDAD_FLOTA_PROPIA.titulo}</h3>
+              </div>
+            </div>
+          </div>
+
+          {topCamionerosPorObra.length === 0 ? (
+            <div className="eg__avanzado-card">
+              <p className="eg__top-empty" style={{ padding: 20 }}>
+                Sin placas de sindicato con viajes de material en este filtro.
+              </p>
+            </div>
+          ) : (
+            <>
+              {topCamionerosPorObra.map((o, idx) => {
+                const camiones = camionesPorDia.find((c) => c.obra === o.obra && c.cc === o.cc) || null;
+                return (
+                  <TarjetaViabilidadFlotaObra
+                    key={`${o.obra}-${o.cc}-${idx}`}
+                    camiones={camiones}
+                    topCamioneros={o}
+                  />
+                );
+              })}
+            </>
+          )}
+
+          {/* Jornada de Renta No Aprovechada */}
+          <div className="eg__avanzado-card">
+            <div className="eg__avanzado-card-header">
+              <div className="eg__avanzado-card-left">
+                <span className="eg__avanzado-card-eyebrow"><Clock size={11} /> Renta de equipo</span>
+                <h3 className="eg__avanzado-card-title">{RENTA_NO_APROVECHADA.titulo}</h3>
+              </div>
+            </div>
+            <p className="eg__avanzado-card-sub" style={{ padding: "0 16px 16px" }}>{RENTA_NO_APROVECHADA.descripcion}</p>
+          </div>
+
+          {rentaNoAprovechada.length === 0 ? (
+            <div className="eg__avanzado-card">
+              <p className="eg__top-empty" style={{ padding: 20 }}>
+                Sin vales de renta con días y viajes registrados en este filtro.
+              </p>
+            </div>
+          ) : (
+            <>
+              {rentaNoAprovechada.map((o, idx) => (
+                <TarjetaRentaNoAprovechadaObra key={`${o.obra}-${o.cc}-${idx}`} datos={o} />
+              ))}
+              <div className="eg__avanzado-card">
+                <p className="eg__avanzado-card-sub" style={{ padding: "16px" }}>{RENTA_NO_APROVECHADA.nota}</p>
+              </div>
+            </>
           )}
         </SeccionColapsable>
       )}

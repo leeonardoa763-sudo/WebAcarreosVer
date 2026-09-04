@@ -24,9 +24,11 @@ import {
   buildTicketsMaterialMap,
   materialDeViaje,
 } from "../../utils/rentaMaterial";
+import { tarifaRentaEfectiva } from "../../utils/tarifaRentaEfectiva";
 
 const DetallesRenta = ({ detalle, ticketsDescarga, mostrarPrecios }) => {
   const [fotoModal, setFotoModal] = useState(false);
+  const tarifa = tarifaRentaEfectiva(detalle);
 
   const ticketsMaterialMap = buildTicketsMaterialMap(ticketsDescarga);
 
@@ -176,20 +178,20 @@ const DetallesRenta = ({ detalle, ticketsDescarga, mostrarPrecios }) => {
         <>
           <div className="divider-thin"></div>
 
-          {detalle.precios_renta?.costo_hr && (
+          {tarifa.costo_hr && (
             <div className="info-row">
               <span className="info-label">Tarifa/Hora:</span>
               <span className="info-value">
-                {formatearMoneda(detalle.precios_renta.costo_hr)}
+                {formatearMoneda(tarifa.costo_hr)}
               </span>
             </div>
           )}
 
-          {detalle.precios_renta?.costo_dia && (
+          {tarifa.costo_dia && (
             <div className="info-row">
               <span className="info-label">Tarifa/Día:</span>
               <span className="info-value">
-                {formatearMoneda(detalle.precios_renta.costo_dia)}
+                {formatearMoneda(tarifa.costo_dia)}
               </span>
             </div>
           )}

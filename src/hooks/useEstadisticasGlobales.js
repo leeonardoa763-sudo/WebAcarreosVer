@@ -34,15 +34,15 @@ const getWeekKey = (fechaStr) => {
 // ── Helper: coincidencia con filtro multi-selección (arreglo vacío = todos) ──
 // modo "excluir" invierte la coincidencia (NOT IN en vez de IN). Con arreglo
 // vacío nunca filtra, sin importar el modo (excluir nada equivale a no filtrar).
-const matchesFiltro = (filtroArr, value, modo = "incluir") => {
+export const matchesFiltro = (filtroArr, value, modo = "incluir") => {
   if (!filtroArr || filtroArr.length === 0) return true;
   const coincide = filtroArr.some((v) => String(v) === String(value));
   return modo === "excluir" ? !coincide : coincide;
 };
 
 // ── Orden y nombre de los tipos de material (ver CLAUDE.md, "Tipos de material") ──
-const ORDEN_TIPOS_MATERIAL = [1, 2, 3];
-const NOMBRE_TIPO_FALLBACK = { 1: "Materiales Pétreos", 2: "Base Asfáltica", 3: "Tepetate / Corte" };
+export const ORDEN_TIPOS_MATERIAL = [1, 2, 3];
+export const NOMBRE_TIPO_FALLBACK = { 1: "Materiales Pétreos", 2: "Base Asfáltica", 3: "Tepetate / Corte" };
 
 // ── Ahorro vs. proceso anterior en papel ─────────────────────────────
 // Ticket térmico impreso en campo (reemplaza el talonario físico). Costo
@@ -104,7 +104,11 @@ const agregarObraMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mod
       }
       const s = obraMap[obraId].matMap[nombreMat];
       s.valesIds.add(vale.id_vale);
-      s.importeIVA += Number(det.costo_total || 0) * 1.16;
+      // Flota propia (GRUPO GEEM): sí cuenta en m³/viajes/vales, pero su
+      // costo_total es el $1/km técnico ficticio — no se suma como dinero.
+      if (!esFlotaPropia(det.sindicatos?.sindicato)) {
+        s.importeIVA += Number(det.costo_total || 0) * 1.16;
+      }
 
       if (tipoId === 3) {
         s.m3Total += Number(det.volumen_real_m3 || 0);
@@ -147,7 +151,16 @@ const agregarObraMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mod
 // Las demás (p.ej. datos de prueba como "GRUPO GEEM") se omiten de esa tabla
 // a petición explícita — el resto de la sección (m³, viajes, importe por
 // banco/material) no se ve afectado, solo el desglose de tarifas.
-const SINDICATO_TARIFAS_REPORTE = "CTM";
+export const SINDICATO_TARIFAS_REPORTE = "CTM";
+
+// Flota propia: sus vales sí cuentan en m³/viajes/vales de cualquier
+// desglose (transportan material real), pero su `costo_total` es un precio
+// técnico ficticio de $1/km para poder cargarlo en la app — nunca un importe
+// real pagado. Se excluye de cualquier SUMA EN PESOS de "todo el material"
+// (Volumen Acumulado, Desglose en Tiempo Real); su valor real a tarifa de
+// mercado ya se calcula aparte en "Flete Evitado" (useIndicadoresEficiencia).
+const SINDICATO_FLOTA_PROPIA = "GRUPO GEEM";
+const esFlotaPropia = (sindicato) => (sindicato || "").toUpperCase().includes(SINDICATO_FLOTA_PROPIA);
 
 // ── Agregación de material por banco desde vales reales (tabla `vales`) ─────
 // Igual que agregarObraMaterialReal pero agrupando tipo de material → banco →
@@ -168,6 +181,9 @@ const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mo
       const esSindicatoTarifas = (det.sindicatos?.sindicato || "")
         .toUpperCase()
         .includes(SINDICATO_TARIFAS_REPORTE);
+      // Flota propia (GRUPO GEEM): sus viajes sí cuentan en m³/viajes, pero su
+      // costo es el $1/km técnico ficticio — no se suma como dinero real.
+      const esFlota = esFlotaPropia(det.sindicatos?.sindicato);
 
       if (!matchesFiltro(filtroMaterial, nombreMat, modoMaterial)) return;
       if (!matchesFiltro(filtroBanco, det.id_banco, modoBanco)) return;
@@ -182,19 +198,22 @@ const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mo
             banco: v.bancos_override?.banco ?? det.bancos?.banco ?? "Sin banco",
             m3: Number(v.volumen_m3 ?? 0),
             distanciaKm: Number(v.distancia_km_override ?? det.distancia_km ?? 0),
-            importe: Number(
+            importe: esFlota ? 0 : Number(
               v.costo_viaje_override ??
                 v.costo_viaje ??
                 Number(v.volumen_m3 ?? 0) * Number(v.precio_m3_override ?? v.precio_m3 ?? det.precio_m3 ?? 0)
             ) * 1.16,
-            tarifa: v.precios_material ?? det.precios_material ?? null,
+            // Tarifa realmente usada: la de obra gana sobre la del sindicato
+            // (mutuamente excluyentes, ver CLAUDE.md "Tarifas por obra") — el
+            // viaje manda sobre el detalle, igual que banco/distancia/precio.
+            tarifa: v.precios_material ?? v.precios_material_obra ?? det.precios_material ?? det.precios_material_obra ?? null,
           }))
         : [{
             banco: det.bancos?.banco ?? "Sin banco",
             m3: Number(det.volumen_real_m3 ?? 0),
             distanciaKm: Number(det.distancia_km ?? 0),
-            importe: Number(det.costo_total ?? 0) * 1.16,
-            tarifa: det.precios_material ?? null,
+            importe: esFlota ? 0 : Number(det.costo_total ?? 0) * 1.16,
+            tarifa: det.precios_material ?? det.precios_material_obra ?? null,
           }];
 
       registros.forEach(({ banco, m3, distanciaKm, importe, tarifa }) => {
@@ -209,8 +228,12 @@ const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mo
         bMap[banco].m3Total += m3;
         bMap[banco].importeIVA += importe;
         bMap[banco].sumaDistancias += distanciaKm;
+        // Clave prefijada porque id_precios_material e id_precios_material_obra
+        // son PKs de tablas distintas — el mismo número en ambas no es la misma fila.
         if (esSindicatoTarifas && tarifa?.id_precios_material != null) {
-          bMap[banco].tarifasMap.set(tarifa.id_precios_material, tarifa);
+          bMap[banco].tarifasMap.set(`m-${tarifa.id_precios_material}`, tarifa);
+        } else if (esSindicatoTarifas && tarifa?.id_precios_material_obra != null) {
+          bMap[banco].tarifasMap.set(`o-${tarifa.id_precios_material_obra}`, tarifa);
         }
 
         const mMap = bMap[banco].materialMap;
@@ -354,6 +377,7 @@ export const useEstadisticasGlobales = () => {
     idSindicato: [],
     material: [],
     idBanco: [],
+    idTipoMaterial: [],
   });
 
   // 2b. Modo por categoría: "incluir" (IN, por defecto) o "excluir" (NOT IN)
@@ -365,6 +389,7 @@ export const useEstadisticasGlobales = () => {
     idSindicato: "incluir",
     material: "incluir",
     idBanco: "incluir",
+    idTipoMaterial: "incluir",
   });
 
   // 3. Fetch principal
@@ -435,8 +460,9 @@ export const useEstadisticasGlobales = () => {
               persona_creador:id_persona_creador (nombre, primer_apellido),
               persona_verificador:id_persona_verificador (nombre, primer_apellido),
               vale_material_detalles (
-                id_detalle_material, volumen_real_m3, costo_total, id_banco,
+                id_detalle_material, volumen_real_m3, costo_total, id_banco, id_sindicato,
                 bancos:id_banco (id_banco, banco),
+                sindicatos:id_sindicato (id_sindicato, sindicato),
                 material:id_material (
                   id_material, material,
                   tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)
@@ -587,13 +613,14 @@ export const useEstadisticasGlobales = () => {
       let queryValesTR = supabase
         .from("vales")
         .select(`
-          id_vale, tipo_vale, estado, fecha_creacion, id_obra, id_empresa, id_vehiculo,
+          id_vale, folio, tipo_vale, estado, fecha_creacion, id_obra, id_empresa, id_vehiculo,
           obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa)),
-          vehiculos:id_vehiculo (id_vehiculo, capacidad_m3),
-          operadores:id_operador (id_operador, id_sindicato),
+          vehiculos:id_vehiculo (id_vehiculo, placas, capacidad_m3),
+          operadores:id_operador (id_operador, id_sindicato, nombre_completo),
           vale_material_detalles (
             id_detalle_material, volumen_real_m3, costo_total, id_banco,
-            distancia_km, precio_m3, id_precios_material, id_sindicato,
+            distancia_km, precio_m3, id_precios_material, id_precios_material_obra, id_sindicato,
+            foto_omitida, es_planta_asfaltos,
             bancos:id_banco (id_banco, banco),
             sindicatos:id_sindicato (id_sindicato, sindicato),
             material:id_material (
@@ -604,21 +631,35 @@ export const useEstadisticasGlobales = () => {
               id_precios_material, numero_de_intervalos,
               primer_km, km_sub_int1, limite_int1, km_sub_int2, limite_int2
             ),
+            precios_material_obra:id_precios_material_obra (
+              id_precios_material_obra, numero_de_intervalos,
+              primer_km, km_sub_int1, limite_int1, km_sub_int2, limite_int2
+            ),
             vale_material_viajes (
-              id_viaje, volumen_m3,
-              precio_m3, costo_viaje, id_precios_material,
+              id_viaje, hora_registro, volumen_m3,
+              precio_m3, costo_viaje, id_precios_material, id_precios_material_obra,
               id_banco_override, distancia_km_override,
               precio_m3_override, costo_viaje_override,
+              registro_anticipado, motivo_anticipado_codigo, foto_omitida,
               bancos_override:id_banco_override (id_banco, banco),
               precios_material:id_precios_material (
                 id_precios_material, numero_de_intervalos,
+                primer_km, km_sub_int1, limite_int1, km_sub_int2, limite_int2
+              ),
+              precios_material_obra:id_precios_material_obra (
+                id_precios_material_obra, numero_de_intervalos,
                 primer_km, km_sub_int1, limite_int1, km_sub_int2, limite_int2
               )
             )
           ),
           tickets_material (id_ticket),
           vale_renta_detalle (
-            id_vale_renta_detalle, total_dias, total_horas, numero_viajes, costo_total,
+            id_vale_renta_detalle, total_dias, total_horas, numero_viajes, costo_total, capacidad_m3,
+            notas_adicionales,
+            material:id_material (
+              id_material, material,
+              tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)
+            ),
             vale_renta_viajes (id_viaje)
           )
         `)
@@ -806,6 +847,24 @@ export const useEstadisticasGlobales = () => {
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [rawVales]);
 
+  const opcionesTipoMaterial = useMemo(() => {
+    const map = {};
+    rawVales.forEach((v) => {
+      (v.vale_material_detalles || []).forEach((d) => {
+        const tipoId = d.material?.tipo_de_material?.id_tipo_de_material;
+        if (tipoId == null) return;
+        map[tipoId] = d.material.tipo_de_material.tipo_de_material || NOMBRE_TIPO_FALLBACK[tipoId] || "Sin clasificar";
+      });
+    });
+    return Object.entries(map)
+      .map(([id, nombre]) => ({ id: Number(id), nombre }))
+      .sort((a, b) => {
+        const ia = ORDEN_TIPOS_MATERIAL.indexOf(a.id);
+        const ib = ORDEN_TIPOS_MATERIAL.indexOf(b.id);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      });
+  }, [rawVales]);
+
   // ── Vales filtrados (nivel vale: mes, semana, obra, empresa, sindicato) ──
   const valesFiltrados = useMemo(() => {
     return rawVales.filter((vale) => {
@@ -838,7 +897,11 @@ export const useEstadisticasGlobales = () => {
         }
         const s = stats[nombre];
         s.valesIds.add(vale.id_vale);
-        s.importeIVA += Number(det.costo_total || 0) * 1.16;
+        // Flota propia (GRUPO GEEM): sí cuenta en m³/viajes/vales, pero su
+        // costo_total es el $1/km técnico ficticio — no se suma como dinero.
+        if (!esFlotaPropia(det.sindicatos?.sindicato)) {
+          s.importeIVA += Number(det.costo_total || 0) * 1.16;
+        }
 
         if (tipoId === 3) {
           s.m3Total += Number(det.volumen_real_m3 || 0);
@@ -1255,7 +1318,11 @@ export const useEstadisticasGlobales = () => {
         }
         const s = obraMap[obraId].matMap[nombreMat];
         s.valesIds.add(vale.id_vale);
-        s.importeIVA += Number(det.costo_total || 0) * 1.16;
+        // Flota propia (GRUPO GEEM): sí cuenta en m³/viajes/vales, pero su
+        // costo_total es el $1/km técnico ficticio — no se suma como dinero.
+        if (!esFlotaPropia(det.sindicatos?.sindicato)) {
+          s.importeIVA += Number(det.costo_total || 0) * 1.16;
+        }
 
         if (tipoId === 3) {
           s.m3Total  += Number(det.volumen_real_m3 || 0);
@@ -1365,7 +1432,11 @@ export const useEstadisticasGlobales = () => {
         }
         const s = obraMap[obraId].matMap[nombreMat];
         s.valesIds.add(vale.id_vale);
-        s.importeIVA += Number(det.costo_total || 0) * 1.16;
+        // Flota propia (GRUPO GEEM): sí cuenta en m³/viajes/vales, pero su
+        // costo_total es el $1/km técnico ficticio — no se suma como dinero.
+        if (!esFlotaPropia(det.sindicatos?.sindicato)) {
+          s.importeIVA += Number(det.costo_total || 0) * 1.16;
+        }
 
         if (tipoId === 3) {
           s.m3Total += Number(det.volumen_real_m3 || 0);
@@ -1643,7 +1714,11 @@ export const useEstadisticasGlobales = () => {
         }
         const s = obraMap[obraId].matMap[nombreMat];
         s.valesIds.add(vale.id_vale);
-        s.importeIVA += Number(det.costo_total || 0) * 1.16;
+        // Flota propia (GRUPO GEEM): sí cuenta en m³/viajes/vales, pero su
+        // costo_total es el $1/km técnico ficticio — no se suma como dinero.
+        if (!esFlotaPropia(det.sindicatos?.sindicato)) {
+          s.importeIVA += Number(det.costo_total || 0) * 1.16;
+        }
 
         if (tipoId === 3) {
           s.m3Total += Number(det.volumen_real_m3 || 0);
@@ -2119,11 +2194,11 @@ export const useEstadisticasGlobales = () => {
   const resetFiltros = useCallback(() => {
     setFiltrosState({
       mes: [], semana: [], idObra: [], idEmpresa: [],
-      idSindicato: [], material: [], idBanco: [],
+      idSindicato: [], material: [], idBanco: [], idTipoMaterial: [],
     });
     setModosFiltro({
       mes: "incluir", semana: "incluir", idObra: "incluir", idEmpresa: "incluir",
-      idSindicato: "incluir", material: "incluir", idBanco: "incluir",
+      idSindicato: "incluir", material: "incluir", idBanco: "incluir", idTipoMaterial: "incluir",
     });
   }, []);
 
@@ -2179,6 +2254,7 @@ export const useEstadisticasGlobales = () => {
     opcionesSindicatos,
     opcionesMateriales,
     opcionesBancos,
+    opcionesTipoMaterial,
     // Gráficas
     seriesTiempo,
     seriesTiempoRenta,
@@ -2217,6 +2293,7 @@ export const useEstadisticasGlobales = () => {
     tablaObraMaterialAcumulado,
     tablaObraRentaAcumulado,
     // Fuente del reporte PDF: vales reales agrupados por los chips globales
+    valesReporteFiltrados,
     tablaObraMaterialReporte,
     tablaObraRentaReporte,
     tablaBancoMaterialReporte,
