@@ -19,19 +19,18 @@ export const INDICE_POSICION_OBRA = {
   titulo: "Índice de Posición de la Obra",
   descripcion:
     "Distancia promedio a los bancos usados, ponderada por m³ entregados. " +
-    "Entre más alto, más lejos está la obra de sus fuentes de material. " +
-    "\"Alto/Medio/Bajo\" es relativo a las demás obras de este filtro (tercio " +
-    "más alejado / intermedio / más cercano) — no hay un corte fijo en km " +
-    "porque la distancia normal varía mucho por región. El desglose por " +
-    "banco explica de dónde sale el número; el desglose por material muestra " +
-    "el precio de FLETE promedio ponderado por m³ (no el precio del " +
-    "material — ese se paga por tonelada, fuera del sistema).",
-  nota:
-    "Las obras con nivel Alto tienen un flete estructuralmente caro sin " +
-    "importar qué tan bien se elija el banco — vale la pena revisar si hay " +
-    "bancos más cercanos aún no usados, o negociar tarifa especial por " +
-    "volumen si es una obra de largo plazo. Las de nivel Bajo no tienen el " +
-    "flete como su principal driver de costo.",
+    "Entre más alto, más lejos está la obra de sus fuentes de material.",
+  // Con 2+ obras el nivel Alto/Bajo es comparativo (tercios); con 1 sola obra
+  // no hay contra qué comparar, así que se omite esa parte del texto.
+  nota: (cantidadObras) =>
+    cantidadObras > 1
+      ? "Nivel Alto: flete caro sin importar qué tan bien se elija el banco " +
+        "— revisa si hay bancos más cercanos sin usar o negocia tarifa por " +
+        "volumen. Nivel Bajo: el flete no es el principal driver de costo " +
+        "de esa obra."
+      : "Si el flete resulta caro, revisa si hay bancos más cercanos sin " +
+        "usar, o negocia tarifa especial por volumen si es una obra de " +
+        "largo plazo.",
   notaBancoDominante:
     "Un solo banco explica más del 70% del índice de esta obra — el número " +
     "no refleja un promedio real entre varias fuentes, sino sobre todo la " +

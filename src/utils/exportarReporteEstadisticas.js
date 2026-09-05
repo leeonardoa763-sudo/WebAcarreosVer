@@ -109,6 +109,20 @@ const formatearMesCorto = (mesKey) => {
   return d.toLocaleDateString("es-MX", { month: "short" }).replace(".", "").toUpperCase();
 };
 
+// `fecha_inicio`/`fecha_fin` de conciliaciones son DATE puro ("2026-08-20"),
+// sin componente de hora: new Date() lo interpreta como medianoche UTC y,
+// al convertir a America/Mexico_City, cae un día antes. Se fuerza mediodía
+// local antes de construir el Date (mismo patrón que "Timestamps y zonas
+// horarias" en el CLAUDE.md raíz).
+const formatearFechaSolo = (fechaISO) => {
+  if (!fechaISO) return "—";
+  return new Date(`${fechaISO.substring(0, 10)}T12:00:00`).toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
 const formatearFechaCorte = (ts) => {
   if (!ts) return "—";
   return new Date(ts).toLocaleDateString("es-MX", {
@@ -1296,22 +1310,48 @@ const dibujarSeccionTendencias = (doc, yPosInicial, seriesImporteTiempo, seriesC
   return yPos + 2;
 };
 
-// ── Lista de conciliaciones vinculadas, agrupada por material, en columnas
-// (relleno por columna: con 3 columnas y 11 items → col1: 1-4, col2: 5-8,
-// col3: 9-11). Cada número es un vínculo clickeable que abre la misma
-// página pública a la que lleva el QR de esa conciliación. `label` es el
-// nombre del material (null para omitir el subtítulo, caso "Renta" que no
-// se subdivide por material). ─────────────────────────────────────────
-const dibujarListaConciliacionesColumnas = (doc, yPosInicial, label, items, cols = 3) => {
+// ── Tabla de conciliaciones vinculadas, agrupada por material ──────────
+// Antes solo se listaban los números de conciliación como vínculos sueltos;
+// ahora cada fila trae el detalle que explica ese importe (periodo, m³,
+// vales, viajes) y un link de soporte que abre la misma página pública a la
+// que lleva el QR de esa conciliación. `label` es el nombre del material
+// (null para omitir el subtítulo, caso "Renta" que no se subdivide por
+// material). El importe de material ya viene recalculado por material (no
+// es el subtotal completo de la conciliación) — ver conciliacionesPorObraTipo
+// en useEstadisticasGlobales.js. ───────────────────────────────────────
+const COLUMNAS_TABLA_CONCILIACIONES = [
+  { key: "numero", label: "#", width: 7, align: "left" },
+  { key: "periodo", label: "PERIODO", width: 33, align: "left" },
+  { key: "importe", label: "IMPORTE", width: 27, align: "right" },
+  { key: "totalFinal", label: "IMPORTE C/IVA-RET.", width: 30, align: "right" },
+  { key: "m3", label: "M³", width: 22, align: "right" },
+  { key: "vales", label: "VALES", width: 16, align: "right" },
+  { key: "viajes", label: "VIAJES", width: 18, align: "right" },
+  { key: "link", label: "SOPORTE", width: 22, align: "left" },
+];
+
+const dibujarEncabezadoTablaConciliaciones = (doc, yPos) => {
+  setFill(doc, "#E8EEF4");
+  doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, 5.5, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  setTextColor(doc, COLOR_SECONDARY);
+  let x = MARGIN_LEFT;
+  COLUMNAS_TABLA_CONCILIACIONES.forEach((col) => {
+    const textX = col.align === "right" ? x + col.width - 1.5 : x + 1.5;
+    doc.text(col.label, textX, yPos + 3.8, { align: col.align === "right" ? "right" : "left" });
+    x += col.width;
+  });
+  setTextColor(doc, COLOR_TEXT);
+  return yPos + 5.5;
+};
+
+const dibujarTablaConciliaciones = (doc, yPosInicial, label, items) => {
   if (!items || items.length === 0) return yPosInicial;
 
   const rowHeight = 5;
-  const colWidth = USABLE_WIDTH / cols;
-  const rows = Math.ceil(items.length / cols);
-  const alturaLabel = label ? 5 : 1;
-  const alturaGrupo = alturaLabel + rows * rowHeight;
-
-  let yPos = checkPageBreak(doc, yPosInicial, alturaGrupo, PAGE_HEIGHT, MARGIN_BOTTOM);
+  const alturaLabel = label ? 5 : 0;
+  let yPos = checkPageBreak(doc, yPosInicial, alturaLabel + 5.5 + rowHeight * 2, PAGE_HEIGHT, MARGIN_BOTTOM);
 
   if (label) {
     doc.setFont("helvetica", "italic");
@@ -1319,27 +1359,59 @@ const dibujarListaConciliacionesColumnas = (doc, yPosInicial, label, items, cols
     setTextColor(doc, COLOR_GRAY);
     doc.text(label, MARGIN_LEFT + 2, yPos);
     setTextColor(doc, COLOR_TEXT);
+    yPos += alturaLabel;
   }
-  yPos += alturaLabel;
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
-  setTextColor(doc, COLOR_BLUE);
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const idx = c * rows + r;
-      if (idx >= items.length) continue;
-      const item = items[idx];
-      const x = MARGIN_LEFT + c * colWidth;
-      const y = yPos + r * rowHeight;
-      doc.textWithLink(String(item.numero), x, y, {
-        url: `${BASE_URL_CONCILIACION}/conciliacion/${item.folio}`,
-      });
+  yPos = dibujarEncabezadoTablaConciliaciones(doc, yPos);
+
+  items.forEach((item, i) => {
+    yPos = checkPageBreak(doc, yPos, rowHeight, PAGE_HEIGHT, MARGIN_BOTTOM);
+    if (yPos === 12) {
+      yPos = dibujarEncabezadoTablaConciliaciones(doc, yPos);
     }
-  }
-  setTextColor(doc, COLOR_TEXT);
 
-  return yPos + rows * rowHeight + 3;
+    if (i % 2 === 1) {
+      setFill(doc, COLOR_ROW_ALT);
+      doc.rect(MARGIN_LEFT, yPos, USABLE_WIDTH, rowHeight, "F");
+    }
+
+    const periodoTxt = item.fechaInicio && item.fechaFin
+      ? `${formatearFechaSolo(item.fechaInicio)} - ${formatearFechaSolo(item.fechaFin)}`
+      : formatearFechaCorte(item.fecha);
+    const valores = {
+      numero: String(item.numero),
+      periodo: periodoTxt,
+      importe: formatearMoneda(item.subtotal),
+      totalFinal: formatearMoneda(item.totalFinal),
+      m3: item.m3 != null ? `${formatearNumero(item.m3, 2)} m³` : "—",
+      vales: formatearNumero(item.vales),
+      viajes: formatearNumero(item.viajes),
+      link: "Ver soporte",
+    };
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.8);
+    let x = MARGIN_LEFT;
+    COLUMNAS_TABLA_CONCILIACIONES.forEach((col) => {
+      const textX = col.align === "right" ? x + col.width - 1.5 : x + 1.5;
+      const raw = valores[col.key];
+      const texto = col.align === "left" ? ajustarTexto(doc, raw, col.width - 3) : raw;
+      if (col.key === "link") {
+        setTextColor(doc, COLOR_BLUE);
+        doc.textWithLink(texto, textX, yPos + 3.5, {
+          url: `${BASE_URL_CONCILIACION}/conciliacion/${item.folio}`,
+        });
+        setTextColor(doc, COLOR_TEXT);
+      } else {
+        doc.text(texto, textX, yPos + 3.5, { align: col.align === "right" ? "right" : "left" });
+      }
+      x += col.width;
+    });
+
+    yPos += rowHeight;
+  });
+
+  return yPos + 3;
 };
 
 // ── Sección: Ahorro Estimado vs. Proceso Anterior en Papel ────────────
@@ -1410,7 +1482,7 @@ const dibujarSeccionAhorro = (doc, yPosInicial, ahorroEstimado, serieConciliacio
           // "Renta" no se subdivide por material — su única clave repite el
           // nombre del tipo, así que se omite el subtítulo en ese caso.
           const label = materialNombre === tipoNombre ? null : materialNombre;
-          yPos = dibujarListaConciliacionesColumnas(doc, yPos, label, materiales[materialNombre]);
+          yPos = dibujarTablaConciliaciones(doc, yPos, label, materiales[materialNombre]);
         });
         yPos += 2;
       });
@@ -1617,7 +1689,7 @@ const dibujarSeccionIndicePosicion = (doc, yPosInicial, indicePosicionObra) => {
     yPos += 4;
   });
 
-  return dibujarParrafo(doc, MARGIN_LEFT, yPos, INDICE_POSICION_OBRA.nota, USABLE_WIDTH, { fontSize: 7 }) + 4;
+  return dibujarParrafo(doc, MARGIN_LEFT, yPos, INDICE_POSICION_OBRA.nota(indicePosicionObra.length), USABLE_WIDTH, { fontSize: 7 }) + 4;
 };
 
 // ── Indicador: Flete Evitado por Flota Propia (GRUPO GEEM) ──────────────

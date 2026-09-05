@@ -409,7 +409,7 @@ export const useEstadisticasGlobales = () => {
       let queryConc = supabase
         .from("conciliaciones")
         .select(
-          "id_conciliacion, tipo_conciliacion, total_final, total_horas, total_dias, fecha_generacion, folio, id_obra, id_empresa, id_sindicato, obras:id_obra (id_obra, obra, cc), sindicatos:id_sindicato (sindicato), empresas:id_empresa (empresa)"
+          "id_conciliacion, tipo_conciliacion, subtotal, iva_16_porciento, retencion_4_porciento, total_final, total_horas, total_dias, fecha_generacion, fecha_inicio, fecha_fin, folio, id_obra, id_empresa, id_sindicato, obras:id_obra (id_obra, obra, cc), sindicatos:id_sindicato (sindicato), empresas:id_empresa (empresa)"
         )
         .neq("id_obra", 14)
         .neq("id_empresa", 4);
@@ -743,56 +743,108 @@ export const useEstadisticasGlobales = () => {
   }, [rawVales]);
 
   // ── Conciliaciones por obra, agrupadas por tipo de material y, dentro de
-  // cada tipo, por material puntual (para la lista de vínculos de la
-  // sección de Ahorro del PDF) — todo el histórico, sin filtro de
-  // mes/semana (igual que Material vs Tiempo/Tendencias, ver línea ~1246),
-  // porque la idea es listar "todas las conciliaciones de la obra".
-  // Material sale de `rawVales`/`valeAConciliacion` (solo vales de material
-  // que sí pertenecen a una conciliación); renta sale directo de
-  // `rawConciliaciones` y no tiene material, va en su propio grupo "Renta"
-  // sin subdivisión. Forma: { [obraId]: { obraNombre, grupos: { [tipoNombre]:
-  // { [materialNombre]: [{folio, fecha, numero}] } } } }. ─────────────────
+  // cada tipo, por material puntual (para la tabla de soporte de la sección
+  // de Ahorro del PDF) — todo el histórico, sin filtro de mes/semana (igual
+  // que Material vs Tiempo/Tendencias, ver línea ~1246), porque la idea es
+  // listar "todas las conciliaciones de la obra". Material sale de
+  // `rawVales`/`valeAConciliacion`; renta sale de `rawValesRenta`/
+  // `valeRentaAConciliacion` y no tiene material, va en su propio grupo
+  // "Renta" sin subdivisión. Forma: { [obraId]: { obraNombre, grupos:
+  // { [tipoNombre]: { [materialNombre]: [{folio, fecha, fechaInicio,
+  // fechaFin, m3, vales, viajes, subtotal, totalFinal, numero}] } } } }.
   const conciliacionesPorObraTipo = useMemo(() => {
     const resultado = {};
-    const addItem = (obraId, obraNombre, tipoNombre, materialNombre, folio, fecha) => {
-      if (!obraId || !folio) return;
+    const addItem = (obraId, obraNombre, tipoNombre, materialNombre, item) => {
+      if (!obraId || !item.folio) return;
       if (!resultado[obraId]) resultado[obraId] = { obraNombre, grupos: {} };
       if (!resultado[obraId].grupos[tipoNombre]) resultado[obraId].grupos[tipoNombre] = {};
       const materialKey = materialNombre || tipoNombre;
       if (!resultado[obraId].grupos[tipoNombre][materialKey]) resultado[obraId].grupos[tipoNombre][materialKey] = [];
-      resultado[obraId].grupos[tipoNombre][materialKey].push({ folio, fecha });
+      resultado[obraId].grupos[tipoNombre][materialKey].push(item);
     };
 
-    // Material: agrupar por conciliación los pares (tipo, material) que toca.
-    const paresPorConciliacion = {};
+    // Material: acumular m3/vales/viajes/costo por (conciliación, tipo, material).
+    // El subtotal/iva/retención de la fila `conciliaciones` es el total de
+    // TODA la conciliación (puede cubrir varios materiales), así que aquí se
+    // recalcula el importe sumando costo_total solo de los detalles de ese
+    // material. IVA 16% / retención 4% son las mismas tasas fijas de
+    // "Fórmulas de precio" (ver CLAUDE.md raíz).
+    const statsPorPar = {};
     rawVales.forEach((vale) => {
       const conc = valeAConciliacion[vale.id_vale];
       if (!conc || conc.tipo_conciliacion !== "material") return;
-      if (!paresPorConciliacion[conc.id_conciliacion]) {
-        paresPorConciliacion[conc.id_conciliacion] = { conc, pares: new Set() };
-      }
       (vale.vale_material_detalles || []).forEach((det) => {
         const tipoNombre = det.material?.tipo_de_material?.tipo_de_material;
         const materialNombre = det.material?.material;
-        if (tipoNombre && materialNombre) {
-          paresPorConciliacion[conc.id_conciliacion].pares.add(`${tipoNombre} ${materialNombre}`);
+        if (!tipoNombre || !materialNombre) return;
+        const key = conc.id_conciliacion + "|" + tipoNombre + "|" + materialNombre;
+        if (!statsPorPar[key]) {
+          statsPorPar[key] = { conc, tipoNombre, materialNombre, m3: 0, valesSet: new Set(), viajes: 0, costo: 0 };
         }
+        const s = statsPorPar[key];
+        s.m3 += Number(det.volumen_real_m3) || 0;
+        s.valesSet.add(vale.id_vale);
+        s.viajes += (det.vale_material_viajes || []).length;
+        s.costo += Number(det.costo_total) || 0;
       });
     });
-    Object.values(paresPorConciliacion).forEach(({ conc, pares }) => {
-      pares.forEach((par) => {
-        const [tipoNombre, materialNombre] = par.split(" ");
-        addItem(conc.id_obra, conc.obras?.obra || "Sin obra", tipoNombre, materialNombre, conc.folio, conc.fecha_generacion);
+    Object.values(statsPorPar).forEach((s) => {
+      const subtotal = s.costo;
+      const importeIVA = subtotal * 0.16;
+      const retencion = subtotal * 0.04;
+      addItem(s.conc.id_obra, s.conc.obras?.obra || "Sin obra", s.tipoNombre, s.materialNombre, {
+        folio: s.conc.folio,
+        fecha: s.conc.fecha_generacion,
+        fechaInicio: s.conc.fecha_inicio,
+        fechaFin: s.conc.fecha_fin,
+        m3: s.m3,
+        vales: s.valesSet.size,
+        viajes: s.viajes,
+        subtotal: subtotal,
+        totalFinal: subtotal + importeIVA - retencion,
       });
     });
 
-    // Renta: sin material, un solo grupo "Renta" sin subdivisión.
+    // Renta: sin material, un solo grupo "Renta" sin subdivisión — aquí sí
+    // se usan los totales reales de la fila (no hay reparto ambiguo entre
+    // materiales). m3 no existe capturado en BD para renta: se aproxima con
+    // viajes × capacidad del vehículo (mismo criterio que en la tabla de
+    // Renta de Equipo — Precio por Viaje y m³ del PDF).
+    const statsPorConciliacionRenta = {};
+    rawValesRenta.forEach((vale) => {
+      const conc = valeRentaAConciliacion[vale.id_vale];
+      if (!conc) return;
+      if (!statsPorConciliacionRenta[conc.id_conciliacion]) {
+        statsPorConciliacionRenta[conc.id_conciliacion] = { valesSet: new Set(), viajes: 0, m3Aprox: 0 };
+      }
+      const s = statsPorConciliacionRenta[conc.id_conciliacion];
+      s.valesSet.add(vale.id_vale);
+      const capacidad = vale.vehiculos?.capacidad_m3;
+      (vale.vale_renta_detalle || []).forEach((det) => {
+        const viajes = Number(det.numero_viajes) || 0;
+        s.viajes += viajes;
+        if (capacidad != null) s.m3Aprox += viajes * Number(capacidad);
+      });
+    });
     rawConciliaciones
       .filter((c) => c.tipo_conciliacion === "renta")
-      .forEach((c) => addItem(c.id_obra, c.obras?.obra || "Sin obra", "Renta", null, c.folio, c.fecha_generacion));
+      .forEach((c) => {
+        const s = statsPorConciliacionRenta[c.id_conciliacion];
+        addItem(c.id_obra, c.obras?.obra || "Sin obra", "Renta", null, {
+          folio: c.folio,
+          fecha: c.fecha_generacion,
+          fechaInicio: c.fecha_inicio,
+          fechaFin: c.fecha_fin,
+          m3: s ? s.m3Aprox : null,
+          vales: s ? s.valesSet.size : 0,
+          viajes: s ? s.viajes : 0,
+          subtotal: Number(c.subtotal) || 0,
+          totalFinal: Number(c.total_final) || 0,
+        });
+      });
 
     // Ordenar cada lista de material por fecha y numerar (el número es el
-    // que se muestra/enlaza en el PDF, reinicia en 1 por cada material).
+    // que se muestra en la tabla del PDF, reinicia en 1 por cada material).
     Object.values(resultado).forEach((obraBlock) => {
       Object.values(obraBlock.grupos).forEach((materialesMap) => {
         Object.values(materialesMap).forEach((lista) => {
@@ -803,7 +855,7 @@ export const useEstadisticasGlobales = () => {
     });
 
     return resultado;
-  }, [rawVales, valeAConciliacion, rawConciliaciones]);
+  }, [rawVales, valeAConciliacion, rawConciliaciones, rawValesRenta, valeRentaAConciliacion]);
 
   const opcionesEmpresas = useMemo(() => {
     const map = {};
