@@ -162,6 +162,108 @@ export const SINDICATO_TARIFAS_REPORTE = "CTM";
 const SINDICATO_FLOTA_PROPIA = "GRUPO GEEM";
 const esFlotaPropia = (sindicato) => (sindicato || "").toUpperCase().includes(SINDICATO_FLOTA_PROPIA);
 
+// ── Tabla obra→material del acumulado histórico, separada por CTM /
+// GRUPO GEEM ──────────────────────────────────────────────────────────
+// Mezclar ambos sindicatos en una sola fila de material (como hacía antes
+// tablaObraMaterialAcumulado) hace que el importe se vea artificialmente
+// bajo: los viajes de GRUPO GEEM (flota propia) sí suman m³/viajes reales,
+// pero su costo_total es el $1/km técnico ficticio, nunca dinero real (ver
+// esFlotaPropia arriba). Separado en dos tablas para que cada una reporte
+// un $/m³ que sí significa algo. `tablaObraMaterialAcumulado` (combinada)
+// se conserva aparte solo para el consumo de presupuesto (m3_consumidos
+// SÍ incluye a GRUPO GEEM — el material se colocó en obra igual).
+const construirTablaMaterialAcumuladoPorSindicato = (
+  valesAcumuladoMaterial, filtroMaterial, filtroBanco, modoMaterial, modoBanco,
+  presupuestoMaterialMap, incluirFlotaPropia
+) => {
+  const obraMap = {};
+  valesAcumuladoMaterial.forEach((vale) => {
+    const obraId = vale.obras?.id_obra;
+    if (!obraId) return;
+
+    (vale.vale_material_detalles || []).forEach((det) => {
+      if (esFlotaPropia(det.sindicatos?.sindicato) !== incluirFlotaPropia) return;
+
+      const nombreMat = det.material?.material || "Sin clasificar";
+      const idMaterial = det.material?.id_material ?? null;
+      const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
+
+      if (!matchesFiltro(filtroMaterial, nombreMat, modoMaterial)) return;
+      if (!matchesFiltro(filtroBanco, det.id_banco, modoBanco)) return;
+
+      if (!obraMap[obraId]) {
+        obraMap[obraId] = {
+          obra: vale.obras?.obra || "Sin obra",
+          cc: vale.obras?.cc ?? null,
+          empresa: vale.obras?.empresas?.empresa || null,
+          matMap: {},
+        };
+      }
+      if (!obraMap[obraId].matMap[nombreMat]) {
+        obraMap[obraId].matMap[nombreMat] = {
+          material: nombreMat, idMaterial, m3Total: 0, valesIds: new Set(), totalViajes: 0, importeIVA: 0,
+        };
+      }
+      const s = obraMap[obraId].matMap[nombreMat];
+      s.valesIds.add(vale.id_vale);
+      // Flota propia: nunca suma dinero real (ver nota arriba); el resto sí.
+      if (!incluirFlotaPropia) {
+        s.importeIVA += Number(det.costo_total || 0) * 1.16;
+      }
+
+      if (tipoId === 3) {
+        s.m3Total += Number(det.volumen_real_m3 || 0);
+        s.totalViajes += vale.tickets_material?.length || 0;
+      } else {
+        const viajes = det.vale_material_viajes || [];
+        if (viajes.length > 0) {
+          viajes.forEach((v) => { s.m3Total += Number(v.volumen_m3 || 0); });
+          s.totalViajes += viajes.length;
+        } else {
+          // Tipo 2 (Base/Carpeta Asfáltica): 1 vale = 1 viaje capturado directo
+          // en el detalle, sin filas en vale_material_viajes → usar volumen_real_m3.
+          s.m3Total += Number(det.volumen_real_m3 || 0);
+          s.totalViajes += (det.volumen_real_m3 != null || det.costo_total != null) ? 1 : 0;
+        }
+      }
+    });
+  });
+
+  return Object.entries(obraMap)
+    .map(([obraId, { obra, cc, empresa, matMap }]) => {
+      const materiales = Object.values(matMap)
+        .map((s) => {
+          const m3Presupuestado = s.idMaterial != null
+            ? presupuestoMaterialMap[`${obraId}::${s.idMaterial}`] ?? null
+            : null;
+          return {
+            ...s,
+            valesCount: s.valesIds.size,
+            m3Presupuestado,
+            pctPresupuesto: m3Presupuestado ? (s.m3Total / m3Presupuestado) * 100 : null,
+          };
+        })
+        .sort((a, b) => b.m3Total - a.m3Total);
+
+      const subtotal = materiales.reduce(
+        (acc, m) => ({
+          m3Total:        acc.m3Total        + m.m3Total,
+          valesCount:     acc.valesCount     + m.valesCount,
+          totalViajes:    acc.totalViajes    + m.totalViajes,
+          importeIVA:     acc.importeIVA     + m.importeIVA,
+          m3Presupuestado: acc.m3Presupuestado + (m.m3Presupuestado || 0),
+        }),
+        { m3Total: 0, valesCount: 0, totalViajes: 0, importeIVA: 0, m3Presupuestado: 0 }
+      );
+      subtotal.pctPresupuesto = subtotal.m3Presupuestado
+        ? (subtotal.m3Total / subtotal.m3Presupuestado) * 100
+        : null;
+
+      return { obra, cc, empresa, materiales, subtotal };
+    })
+    .sort((a, b) => b.subtotal.m3Total - a.subtotal.m3Total);
+};
+
 // ── Agregación de material por banco desde vales reales (tabla `vales`) ─────
 // Igual que agregarObraMaterialReal pero agrupando tipo de material → banco →
 // material (desglose de qué materiales salieron de cada banco) en vez de
@@ -613,7 +715,7 @@ export const useEstadisticasGlobales = () => {
       let queryValesTR = supabase
         .from("vales")
         .select(`
-          id_vale, folio, tipo_vale, estado, fecha_creacion, id_obra, id_empresa, id_vehiculo,
+          id_vale, folio, tipo_vale, estado, fecha_creacion, id_obra, id_empresa, id_vehiculo, es_pipa_agua,
           obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa)),
           vehiculos:id_vehiculo (id_vehiculo, placas, capacidad_m3),
           operadores:id_operador (id_operador, id_sindicato, nombre_completo),
@@ -1825,11 +1927,46 @@ export const useEstadisticasGlobales = () => {
       .sort((a, b) => b.subtotal.m3Total - a.subtotal.m3Total);
   }, [valesAcumuladoMaterial, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco, presupuestoMaterialMap]);
 
+  // ── Mismas tablas, separadas CTM / GRUPO GEEM (ver construirTablaMaterialAcumuladoPorSindicato) ──
+  const tablaObraMaterialAcumuladoCTM = useMemo(
+    () => construirTablaMaterialAcumuladoPorSindicato(
+      valesAcumuladoMaterial, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco,
+      presupuestoMaterialMap, false
+    ),
+    [valesAcumuladoMaterial, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco, presupuestoMaterialMap]
+  );
+
+  const tablaObraMaterialAcumuladoGeem = useMemo(
+    () => construirTablaMaterialAcumuladoPorSindicato(
+      valesAcumuladoMaterial, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco,
+      presupuestoMaterialMap, true
+    ),
+    [valesAcumuladoMaterial, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco, presupuestoMaterialMap]
+  );
+
+  // ── Vales de renta acumulados, separados equipo / pipas de agua ─────
+  // `es_pipa_agua` es el sello de cabecera del vale (ver appAcarreos/utils/pipasAgua.js).
+  // Las pipas se cobran por hora/día igual que la renta de equipo, pero el
+  // trigger `recalcular_presupuesto_renta_fn` (BD) las excluye a propósito del
+  // presupuesto de renta ("las pipas no consumen presupuesto de renta") — por
+  // eso tablaObraRentaAcumulado (y su % Presupuesto) también debe excluirlas,
+  // o el cálculo del cliente no coincidiría con el de la BD.
+  const valesAcumuladoRentaEquipo = useMemo(
+    () => valesAcumuladoRenta.filter((vale) => !vale.es_pipa_agua),
+    [valesAcumuladoRenta]
+  );
+  const valesAcumuladoRentaPipas = useMemo(
+    () => valesAcumuladoRenta.filter((vale) => vale.es_pipa_agua),
+    [valesAcumuladoRenta]
+  );
+
   // ── Tabla renta agrupada por obra (acumulado histórico) ────────────
   // Importe SIN IVA ni retención, igual que tablaObraRentaTiempoReal.
+  // Excluye pipas de agua (ver valesAcumuladoRentaEquipo arriba) — tienen su
+  // propia tabla (tablaObraPipasAcumulado).
   const tablaObraRentaAcumulado = useMemo(() => {
     const obraMap = {};
-    valesAcumuladoRenta.forEach((vale) => {
+    valesAcumuladoRentaEquipo.forEach((vale) => {
       const obraId = vale.id_obra;
       if (!obraId) return;
       if (!obraMap[obraId]) {
@@ -1872,7 +2009,50 @@ export const useEstadisticasGlobales = () => {
         };
       })
       .sort((a, b) => b.subtotalSinIva - a.subtotalSinIva);
-  }, [valesAcumuladoRenta, presupuestoRentaMap]);
+  }, [valesAcumuladoRentaEquipo, presupuestoRentaMap]);
+
+  // ── Tabla pipas de agua agrupada por obra (acumulado histórico) ────
+  // Las pipas no tienen precio comparable ni m³ capturado en BD: lo que
+  // importa aquí son los viajes y la capacidad del vehículo, no el día ni
+  // el importe (petición explícita — ver nota en valesAcumuladoRentaEquipo).
+  // El volumen aproximado se deriva igual que en renta de equipo: viajes ×
+  // capacidad promedio del vehículo.
+  const tablaObraPipasAcumulado = useMemo(() => {
+    const obraMap = {};
+    valesAcumuladoRentaPipas.forEach((vale) => {
+      const obraId = vale.id_obra;
+      if (!obraId) return;
+      if (!obraMap[obraId]) {
+        obraMap[obraId] = {
+          obra: vale.obras?.obra || "Sin obra",
+          cc: vale.obras?.cc ?? null,
+          empresa: vale.obras?.empresas?.empresa || null,
+          vales: 0, totalViajes: 0, capacidadSuma: 0, capacidadCount: 0,
+        };
+      }
+      const o = obraMap[obraId];
+      o.vales += 1;
+      (vale.vale_renta_detalle || []).forEach((det) => {
+        o.totalViajes += det.vale_renta_viajes?.length > 0
+          ? det.vale_renta_viajes.length
+          : (det.numero_viajes || 1);
+        if (vale.vehiculos?.capacidad_m3 != null) {
+          o.capacidadSuma += Number(vale.vehiculos.capacidad_m3);
+          o.capacidadCount += 1;
+        }
+      });
+    });
+    return Object.values(obraMap)
+      .map((row) => {
+        const capacidadPromedio = row.capacidadCount > 0 ? row.capacidadSuma / row.capacidadCount : null;
+        return {
+          ...row,
+          capacidadPromedio,
+          volumenAprox: capacidadPromedio != null ? row.totalViajes * capacidadPromedio : null,
+        };
+      })
+      .sort((a, b) => b.totalViajes - a.totalViajes);
+  }, [valesAcumuladoRentaPipas]);
 
   // ── Fuente del reporte PDF: vales reales filtrados por los chips globales ──
   // A diferencia de las tablas "tiempo real" (Hoy/Ayer/Semana local), esta
@@ -2343,7 +2523,10 @@ export const useEstadisticasGlobales = () => {
     rangoAcumuladoHasta,
     seleccionarRangoAcumulado,
     tablaObraMaterialAcumulado,
+    tablaObraMaterialAcumuladoCTM,
+    tablaObraMaterialAcumuladoGeem,
     tablaObraRentaAcumulado,
+    tablaObraPipasAcumulado,
     // Fuente del reporte PDF: vales reales agrupados por los chips globales
     valesReporteFiltrados,
     tablaObraMaterialReporte,

@@ -1,69 +1,75 @@
 /*
  * src/styles/reporte-diario.css
  *
- * Estilos del modal "Reporte Diario" (prefijo BEM: rpd__)
- * Usado en: ModalReporteDiario.jsx
+ * Estilos de la página "Reporte Diario" (prefijo BEM: rpd__ para el
+ * contenido del reporte —lo que se captura como imagen—, rpd-page__ para
+ * el chrome de la página que NO se captura: la barra de fecha/exportar).
+ * Usado en: ReporteDiario.jsx
  */
 
-.rpd__overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(10, 24, 45, 0.55);
-  backdrop-filter: blur(4px);
-  z-index: 1100;
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Barlow+Condensed:wght@500;600;700&display=swap');
+
+.rpd-page {
+  min-height: 100%;
+  background: #eef2f7;
+  padding-bottom: 48px;
+  font-family: 'Outfit', system-ui, sans-serif;
+}
+
+/* ── Barra de herramientas (fuera de la captura) ──────────────── */
+.rpd-page__toolbar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 16px;
-}
-
-.rpd__modal {
-  background: #ffffff;
-  border-radius: 20px;
-  box-shadow: 0 16px 48px rgba(0, 78, 137, 0.15), 0 4px 16px rgba(0, 0, 0, 0.07);
-  width: 100%;
-  max-width: 920px;
-  max-height: 92vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  animation: rpd-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-@keyframes rpd-in {
-  from { opacity: 0; transform: scale(0.97) translateY(6px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-/* ── Header ─────────────────────────────────────────────── */
-.rpd__header {
-  display: flex;
-  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 20px 24px;
+  padding: 18px 28px;
   background: linear-gradient(135deg, #0a1f3d 0%, #004e89 100%);
   flex-wrap: wrap;
 }
 
-.rpd__title {
-  margin: 0;
-  font-size: 1.3rem;
-  font-weight: 800;
+.rpd-page__toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: #ffffff;
+  font-weight: 700;
+  font-size: 14px;
 }
 
-.rpd__subtitle {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.rpd__header-actions {
+.rpd-page__toolbar-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.rpd__date-quick {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+}
+
+.rpd__date-quick-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.rpd__date-quick-btn:hover {
+  color: #ffffff;
+}
+
+.rpd__date-quick-btn--active {
+  background: #ffffff;
+  color: #004e89;
 }
 
 .rpd__date-input {
@@ -101,37 +107,15 @@
   cursor: not-allowed;
 }
 
-.rpd__close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: none;
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
-  cursor: pointer;
+.rpd__export-btn--pdf {
+  background: #dc2626;
 }
 
-.rpd__close:hover {
-  background: rgba(255, 255, 255, 0.22);
+.rpd__export-btn--pdf:hover:not(:disabled) {
+  background: #b91c1c;
 }
 
-/* ── Body ───────────────────────────────────────────────── */
-.rpd__body {
-  padding: 20px 24px 28px;
-  overflow-y: auto;
-}
-
-.rpd__fecha-label {
-  margin: 0 0 18px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #64748b;
-  text-transform: capitalize;
-}
-
+/* ── Estados (fuera de la captura) ───────────────────────────── */
 .rpd__loading,
 .rpd__empty {
   padding: 32px;
@@ -142,6 +126,11 @@
   border-radius: 12px;
 }
 
+.rpd__loading {
+  max-width: 1080px;
+  margin: 24px auto 0;
+}
+
 .rpd__empty--sano {
   color: #1a936f;
   background: rgba(26, 147, 111, 0.08);
@@ -149,11 +138,12 @@
 }
 
 .rpd__error {
+  max-width: 1080px;
+  margin: 24px auto 0;
   padding: 16px;
   border-radius: 12px;
   background: #fee2e2;
   color: #dc2626;
-  margin-bottom: 16px;
   text-align: center;
 }
 
@@ -167,6 +157,60 @@
   cursor: pointer;
 }
 
+/* ── Tarjeta del reporte (esto sí se captura como imagen) ─────── */
+.rpd-page__report {
+  max-width: 1080px;
+  margin: 24px auto 0;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 16px 48px rgba(0, 78, 137, 0.12), 0 4px 16px rgba(0, 0, 0, 0.05);
+  padding: 28px 30px 34px;
+}
+
+.rpd-page__report-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 18px;
+  border-bottom: 2px solid rgba(0, 78, 137, 0.08);
+  flex-wrap: wrap;
+}
+
+.rpd-page__title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #1a2332;
+}
+
+.rpd-page__subtitle {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.rpd-page__report-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.rpd-page__fecha {
+  font-size: 14px;
+  font-weight: 700;
+  color: #004e89;
+  text-transform: capitalize;
+}
+
+.rpd-page__generado {
+  font-size: 10.5px;
+  color: #94a3b8;
+}
+
 /* ── KPIs ───────────────────────────────────────────────── */
 .rpd__kpi-grid {
   display: grid;
@@ -176,13 +220,26 @@
 }
 
 .rpd__kpi {
-  background: #f5f6fa;
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, #0f2a4a 0%, #0a1f3d 100%);
   border-radius: 14px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  box-shadow: 0 8px 22px rgba(0, 78, 137, 0.16);
+}
+
+.rpd__kpi::after {
+  content: "";
+  position: absolute;
+  top: -30%;
+  right: -20%;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
 }
 
 .rpd__kpi-icon {
@@ -192,20 +249,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 1;
 }
 
 .rpd__kpi-label {
   font-size: 11.5px;
   font-weight: 600;
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.65);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  z-index: 1;
 }
 
 .rpd__kpi-value {
   font-size: 1.5rem;
   font-weight: 800;
-  color: #1a2332;
+  color: #ffffff;
+  z-index: 1;
 }
 
 .rpd__kpi-trend {
@@ -213,16 +273,19 @@
   align-items: center;
   gap: 4px;
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 700;
   width: fit-content;
+  padding: 2px 8px;
+  border-radius: 20px;
+  z-index: 1;
 }
 
-.rpd__kpi-trend--up { color: #1a936f; }
-.rpd__kpi-trend--down { color: #dc2626; }
+.rpd__kpi-trend--up { color: #34d399; background: rgba(52, 211, 153, 0.15); }
+.rpd__kpi-trend--down { color: #f87171; background: rgba(248, 113, 113, 0.15); }
 
 /* ── Secciones ──────────────────────────────────────────── */
 .rpd__section-header {
-  margin: 24px 0 12px;
+  margin: 26px 0 12px;
 }
 
 .rpd__section-header h3 {
@@ -238,60 +301,7 @@
   color: #64748b;
 }
 
-/* ── Tablas de desglose (material / renta) ─────────────────── */
-.rpd__table-wrap {
-  overflow-x: auto;
-  background: #f5f6fa;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 14px;
-  padding: 4px 0;
-}
-
-.rpd__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12.5px;
-}
-
-.rpd__table th {
-  text-align: left;
-  padding: 10px 14px;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: #64748b;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.rpd__table td {
-  padding: 8px 14px;
-  color: #1a2332;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-}
-
-.rpd__table-right {
-  text-align: right;
-}
-
-.rpd__table-indent {
-  padding-left: 26px !important;
-  color: #64748b;
-}
-
-.rpd__table-row--obra td {
-  font-weight: 700;
-  color: #004e89;
-  background: rgba(0, 78, 137, 0.06);
-}
-
-.rpd__table-row--subtotal td {
-  font-weight: 700;
-  font-style: italic;
-  background: rgba(0, 0, 0, 0.02);
-}
-
-/* ── Gráficas ───────────────────────────────────────────── */
+/* ── Gráficas (material / renta / hora pico) ───────────────── */
 .rpd__chart-card {
   background: #f5f6fa;
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -308,6 +318,228 @@
   font-size: 13px;
   font-weight: 700;
   color: #1a2332;
+}
+
+/* ── Eficiencia de renta por equipo (viajes/día) ────────────── */
+.rpd__renta-eficiencia {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.rpd__renta-eficiencia-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 20px;
+  background: #f5f6fa;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 11px;
+}
+
+.rpd__renta-eficiencia-chip--red {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.25);
+}
+
+.rpd__renta-eficiencia-chip--yellow {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.rpd__renta-eficiencia-chip--green {
+  background: rgba(26, 147, 111, 0.1);
+  border-color: rgba(26, 147, 111, 0.28);
+}
+
+.rpd__renta-eficiencia-nombre {
+  font-weight: 700;
+  color: #1a2332;
+}
+
+.rpd__renta-eficiencia-nivel {
+  font-weight: 700;
+}
+
+.rpd__renta-eficiencia-chip--red .rpd__renta-eficiencia-nivel { color: #dc2626; }
+.rpd__renta-eficiencia-chip--yellow .rpd__renta-eficiencia-nivel { color: #b45309; }
+.rpd__renta-eficiencia-chip--green .rpd__renta-eficiencia-nivel { color: #1a936f; }
+
+.rpd__renta-eficiencia-ratio {
+  color: #64748b;
+}
+
+/* ── Flota propia (Grupo GEEM) y Pipas de Agua ──────────────── */
+.rpd__flota-propia {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 14px 0 26px;
+}
+
+.rpd__info-card {
+  background: rgba(0, 78, 137, 0.05);
+  border: 1px solid rgba(0, 78, 137, 0.12);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rpd__info-card-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #004e89;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rpd__info-card-stats {
+  display: flex;
+  gap: 20px;
+}
+
+.rpd__info-card-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.rpd__info-card-stat-val {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #1a2332;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+
+.rpd__info-card-stat-val--money {
+  color: #1a936f;
+}
+
+.rpd__info-card-stat-lbl {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #64748b;
+}
+
+.rpd__info-card-nota {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 10.5px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.rpd__info-card-nota svg {
+  flex-shrink: 0;
+  color: #94a3b8;
+}
+
+/* ── Ranking de obras ───────────────────────────────────── */
+.rpd__obra-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rpd__obra-row {
+  background: #f5f6fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.rpd__obra-row-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.rpd__obra-row-nombre {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a2332;
+}
+
+.rpd__obra-row-importe {
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.rpd__obra-row-bar-track {
+  width: 100%;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.rpd__obra-row-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+/* Detalle por material/renta en chips horizontales que envuelven (flex-wrap)
+   en vez de una fila completa por material — así una obra con muchos
+   materiales distintos no alarga la página verticalmente. */
+.rpd__obra-row-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.rpd__obra-row-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.rpd__obra-row-chip-nombre {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a2332;
+}
+
+.rpd__obra-row-chip-stats {
+  font-size: 10.5px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+/* Acumulado histórico del material en la obra (presupuesto) — se resalta en
+   negro y negritas (a propósito distinto del gris apagado de las stats del
+   día) para que no pase desapercibido dentro del chip. */
+.rpd__obra-row-chip-acumulado {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #0b0f14;
+  white-space: nowrap;
+}
+
+.rpd__obra-rank-mas {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  font-style: italic;
+  color: #64748b;
+  text-align: center;
 }
 
 /* ── Eficiencia ─────────────────────────────────────────── */
@@ -339,63 +571,14 @@
   color: #64748b;
 }
 
-/* ── Alertas de presupuesto ─────────────────────────────── */
-.rpd__alertas {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.rpd__alerta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid transparent;
-}
-
-.rpd__alerta--yellow {
-  background: rgba(245, 158, 11, 0.1);
-  border-color: rgba(245, 158, 11, 0.3);
-  color: #b45309;
-}
-
-.rpd__alerta--red {
-  background: rgba(220, 38, 38, 0.08);
-  border-color: rgba(220, 38, 38, 0.28);
-  color: #dc2626;
-}
-
-.rpd__alerta-info {
-  flex: 1;
-}
-
-.rpd__alerta-obra {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: #1a2332;
-}
-
-.rpd__alerta-concepto {
-  font-size: 12px;
-  color: #1a2332;
-}
-
-.rpd__alerta-detalle {
-  font-size: 11px;
-  color: #64748b;
-}
-
-.rpd__alerta-pct {
-  font-size: 1.1rem;
-  font-weight: 800;
-}
-
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 720px) {
   .rpd__kpi-grid,
   .rpd__eficiencia-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .rpd-page__report {
+    padding: 20px 18px 26px;
   }
 }

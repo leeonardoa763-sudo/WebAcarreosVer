@@ -29,6 +29,7 @@ import VisualizarVale from "./pages/VisualizarVale";
 import VisualizarConciliacion from "./pages/VisualizarConciliacion";
 import HistorialConciliaciones from "./pages/HistorialConciliaciones";
 import EstadisticasGlobales from "./pages/EstadisticasGlobales";
+import ReporteDiario from "./pages/ReporteDiario";
 
 // 5. Estilos
 import "./styles/global.css";
@@ -111,6 +112,19 @@ const App = () => {
               <ProtectedRoute requiredRole={["Administrador", "Gerencia", "Residente"]}>
                 <Layout>
                   <EstadisticasGlobales />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Reporte Diario - mismos roles que Estadísticas Globales, página
+              aparte (se abre en pestaña nueva) para exportarse como imagen */}
+          <Route
+            path="/reporte-diario"
+            element={
+              <ProtectedRoute requiredRole={["Administrador", "Gerencia", "Residente"]}>
+                <Layout>
+                  <ReporteDiario />
                 </Layout>
               </ProtectedRoute>
             }

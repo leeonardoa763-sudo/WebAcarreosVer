@@ -2,19 +2,34 @@
  * src/hooks/useReporteDiario.js
  *
  * Reporte operativo de un día específico: KPIs, comparativa vs. día anterior,
- * desglose por material y por renta (agrupado por obra, con su CC) y
- * métricas de eficiencia (tiempos entre viajes, hora pico, rendimiento por
- * vehículo).
+ * materiales del día (materialesDelDia, m³/importe por tipo de material,
+ * compañía completa) y renta del día (rentaPorEquipo, importe/viajes por
+ * tipo de equipo, con clasificación de eficiencia por viajes/día — excluye
+ * pipas de agua, ver pipasDelDia) para las gráficas del reporte, desglose
+ * por material y por renta agrupado por obra (con su CC), cada material del
+ * desglose trae también `acumuladoM3` — el m3_consumidos histórico de
+ * presupuesto_material_obra para ese par obra/material, null si no hay
+ * presupuesto configurado — ranking por obra (resumenPorObra, combina
+ * material+renta por importe) para la vista secundaria "Obras del Día",
+ * resumen de flota propia (flotaPropia: viajes GEEM, viajes a planta de
+ * asfaltos con su desglose de material, y ahorro estimado a tarifa de
+ * sindicato CTM), resumen de pipas de agua (pipasDelDia: viajes y capacidad
+ * aproximada, separado de renta de equipo porque no consume su presupuesto
+ * ni se mide igual) y métricas de eficiencia (tiempos entre viajes, hora
+ * pico, distribución horaria por material, rendimiento por vehículo).
  *
- * Dependencias: supabase
- * Usado en: ModalReporteDiario.jsx
+ * Dependencias: supabase, utils/cotizarFlete, SINDICATO_TARIFAS_REPORTE de
+ * hooks/useEstadisticasGlobales
+ * Usado en: ReporteDiario.jsx
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../config/supabase";
+import { cotizarFleteM3 } from "../utils/cotizarFlete";
+import { SINDICATO_TARIFAS_REPORTE } from "./useEstadisticasGlobales";
 
 // ── Helpers de fecha ──────────────────────────────────────────────────
-const formatFechaLocal = (date) => {
+export const formatFechaLocal = (date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
@@ -32,6 +47,98 @@ const calcularRango = (fechaStr) => {
 // Excluye obra/empresa de prueba (ID 14 / ID 4), mismo criterio que useDashboardAnalytics
 const esValeReal = (v) => Number(v.id_obra) !== 14 && Number(v.id_empresa) !== 4;
 
+const round2 = (n) => Math.round(n * 100) / 100;
+
+const coincideSindicato = (nombre, buscado) => (nombre || "").toUpperCase().includes(buscado);
+
+// Flota propia (GRUPO GEEM): mismo criterio que useEstadisticasGlobales.js —
+// sus viajes sí cuentan en m³ y en el conteo de viajes (el material se movió
+// de verdad), pero no en importe (no hay factura real, es transporte con
+// camiones propios).
+const SINDICATO_FLOTA_PROPIA = "GRUPO GEEM";
+const esFlotaPropia = (sindicato) => coincideSindicato(sindicato, SINDICATO_FLOTA_PROPIA);
+
+// ── Registros de material de un vale (compartido por KPIs, materiales del
+// día, desglose por obra y flota propia) ─────────────────────────────────
+// Un "registro" = una unidad de actividad real: un viaje (Tipo 1), un grupo
+// de tickets físicos (Tipo 3, no se puede repartir m³/importe entre
+// tickets individuales) o el detalle completo (Tipo 2, sin filas propias en
+// vale_material_viajes). Centralizar esto evita que la exclusión de importe
+// de flota propia (o el resto de reglas) se tenga que repetir y mantener
+// igual en varios sitios.
+const expandirRegistrosMaterial = (vale) => {
+  const registros = [];
+
+  (vale.vale_material_detalles || []).forEach((det) => {
+    const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
+    const material = det.material?.material || "Sin clasificar";
+    const idMaterial = det.id_material ?? null;
+    const esGeem = esFlotaPropia(det.sindicatos?.sindicato);
+    const esPlanta = det.es_planta_asfaltos ?? false;
+    const distanciaKmDetalle = Number(det.distancia_km || 0);
+
+    if (tipoId === 3) {
+      // Tipo 3 (Tepetate/Corte): volumen medido, viajes = tickets físicos
+      const tickets = vale.tickets_material?.length || 0;
+      registros.push({
+        material,
+        idMaterial,
+        tipoId,
+        m3: Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0),
+        importe: Number(det.costo_total || 0),
+        viajes: tickets > 0 ? tickets : 1,
+        distanciaKm: distanciaKmDetalle,
+        esGeem,
+        esPlanta,
+        tuvoActividad: tickets > 0,
+      });
+    } else {
+      const viajes = det.vale_material_viajes || [];
+      if (viajes.length > 0) {
+        // Tipo 1 (Pétreos): volumen y costo por viaje individual
+        viajes.forEach((viaje) => {
+          const vol = Number(viaje.volumen_m3 || 0);
+          registros.push({
+            material,
+            idMaterial,
+            tipoId,
+            m3: vol,
+            // Prioridad de costo por viaje: override directo → precio_m3 override × vol → precio_m3 del detalle × vol
+            importe:
+              viaje.costo_viaje_override != null
+                ? Number(viaje.costo_viaje_override)
+                : viaje.precio_m3_override != null
+                ? Number(viaje.precio_m3_override) * vol
+                : Number(det.precio_m3 || 0) * vol,
+            viajes: 1,
+            distanciaKm: Number(viaje.distancia_km_override ?? distanciaKmDetalle),
+            esGeem,
+            esPlanta,
+            tuvoActividad: true,
+          });
+        });
+      } else {
+        // Tipo 2 (Base Asfáltica): el volumen se captura directo en el
+        // detalle, sin filas individuales en vale_material_viajes
+        registros.push({
+          material,
+          idMaterial,
+          tipoId,
+          m3: Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0),
+          importe: Number(det.costo_total || 0),
+          viajes: 1,
+          distanciaKm: distanciaKmDetalle,
+          esGeem,
+          esPlanta,
+          tuvoActividad: true,
+        });
+      }
+    }
+  });
+
+  return registros;
+};
+
 // ── Volumen/costo/actividad de un vale (compartido entre KPIs y desglose) ──
 const calcularVolumenYCosto = (vale) => {
   let m3 = 0;
@@ -39,50 +146,18 @@ const calcularVolumenYCosto = (vale) => {
   let viajesCount = 0;
   let tuvoActividad = false;
 
-  (vale.vale_material_detalles || []).forEach((det) => {
-    const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
-
-    if (tipoId === 3) {
-      // Tipo 3 (Tepetate/Corte): volumen medido, viajes = tickets físicos
-      const tickets = vale.tickets_material?.length || 0;
-      m3 += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
-      importe += Number(det.costo_total || 0);
-      viajesCount += tickets > 0 ? tickets : 1;
-      if (tickets > 0) tuvoActividad = true;
-    } else {
-      const viajes = det.vale_material_viajes || [];
-      if (viajes.length > 0) {
-        // Tipo 1 (Pétreos): volumen y costo por viaje individual
-        viajes.forEach((viaje) => {
-          const vol = Number(viaje.volumen_m3 || 0);
-          m3 += vol;
-          viajesCount += 1;
-          // Prioridad de costo por viaje: override directo → precio_m3 override × vol → precio_m3 del detalle × vol
-          importe +=
-            viaje.costo_viaje_override != null
-              ? Number(viaje.costo_viaje_override)
-              : viaje.precio_m3_override != null
-              ? Number(viaje.precio_m3_override) * vol
-              : Number(det.precio_m3 || 0) * vol;
-          tuvoActividad = true;
-        });
-      } else {
-        // Tipo 2 (Base Asfáltica): el volumen se captura directo en el
-        // detalle, sin filas individuales en vale_material_viajes — mismo
-        // criterio que tablaObraMaterialAcumulado en useEstadisticasGlobales.js
-        m3 += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
-        importe += Number(det.costo_total || 0);
-        viajesCount += 1;
-        tuvoActividad = true;
-      }
-    }
+  expandirRegistrosMaterial(vale).forEach((r) => {
+    m3 += r.m3;
+    if (!r.esGeem) importe += r.importe;
+    viajesCount += r.viajes;
+    if (r.tuvoActividad) tuvoActividad = true;
   });
 
   (vale.vale_renta_detalle || []).forEach((det) => {
-    const viajesRenta = det.vale_renta_viajes || [];
+    const viajesRenta = det.vale_renta_viajes?.length > 0 ? det.vale_renta_viajes.length : (det.numero_viajes || 0);
     importe += Number(det.costo_total || 0);
-    viajesCount += viajesRenta.length;
-    if (viajesRenta.length > 0) tuvoActividad = true;
+    viajesCount += viajesRenta;
+    if (viajesRenta > 0) tuvoActividad = true;
   });
 
   return { m3, importe, viajesCount, tuvoActividad };
@@ -105,13 +180,13 @@ const calcularKpis = (vales) => {
     if (tuvoActividad && idVehiculo != null) vehiculosActivos.add(idVehiculo);
   });
 
-  const subtotal = Math.round(importeTotal * 100) / 100;
+  const subtotal = round2(importeTotal);
   return {
     vehiculosActivos: vehiculosActivos.size,
-    materialM3: Math.round(materialM3 * 100) / 100,
+    materialM3: round2(materialM3),
     totalViajes,
     importeTotal: subtotal,
-    importeConIva: Math.round(subtotal * 1.16 * 100) / 100,
+    importeConIva: round2(subtotal * 1.16),
   };
 };
 
@@ -124,7 +199,7 @@ const calcularComparativa = (actual, anterior) => {
   const resultado = {};
   campos.forEach((k) => {
     resultado[k] = {
-      valor: Math.round((actual[k] - anterior[k]) * 100) / 100,
+      valor: round2(actual[k] - anterior[k]),
       pct: calcPct(actual[k], anterior[k]),
       sube: actual[k] >= anterior[k],
     };
@@ -142,6 +217,7 @@ const calcularDesgloseMaterial = (vales) => {
 
     if (!obraMap[obraId]) {
       obraMap[obraId] = {
+        obraId,
         obra: vale.obras?.obra || "Sin obra",
         cc: vale.obras?.cc ?? null,
         empresa: vale.empresas?.empresa || null,
@@ -149,56 +225,24 @@ const calcularDesgloseMaterial = (vales) => {
       };
     }
 
-    vale.vale_material_detalles.forEach((det) => {
-      const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
-      const nombreMat = det.material?.material || "Sin clasificar";
-
-      if (!obraMap[obraId].matMap[nombreMat]) {
-        obraMap[obraId].matMap[nombreMat] = { material: nombreMat, m3Total: 0, importe: 0, viajes: 0 };
+    expandirRegistrosMaterial(vale).forEach((r) => {
+      if (!obraMap[obraId].matMap[r.material]) {
+        obraMap[obraId].matMap[r.material] = { material: r.material, idMaterial: r.idMaterial, m3Total: 0, importe: 0, viajes: 0 };
       }
-      const s = obraMap[obraId].matMap[nombreMat];
-
-      if (tipoId === 3) {
-        const tickets = vale.tickets_material?.length || 0;
-        s.m3Total += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
-        s.importe += Number(det.costo_total || 0);
-        s.viajes += tickets > 0 ? tickets : 1;
-      } else {
-        const viajes = det.vale_material_viajes || [];
-        if (viajes.length > 0) {
-          viajes.forEach((viaje) => {
-            const vol = Number(viaje.volumen_m3 || 0);
-            s.m3Total += vol;
-            s.importe +=
-              viaje.costo_viaje_override != null
-                ? Number(viaje.costo_viaje_override)
-                : viaje.precio_m3_override != null
-                ? Number(viaje.precio_m3_override) * vol
-                : Number(det.precio_m3 || 0) * vol;
-            s.viajes += 1;
-          });
-        } else {
-          // Tipo 2 (Base Asfáltica): el volumen se captura directo en el
-          // detalle, sin filas individuales en vale_material_viajes
-          s.m3Total += Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0);
-          s.importe += Number(det.costo_total || 0);
-          s.viajes += 1;
-        }
-      }
+      const s = obraMap[obraId].matMap[r.material];
+      s.m3Total += r.m3;
+      if (!r.esGeem) s.importe += r.importe;
+      s.viajes += r.viajes;
     });
   });
 
   return Object.values(obraMap)
-    .map(({ obra, cc, empresa, matMap }) => {
+    .map(({ obraId, obra, cc, empresa, matMap }) => {
       const materiales = Object.values(matMap)
         // Descarta materiales sin actividad real ese día (detalle del vale
         // existe pero no se registró ningún viaje/ticket con volumen o costo)
         .filter((m) => m.m3Total > 0 || m.importe > 0)
-        .map((m) => ({
-          ...m,
-          m3Total: Math.round(m.m3Total * 100) / 100,
-          importe: Math.round(m.importe * 100) / 100,
-        }))
+        .map((m) => ({ ...m, m3Total: round2(m.m3Total), importe: round2(m.importe) }))
         .sort((a, b) => b.m3Total - a.m3Total);
       const subtotal = materiales.reduce(
         (acc, m) => ({
@@ -208,17 +252,180 @@ const calcularDesgloseMaterial = (vales) => {
         }),
         { m3Total: 0, importe: 0, viajes: 0 }
       );
-      return { obra, cc, empresa, materiales, subtotal };
+      return { obraId, obra, cc, empresa, materiales, subtotal };
     })
     .filter((o) => o.materiales.length > 0)
     .sort((a, b) => b.subtotal.m3Total - a.subtotal.m3Total);
 };
 
-// ── Desglose por renta (agrupado por obra, con CC) ───────────────────────
+// ── Materiales del día (compañía completa, sin agrupar por obra) ────────
+// Responde directamente "cuánto moví de grava hoy": un solo mapa por
+// nombre de material, para la gráfica principal del reporte.
+const calcularMaterialesDelDia = (vales) => {
+  const matMap = {};
+
+  vales.forEach((vale) => {
+    expandirRegistrosMaterial(vale).forEach((r) => {
+      if (!matMap[r.material]) matMap[r.material] = { material: r.material, m3Total: 0, importe: 0, viajes: 0 };
+      const s = matMap[r.material];
+      s.m3Total += r.m3;
+      if (!r.esGeem) s.importe += r.importe;
+      s.viajes += r.viajes;
+    });
+  });
+
+  return Object.values(matMap)
+    .filter((m) => m.m3Total > 0 || m.importe > 0)
+    .map((m) => ({ ...m, m3Total: round2(m.m3Total), importe: round2(m.importe) }))
+    .sort((a, b) => b.m3Total - a.m3Total);
+};
+
+// ── Flota propia (GRUPO GEEM) del día ─────────────────────────────────────
+// Sus viajes no traen factura (por eso se excluyen del importe en todo lo
+// demás), pero siguen siendo actividad real de la operación. Además del
+// conteo de viajes, revalúa cada uno a la tarifa real de sindicato CTM para
+// el mismo material+distancia (mismo criterio que
+// useIndicadoresEficiencia.calcularFleteEvitadoFlotaPropia): la tarifa
+// técnica de $1/km que trae el vale de GEEM no es dinero real, el ahorro es
+// el valor completo a tarifa de sindicato. También separa qué se llevó a
+// planta de asfaltos y cuánto.
+const calcularFlotaPropia = (vales, preciosMaterialTodos) => {
+  const tarifaCTM = (tipoMaterialId) =>
+    preciosMaterialTodos.find(
+      (t) => t.id_tipo_de_material === tipoMaterialId && coincideSindicato(t.sindicatos?.sindicato, SINDICATO_TARIFAS_REPORTE)
+    ) || null;
+
+  let viajesGeem = 0;
+  let valorAhorrado = 0;
+  let viajesPlanta = 0;
+  const materialesPlanta = {};
+
+  vales.forEach((vale) => {
+    expandirRegistrosMaterial(vale).forEach((r) => {
+      if (!r.esGeem) return;
+      viajesGeem += r.viajes;
+
+      if (r.m3 > 0) {
+        const tarifa = tarifaCTM(r.tipoId);
+        const valorM3 = tarifa ? cotizarFleteM3(r.distanciaKm, tarifa) : null;
+        if (valorM3 != null) valorAhorrado += valorM3 * r.m3;
+      }
+
+      if (r.esPlanta) {
+        viajesPlanta += r.viajes;
+        if (!materialesPlanta[r.material]) materialesPlanta[r.material] = { material: r.material, m3: 0, viajes: 0 };
+        materialesPlanta[r.material].m3 += r.m3;
+        materialesPlanta[r.material].viajes += r.viajes;
+      }
+    });
+  });
+
+  return {
+    viajesGeem,
+    valorAhorrado: round2(valorAhorrado),
+    viajesPlanta,
+    materialesPlanta: Object.values(materialesPlanta)
+      .map((m) => ({ ...m, m3: round2(m.m3) }))
+      .sort((a, b) => b.m3 - a.m3),
+  };
+};
+
+// ── Pipas de agua del día ──────────────────────────────────────────────
+// `es_pipa_agua` es el sello de cabecera del vale — las pipas se cobran
+// por hora/día igual que la renta de equipo pero no consumen su
+// presupuesto (mismo criterio que tablaObraPipasAcumulado en
+// useEstadisticasGlobales.js), así que viven aparte de rentaPorEquipo/
+// desgloseRenta. No hay m³ medido: la capacidad aproximada sale de
+// capacidad_m3 del vehículo (mismo criterio que renta de equipo).
+const calcularPipasDelDia = (vales) => {
+  let vales_ = 0;
+  let totalViajes = 0;
+  let capacidadSuma = 0;
+  let capacidadCount = 0;
+
+  vales.forEach((vale) => {
+    if (!vale.es_pipa_agua) return;
+    const rentaDetalles = vale.vale_renta_detalle || [];
+    if (rentaDetalles.length === 0) return;
+
+    vales_ += 1;
+    rentaDetalles.forEach((det) => {
+      totalViajes += det.vale_renta_viajes?.length > 0 ? det.vale_renta_viajes.length : (det.numero_viajes || 0);
+      if (vale.vehiculos?.capacidad_m3 != null) {
+        capacidadSuma += Number(vale.vehiculos.capacidad_m3);
+        capacidadCount += 1;
+      }
+    });
+  });
+
+  const capacidadPromedio = capacidadCount > 0 ? capacidadSuma / capacidadCount : null;
+  return {
+    vales: vales_,
+    totalViajes,
+    capacidadPromedio: capacidadPromedio != null ? round2(capacidadPromedio) : null,
+    volumenAprox: capacidadPromedio != null ? round2(totalViajes * capacidadPromedio) : null,
+  };
+};
+
+// ── Renta del día por tipo de equipo (compañía completa, sin pipas) ──────
+// Clasifica cada tipo de equipo por su ritmo del día (viajes ÷ días) en el
+// mismo espectro de eficiencia que useIndicadoresEficiencia.calcularRentaNoAprovechada
+// (constante de negocio confirmada con Bruno: meta_viajes_dia_renta = 7).
+// Las claves internas se conservan por compatibilidad (desperdiciado/ideal),
+// solo cambian las etiquetas mostradas.
+const META_VIAJES_DIA_RENTA = 7;
+const RANGOS_EFICIENCIA_RENTA = [
+  { key: "desperdiciado", label: "Poca Eficiencia", max: META_VIAJES_DIA_RENTA - 4 },
+  { key: "pocaEficiencia", label: "Eficiencia Media", max: META_VIAJES_DIA_RENTA - 1 },
+  { key: "buenaEficiencia", label: "Buena Eficiencia", max: META_VIAJES_DIA_RENTA + 2 },
+  { key: "ideal", label: "Muy Buena Eficiencia", max: Infinity },
+];
+const clasificarRangoRenta = (viajesPorDia) => {
+  if (viajesPorDia == null) return null;
+  const rango = RANGOS_EFICIENCIA_RENTA.find((r) => viajesPorDia <= r.max);
+  return rango?.key ?? "ideal";
+};
+
+const calcularRentaPorEquipo = (vales) => {
+  const equipoMap = {};
+
+  vales.forEach((vale) => {
+    if (vale.es_pipa_agua) return;
+    (vale.vale_renta_detalle || []).forEach((det) => {
+      const equipo = det.material?.material || "Sin clasificar";
+      if (!equipoMap[equipo]) {
+        equipoMap[equipo] = { equipo, importe: 0, horas: 0, dias: 0, viajes: 0 };
+      }
+      const viajes = det.vale_renta_viajes?.length > 0 ? det.vale_renta_viajes.length : (det.numero_viajes || 0);
+      equipoMap[equipo].importe += Number(det.costo_total || 0);
+      equipoMap[equipo].horas += Number(det.total_horas || 0);
+      equipoMap[equipo].dias += Number(det.total_dias || 0);
+      equipoMap[equipo].viajes += viajes;
+    });
+  });
+
+  return Object.values(equipoMap)
+    .filter((e) => e.importe > 0 || e.horas > 0 || e.dias > 0)
+    .map((e) => {
+      const viajesPorDia = e.dias > 0 ? e.viajes / e.dias : null;
+      return {
+        ...e,
+        importe: round2(e.importe),
+        horas: round2(e.horas),
+        dias: round2(e.dias),
+        viajesPorDia: viajesPorDia != null ? round2(viajesPorDia) : null,
+        nivelEficiencia: clasificarRangoRenta(viajesPorDia),
+      };
+    })
+    .sort((a, b) => b.importe - a.importe);
+};
+
+// ── Desglose por renta (agrupado por obra, con CC, sin pipas) ────────────
 const calcularDesgloseRenta = (vales) => {
   const obraMap = {};
 
   vales.forEach((vale) => {
+    if (vale.es_pipa_agua) return;
     const rentaDetalles = vale.vale_renta_detalle || [];
     const obraId = vale.obras?.id_obra;
     if (!obraId || rentaDetalles.length === 0) return;
@@ -247,12 +454,7 @@ const calcularDesgloseRenta = (vales) => {
     // Descarta obras sin actividad real ese día (vale con detalle de renta
     // pero sin horas, días ni costo registrado)
     .filter((o) => o.horas > 0 || o.dias > 0 || o.importe > 0)
-    .map((o) => ({
-      ...o,
-      horas: Math.round(o.horas * 100) / 100,
-      dias: Math.round(o.dias * 100) / 100,
-      importe: Math.round(o.importe * 100) / 100,
-    }))
+    .map((o) => ({ ...o, horas: round2(o.horas), dias: round2(o.dias), importe: round2(o.importe) }))
     .sort((a, b) => b.importe - a.importe);
 };
 
@@ -264,6 +466,7 @@ const calcularEficiencia = (vales) => {
     const idVehiculo = vale.vehiculos?.id_vehiculo;
     const placas = vale.vehiculos?.placas || "Sin placas";
     (vale.vale_material_detalles || []).forEach((det) => {
+      const material = det.material?.material || "Sin clasificar";
       (det.vale_material_viajes || []).forEach((viaje) => {
         if (!viaje.hora_registro) return;
         viajesConHora.push({
@@ -272,22 +475,30 @@ const calcularEficiencia = (vales) => {
           placas,
           m3: Number(viaje.volumen_m3 || 0),
           obra: vale.obras?.obra || "Sin obra",
+          material,
         });
       });
     });
   });
 
-  // Distribución de viajes por hora del día (hora local)
-  const horas = {};
-  for (let h = 0; h < 24; h++) horas[h] = 0;
-  viajesConHora.forEach((x) => { horas[x.hora.getHours()] += 1; });
-  const distribucionHoraria = Object.entries(horas).map(([h, cantidad]) => ({
-    hora: parseInt(h),
-    label: `${String(h).padStart(2, "0")}:00`,
-    viajes: cantidad,
-  }));
+  // Distribución de viajes por hora del día (hora local), desglosada por
+  // material para que la gráfica se pueda colorear/leyendar por tipo.
+  const materialesDistintos = [...new Set(viajesConHora.map((x) => x.material))].sort();
+  const horasMap = {};
+  for (let h = 0; h < 24; h++) {
+    horasMap[h] = { hora: h, label: `${String(h).padStart(2, "0")}:00` };
+    materialesDistintos.forEach((m) => { horasMap[h][m] = 0; });
+  }
+  viajesConHora.forEach((x) => {
+    const h = x.hora.getHours();
+    horasMap[h][x.material] = (horasMap[h][x.material] || 0) + 1;
+  });
+  const distribucionHoraria = Object.values(horasMap);
   const horaPico = distribucionHoraria.reduce(
-    (max, h) => (h.viajes > max.viajes ? h : max),
+    (max, row) => {
+      const total = materialesDistintos.reduce((s, m) => s + row[m], 0);
+      return total > max.viajes ? { viajes: total, label: row.label } : max;
+    },
     { viajes: 0, label: "—" }
   );
 
@@ -317,20 +528,20 @@ const calcularEficiencia = (vales) => {
 
   const vehiculoTopRaw = Object.values(porVehiculo).sort((a, b) => b.m3Total - a.m3Total)[0] || null;
   const vehiculoTop = vehiculoTopRaw
-    ? { placas: vehiculoTopRaw.placas, m3Total: Math.round(vehiculoTopRaw.m3Total * 100) / 100, viajes: vehiculoTopRaw.viajes }
+    ? { placas: vehiculoTopRaw.placas, m3Total: round2(vehiculoTopRaw.m3Total), viajes: vehiculoTopRaw.viajes }
     : null;
 
   const porObraM3 = {};
   viajesConHora.forEach((x) => { porObraM3[x.obra] = (porObraM3[x.obra] || 0) + x.m3; });
   const obraTopEntry = Object.entries(porObraM3).sort((a, b) => b[1] - a[1])[0];
-  const obraTop = obraTopEntry ? { obra: obraTopEntry[0], m3Total: Math.round(obraTopEntry[1] * 100) / 100 } : null;
+  const obraTop = obraTopEntry ? { obra: obraTopEntry[0], m3Total: round2(obraTopEntry[1]) } : null;
 
   const totalM3Material = viajesConHora.reduce((acc, x) => acc + x.m3, 0);
-  const m3PromedioPorViaje =
-    viajesConHora.length > 0 ? Math.round((totalM3Material / viajesConHora.length) * 100) / 100 : 0;
+  const m3PromedioPorViaje = viajesConHora.length > 0 ? round2(totalM3Material / viajesConHora.length) : 0;
 
   return {
     distribucionHoraria,
+    materialesDistintos,
     horaPico: horaPico.viajes > 0 ? horaPico : null,
     tiempoPromedioEntreViajesMin,
     m3PromedioPorViaje,
@@ -346,6 +557,60 @@ export const useReporteDiario = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Tarifas de sindicato (todas, no solo CTM) — tabla de referencia chica,
+  // independiente de la fecha seleccionada, se pide una sola vez.
+  const [preciosMaterialTodos, setPreciosMaterialTodos] = useState([]);
+
+  useEffect(() => {
+    let activo = true;
+    supabase
+      .from("precios_material")
+      .select(`
+        id_precios_material, id_tipo_de_material, id_sindicato,
+        numero_de_intervalos, primer_km, km_sub_int1, limite_int1, km_sub_int2, limite_int2,
+        sindicatos:id_sindicato (id_sindicato, sindicato)
+      `)
+      .then(({ data, error: err }) => {
+        if (!activo) return;
+        if (err) {
+          console.error("Error al cargar precios_material en useReporteDiario:", err.message);
+          return;
+        }
+        setPreciosMaterialTodos(data || []);
+      });
+    return () => { activo = false; };
+  }, []);
+
+  // Acumulado histórico de presupuesto por obra/material (m3_consumidos ya es
+  // el corte acumulado a la fecha, actualizado por trigger en BD — no depende
+  // del día seleccionado), para mostrar contexto junto al material del día en
+  // "Obras del Día". Igual que preciosMaterialTodos, se pide una sola vez.
+  const [presupuestosMaterial, setPresupuestosMaterial] = useState([]);
+
+  useEffect(() => {
+    let activo = true;
+    supabase
+      .from("presupuesto_material_obra")
+      .select("id_obra, id_material, m3_consumidos, m3_presupuestados")
+      .then(({ data, error: err }) => {
+        if (!activo) return;
+        if (err) {
+          console.error("Error al cargar presupuesto_material_obra en useReporteDiario:", err.message);
+          return;
+        }
+        setPresupuestosMaterial(data || []);
+      });
+    return () => { activo = false; };
+  }, []);
+
+  const acumuladoMaterialMap = useMemo(() => {
+    const map = {};
+    presupuestosMaterial.forEach((p) => {
+      map[`${p.id_obra}::${p.id_material}`] = Number(p.m3_consumidos || 0);
+    });
+    return map;
+  }, [presupuestosMaterial]);
+
   const rango = useMemo(() => calcularRango(fecha), [fecha]);
 
   const fetchData = useCallback(async () => {
@@ -358,17 +623,26 @@ export const useReporteDiario = () => {
       const { data, error: err } = await supabase
         .from("vales")
         .select(`
-          id_vale, folio, tipo_vale, estado, fecha_creacion, id_obra, id_empresa,
+          id_vale, folio, tipo_vale, estado, fecha_creacion, id_obra, id_empresa, es_pipa_agua,
           obras:id_obra (id_obra, obra, cc),
           empresas:id_empresa (id_empresa, empresa),
-          vehiculos:id_vehiculo (id_vehiculo, placas),
+          vehiculos:id_vehiculo (id_vehiculo, placas, capacidad_m3),
           tickets_material (id_ticket, fecha_impresion),
           vale_material_detalles (
             id_detalle_material, volumen_real_m3, cantidad_pedida_m3, costo_total, precio_m3, id_material,
+            id_sindicato, es_planta_asfaltos, distancia_km,
+            sindicatos:id_sindicato (id_sindicato, sindicato),
             material:id_material (id_material, material, tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)),
-            vale_material_viajes (id_viaje, hora_registro, volumen_m3, precio_m3, costo_viaje, precio_m3_override, costo_viaje_override)
+            vale_material_viajes (
+              id_viaje, hora_registro, volumen_m3, precio_m3, costo_viaje,
+              precio_m3_override, costo_viaje_override, distancia_km_override
+            )
           ),
-          vale_renta_detalle (total_horas, total_dias, costo_total, vale_renta_viajes (id_viaje, hora_registro))
+          vale_renta_detalle (
+            total_horas, total_dias, numero_viajes, costo_total, id_material,
+            material:id_material (id_material, material),
+            vale_renta_viajes (id_viaje, hora_registro)
+          )
         `)
         .gte("fecha_creacion", inicioAnterior.toISOString())
         .lte("fecha_creacion", finSeleccionado.toISOString())
@@ -409,9 +683,53 @@ export const useReporteDiario = () => {
   const kpis = useMemo(() => calcularKpis(valesDia), [valesDia]);
   const kpisAnterior = useMemo(() => calcularKpis(valesDiaAnterior), [valesDiaAnterior]);
   const comparativa = useMemo(() => calcularComparativa(kpis, kpisAnterior), [kpis, kpisAnterior]);
-  const desgloseMaterial = useMemo(() => calcularDesgloseMaterial(valesDia), [valesDia]);
+  const materialesDelDia = useMemo(() => calcularMaterialesDelDia(valesDia), [valesDia]);
+  const rentaPorEquipo = useMemo(() => calcularRentaPorEquipo(valesDia), [valesDia]);
+  const pipasDelDia = useMemo(() => calcularPipasDelDia(valesDia), [valesDia]);
+  const flotaPropia = useMemo(
+    () => calcularFlotaPropia(valesDia, preciosMaterialTodos),
+    [valesDia, preciosMaterialTodos]
+  );
+  const desgloseMaterialSinAcumulado = useMemo(() => calcularDesgloseMaterial(valesDia), [valesDia]);
+  // Cruza cada material del desglose con su acumulado histórico de
+  // presupuesto (obra + material) — contexto de "cuánto llevamos de esto en
+  // la obra", no solo lo del día. Se omite cuando no hay presupuesto
+  // configurado para ese par obra/material.
+  const desgloseMaterial = useMemo(
+    () =>
+      desgloseMaterialSinAcumulado.map((o) => ({
+        ...o,
+        materiales: o.materiales.map((m) => ({
+          ...m,
+          acumuladoM3: m.idMaterial != null ? acumuladoMaterialMap[`${o.obraId}::${m.idMaterial}`] ?? null : null,
+        })),
+      })),
+    [desgloseMaterialSinAcumulado, acumuladoMaterialMap]
+  );
   const desgloseRenta = useMemo(() => calcularDesgloseRenta(valesDia), [valesDia]);
   const eficiencia = useMemo(() => calcularEficiencia(valesDia), [valesDia]);
+
+  // Ranking por obra para la vista visual (reemplaza las tablas de desglose):
+  // combina material + renta con el importe como denominador común, ya que m³
+  // y horas no son comparables entre sí. m3Total/horasRenta se conservan como
+  // dato de apoyo (caption) bajo cada barra, no como criterio de orden.
+  const resumenPorObra = useMemo(() => {
+    const map = {};
+    const clave = (o) => `${o.obra}__${o.cc}`;
+    desgloseMaterial.forEach((o) => {
+      map[clave(o)] ??= { obra: o.obra, cc: o.cc, empresa: o.empresa, importeMaterial: 0, importeRenta: 0, m3Total: 0, horasRenta: 0 };
+      map[clave(o)].importeMaterial += o.subtotal.importe;
+      map[clave(o)].m3Total += o.subtotal.m3Total;
+    });
+    desgloseRenta.forEach((o) => {
+      map[clave(o)] ??= { obra: o.obra, cc: o.cc, empresa: o.empresa, importeMaterial: 0, importeRenta: 0, m3Total: 0, horasRenta: 0 };
+      map[clave(o)].importeRenta += o.importe;
+      map[clave(o)].horasRenta += o.horas;
+    });
+    return Object.values(map)
+      .map((o) => ({ ...o, importeTotal: o.importeMaterial + o.importeRenta }))
+      .sort((a, b) => b.importeTotal - a.importeTotal);
+  }, [desgloseMaterial, desgloseRenta]);
 
   return {
     fecha,
@@ -420,8 +738,13 @@ export const useReporteDiario = () => {
     error,
     kpis,
     comparativa,
+    materialesDelDia,
+    rentaPorEquipo,
+    pipasDelDia,
+    flotaPropia,
     desgloseMaterial,
     desgloseRenta,
+    resumenPorObra,
     eficiencia,
     refresh: fetchData,
   };

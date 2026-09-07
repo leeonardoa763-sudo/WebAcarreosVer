@@ -10,6 +10,7 @@
 | `DashboardUnificado.jsx` | `/dashboard-unificado` | Todos autenticados | `useDashboardUnificado` | `dashboard-unificado.css` |
 | `Dashboard.jsx` | `/dashboard` | Solo Administrador | `useDashboardAnalytics`, `useMvStats` | `dashboard.css` |
 | `EstadisticasGlobales.jsx` | `/estadisticas` | Administrador, Finanzas | `useEstadisticasGlobales` | `estadisticas-globales.css` |
+| `ReporteDiario.jsx` | `/reporte-diario` | Administrador, Gerencia, Residente | `useReporteDiario` | `reporte-diario.css` |
 | `VerificarVales.jsx` | `/verificar-vales` | Todos autenticados | `useVerificacion` | `verificacion.css` |
 | `AutorizarVales.jsx` | `/autorizar-vales` | Solo Administrador | `useAutorizacion` | `autorizar-vales.css` |
 | `Conciliaciones.jsx` | `/conciliaciones` | Todos autenticados | `useConciliaciones` + `useConciliacionesMaterial` | `conciliaciones.css` |

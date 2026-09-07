@@ -42,6 +42,7 @@ import {
   FileText,
   Download,
   Image as ImageIcon,
+  Droplets,
 } from "lucide-react";
 
 // 3. Recharts
@@ -65,10 +66,7 @@ import {
 import { useEstadisticasGlobales } from "../hooks/useEstadisticasGlobales";
 import { useIndicadoresEficiencia } from "../hooks/useIndicadoresEficiencia";
 
-// 5. Componentes
-import ModalReporteDiario from "../components/estadisticas/ModalReporteDiario";
-
-// 6. Utils
+// 5. Utils
 import { generarPDFReporteEstadisticas } from "../utils/exportarReporteEstadisticas";
 import { exportarElementoComoImagen } from "../utils/exportarImagen";
 import {
@@ -78,7 +76,7 @@ import {
   RENTA_NO_APROVECHADA,
 } from "../utils/interpretacionIndicadores";
 
-// 7. Estilos
+// 6. Estilos
 import "../styles/estadisticas-globales.css";
 
 // ── Paleta ─────────────────────────────────────────────────────────
@@ -1141,10 +1139,11 @@ const TarjetaViabilidadFlotaObra = ({ camiones, topCamioneros }) => {
 // ── Tarjeta de Jornada de Renta No Aprovechada por obra ─────────────
 // Cada vale de renta se clasifica por su propio ritmo (viajes ÷ días) en un
 // espectro de eficiencia — ver calcularRentaNoAprovechada en
-// useIndicadoresEficiencia.js. Solo el espectro "Desperdiciado" (1-3
-// viajes/día) cuenta como dinero perdido (el costo completo del vale); los
-// demás son señal de eficiencia, no de pérdida. Cuando algún vale de un
-// espectro trae nota del checador/operador, un botón la muestra.
+// useIndicadoresEficiencia.js. Solo el espectro "Poca Eficiencia" (1-3
+// viajes/día, clave interna `desperdiciado`) cuenta como dinero perdido (el
+// costo completo del vale); los demás son señal de eficiencia, no de
+// pérdida. Cuando algún vale de un espectro trae nota del checador/operador,
+// un botón la muestra.
 const COLOR_RANGO_RENTA = {
   desperdiciado: "red",
   pocaEficiencia: "yellow",
@@ -1711,7 +1710,10 @@ const EstadisticasGlobales = () => {
     rangoAcumuladoHasta,
     seleccionarRangoAcumulado,
     tablaObraMaterialAcumulado,
+    tablaObraMaterialAcumuladoCTM,
+    tablaObraMaterialAcumuladoGeem,
     tablaObraRentaAcumulado,
+    tablaObraPipasAcumulado,
     valesReporteFiltrados,
     tablaObraMaterialReporte,
     tablaObraRentaReporte,
@@ -1748,11 +1750,8 @@ const EstadisticasGlobales = () => {
   // 3. Modal de conciliaciones por material
   const [modalMaterial, setModalMaterial] = useState(null);
 
-  // 3b. Modal de Reporte Diario
-  const [mostrarReporteDiario, setMostrarReporteDiario] = useState(false);
-
-  // 3c. Acción pendiente de que terminen de cargar los dominios necesarios
-  // ("pdf" | "reporte-diario" | null). Los datos derivados del hook (resumen,
+  // 3b. Acción pendiente de que terminen de cargar los dominios necesarios
+  // para el PDF ("pdf" | null). Los datos derivados del hook (resumen,
   // tablas, etc.) solo se actualizan en el siguiente render después de que un
   // fetch resuelve, así que la acción real se dispara desde un efecto que
   // observa las banderas *Cargado/*Cargadas, no justo después del await.
@@ -1941,20 +1940,12 @@ const EstadisticasGlobales = () => {
     }
   };
 
-  // Reporte Diario necesita el acumulado histórico + presupuestos (tiempoReal +
-  // presupuestos): dispara la carga y abre el modal solo cuando ya están listos.
+  // Reporte Diario vive en su propia página (se abre en pestaña nueva) con
+  // su propio fetch independiente — no depende de los dominios de esta
+  // página, así que no hay nada que "garantizar" antes de abrirla.
   const handleAbrirReporteDiario = () => {
-    garantizarTiempoReal();
-    garantizarPresupuestos();
-    setPendingAccion("reporte-diario");
+    window.open("/reporte-diario", "_blank", "noopener,noreferrer");
   };
-
-  useEffect(() => {
-    if (pendingAccion !== "reporte-diario") return;
-    if (!(tiempoRealCargado && presupuestosCargados)) return;
-    setMostrarReporteDiario(true);
-    setPendingAccion(null);
-  }, [pendingAccion, tiempoRealCargado, presupuestosCargados]);
 
   // Refresca solo los dominios que ya se cargaron alguna vez (no tiene caso
   // pedir datos de una sección que el usuario nunca ha desplegado).
@@ -2055,8 +2046,12 @@ const EstadisticasGlobales = () => {
     };
   }, [tablaObraRentaTiempoReal, derivarPrecioRenta]);
 
-  const totalesTablaObraAcumulado = useMemo(() => {
-    const t = tablaObraMaterialAcumulado.reduce(
+  // tablaObraMaterialAcumulado (combinada CTM+GEEM) se conserva para el
+  // contador de obras del encabezado; la sección "Volumen Acumulado por
+  // Obra" muestra las dos tablas separadas de abajo, cada una con su
+  // propio total.
+  const construirTotalesMaterial = (tabla) => {
+    const t = tabla.reduce(
       (acc, obraRow) => ({
         m3Total:        acc.m3Total        + obraRow.subtotal.m3Total,
         valesCount:     acc.valesCount     + obraRow.subtotal.valesCount,
@@ -2068,7 +2063,35 @@ const EstadisticasGlobales = () => {
     );
     t.pctPresupuesto = t.m3Presupuestado ? (t.m3Total / t.m3Presupuestado) * 100 : null;
     return t;
-  }, [tablaObraMaterialAcumulado]);
+  };
+
+  const totalesTablaObraAcumuladoCTM = useMemo(
+    () => construirTotalesMaterial(tablaObraMaterialAcumuladoCTM),
+    [tablaObraMaterialAcumuladoCTM]
+  );
+
+  const totalesTablaObraAcumuladoGeem = useMemo(
+    () => construirTotalesMaterial(tablaObraMaterialAcumuladoGeem),
+    [tablaObraMaterialAcumuladoGeem]
+  );
+
+  const totalesPipasAcumulado = useMemo(() => {
+    const t = tablaObraPipasAcumulado.reduce(
+      (acc, row) => ({
+        vales:          acc.vales          + row.vales,
+        totalViajes:    acc.totalViajes    + row.totalViajes,
+        capacidadSuma:  acc.capacidadSuma  + (row.capacidadSuma || 0),
+        capacidadCount: acc.capacidadCount + (row.capacidadCount || 0),
+      }),
+      { vales: 0, totalViajes: 0, capacidadSuma: 0, capacidadCount: 0 }
+    );
+    const capacidadPromedio = t.capacidadCount > 0 ? t.capacidadSuma / t.capacidadCount : null;
+    return {
+      ...t,
+      capacidadPromedio,
+      volumenAprox: capacidadPromedio != null ? t.totalViajes * capacidadPromedio : null,
+    };
+  }, [tablaObraPipasAcumulado]);
 
   const totalesRentaAcumulado = useMemo(() => {
     const t = tablaObraRentaAcumulado.reduce(
@@ -2223,13 +2246,9 @@ const EstadisticasGlobales = () => {
           </span>
         </div>
         <div className="eg__header-actions">
-          <button
-            className="eg__report-btn"
-            onClick={handleAbrirReporteDiario}
-            disabled={pendingAccion === "reporte-diario"}
-          >
+          <button className="eg__report-btn" onClick={handleAbrirReporteDiario}>
             <CalendarDays size={14} />
-            {pendingAccion === "reporte-diario" ? "Cargando…" : "Reporte Diario"}
+            Reporte Diario
           </button>
           <button
             className="eg__export-btn"
@@ -2890,6 +2909,10 @@ const EstadisticasGlobales = () => {
             importe de Renta se muestra sin IVA ni retención. La columna % Presupuesto
             compara lo ejecutado contra lo asignado por obra en{" "}
             <code>presupuesto_material_obra</code> / <code>presupuesto_renta_obra</code>.
+            Material se separa en CTM (sindicato pagado) y Grupo GEEM (flota propia,
+            sin costo real — su valor de mercado está en "Flete Evitado" más abajo);
+            Renta separa el equipo de las pipas de agua, que no consumen presupuesto
+            de renta y se miden por viajes y capacidad, no por importe ni por día.
           </p>
 
           <div className="eg__rango-fechas eg__rango-fechas--acumulado">
@@ -2925,11 +2948,11 @@ const EstadisticasGlobales = () => {
           )}
 
           <div ref={desgloseAcumuladoRef}>
-            {/* ─ Sub-sección material ─ */}
+            {/* ─ Sub-sección material — CTM (sindicato pagado) ─ */}
             <div className="eg__tabla-subseccion">
               <span className="eg__tabla-subseccion__label">
                 <Truck size={12} />
-                Material
+                Material — CTM
               </span>
             </div>
             <div className="eg__tabla-wrap">
@@ -2947,14 +2970,14 @@ const EstadisticasGlobales = () => {
                 <tbody>
                   {loadingTiempoReal || loadingPresupuestos ? (
                     renderSkeletonRows()
-                  ) : tablaObraMaterialAcumulado.length === 0 ? (
+                  ) : tablaObraMaterialAcumuladoCTM.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="eg__empty">
-                        Sin datos de material para los filtros seleccionados.
+                        Sin datos de material CTM para los filtros seleccionados.
                       </td>
                     </tr>
                   ) : (
-                    tablaObraMaterialAcumulado.map((obraRow) => (
+                    tablaObraMaterialAcumuladoCTM.map((obraRow) => (
                       <Fragment key={obraRow.obra}>
                         <tr className="eg__tabla-obra-header">
                           <td colSpan={6}>
@@ -3005,24 +3028,131 @@ const EstadisticasGlobales = () => {
                     ))
                   )}
                 </tbody>
-                {!loadingTiempoReal && !loadingPresupuestos && tablaObraMaterialAcumulado.length > 0 && (
+                {!loadingTiempoReal && !loadingPresupuestos && tablaObraMaterialAcumuladoCTM.length > 0 && (
                   <tfoot>
                     <tr>
                       <td>Total</td>
-                      <td>{formatNum(totalesTablaObraAcumulado.m3Total, 2)} m³</td>
-                      <td>{formatNum(totalesTablaObraAcumulado.valesCount)}</td>
-                      <td>{formatNum(totalesTablaObraAcumulado.totalViajes)}</td>
+                      <td>{formatNum(totalesTablaObraAcumuladoCTM.m3Total, 2)} m³</td>
+                      <td>{formatNum(totalesTablaObraAcumuladoCTM.valesCount)}</td>
+                      <td>{formatNum(totalesTablaObraAcumuladoCTM.totalViajes)}</td>
                       <td className="eg__importe-cell">
-                        {formatMXN(totalesTablaObraAcumulado.importeIVA)}
+                        {formatMXN(totalesTablaObraAcumuladoCTM.importeIVA)}
                       </td>
-                      <td className={`eg__pct-cell ${pctCellClass(totalesTablaObraAcumulado.pctPresupuesto)}`}>
-                        {formatPct(totalesTablaObraAcumulado.pctPresupuesto)}
+                      <td className={`eg__pct-cell ${pctCellClass(totalesTablaObraAcumuladoCTM.pctPresupuesto)}`}>
+                        {formatPct(totalesTablaObraAcumuladoCTM.pctPresupuesto)}
                       </td>
                     </tr>
                   </tfoot>
                 )}
               </table>
             </div>
+
+            {/* ─ Sub-sección material — Grupo GEEM (flota propia, sin importe real) ─ */}
+            {!loadingTiempoReal && !loadingPresupuestos && (
+              <>
+                <div className="eg__tabla-subseccion eg__tabla-subseccion--renta">
+                  <span className="eg__tabla-subseccion__label">
+                    <Truck size={12} />
+                    Material — Grupo GEEM
+                  </span>
+                  {tablaObraMaterialAcumuladoGeem.length > 0 && (
+                    <span className="eg__tabla-badge eg__tabla-badge--amber">
+                      {tablaObraMaterialAcumuladoGeem.length}{" "}
+                      {tablaObraMaterialAcumuladoGeem.length === 1 ? "obra" : "obras"}
+                    </span>
+                  )}
+                </div>
+                <p className="eg__tabla-subnota">
+                  Flota propia: viajes reales de material, pero su costo_total es un
+                  $1/km técnico para poder cargarse en la app, nunca dinero pagado —
+                  por eso no lleva columna de importe. Su valor a tarifa de mercado
+                  se calcula en "Flete Evitado por Flota Propia" más abajo.
+                </p>
+                <div className="eg__tabla-wrap">
+                  <table className="eg__tabla">
+                    <thead>
+                      <tr>
+                        <th>Material</th>
+                        <th>M³ Total</th>
+                        <th>Vales</th>
+                        <th>Viajes</th>
+                        <th>% Presupuesto</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tablaObraMaterialAcumuladoGeem.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="eg__empty">
+                            Sin viajes de Grupo GEEM para los filtros seleccionados.
+                          </td>
+                        </tr>
+                      ) : (
+                        tablaObraMaterialAcumuladoGeem.map((obraRow) => (
+                          <Fragment key={obraRow.obra}>
+                            <tr className="eg__tabla-obra-header">
+                              <td colSpan={5}>
+                                <span className="eg__tabla-obra-label">
+                                  {obraRow.empresa && (
+                                    <span className="eg__tabla-obra-empresa">{obraRow.empresa}</span>
+                                  )}
+                                  {obraRow.cc != null && (
+                                    <span className="eg__tabla-obra-cc">CC {obraRow.cc}</span>
+                                  )}
+                                  {obraRow.obra}
+                                </span>
+                              </td>
+                            </tr>
+                            {obraRow.materiales.map((mat, matIdx) => (
+                              <tr key={mat.material}>
+                                <td>
+                                  <div className="eg__material-name eg__material-name--sub">
+                                    <span
+                                      className="eg__material-dot"
+                                      style={{ background: DOT_COLORS[matIdx % DOT_COLORS.length] }}
+                                    />
+                                    {mat.material}
+                                  </div>
+                                </td>
+                                <td>{formatNum(mat.m3Total, 2)} m³</td>
+                                <td>{formatNum(mat.valesCount)}</td>
+                                <td>{formatNum(mat.totalViajes)}</td>
+                                <td className={`eg__pct-cell ${pctCellClass(mat.pctPresupuesto)}`}>
+                                  {formatPct(mat.pctPresupuesto)}
+                                </td>
+                              </tr>
+                            ))}
+                            {obraRow.materiales.length > 1 && (
+                              <tr className="eg__tabla-subtotal">
+                                <td>Subtotal</td>
+                                <td>{formatNum(obraRow.subtotal.m3Total, 2)} m³</td>
+                                <td>{formatNum(obraRow.subtotal.valesCount)}</td>
+                                <td>{formatNum(obraRow.subtotal.totalViajes)}</td>
+                                <td className={`eg__pct-cell ${pctCellClass(obraRow.subtotal.pctPresupuesto)}`}>
+                                  {formatPct(obraRow.subtotal.pctPresupuesto)}
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        ))
+                      )}
+                    </tbody>
+                    {tablaObraMaterialAcumuladoGeem.length > 0 && (
+                      <tfoot>
+                        <tr>
+                          <td>Total</td>
+                          <td>{formatNum(totalesTablaObraAcumuladoGeem.m3Total, 2)} m³</td>
+                          <td>{formatNum(totalesTablaObraAcumuladoGeem.valesCount)}</td>
+                          <td>{formatNum(totalesTablaObraAcumuladoGeem.totalViajes)}</td>
+                          <td className={`eg__pct-cell ${pctCellClass(totalesTablaObraAcumuladoGeem.pctPresupuesto)}`}>
+                            {formatPct(totalesTablaObraAcumuladoGeem.pctPresupuesto)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </>
+            )}
 
             {/* ─ Sub-sección renta ─ */}
             {!loadingTiempoReal && !loadingPresupuestos && (
@@ -3113,6 +3243,83 @@ const EstadisticasGlobales = () => {
                           <td className={`eg__pct-cell ${pctCellClass(totalesRentaAcumulado.pctPresupuesto)}`}>
                             {formatPct(totalesRentaAcumulado.pctPresupuesto)}
                           </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </>
+            )}
+
+            {/* ─ Sub-sección pipas de agua (viajes y capacidad, no importe ni día) ─ */}
+            {!loadingTiempoReal && !loadingPresupuestos && (
+              <>
+                <div className="eg__tabla-subseccion eg__tabla-subseccion--renta">
+                  <span className="eg__tabla-subseccion__label">
+                    <Droplets size={12} />
+                    Pipas de Agua
+                  </span>
+                  {tablaObraPipasAcumulado.length > 0 && (
+                    <span className="eg__tabla-badge eg__tabla-badge--blue">
+                      {tablaObraPipasAcumulado.length}{" "}
+                      {tablaObraPipasAcumulado.length === 1 ? "obra" : "obras"}
+                    </span>
+                  )}
+                </div>
+                <p className="eg__tabla-subnota">
+                  Las pipas no consumen presupuesto de renta ni tienen un precio
+                  comparable a m³ de material — lo que importa es cuánta agua se
+                  repartió: viajes y capacidad del vehículo. El volumen aproximado
+                  es viajes × capacidad promedio (no hay m³ capturado en BD).
+                </p>
+                <div className="eg__tabla-wrap">
+                  <table className="eg__tabla">
+                    <thead>
+                      <tr>
+                        <th>Obra</th>
+                        <th>Vales</th>
+                        <th>Viajes</th>
+                        <th>Capacidad Prom.</th>
+                        <th>Volumen Aprox.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tablaObraPipasAcumulado.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="eg__empty">
+                            Sin pipas de agua para los filtros seleccionados.
+                          </td>
+                        </tr>
+                      ) : (
+                        tablaObraPipasAcumulado.map((row) => (
+                          <tr key={row.obra}>
+                            <td>
+                              <span className="eg__obra-cell">
+                                {row.empresa && (
+                                  <span className="eg__tabla-obra-empresa">{row.empresa}</span>
+                                )}
+                                {row.cc != null && (
+                                  <span className="eg__tabla-obra-cc">CC {row.cc}</span>
+                                )}
+                                {row.obra}
+                              </span>
+                            </td>
+                            <td>{formatNum(row.vales)}</td>
+                            <td>{formatNum(row.totalViajes)}</td>
+                            <td>{row.capacidadPromedio != null ? `${formatNum(row.capacidadPromedio, 1)} m³` : "—"}</td>
+                            <td>{row.volumenAprox != null ? `${formatNum(row.volumenAprox, 1)} m³` : "—"}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {tablaObraPipasAcumulado.length > 0 && (
+                      <tfoot>
+                        <tr>
+                          <td>Total</td>
+                          <td>{formatNum(totalesPipasAcumulado.vales)}</td>
+                          <td>{formatNum(totalesPipasAcumulado.totalViajes)}</td>
+                          <td>{totalesPipasAcumulado.capacidadPromedio != null ? `${formatNum(totalesPipasAcumulado.capacidadPromedio, 1)} m³` : "—"}</td>
+                          <td>{totalesPipasAcumulado.volumenAprox != null ? `${formatNum(totalesPipasAcumulado.volumenAprox, 1)} m³` : "—"}</td>
                         </tr>
                       </tfoot>
                     )}
@@ -3381,15 +3588,6 @@ const EstadisticasGlobales = () => {
           materialNombre={modalMaterial.materialNombre}
           conciliaciones={modalMaterial.conciliaciones}
           onClose={() => setModalMaterial(null)}
-        />
-      )}
-
-      {/* ── Modal Reporte Diario ──────────────────────────────── */}
-      {mostrarReporteDiario && (
-        <ModalReporteDiario
-          presupuestosMaterial={tablaObraMaterialAcumulado}
-          presupuestosRenta={tablaObraRentaAcumulado}
-          onClose={() => setMostrarReporteDiario(false)}
         />
       )}
 

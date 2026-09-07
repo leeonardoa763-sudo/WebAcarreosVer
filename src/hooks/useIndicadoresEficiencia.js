@@ -457,19 +457,21 @@ const calcularTopCamionerosPorObra = (valesMaterial) => {
 //
 // Ahora, en vez de estimar un $ de desperdicio, cada vale_renta_detalle se
 // clasifica por su propio ritmo real (viajes ÷ días) en un espectro fijo de
-// eficiencia (confirmado con Bruno): 1-3 viajes/día es desperdicio franco —
+// eficiencia (confirmado con Bruno): 1-3 viajes/día es "Poca Eficiencia" —
 // se suma el costo COMPLETO de esos vales (no una fracción), porque es dinero
-// pagado por un equipo casi parado. 4-6 es poca eficiencia (se señala, no se
-// cuenta como desperdicio). 7-9 y 10+ son los dos escalones de buen uso.
+// pagado por un equipo casi parado (internamente sigue siendo el espectro
+// `desperdiciado`, ver totalDesperdiciado abajo). 4-6 es "Eficiencia Media"
+// (se señala, no se cuenta como desperdicio). 7-9 y 10+ son los dos
+// escalones de buen uso: "Buena Eficiencia" y "Muy Buena Eficiencia".
 // Por obra, se reporta cuántos vales y cuánto se pagó en cada espectro.
 // Los cortes de 3 y 6 quedan uno y cuatro viajes por debajo de la meta; el
 // de 9 la deja un tramo por encima — la meta en sí (7) cae dentro de "Buena
-// Eficiencia", no en el escalón "Ideal".
+// Eficiencia", no en el escalón "Muy Buena Eficiencia".
 const RANGOS_EFICIENCIA_RENTA = [
-  { key: "desperdiciado", label: "Desperdiciado", rango: "1-3 viajes/día", max: META_VIAJES_DIA_RENTA - 4 },
-  { key: "pocaEficiencia", label: "Poca Eficiencia", rango: "4-6 viajes/día", max: META_VIAJES_DIA_RENTA - 1 },
+  { key: "desperdiciado", label: "Poca Eficiencia", rango: "1-3 viajes/día", max: META_VIAJES_DIA_RENTA - 4 },
+  { key: "pocaEficiencia", label: "Eficiencia Media", rango: "4-6 viajes/día", max: META_VIAJES_DIA_RENTA - 1 },
   { key: "buenaEficiencia", label: "Buena Eficiencia", rango: "7-9 viajes/día", max: META_VIAJES_DIA_RENTA + 2 },
-  { key: "ideal", label: "Ideal", rango: "10+ viajes/día", max: Infinity },
+  { key: "ideal", label: "Muy Buena Eficiencia", rango: "10+ viajes/día", max: Infinity },
 ];
 
 const clasificarRangoRenta = (viajesPorDia) => {

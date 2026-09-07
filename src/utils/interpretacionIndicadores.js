@@ -86,12 +86,13 @@ export const RENTA_NO_APROVECHADA = {
   descripcion:
     "Cada vale de renta se clasifica por su propio ritmo real (viajes ÷ días) " +
     "en un espectro de eficiencia frente a la meta de 7 viajes/día: 1-3 " +
-    "(Desperdiciado — se suma el costo completo del vale), 4-6 (Poca " +
-    "Eficiencia), 7-9 (Buena Eficiencia) y 10+ (Ideal). Agrupado por obra, " +
-    "con el número de vales, el % que representa cada espectro y cuánto se " +
-    "pagó en cada uno.",
+    "(Poca Eficiencia — se suma el costo completo del vale, es el tramo que " +
+    "cuenta como desperdicio), 4-6 (Eficiencia Media), 7-9 (Buena " +
+    "Eficiencia) y 10+ (Muy Buena Eficiencia). Agrupado por obra, con el " +
+    "número de vales, el % que representa cada espectro y cuánto se pagó en " +
+    "cada uno.",
   nota:
-    "Revisa los vales en \"Desperdiciado\": si tenían suficiente material para " +
-    "mover ese día, o si conviene reducir a medio turno o menos equipos " +
+    "Revisa los vales en \"Poca Eficiencia\": si tenían suficiente material " +
+    "para mover ese día, o si conviene reducir a medio turno o menos equipos " +
     "rentados en esa obra.",
 };
