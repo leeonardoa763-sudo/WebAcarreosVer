@@ -17,8 +17,11 @@
  * importe (título coloreado por empresa — CAPAM azul, COEDESSA amarillo,
  * TRIACO rojo, resto sin color — con su detalle de material/renta siempre
  * visible en chips horizontales para no alargar la página; cada chip de
- * material trae el acumulado histórico de presupuesto de esa obra/material
- * cuando existe) y eficiencia operativa con distribución horaria coloreada
+ * material trae el acumulado histórico de presupuesto de esa obra/material,
+ * el % de presupuesto ya usado (color semáforo) y, si aplica, nota de
+ * cuánto de ese material fue a planta de asfaltos — mismo % también en el
+ * chip de renta, contra su propio presupuesto por obra) y
+ * eficiencia operativa con distribución horaria coloreada
  * por material.
  *
  * Dependencias: useReporteDiario, recharts, exportarImagen, formatters
@@ -122,6 +125,29 @@ const tooltipStyle = {
   borderRadius: 10,
   fontSize: 12,
   fontFamily: "Outfit, system-ui, sans-serif",
+};
+
+// Mismos umbrales que pctCellClass en EstadisticasGlobales.jsx (no inventar
+// una escala nueva para el mismo concepto de "% de presupuesto usado"): rojo
+// ya se pasó del presupuesto, amarillo cerca de acabarse, verde el resto.
+const claseNivelPresupuesto = (pct) => {
+  if (pct == null) return null;
+  if (pct > 100) return "red";
+  if (pct >= 80) return "yellow";
+  return "green";
+};
+
+// Línea propia dentro del chip, separada del resto (más margen + borde
+// superior) para que el % de presupuesto no se pierda entre las demás
+// estadísticas del chip — a propósito distinta de rpd__obra-row-chip-stats.
+const PresupuestoChip = ({ pct }) => {
+  const nivel = claseNivelPresupuesto(pct);
+  if (nivel == null) return null;
+  return (
+    <span className={`rpd__obra-row-chip-presupuesto rpd__obra-row-chip-presupuesto--${nivel}`}>
+      {pct}% de presupuesto usado
+    </span>
+  );
 };
 
 const KpiCard = ({ icon: Icon, label, value, comparativa, color }) => {
@@ -534,11 +560,17 @@ const ReporteDiario = () => {
                             <span className="rpd__obra-row-chip-stats">
                               {formatearNumero(m.viajes, 0)} viajes · {formatearNumero(m.m3Total, 2)} m³
                             </span>
+                            {m.viajesPlanta > 0 && (
+                              <span className="rpd__obra-row-chip-planta">
+                                <Factory size={10} /> A planta de asfaltos: {formatearNumero(m.m3Planta, 1)} m³
+                              </span>
+                            )}
                             {m.acumuladoM3 != null && (
                               <span className="rpd__obra-row-chip-acumulado">
                                 Acumulado obra: {formatearNumero(m.acumuladoM3, 0)} m³
                               </span>
                             )}
+                            <PresupuestoChip pct={m.pctPresupuestoUsado} />
                           </div>
                         ))}
                         {renta && (
@@ -548,6 +580,7 @@ const ReporteDiario = () => {
                               {formatearNumero(renta.vales, 0)} vale{renta.vales === 1 ? "" : "s"} · {formatearNumero(renta.horas, 1)} hrs ·{" "}
                               {formatearNumero(renta.dias, 1)} días · {formatearMoneda(renta.importe)}
                             </span>
+                            <PresupuestoChip pct={renta.pctPresupuestoUsado} />
                           </div>
                         )}
                       </div>

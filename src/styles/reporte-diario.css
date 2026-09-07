@@ -534,6 +534,36 @@
   white-space: nowrap;
 }
 
+/* Nota de viajes a planta de asfaltos dentro del chip de material — mismo
+   ícono (Factory) y tono que la nota "A planta" de Flota Propia, para no
+   inventar un segundo lenguaje visual para el mismo concepto. */
+.rpd__obra-row-chip-planta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+/* % de presupuesto usado — línea propia con separación extra (borde +
+   margen) para que se lea de un vistazo, y color semáforo según qué tan
+   cerca está de agotarse (mismos umbrales/colores que .eg__pct-cell en
+   EstadisticasGlobales.jsx: verde normal, amarillo cerca del límite, rojo ya
+   excedido). */
+.rpd__obra-row-chip-presupuesto {
+  margin-top: 5px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.12);
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.rpd__obra-row-chip-presupuesto--green  { color: #059669; }
+.rpd__obra-row-chip-presupuesto--yellow { color: #d97706; }
+.rpd__obra-row-chip-presupuesto--red    { color: #dc2626; }
+
 .rpd__obra-rank-mas {
   margin: 2px 0 0;
   font-size: 11.5px;

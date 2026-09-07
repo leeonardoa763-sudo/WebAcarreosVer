@@ -8,8 +8,15 @@
  * pipas de agua, ver pipasDelDia) para las gráficas del reporte, desglose
  * por material y por renta agrupado por obra (con su CC), cada material del
  * desglose trae también `acumuladoM3` — el m3_consumidos histórico de
- * presupuesto_material_obra para ese par obra/material, null si no hay
- * presupuesto configurado — ranking por obra (resumenPorObra, combina
+ * presupuesto_material_obra para ese par obra/material — y `pctPresupuestoUsado`
+ * (m3_consumidos ÷ m3_presupuestados), ambos null si no hay presupuesto
+ * configurado; cada material del desglose también trae `viajesPlanta`/
+ * `m3Planta` — cuánto de ese material (de cualquier sindicato, no solo
+ * GEEM) se registró con es_planta_asfaltos, para la nota "→ Planta de
+ * Asfaltos" en el chip; cada obra del desglose de renta trae su propio
+ * `pctPresupuestoUsado` contra presupuesto_renta_obra (monto_consumido ÷
+ * monto_presupuestado — a diferencia del de material, es un monto único por
+ * obra, sin desglose por tipo de equipo) — ranking por obra (resumenPorObra, combina
  * material+renta por importe) para la vista secundaria "Obras del Día",
  * resumen de flota propia (flotaPropia: viajes GEEM, viajes a planta de
  * asfaltos con su desglose de material, y ahorro estimado a tarifa de
@@ -253,12 +260,28 @@ const calcularDesgloseMaterial = (vales) => {
 
     expandirRegistrosMaterial(vale).forEach((r) => {
       if (!obraMap[obraId].matMap[r.material]) {
-        obraMap[obraId].matMap[r.material] = { material: r.material, idMaterial: r.idMaterial, m3Total: 0, importe: 0, viajes: 0 };
+        obraMap[obraId].matMap[r.material] = {
+          material: r.material,
+          idMaterial: r.idMaterial,
+          m3Total: 0,
+          importe: 0,
+          viajes: 0,
+          m3Planta: 0,
+          viajesPlanta: 0,
+        };
       }
       const s = obraMap[obraId].matMap[r.material];
       s.m3Total += r.m3;
       if (!r.esGeem) s.importe += r.importe;
       s.viajes += r.viajes;
+      // Nota de viajes a planta de asfaltos — es_planta_asfaltos es un sello
+      // del detalle, independiente de si es flota propia (GEEM) o no; aquí
+      // se marca para cualquier material/obra, a diferencia de flotaPropia
+      // (calcularFlotaPropia) que solo lo desglosa para GEEM.
+      if (r.esPlanta) {
+        s.m3Planta += r.m3;
+        s.viajesPlanta += r.viajes;
+      }
     });
   });
 
@@ -268,7 +291,7 @@ const calcularDesgloseMaterial = (vales) => {
         // Descarta materiales sin actividad real ese día (detalle del vale
         // existe pero no se registró ningún viaje/ticket con volumen o costo)
         .filter((m) => m.m3Total > 0 || m.importe > 0)
-        .map((m) => ({ ...m, m3Total: round2(m.m3Total), importe: round2(m.importe) }))
+        .map((m) => ({ ...m, m3Total: round2(m.m3Total), importe: round2(m.importe), m3Planta: round2(m.m3Planta) }))
         .sort((a, b) => b.m3Total - a.m3Total);
       const subtotal = materiales.reduce(
         (acc, m) => ({
@@ -459,6 +482,7 @@ const calcularDesgloseRenta = (vales) => {
 
     if (!obraMap[obraId]) {
       obraMap[obraId] = {
+        obraId,
         obra: vale.obras?.obra || "Sin obra",
         cc: vale.obras?.cc ?? null,
         empresa: vale.empresas?.empresa || null,
@@ -633,10 +657,45 @@ export const useReporteDiario = () => {
   const acumuladoMaterialMap = useMemo(() => {
     const map = {};
     presupuestosMaterial.forEach((p) => {
-      map[`${p.id_obra}::${p.id_material}`] = Number(p.m3_consumidos || 0);
+      map[`${p.id_obra}::${p.id_material}`] = {
+        consumido: Number(p.m3_consumidos || 0),
+        presupuestado: p.m3_presupuestados != null ? Number(p.m3_presupuestados) : null,
+      };
     });
     return map;
   }, [presupuestosMaterial]);
+
+  // Presupuesto de renta por obra (a diferencia del de material, no se
+  // desglosa por equipo — presupuesto_renta_obra es un monto único por obra,
+  // mismo criterio que tablaObraRentaAcumulado en useEstadisticasGlobales.js).
+  const [presupuestosRenta, setPresupuestosRenta] = useState([]);
+
+  useEffect(() => {
+    let activo = true;
+    supabase
+      .from("presupuesto_renta_obra")
+      .select("id_obra, monto_consumido, monto_presupuestado")
+      .then(({ data, error: err }) => {
+        if (!activo) return;
+        if (err) {
+          console.error("Error al cargar presupuesto_renta_obra en useReporteDiario:", err.message);
+          return;
+        }
+        setPresupuestosRenta(data || []);
+      });
+    return () => { activo = false; };
+  }, []);
+
+  const presupuestoRentaMap = useMemo(() => {
+    const map = {};
+    presupuestosRenta.forEach((p) => {
+      map[p.id_obra] = {
+        consumido: Number(p.monto_consumido || 0),
+        presupuestado: p.monto_presupuestado != null ? Number(p.monto_presupuestado) : null,
+      };
+    });
+    return map;
+  }, [presupuestosRenta]);
 
   const rango = useMemo(() => calcularRango(fecha), [fecha]);
 
@@ -734,20 +793,43 @@ export const useReporteDiario = () => {
   const desgloseMaterialSinAcumulado = useMemo(() => calcularDesgloseMaterial(valesDia), [valesDia]);
   // Cruza cada material del desglose con su acumulado histórico de
   // presupuesto (obra + material) — contexto de "cuánto llevamos de esto en
-  // la obra", no solo lo del día. Se omite cuando no hay presupuesto
-  // configurado para ese par obra/material.
+  // la obra", no solo lo del día. También calcula qué % del presupuesto ya
+  // se surtió (redondeado a entero, para caber en el chip sin ocupar más
+  // espacio). Ambos se omiten cuando no hay presupuesto configurado para ese
+  // par obra/material, o cuando m3_presupuestados es 0 (evita división entre
+  // cero).
   const desgloseMaterial = useMemo(
     () =>
       desgloseMaterialSinAcumulado.map((o) => ({
         ...o,
-        materiales: o.materiales.map((m) => ({
-          ...m,
-          acumuladoM3: m.idMaterial != null ? acumuladoMaterialMap[`${o.obraId}::${m.idMaterial}`] ?? null : null,
-        })),
+        materiales: o.materiales.map((m) => {
+          const registro = m.idMaterial != null ? acumuladoMaterialMap[`${o.obraId}::${m.idMaterial}`] : null;
+          const presupuestado = registro?.presupuestado;
+          const pctPresupuestoUsado =
+            presupuestado != null && presupuestado > 0
+              ? Math.round((registro.consumido / presupuestado) * 100)
+              : null;
+          return { ...m, acumuladoM3: registro?.consumido ?? null, pctPresupuestoUsado };
+        }),
       })),
     [desgloseMaterialSinAcumulado, acumuladoMaterialMap]
   );
-  const desgloseRenta = useMemo(() => calcularDesgloseRenta(valesDia), [valesDia]);
+  const desgloseRentaSinPresupuesto = useMemo(() => calcularDesgloseRenta(valesDia), [valesDia]);
+  // Mismo cruce que desgloseMaterial, pero contra presupuesto_renta_obra
+  // (monto en $, por obra completa — no hay desglose por tipo de equipo).
+  const desgloseRenta = useMemo(
+    () =>
+      desgloseRentaSinPresupuesto.map((o) => {
+        const registro = presupuestoRentaMap[o.obraId];
+        const presupuestado = registro?.presupuestado;
+        const pctPresupuestoUsado =
+          presupuestado != null && presupuestado > 0
+            ? Math.round((registro.consumido / presupuestado) * 100)
+            : null;
+        return { ...o, pctPresupuestoUsado };
+      }),
+    [desgloseRentaSinPresupuesto, presupuestoRentaMap]
+  );
   const eficiencia = useMemo(() => calcularEficiencia(valesDia), [valesDia]);
 
   // Ranking por obra para la vista visual (reemplaza las tablas de desglose):
