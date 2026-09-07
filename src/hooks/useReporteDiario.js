@@ -18,12 +18,14 @@
  * ni se mide igual) y métricas de eficiencia (tiempos entre viajes, hora
  * pico, distribución horaria por material, rendimiento por vehículo).
  *
- * El día de un vale es su fecha efectiva (obtenerFechaEfectiva, mismo
- * criterio que useValesFilters.js / ValeCardRenta / "Fecha de Emisión" en
- * ModalValeDetalle): fecha_programada cuando el vale fue planeado con
- * anticipación (en_proceso o ya emitido), fecha_creacion en el resto. Así
- * el reporte del día seleccionado incluye tanto los vales planeados para
- * ese día como los emitidos normalmente ese mismo día.
+ * El día de un vale es su fecha efectiva (obtenerFechaEfectiva):
+ * fecha_completado si ya se cerró (fecha operacional real, sin importar
+ * cuándo se planeó o se creó el registro — mismo criterio que
+ * appAcarreos/useEstadisticasMaterialTendencia.js), si no fecha_programada
+ * cuando fue planeado con anticipación (en_proceso, aún sin cerrar), y
+ * fecha_creacion como último recurso. Así el reporte del día seleccionado
+ * incluye tanto los vales planeados para ese día como los que se
+ * completaron ese día aunque se hayan planeado para otro.
  *
  * Dependencias: supabase, utils/cotizarFlete, SINDICATO_TARIFAS_REPORTE de
  * hooks/useEstadisticasGlobales
@@ -52,14 +54,21 @@ const calcularRango = (fechaStr) => {
   return { inicioAnterior, inicioSeleccionado, finSeleccionado };
 };
 
-// Fecha efectiva de un vale: mismo criterio que useValesFilters.js /
-// ValeCardRenta / ValesList ("Fecha de Emisión" en ModalValeDetalle) — un
-// vale planeado con anticipación (en_proceso, con fecha_programada) cuenta
-// en el día para el que fue planeado, no en el día en que se creó el
-// registro. Sin fecha_programada, la fecha efectiva es fecha_creacion (el
-// caso normal, vale emitido el mismo día).
-const obtenerFechaEfectiva = (vale) =>
-  vale.fecha_programada ? new Date(`${vale.fecha_programada}T12:00:00`) : new Date(vale.fecha_creacion);
+// Fecha efectiva de un vale para el reporte, en orden de prioridad:
+// 1. fecha_completado — la fecha operacional real (appAcarreos/schema.sql:
+//    "fecha_creacion: NO usar para estadísticas — fecha_completado: USAR
+//    para estadísticas"). Se graba cuando el checador cierra el vale y pasa
+//    a estado 'emitido' (useViajesMaterial.js / ValeDetalleRenta.js), sin
+//    importar qué día se planeó o se creó el registro.
+// 2. fecha_programada — el vale fue planeado con anticipación (en_proceso)
+//    pero aún no se completa: cuenta en el día para el que se planeó.
+// 3. fecha_creacion — fallback para el resto (vale creado y completado el
+//    mismo día, o sin ninguno de los dos campos anteriores).
+const obtenerFechaEfectiva = (vale) => {
+  if (vale.fecha_completado) return new Date(vale.fecha_completado);
+  if (vale.fecha_programada) return new Date(`${vale.fecha_programada}T12:00:00`);
+  return new Date(vale.fecha_creacion);
+};
 
 // Excluye obra/empresa de prueba (ID 14 / ID 4), mismo criterio que useDashboardAnalytics
 const esValeReal = (v) => Number(v.id_obra) !== 14 && Number(v.id_empresa) !== 4;
@@ -643,7 +652,7 @@ export const useReporteDiario = () => {
       const { data, error: err } = await supabase
         .from("vales")
         .select(`
-          id_vale, folio, tipo_vale, estado, fecha_creacion, fecha_programada, id_obra, id_empresa, es_pipa_agua,
+          id_vale, folio, tipo_vale, estado, fecha_creacion, fecha_completado, fecha_programada, id_obra, id_empresa, es_pipa_agua,
           obras:id_obra (id_obra, obra, cc),
           empresas:id_empresa (id_empresa, empresa),
           vehiculos:id_vehiculo (id_vehiculo, placas, capacidad_m3),
@@ -667,12 +676,16 @@ export const useReporteDiario = () => {
           )
         `)
         // Trae vales por fecha_creacion (caso normal) O por fecha_programada
-        // (vale planeado con anticipación, ver obtenerFechaEfectiva) — un
-        // vale creado días antes pero planeado para este rango no tendría
-        // fecha_creacion en la ventana, y se perdería del reporte.
+        // (vale planeado con anticipación, aún no completado) O por
+        // fecha_completado (vale planeado para otro día pero cerrado en
+        // este rango — ver obtenerFechaEfectiva, fecha_completado manda).
+        // Sin las tres, un vale planeado el sábado y completado hoy no
+        // tendría ningún campo de fecha en la ventana de "hoy" y se
+        // perdería del reporte por completo.
         .or(
           `and(fecha_creacion.gte.${inicioAnterior.toISOString()},fecha_creacion.lt.${finSeleccionado.toISOString()}),` +
-            `and(fecha_programada.gte.${programadaInicio},fecha_programada.lt.${programadaFin})`
+            `and(fecha_programada.gte.${programadaInicio},fecha_programada.lt.${programadaFin}),` +
+            `and(fecha_completado.gte.${inicioAnterior.toISOString()},fecha_completado.lt.${finSeleccionado.toISOString()})`
         )
         .limit(10000);
 
