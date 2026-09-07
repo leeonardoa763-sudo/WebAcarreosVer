@@ -55,6 +55,8 @@ import {
   materialDeViaje,
   buildTicketsBancoMap,
   bancoDeViaje,
+  cargaDeViaje,
+  materialLabelDetalle,
 } from "../../utils/rentaMaterial";
 import { getAlertaConfig } from "../../utils/alertasVale";
 import { tarifaRentaEfectiva } from "../../utils/tarifaRentaEfectiva";
@@ -561,7 +563,7 @@ const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
             <div key={detalle.id_vale_renta_detalle} className="vdm__detalle-item">
               <div className="vdm__detalle-header">
                 <span className="vdm__detalle-num">#{index + 1}</span>
-                <span className="vdm__detalle-nombre">{detalle.material?.material || "N/A"}</span>
+                <span className="vdm__detalle-nombre">{materialLabelDetalle(detalle)}</span>
                 {valeEditable && (
                   <button
                     type="button"
@@ -647,6 +649,7 @@ const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
                       <span>#</span>
                       <span>Hora</span>
                       <span>Material movido</span>
+                      <span>Carga</span>
                       <span>Banco descarga</span>
                       <span>Registrado por</span>
                     </div>
@@ -660,6 +663,7 @@ const DetalleRenta = ({ vale, valeEditable, onAbrirEditar }) => {
                           <span>{viaje.numero_viaje}</span>
                           <span>{formatHora(viaje.hora_registro)}</span>
                           <span>{materialDeViaje(ticketsMaterialMap, viaje, detalle.material?.material)}</span>
+                          <span>{cargaDeViaje(viaje)}</span>
                           <span>{bancoDeViaje(ticketsBancoMap, viaje)}</span>
                           <span>{nombrePersona}</span>
                         </div>
@@ -832,6 +836,8 @@ const ModalValeDetalle = ({ vale, onCerrar, onValeActualizado, onVerVale }) => {
               .from("vale_renta_viajes")
               .select(`
                 id_viaje, id_vale_renta_detalle, numero_viaje, hora_registro,
+                id_material, carga_porcentaje, banco_descarga, ticket_impreso,
+                material:id_material (id_material, material),
                 persona_registro:id_persona_registro (nombre, primer_apellido)
               `)
               .in("id_vale_renta_detalle", ids),

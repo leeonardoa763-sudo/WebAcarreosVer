@@ -19,6 +19,7 @@ import {
   formatearMoneda,
 } from "../../../utils/formatters";
 import { tarifaRentaEfectiva } from "../../../utils/tarifaRentaEfectiva";
+import { materialLabelDetalle } from "../../../utils/rentaMaterial";
 
 const VistaPreviewRenta = ({ conciliacion, valesAgrupados }) => {
   // Calcular totales generales
@@ -94,7 +95,7 @@ const VistaPreviewRenta = ({ conciliacion, valesAgrupados }) => {
                       <td>
                         {formatearFechaCorta(vale.fecha_creacion.split("T")[0])}
                       </td>
-                      <td>{detalle.material?.material || "N/A"}</td>
+                      <td>{materialLabelDetalle(detalle)}</td>
                       <td className="text-center">
                         {detalle.numero_viajes || 0}
                       </td>

@@ -25,6 +25,7 @@ import { useState, useCallback, useMemo } from "react";
 import { supabase } from "../config/supabase";
 import { cotizarFleteM3 } from "../utils/cotizarFlete";
 import { SINDICATO_TARIFAS_REPORTE, matchesFiltro } from "./useEstadisticasGlobales";
+import { materialLabelDetalle } from "../utils/rentaMaterial";
 
 // Flota propia: tarifa intencional de $1/km (esos vales no se cobran a precio
 // de mercado). Ver memoria de negocio — GRUPO GEEM, no CATEM/CITRACON/PRUEBAS.
@@ -495,7 +496,8 @@ const calcularRentaNoAprovechada = (valesRenta) => {
       const viajesPorDiaReal = viajes / totalDias;
       const importe = Number(det.costo_total || 0);
       const rangoKey = clasificarRangoRenta(viajesPorDiaReal);
-      const materialNombre = det.material?.material || "Sin clasificar";
+      const labelDetalle = materialLabelDetalle(det);
+      const materialNombre = labelDetalle === "—" ? "Sin clasificar" : labelDetalle;
 
       if (!porObra[obraId]) {
         porObra[obraId] = {

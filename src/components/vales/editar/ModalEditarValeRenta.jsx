@@ -1,9 +1,12 @@
 /**
  * src/components/vales/editar/ModalEditarValeRenta.jsx
  *
- * Modal para editar un vale de renta: material, tipo de renta (día completo,
- * medio día, por horas) y sus viajes (agregar/editar hora/eliminar).
- * Solo visible para Administrador. Bloqueado si el vale está conciliado o verificado.
+ * Modal para editar un vale de renta: tipo de renta (día completo, medio día,
+ * por horas) y sus viajes (agregar/editar hora/eliminar). Pipas de agua
+ * (esPipaAgua) también editan aquí el material fijo del vale; renta normal
+ * edita material/carga/banco por viaje en vez de eso (ver
+ * TablaEditarViajesRenta). Solo visible para Administrador. Bloqueado si el
+ * vale está conciliado o verificado.
  *
  * Dependencias: useEditarValeRenta, useAuth, TablaEditarViajesRenta, lucide-react, modal-editar-vale.css
  * Usado en: ValeCardRenta.jsx
@@ -71,10 +74,12 @@ const ModalEditarValeRenta = ({
 
   const {
     detalle,
+    esPipaAgua,
     opcionSeleccionada,
     totalHorasInput,
     costoPreview,
     materiales,
+    bancosSugeridos,
     viajes,
     viajesAEliminar,
     viajesNuevos,
@@ -186,7 +191,9 @@ const ModalEditarValeRenta = ({
   }
 
   const { costo_dia, costo_hr } = tarifaRentaEfectiva(detalle);
-  const materialNombre = detalle?.material?.material || "Sin material";
+  const materialNombre = esPipaAgua
+    ? detalle?.material?.material || "Sin material"
+    : detalle?.categoria_planeada?.categoria || "Categoría sin declarar";
 
   // ── Render principal ───────────────────────────────────────────────────────
 
@@ -229,27 +236,43 @@ const ModalEditarValeRenta = ({
 
         {/* ── Cuerpo ── */}
         <div className="mev__body">
-          {/* Material del detalle */}
-          <div className="mer__opciones">
-            <p className="mer__opciones-titulo">
-              <Package size={14} aria-hidden="true" />
-              Material
-            </p>
-            <select
-              className="mev__campo-input mer__material-select"
-              value={detalle?.id_material || ""}
-              onChange={(e) => editarMaterialDetalle(Number(e.target.value))}
-              disabled={guardando}
-              aria-label="Material del detalle de renta"
-            >
-              <option value="">Seleccionar material...</option>
-              {materiales.map((mat) => (
-                <option key={mat.id_material} value={mat.id_material}>
-                  {mat.material}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Material del detalle: solo pipas de agua tienen material fijo
+              por vale. Renta normal declara material por viaje (ver tabla
+              de abajo) — aquí solo se muestra la categoría planeada,
+              orientativa y no editable. */}
+          {esPipaAgua ? (
+            <div className="mer__opciones">
+              <p className="mer__opciones-titulo">
+                <Package size={14} aria-hidden="true" />
+                Material
+              </p>
+              <select
+                className="mev__campo-input mer__material-select"
+                value={detalle?.id_material || ""}
+                onChange={(e) => editarMaterialDetalle(Number(e.target.value))}
+                disabled={guardando}
+                aria-label="Material del detalle de renta"
+              >
+                <option value="">Seleccionar material...</option>
+                {materiales.map((mat) => (
+                  <option key={mat.id_material} value={mat.id_material}>
+                    {mat.material}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="mer__opciones">
+              <p className="mer__opciones-titulo">
+                <Package size={14} aria-hidden="true" />
+                Categoría planeada
+              </p>
+              <p className="mev__campo-input" style={{ color: colors.textSecondary }}>
+                {detalle?.categoria_planeada?.categoria || "Sin declarar"} — el
+                material real se declara por viaje, en la tabla de abajo.
+              </p>
+            </div>
+          )}
 
           {/* Tarifas de referencia */}
           {(costo_dia || costo_hr) && (
@@ -351,6 +374,9 @@ const ModalEditarValeRenta = ({
               viajes={viajes}
               viajesAEliminar={viajesAEliminar}
               viajesNuevos={viajesNuevos}
+              esPipaAgua={esPipaAgua}
+              materiales={materiales}
+              bancosSugeridos={bancosSugeridos}
               onEditarCampoViaje={editarCampoViaje}
               onAgregarViaje={agregarViaje}
               onEliminarViaje={eliminarViaje}

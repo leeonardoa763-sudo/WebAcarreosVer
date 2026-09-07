@@ -232,6 +232,7 @@ const VisualizarVale = () => {
             tickets_descarga (
               numero_ticket,
               id_material_ticket,
+              banco_descarga,
               material_ticket:id_material_ticket (
                 material
               )
@@ -262,6 +263,11 @@ const VisualizarVale = () => {
               material:id_material (
                 material
               ),
+              id_categoria_planeada,
+              categoria_planeada:id_categoria_planeada (
+                id_categoria_material_renta,
+                categoria
+              ),
               costo_hr_aplicado,
               costo_dia_aplicado,
               precios_renta:id_precios_renta (
@@ -272,6 +278,14 @@ const VisualizarVale = () => {
                 id_viaje,
                 numero_viaje,
                 hora_registro,
+                id_material,
+                carga_porcentaje,
+                banco_descarga,
+                ticket_impreso,
+                material:id_material (
+                  id_material,
+                  material
+                ),
                 persona_registro:id_persona_registro (
                   nombre,
                   primer_apellido

@@ -18,6 +18,13 @@
  * ni se mide igual) y métricas de eficiencia (tiempos entre viajes, hora
  * pico, distribución horaria por material, rendimiento por vehículo).
  *
+ * El día de un vale es su fecha efectiva (obtenerFechaEfectiva, mismo
+ * criterio que useValesFilters.js / ValeCardRenta / "Fecha de Emisión" en
+ * ModalValeDetalle): fecha_programada cuando el vale fue planeado con
+ * anticipación (en_proceso o ya emitido), fecha_creacion en el resto. Así
+ * el reporte del día seleccionado incluye tanto los vales planeados para
+ * ese día como los emitidos normalmente ese mismo día.
+ *
  * Dependencias: supabase, utils/cotizarFlete, SINDICATO_TARIFAS_REPORTE de
  * hooks/useEstadisticasGlobales
  * Usado en: ReporteDiario.jsx
@@ -27,6 +34,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../config/supabase";
 import { cotizarFleteM3 } from "../utils/cotizarFlete";
 import { SINDICATO_TARIFAS_REPORTE } from "./useEstadisticasGlobales";
+import { materialLabelDetalle } from "../utils/rentaMaterial";
 
 // ── Helpers de fecha ──────────────────────────────────────────────────
 export const formatFechaLocal = (date) => {
@@ -43,6 +51,15 @@ const calcularRango = (fechaStr) => {
   const inicioAnterior = new Date(inicioSeleccionado.getTime() - 86400000);
   return { inicioAnterior, inicioSeleccionado, finSeleccionado };
 };
+
+// Fecha efectiva de un vale: mismo criterio que useValesFilters.js /
+// ValeCardRenta / ValesList ("Fecha de Emisión" en ModalValeDetalle) — un
+// vale planeado con anticipación (en_proceso, con fecha_programada) cuenta
+// en el día para el que fue planeado, no en el día en que se creó el
+// registro. Sin fecha_programada, la fecha efectiva es fecha_creacion (el
+// caso normal, vale emitido el mismo día).
+const obtenerFechaEfectiva = (vale) =>
+  vale.fecha_programada ? new Date(`${vale.fecha_programada}T12:00:00`) : new Date(vale.fecha_creacion);
 
 // Excluye obra/empresa de prueba (ID 14 / ID 4), mismo criterio que useDashboardAnalytics
 const esValeReal = (v) => Number(v.id_obra) !== 14 && Number(v.id_empresa) !== 4;
@@ -392,7 +409,8 @@ const calcularRentaPorEquipo = (vales) => {
   vales.forEach((vale) => {
     if (vale.es_pipa_agua) return;
     (vale.vale_renta_detalle || []).forEach((det) => {
-      const equipo = det.material?.material || "Sin clasificar";
+      const labelDetalle = materialLabelDetalle(det);
+      const equipo = labelDetalle === "—" ? "Sin clasificar" : labelDetalle;
       if (!equipoMap[equipo]) {
         equipoMap[equipo] = { equipo, importe: 0, horas: 0, dias: 0, viajes: 0 };
       }
@@ -619,11 +637,13 @@ export const useReporteDiario = () => {
       setError(null);
 
       const { inicioAnterior, finSeleccionado } = calcularRango(fecha);
+      const programadaInicio = formatFechaLocal(inicioAnterior);
+      const programadaFin = formatFechaLocal(finSeleccionado);
 
       const { data, error: err } = await supabase
         .from("vales")
         .select(`
-          id_vale, folio, tipo_vale, estado, fecha_creacion, id_obra, id_empresa, es_pipa_agua,
+          id_vale, folio, tipo_vale, estado, fecha_creacion, fecha_programada, id_obra, id_empresa, es_pipa_agua,
           obras:id_obra (id_obra, obra, cc),
           empresas:id_empresa (id_empresa, empresa),
           vehiculos:id_vehiculo (id_vehiculo, placas, capacidad_m3),
@@ -641,11 +661,19 @@ export const useReporteDiario = () => {
           vale_renta_detalle (
             total_horas, total_dias, numero_viajes, costo_total, id_material,
             material:id_material (id_material, material),
+            id_categoria_planeada,
+            categoria_planeada:id_categoria_planeada (id_categoria_material_renta, categoria),
             vale_renta_viajes (id_viaje, hora_registro)
           )
         `)
-        .gte("fecha_creacion", inicioAnterior.toISOString())
-        .lte("fecha_creacion", finSeleccionado.toISOString())
+        // Trae vales por fecha_creacion (caso normal) O por fecha_programada
+        // (vale planeado con anticipación, ver obtenerFechaEfectiva) — un
+        // vale creado días antes pero planeado para este rango no tendría
+        // fecha_creacion en la ventana, y se perdería del reporte.
+        .or(
+          `and(fecha_creacion.gte.${inicioAnterior.toISOString()},fecha_creacion.lt.${finSeleccionado.toISOString()}),` +
+            `and(fecha_programada.gte.${programadaInicio},fecha_programada.lt.${programadaFin})`
+        )
         .limit(10000);
 
       if (err) throw err;
@@ -666,7 +694,7 @@ export const useReporteDiario = () => {
     const { inicioSeleccionado, finSeleccionado } = rango;
     return rawVales.filter((v) => {
       if (!esValeReal(v) || !v.fecha_creacion) return false;
-      const t = new Date(v.fecha_creacion).getTime();
+      const t = obtenerFechaEfectiva(v).getTime();
       return t >= inicioSeleccionado.getTime() && t < finSeleccionado.getTime();
     });
   }, [rawVales, rango]);
@@ -675,7 +703,7 @@ export const useReporteDiario = () => {
     const { inicioAnterior, inicioSeleccionado } = rango;
     return rawVales.filter((v) => {
       if (!esValeReal(v) || !v.fecha_creacion) return false;
-      const t = new Date(v.fecha_creacion).getTime();
+      const t = obtenerFechaEfectiva(v).getTime();
       return t >= inicioAnterior.getTime() && t < inicioSeleccionado.getTime();
     });
   }, [rawVales, rango]);

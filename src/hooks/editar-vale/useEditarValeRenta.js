@@ -1,10 +1,16 @@
 /**
  * src/hooks/editar-vale/useEditarValeRenta.js
  *
- * Lógica para editar un vale de renta: material del detalle, tipo de renta
- * (día completo, medio día, horas) y sus viajes internos (vale_renta_viajes:
- * numero_viaje, hora_registro). Actualiza id_material, es_renta_por_dia,
- * total_dias, total_horas, numero_viajes y recalcula costo_total.
+ * Lógica para editar un vale de renta: tipo de renta (día completo, medio
+ * día, horas) y sus viajes internos (vale_renta_viajes). Actualiza
+ * es_renta_por_dia, total_dias, total_horas, numero_viajes y recalcula
+ * costo_total.
+ *
+ * Pipas de agua (es_pipa_agua, vía vales:id_vale) siguen con material fijo a
+ * nivel detalle (id_material, editable con editarMaterialDetalle) y tickets
+ * de descarga aparte. Renta normal (4 rubros) ya no fija material al vale —
+ * cada viaje declara el suyo (id_material, carga_porcentaje, banco_descarga),
+ * editable aquí con editarCampoViaje cuando esPipaAgua es false.
  *
  * Nota: precios_renta (costo_hr/costo_dia) depende de id_sindicato, no del
  * material — cambiar el material no requiere recalcular tarifas.
@@ -87,8 +93,12 @@ export const useEditarValeRenta = () => {
   // Horas ingresadas manualmente (solo aplica cuando opcion === 'horas')
   const [totalHorasInput, setTotalHorasInput] = useState("");
 
-  // Catálogo de materiales disponibles (para editar el material del detalle)
+  // Catálogo de materiales disponibles (para editar el material del detalle
+  // en pipas, o el material por viaje en renta normal)
   const [materiales, setMateriales] = useState([]);
+
+  // Bancos de descarga ya usados en la obra (sugerencias para renta normal)
+  const [bancosSugeridos, setBancosSugeridos] = useState([]);
 
   // id_material original — para detectar cambios pendientes y descartar
   const [idMaterialOriginal, setIdMaterialOriginal] = useState(null);
@@ -126,7 +136,9 @@ export const useEditarValeRenta = () => {
         .select(
           `
           id_vale_renta_detalle,
+          id_vale,
           id_material,
+          id_categoria_planeada,
           es_renta_por_dia,
           total_dias,
           total_horas,
@@ -136,6 +148,10 @@ export const useEditarValeRenta = () => {
           hora_fin,
           costo_hr_aplicado,
           costo_dia_aplicado,
+          vales:id_vale (
+            id_obra,
+            es_pipa_agua
+          ),
           precios_renta:id_precios_renta (
             id_precios_renta,
             costo_hr,
@@ -145,10 +161,22 @@ export const useEditarValeRenta = () => {
             id_material,
             material
           ),
+          categoria_planeada:id_categoria_planeada (
+            id_categoria_material_renta,
+            categoria
+          ),
           vale_renta_viajes (
             id_viaje,
             numero_viaje,
             hora_registro,
+            id_material,
+            carga_porcentaje,
+            banco_descarga,
+            ticket_impreso,
+            material:id_material (
+              id_material,
+              material
+            ),
             persona_registro:id_persona_registro (
               nombre,
               primer_apellido
@@ -161,14 +189,40 @@ export const useEditarValeRenta = () => {
 
       if (err) throw err;
 
-      // Catálogo de materiales (para el selector de edición)
+      // Catálogo de materiales (para el selector de edición) — incluye la
+      // categoría de renta para agrupar el selector de material por viaje
       const { data: dataMateriales, error: errorMateriales } = await supabase
         .from("material")
-        .select("id_material, material")
+        .select(
+          `
+          id_material,
+          material,
+          id_categoria_material_renta,
+          categoria_material_renta:id_categoria_material_renta (
+            id_categoria_material_renta,
+            categoria,
+            orden
+          )
+        `,
+        )
         .order("material", { ascending: true });
 
       if (errorMateriales) throw errorMateriales;
       setMateriales(dataMateriales || []);
+
+      // Bancos de descarga ya usados en la obra de este vale (sugerencias,
+      // solo aplica a renta normal — pipas no usan este campo)
+      const esPipa = !!data?.vales?.es_pipa_agua;
+      if (!esPipa && data?.vales?.id_obra) {
+        const { data: dataBancos } = await supabase
+          .from("bancos_descarga_renta_obra")
+          .select("banco_descarga")
+          .eq("id_obra", data.vales.id_obra)
+          .order("usos", { ascending: false });
+        setBancosSugeridos((dataBancos || []).map((b) => b.banco_descarga));
+      } else {
+        setBancosSugeridos([]);
+      }
 
       const opcionActual = detectarOpcionActual(data);
       const viajesOrdenados = [...(data.vale_renta_viajes || [])].sort(
@@ -233,17 +287,32 @@ export const useEditarValeRenta = () => {
   // ── Viajes: edición de campo ───────────────────────────────────────────────
 
   /**
-   * Actualiza un campo de un viaje (solo hora_registro es editable).
+   * Actualiza un campo de un viaje: hora_registro (todos), o
+   * id_material/carga_porcentaje/banco_descarga (solo renta normal, no
+   * pipas). Al cambiar id_material también actualiza el objeto `material`
+   * embebido para que la UI muestre el nombre sin esperar a recargar.
    * @param {string} id_viaje - UUID del viaje (o id temporal para nuevos)
    * @param {string} campo
-   * @param {string} valor
+   * @param {string|number} valor
    */
-  const editarCampoViaje = useCallback((id_viaje, campo, valor) => {
-    setViajes((prev) =>
-      prev.map((v) => (v.id_viaje === id_viaje ? { ...v, [campo]: valor } : v)),
-    );
-    setViajesEditados((prev) => new Set(prev).add(id_viaje));
-  }, []);
+  const editarCampoViaje = useCallback(
+    (id_viaje, campo, valor) => {
+      setViajes((prev) =>
+        prev.map((v) => {
+          if (v.id_viaje !== id_viaje) return v;
+          if (campo === "id_material") {
+            const materialSeleccionado = materiales.find(
+              (m) => m.id_material === valor,
+            );
+            return { ...v, id_material: valor, material: materialSeleccionado ?? null };
+          }
+          return { ...v, [campo]: valor };
+        }),
+      );
+      setViajesEditados((prev) => new Set(prev).add(id_viaje));
+    },
+    [materiales],
+  );
 
   // ── Viajes: agregar ────────────────────────────────────────────────────────
 
@@ -261,6 +330,10 @@ export const useEditarValeRenta = () => {
       id_viaje: idTemporal,
       numero_viaje: siguienteNumero,
       hora_registro: null,
+      id_material: null,
+      material: null,
+      carga_porcentaje: null,
+      banco_descarga: null,
       persona_registro: null,
       esNuevo: true,
     };
@@ -361,6 +434,7 @@ export const useEditarValeRenta = () => {
         setMensajeExito(null);
 
         const errores = [];
+        const esPipa = !!detalle?.vales?.es_pipa_agua;
 
         // 1. DELETE viajes marcados
         for (const id_viaje of viajesAEliminar) {
@@ -381,9 +455,18 @@ export const useEditarValeRenta = () => {
           const viaje = viajes.find((v) => v.id_viaje === id_viaje);
           if (!viaje) continue;
 
+          const camposUpdate = { hora_registro: viaje.hora_registro || null };
+          // Material/carga/banco por viaje: solo renta normal — en pipas ese
+          // dato vive en tickets_descarga (ya impreso, no se toca aquí).
+          if (!esPipa) {
+            camposUpdate.id_material = viaje.id_material || null;
+            camposUpdate.carga_porcentaje = viaje.carga_porcentaje || null;
+            camposUpdate.banco_descarga = (viaje.banco_descarga || "").trim() || null;
+          }
+
           const { error } = await supabase
             .from("vale_renta_viajes")
-            .update({ hora_registro: viaje.hora_registro || null })
+            .update(camposUpdate)
             .eq("id_viaje", id_viaje);
 
           if (error)
@@ -396,12 +479,21 @@ export const useEditarValeRenta = () => {
         const viajesAInsertar = viajes.filter((v) => viajesNuevos.has(v.id_viaje));
 
         for (const viaje of viajesAInsertar) {
-          const { error } = await supabase.from("vale_renta_viajes").insert({
+          const camposInsert = {
             id_vale_renta_detalle: detalle.id_vale_renta_detalle,
             numero_viaje: viaje.numero_viaje,
             hora_registro: viaje.hora_registro || null,
             id_persona_registro: id_persona,
-          });
+          };
+          if (!esPipa) {
+            camposInsert.id_material = viaje.id_material || null;
+            camposInsert.carga_porcentaje = viaje.carga_porcentaje || null;
+            camposInsert.banco_descarga = (viaje.banco_descarga || "").trim() || null;
+          }
+
+          const { error } = await supabase
+            .from("vale_renta_viajes")
+            .insert(camposInsert);
 
           if (error)
             errores.push(
@@ -418,10 +510,13 @@ export const useEditarValeRenta = () => {
           (v) => !viajesAEliminar.has(v.id_viaje),
         ).length;
 
-        let payload = {
-          numero_viajes: numeroViajesFinal,
-          id_material: detalle.id_material,
-        };
+        let payload = { numero_viajes: numeroViajesFinal };
+        // El material a nivel detalle solo existe para pipas — renta normal
+        // ya no fija material al vale (id_material se queda null siempre,
+        // ver categoria_planeada y el material por viaje).
+        if (esPipa) {
+          payload.id_material = detalle.id_material;
+        }
 
         if (opcionSeleccionada === "dia") {
           payload = {
@@ -534,10 +629,12 @@ export const useEditarValeRenta = () => {
 
   return {
     detalle,
+    esPipaAgua: !!detalle?.vales?.es_pipa_agua,
     opcionSeleccionada,
     totalHorasInput,
     costoPreview,
     materiales,
+    bancosSugeridos,
     viajes,
     viajesAEliminar,
     viajesNuevos,

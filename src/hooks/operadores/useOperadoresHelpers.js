@@ -21,10 +21,11 @@
 import { colors } from "../../config/colors";
 
 // 2. Utils
-import { formatearHora } from "../../utils/formatters";
 import {
   buildTicketsMaterialMap,
   materialDeViaje,
+  cargaDeViaje,
+  materialLabelDetalle,
 } from "../../utils/rentaMaterial";
 
 /**
@@ -310,11 +311,12 @@ export const prepararDatosExcelRenta = (datos) => {
             };
 
             if (viajes.length === 0) {
-              // Sin viajes registrados: una fila con el material pedido del detalle.
+              // Sin viajes registrados: una fila con el material/categoría del detalle.
               filas.push({
                 ...baseFila,
                 Viaje: "",
-                Material: detalle.material?.material || "",
+                Material: materialLabelDetalle(detalle),
+                Carga: "",
                 Hora: "",
                 ...totalesDetalle,
                 Operador: operador,
@@ -331,6 +333,7 @@ export const prepararDatosExcelRenta = (datos) => {
                   viaje,
                   detalle.material?.material,
                 ),
+                Carga: cargaDeViaje(viaje),
                 Hora: viaje.hora_registro
                   ? formatearHora(viaje.hora_registro)
                   : "",

@@ -97,6 +97,11 @@ export const useConciliacionesQueries = () => {
                 id_material,
                 material
               ),
+              id_categoria_planeada,
+              categoria_planeada:id_categoria_planeada (
+                id_categoria_material_renta,
+                categoria
+              ),
               costo_hr_aplicado,
               costo_dia_aplicado,
               precios_renta:id_precios_renta (
@@ -403,6 +408,11 @@ export const useConciliacionesQueries = () => {
                       costo_total,
                       material:id_material (
                         material
+                      ),
+                      id_categoria_planeada,
+                      categoria_planeada:id_categoria_planeada (
+                        id_categoria_material_renta,
+                        categoria
                       )
                     )
                   `,
@@ -538,7 +548,8 @@ export const useConciliacionesQueries = () => {
                   material:id_material ( material )
                 ),
                 vale_renta_detalle (
-                  material:id_material ( material )
+                  material:id_material ( material ),
+                  categoria_planeada:id_categoria_planeada ( categoria )
                 )
               )
             )
@@ -581,7 +592,7 @@ export const useConciliacionesQueries = () => {
           const materialesUnicos = [
             ...new Set(
               detalles
-                .map((d) => d.material?.material)
+                .map((d) => d.material?.material || d.categoria_planeada?.categoria)
                 .filter(Boolean),
             ),
           ];
@@ -805,6 +816,11 @@ export const useConciliacionesQueries = () => {
             es_renta_por_dia,
             material:id_material (
               material
+            ),
+            id_categoria_planeada,
+            categoria_planeada:id_categoria_planeada (
+              id_categoria_material_renta,
+              categoria
             )
           )
         `,

@@ -26,6 +26,7 @@ import {
   textoAnticipado,
   textoSinFoto,
 } from "../utils/excepcionesVale";
+import { materialLabelDetalle } from "../utils/rentaMaterial";
 
 const formatDate = (date) => {
   const y = date.getFullYear();
@@ -105,6 +106,8 @@ const SELECT_AUTORIZACION = `
     notas_adicionales, es_renta_por_dia,
     foto_omitida, motivo_sin_foto_codigo, motivo_sin_foto_texto,
     material:id_material (id_material, material),
+    id_categoria_planeada,
+    categoria_planeada:id_categoria_planeada (id_categoria_material_renta, categoria),
     costo_hr_aplicado, costo_dia_aplicado,
     precios_renta:id_precios_renta (costo_hr, costo_dia),
     vale_renta_viajes (id_viaje, numero_viaje, hora_registro)
@@ -120,7 +123,7 @@ const SELECT_AUTORIZACION = `
 
 const getMaterialVale = (vale) => {
   if (vale.tipo_vale === "renta") {
-    return vale.vale_renta_detalle?.[0]?.material?.material ?? "—";
+    return materialLabelDetalle(vale.vale_renta_detalle?.[0]);
   }
   return vale.vale_material_detalles?.[0]?.material?.material ?? "—";
 };

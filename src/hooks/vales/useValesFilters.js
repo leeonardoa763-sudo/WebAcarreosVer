@@ -56,10 +56,15 @@ export const useValesFilters = () => {
             (detalle) => detalle.material?.id_material === filters.id_material,
           );
         }
-        // Para vales de renta, buscar en vale_renta_detalle
+        // Para vales de renta, buscar en vale_renta_detalle (pipas: material
+        // fijo del detalle; renta normal: material declarado por viaje)
         if (vale.tipo_vale === "renta" && vale.vale_renta_detalle) {
           return vale.vale_renta_detalle.some(
-            (detalle) => detalle.material?.id_material === filters.id_material,
+            (detalle) =>
+              detalle.material?.id_material === filters.id_material ||
+              detalle.vale_renta_viajes?.some(
+                (viaje) => viaje.id_material === filters.id_material,
+              ),
           );
         }
         return false;
@@ -137,8 +142,12 @@ export const useValesFilters = () => {
       // Búsqueda en renta
       let enRenta = false;
       if (vale.tipo_vale === "renta" && vale.vale_renta_detalle) {
-        enRenta = vale.vale_renta_detalle.some((detalle) =>
-          detalle.material?.material?.toLowerCase().includes(searchLower),
+        enRenta = vale.vale_renta_detalle.some(
+          (detalle) =>
+            detalle.material?.material?.toLowerCase().includes(searchLower) ||
+            detalle.vale_renta_viajes?.some((viaje) =>
+              viaje.material?.material?.toLowerCase().includes(searchLower),
+            ),
         );
       }
 

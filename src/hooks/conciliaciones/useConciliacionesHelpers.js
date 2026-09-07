@@ -12,6 +12,9 @@
  * Usado en: useConciliaciones.js
  */
 
+// Utils
+import { materialLabelDetalle } from "../../utils/rentaMaterial";
+
 /**
  * Hook para funciones auxiliares de conciliaciones
  */
@@ -168,7 +171,7 @@ export const useConciliacionesHelpers = () => {
       vales: grupo.vales.map((vale) => ({
         ...vale,
         detallesFormateados: vale.vale_renta_detalle.map((detalle) => ({
-          material: detalle.material?.material || "N/A",
+          material: materialLabelDetalle(detalle),
           capacidad: detalle.capacidad_m3,
           viajes: detalle.numero_viajes,
           dias: detalle.total_dias || 0,

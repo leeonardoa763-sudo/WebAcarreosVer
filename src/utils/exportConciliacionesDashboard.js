@@ -87,8 +87,10 @@ const obtenerMaterialMovido = (conc) => {
     const tipoConc = conc.tipo || conc.tipo_conciliacion;
 
     if (tipoConc === "renta") {
-      // Para renta el material puede variar por viaje: los materiales reales
-      // movidos están en tickets_descarga, no en el material fijo del detalle.
+      // Para renta el material puede variar por viaje. Pipas: el material real
+      // vive en tickets_descarga. Renta normal (4 rubros): cada viaje trae su
+      // propio id_material; sin viajes con material declarado, se cae a la
+      // categoría planeada del detalle.
       const materiales = new Set();
       conc.vales.forEach((vale) => {
         const tickets = vale.tickets_descarga || [];
@@ -98,14 +100,20 @@ const obtenerMaterialMovido = (conc) => {
               materiales.add(ticket.material_ticket.material);
             }
           });
-        } else {
-          // Fallback: sin tickets, usar el material pedido del detalle.
-          vale.vale_renta_detalle?.forEach((detalle) => {
-            if (detalle.material?.material) {
-              materiales.add(detalle.material.material);
-            }
-          });
+          return;
         }
+        vale.vale_renta_detalle?.forEach((detalle) => {
+          const materialesViaje = (detalle.vale_renta_viajes || [])
+            .map((v) => v.material?.material)
+            .filter(Boolean);
+          if (materialesViaje.length > 0) {
+            materialesViaje.forEach((m) => materiales.add(m));
+          } else if (detalle.material?.material) {
+            materiales.add(detalle.material.material);
+          } else if (detalle.categoria_planeada?.categoria) {
+            materiales.add(detalle.categoria_planeada.categoria);
+          }
+        });
       });
       return materiales.size > 0 ? Array.from(materiales).join(", ") : "";
     } else {
@@ -403,6 +411,16 @@ export const exportarConVales = async (conciliaciones, tipoActivo) => {
                   costo_total,
                   material:id_material (
                     material
+                  ),
+                  categoria_planeada:id_categoria_planeada (
+                    categoria
+                  ),
+                  vale_renta_viajes (
+                    id_viaje,
+                    numero_viaje,
+                    material:id_material (
+                      material
+                    )
                   )
                 )
               `

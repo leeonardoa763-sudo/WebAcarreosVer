@@ -21,6 +21,7 @@ import { rentaStyles } from "../shared/styles/rentaStyles";
 
 // Utils
 import { tarifaRentaEfectiva } from "../../tarifaRentaEfectiva";
+import { materialLabelDetalle } from "../../rentaMaterial";
 
 // Registrar fuentes
 Font.register({
@@ -164,10 +165,7 @@ const PDFConciliacionRenta = ({ conciliacion, valesAgrupados, totales, qrDataUrl
                           {formatearFecha(obtenerFechaEfectiva(vale))}
                         </Text>
                         <Text style={rentaStyles.colMaterial}>
-                          {(detalle.material?.material || "N/A").substring(
-                            0,
-                            20,
-                          )}
+                          {materialLabelDetalle(detalle).substring(0, 20)}
                         </Text>
                         <Text style={rentaStyles.colViajes}>
                           {detalle.numero_viajes || 0}

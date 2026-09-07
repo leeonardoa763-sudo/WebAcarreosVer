@@ -40,6 +40,7 @@ import {
   MOTIVOS_SIN_FOTO,
 } from "./excepcionesVale";
 import { tarifaRentaEfectiva } from "./tarifaRentaEfectiva";
+import { materialLabelDetalle } from "./rentaMaterial";
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
 
@@ -286,7 +287,7 @@ const filaDetalleRenta = (vale, det) => {
 
   return {
     ...datosGeneralesVale(vale),
-    "Equipo / Material": texto(det.material?.material),
+    "Equipo / Material": texto(materialLabelDetalle(det)),
     Cobro: porDia ? "Por día" : "Por hora",
     Días: porDia ? num(det.total_dias) : "",
     Horas: porDia ? "" : num(det.total_horas),
@@ -444,10 +445,12 @@ const FORMATOS_VIAJES_RENTA = {
 };
 
 /**
- * Viajes de renta. Un viaje deja hasta dos rastros: la fila de
- * `vale_renta_viajes` (hora y quién lo registró) y el ticket de descarga
- * (material y banco reales, que pueden variar viaje a viaje). Se cruzan por
- * número de viaje.
+ * Viajes de renta. Un viaje deja hasta dos rastros según el tipo:
+ * - Renta normal (4 rubros): la propia fila de `vale_renta_viajes` trae su
+ *   material, carga y banco de descarga.
+ * - Pipas de agua: el material/banco real vive en el ticket de descarga
+ *   (`tickets_descarga`, cruzado por numero_ticket = numero_viaje) — no
+ *   tienen carga_porcentaje.
  *
  * Solo se listan los viajes con rastro. Cuántos se declararon al crear el vale
  * está en la hoja Renta ("Viajes declarados"): rellenar hasta ese número
@@ -457,7 +460,7 @@ const filasViajesRenta = (vale) => {
   const det = vale.vale_renta_detalle?.[0];
   if (!det) return [];
 
-  const materialPedido = det.material?.material;
+  const materialPedido = materialLabelDetalle(det);
   const porNumero = new Map();
   const obtener = (numero) => {
     if (!porNumero.has(numero)) porNumero.set(numero, { numero });
@@ -468,6 +471,9 @@ const filasViajesRenta = (vale) => {
     const item = obtener(v.numero_viaje);
     item.horaRegistro = v.hora_registro;
     item.personaRegistro = v.persona_registro;
+    item.material = v.material?.material;
+    item.banco = v.banco_descarga;
+    item.carga = v.carga_porcentaje;
   }
   for (const t of vale.tickets_descarga ?? []) {
     const item = obtener(t.numero_ticket);
@@ -486,6 +492,7 @@ const filasViajesRenta = (vale) => {
       Cobro: esRentaPorDia(det) ? "Por día" : "Por hora",
       Viaje: num(v.numero),
       "Material descargado": texto(v.material ?? materialPedido),
+      "Carga %": v.carga != null ? num(v.carga) : "",
       "Banco de descarga": texto(v.banco),
       Ticket: texto(v.ticket),
       "Fecha registro": fechaExcel(v.horaRegistro),

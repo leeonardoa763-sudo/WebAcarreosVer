@@ -18,6 +18,11 @@ import { supabase } from "../config/supabase";
 
 // 3. Utils
 import { calcularSemanaISO } from "../utils/dateUtils";
+import {
+  buildTicketsMaterialMap,
+  materialDeViaje,
+  materialLabelDetalle,
+} from "../utils/rentaMaterial";
 
 const POR_PAGINA = 25;
 
@@ -38,6 +43,8 @@ const PREVIO_SELECT = `
     id_vale_renta_detalle, total_horas, total_dias, costo_total,
     numero_viajes, es_renta_por_dia,
     material:id_material (id_material, material),
+    id_categoria_planeada,
+    categoria_planeada:id_categoria_planeada (id_categoria_material_renta, categoria),
     vale_renta_viajes (id_viaje)
   )
 `;
@@ -111,7 +118,7 @@ const getCantidadVale = (vale) => {
 
 const getMaterialVale = (vale) => {
   if (vale.tipo_vale === "renta") {
-    return vale.vale_renta_detalle?.[0]?.material?.material ?? "—";
+    return materialLabelDetalle(vale.vale_renta_detalle?.[0]);
   }
   return vale.vale_material_detalles?.[0]?.material?.material ?? "—";
 };
@@ -209,22 +216,16 @@ const calcularKpisDeVales = (lista) => {
         viajesRenta  += numViajes;
 
         // Desglose por material: cada viaje de renta puede llevar material
-        // distinto. El material real por viaje vive en tickets_descarga
-        // (numero_ticket = numero_viaje). Los viajes sin ticket se atribuyen al
-        // material pedido del detalle para que el desglose cuadre con numViajes.
-        const tickets = vale.tickets_descarga || [];
-        let atribuidos = 0;
-        for (const ticket of tickets) {
-          if (atribuidos >= numViajes) break;
-          const nombre =
-            ticket.material_ticket?.material ?? d.material?.material ?? "Sin material";
+        // distinto. Pipas: el material real por viaje vive en tickets_descarga
+        // (numero_ticket = numero_viaje). Renta normal: cada fila de
+        // vale_renta_viajes ya trae su propio id_material. materialDeViaje
+        // resuelve ambos casos; el fallback final es la categoría planeada
+        // del detalle (o su material fijo, si es pipa sin ticket).
+        const ticketsMap = buildTicketsMaterialMap(vale.tickets_descarga);
+        const materialDetalle = materialLabelDetalle(d);
+        for (const v of d.vale_renta_viajes ?? []) {
+          const nombre = materialDeViaje(ticketsMap, v, materialDetalle);
           viajesPorMaterial[nombre] = (viajesPorMaterial[nombre] || 0) + 1;
-          atribuidos++;
-        }
-        if (numViajes > atribuidos) {
-          const nombre = d.material?.material ?? "Sin material";
-          viajesPorMaterial[nombre] =
-            (viajesPorMaterial[nombre] || 0) + (numViajes - atribuidos);
         }
         // Estimado: capacidad del camión × número de viajes
         const capRenta = Number(vale.vehiculos?.capacidad_m3 ?? 0);
@@ -432,10 +433,14 @@ export const useDashboardUnificado = () => {
             notas_adicionales, es_renta_por_dia, es_turno_nocturno,
             foto_omitida, motivo_sin_foto_codigo, motivo_sin_foto_texto,
             material:id_material (id_material, material),
+            id_categoria_planeada,
+            categoria_planeada:id_categoria_planeada (id_categoria_material_renta, categoria),
             costo_hr_aplicado, costo_dia_aplicado,
             precios_renta:id_precios_renta (costo_hr, costo_dia),
             vale_renta_viajes (
               id_viaje, numero_viaje, hora_registro,
+              id_material, carga_porcentaje, banco_descarga, ticket_impreso,
+              material:id_material (id_material, material),
               persona_registro:id_persona_registro (nombre, primer_apellido, segundo_apellido)
             )
           ),

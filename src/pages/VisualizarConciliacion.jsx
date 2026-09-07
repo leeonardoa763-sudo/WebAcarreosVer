@@ -43,6 +43,10 @@ import {
 import {
   buildTicketsMaterialMap,
   materialDeViaje,
+  buildTicketsBancoMap,
+  bancoDeViaje,
+  cargaDeViaje,
+  materialLabelDetalle,
 } from "../utils/rentaMaterial";
 
 // 6. Componentes reutilizables de VisualizarVale
@@ -165,6 +169,7 @@ const ValeTimeline = ({ vale, personaGenerador, fechaGeneracion }) => {
 const ValeRentaDetalles = ({ detalles, ticketsDescarga }) => {
   const [fotoModal, setFotoModal] = useState(null);
   const ticketsMaterialMap = buildTicketsMaterialMap(ticketsDescarga);
+  const ticketsBancoMap = buildTicketsBancoMap(ticketsDescarga);
 
   return (
     <div>
@@ -175,7 +180,9 @@ const ValeRentaDetalles = ({ detalles, ticketsDescarga }) => {
         return (
           <div key={det.id_vale_renta_detalle ?? idx} className="vc-renta-detalle">
             <div className="vc-renta-detalle__titulo">
-              {det.material?.material || "Servicio de renta"}
+              {materialLabelDetalle(det) !== "—"
+                ? materialLabelDetalle(det)
+                : "Servicio de renta"}
             </div>
 
             {/* Foto de evidencia */}
@@ -286,6 +293,12 @@ const ValeRentaDetalles = ({ detalles, ticketsDescarga }) => {
                           viaje,
                           det.material?.material,
                         )}
+                      </span>
+                      <span className="vc-renta-viaje-carga">
+                        {cargaDeViaje(viaje)}
+                      </span>
+                      <span className="vc-renta-viaje-banco">
+                        {bancoDeViaje(ticketsBancoMap, viaje)}
                       </span>
                       <span className="vc-renta-viaje-persona">
                         {nombrePersona(viaje.persona_registro) || "—"}
@@ -704,6 +717,7 @@ const VisualizarConciliacion = () => {
                 tickets_descarga (
                   numero_ticket,
                   id_material_ticket,
+                  banco_descarga,
                   material_ticket:id_material_ticket (
                     material
                   )
@@ -724,12 +738,19 @@ const VisualizarConciliacion = () => {
                   longitud_completado,
                   distancia_obra_metros,
                   material:id_material (material),
+                  id_categoria_planeada,
+                  categoria_planeada:id_categoria_planeada (id_categoria_material_renta, categoria),
                   costo_hr_aplicado, costo_dia_aplicado,
                   precios_renta:id_precios_renta (costo_hr, costo_dia),
                   vale_renta_viajes (
                     id_viaje,
                     numero_viaje,
                     hora_registro,
+                    id_material,
+                    carga_porcentaje,
+                    banco_descarga,
+                    ticket_impreso,
+                    material:id_material (id_material, material),
                     persona_registro:id_persona_registro (nombre, primer_apellido)
                   )
                 )

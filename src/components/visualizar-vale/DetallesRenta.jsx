@@ -23,6 +23,10 @@ import {
 import {
   buildTicketsMaterialMap,
   materialDeViaje,
+  buildTicketsBancoMap,
+  bancoDeViaje,
+  cargaDeViaje,
+  materialLabelDetalle,
 } from "../../utils/rentaMaterial";
 import { tarifaRentaEfectiva } from "../../utils/tarifaRentaEfectiva";
 
@@ -31,6 +35,7 @@ const DetallesRenta = ({ detalle, ticketsDescarga, mostrarPrecios }) => {
   const tarifa = tarifaRentaEfectiva(detalle);
 
   const ticketsMaterialMap = buildTicketsMaterialMap(ticketsDescarga);
+  const ticketsBancoMap = buildTicketsBancoMap(ticketsDescarga);
 
   const totalDias = Number(detalle.total_dias || 0);
   const esRentaPorDia = totalDias > 0;
@@ -119,7 +124,7 @@ const DetallesRenta = ({ detalle, ticketsDescarga, mostrarPrecios }) => {
       <div className="info-full">
         <span className="info-label">Material Movido:</span>
         <span className="info-value">
-          {detalle.material?.material || "N/A"}
+          {materialLabelDetalle(detalle)}
         </span>
       </div>
 
@@ -230,6 +235,8 @@ const DetallesRenta = ({ detalle, ticketsDescarga, mostrarPrecios }) => {
               <span>#</span>
               <span>Hora de registro</span>
               <span>Material</span>
+              <span>Carga</span>
+              <span>Banco descarga</span>
               <span>Registrado por</span>
             </div>
 
@@ -253,6 +260,12 @@ const DetallesRenta = ({ detalle, ticketsDescarga, mostrarPrecios }) => {
                       viaje,
                       detalle.material?.material,
                     )}
+                  </span>
+                  <span className="viajes-renta__carga">
+                    {cargaDeViaje(viaje)}
+                  </span>
+                  <span className="viajes-renta__banco">
+                    {bancoDeViaje(ticketsBancoMap, viaje)}
                   </span>
                   <span className="viajes-renta__persona">
                     {nombreRegistrador}

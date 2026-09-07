@@ -20,6 +20,9 @@ import { useAuth } from "./useAuth";
 // 3. Config
 import { supabase } from "../config/supabase";
 
+// 4. Utils
+import { materialLabelDetalle } from "../utils/rentaMaterial";
+
 // ── Helper: semana del año ──────────────────────────────────────────
 const getWeekKey = (fechaStr) => {
   if (!fechaStr) return null;
@@ -617,6 +620,8 @@ export const useEstadisticasGlobales = () => {
               vale_renta_detalle (
                 id_vale_renta_detalle, hora_inicio, total_horas, total_dias, numero_viajes, costo_total,
                 material:id_material (id_material, material),
+                id_categoria_planeada,
+                categoria_planeada:id_categoria_planeada (id_categoria_material_renta, categoria),
                 vale_renta_viajes (id_viaje, hora_registro)
               )
             `)
@@ -762,6 +767,8 @@ export const useEstadisticasGlobales = () => {
               id_material, material,
               tipo_de_material:id_tipo_de_material (id_tipo_de_material, tipo_de_material)
             ),
+            id_categoria_planeada,
+            categoria_planeada:id_categoria_planeada (id_categoria_material_renta, categoria),
             vale_renta_viajes (id_viaje)
           )
         `)
@@ -2168,7 +2175,8 @@ export const useEstadisticasGlobales = () => {
       const mes = conc.fecha_generacion.substring(0, 7);
 
       (vale.vale_renta_detalle || []).forEach((det) => {
-        const equipo = det.material?.material || "Sin clasificar";
+        const labelDetalle = materialLabelDetalle(det);
+        const equipo = labelDetalle === "—" ? "Sin clasificar" : labelDetalle;
         const numViajes = det.vale_renta_viajes?.length > 0
           ? det.vale_renta_viajes.length
           : (det.numero_viajes || 1);
@@ -2270,7 +2278,8 @@ export const useEstadisticasGlobales = () => {
       if (!obraMap[obraId]) obraMap[obraId] = { obra: obraNombre, cc, equipos: {} };
 
       (vale.vale_renta_detalle || []).forEach((det) => {
-        const equipo = det.material?.material || "Sin clasificar";
+        const labelDetalle = materialLabelDetalle(det);
+        const equipo = labelDetalle === "—" ? "Sin clasificar" : labelDetalle;
         if (!obraMap[obraId].equipos[equipo]) {
           obraMap[obraId].equipos[equipo] = {
             equipo, viajes: 0, totalDias: 0, totalHoras: 0,

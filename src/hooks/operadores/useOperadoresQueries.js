@@ -176,6 +176,11 @@ const construirQueryBase = (tipoVale) => {
               id_material,
               material
             ),
+            id_categoria_planeada,
+            categoria_planeada:id_categoria_planeada (
+              id_categoria_material_renta,
+              categoria
+            ),
             sindicatos (
               id_sindicato,
               sindicato
@@ -190,7 +195,15 @@ const construirQueryBase = (tipoVale) => {
             vale_renta_viajes (
               id_viaje,
               numero_viaje,
-              hora_registro
+              hora_registro,
+              id_material,
+              carga_porcentaje,
+              banco_descarga,
+              ticket_impreso,
+              material:id_material (
+                id_material,
+                material
+              )
             )
           ),
           tickets_descarga (

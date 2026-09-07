@@ -175,6 +175,11 @@ export const useValesQueries = () => {
             id_material,
             material
           ),
+          id_categoria_planeada,
+          categoria_planeada:id_categoria_planeada (
+            id_categoria_material_renta,
+            categoria
+          ),
           precios_renta:id_precios_renta (
             costo_hr,
             costo_dia
@@ -182,7 +187,15 @@ export const useValesQueries = () => {
           vale_renta_viajes (
             id_viaje,
             numero_viaje,
-            hora_registro
+            hora_registro,
+            id_material,
+            carga_porcentaje,
+            banco_descarga,
+            ticket_impreso,
+            material:id_material (
+              id_material,
+              material
+            )
           )
         ),
         solicitudes_desverificacion (
@@ -367,6 +380,11 @@ export const useValesQueries = () => {
               id_material,
               material
             ),
+            id_categoria_planeada,
+            categoria_planeada:id_categoria_planeada (
+              id_categoria_material_renta,
+              categoria
+            ),
             costo_hr_aplicado,
             costo_dia_aplicado,
             precios_renta:id_precios_renta (
@@ -376,7 +394,15 @@ export const useValesQueries = () => {
             vale_renta_viajes (
               id_viaje,
               numero_viaje,
-              hora_registro
+              hora_registro,
+              id_material,
+              carga_porcentaje,
+              banco_descarga,
+              ticket_impreso,
+              material:id_material (
+                id_material,
+                material
+              )
             )
           ),
           solicitudes_desverificacion (
@@ -527,6 +553,11 @@ export const useValesQueries = () => {
             material:id_material (
               material
             ),
+            id_categoria_planeada,
+            categoria_planeada:id_categoria_planeada (
+              id_categoria_material_renta,
+              categoria
+            ),
             costo_hr_aplicado,
             costo_dia_aplicado,
             precios_renta:id_precios_renta (
@@ -536,7 +567,15 @@ export const useValesQueries = () => {
             vale_renta_viajes (
               id_viaje,
               numero_viaje,
-              hora_registro
+              hora_registro,
+              id_material,
+              carga_porcentaje,
+              banco_descarga,
+              ticket_impreso,
+              material:id_material (
+                id_material,
+                material
+              )
             )
           ),
           solicitudes_desverificacion (
