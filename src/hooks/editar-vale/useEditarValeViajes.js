@@ -140,6 +140,11 @@ export const useEditarValeViajes = () => {
   const [error, setError] = useState(null);
   const [mensajeExito, setMensajeExito] = useState(null);
 
+  // Aviso de la última actualización de tarifa vigente (independiente de
+  // mensajeExito, que solo se usa tras guardar en BD)
+  const [avisoTarifa, setAvisoTarifa] = useState(null);
+  const [actualizandoTarifa, setActualizandoTarifa] = useState(false);
+
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   /**
@@ -153,6 +158,7 @@ export const useEditarValeViajes = () => {
       setLoading(true);
       setError(null);
       setMensajeExito(null);
+      setAvisoTarifa(null);
       setViajesEditados(new Set());
       setViajesNuevos(new Set());
       setViajesAEliminar(new Set());
@@ -182,6 +188,7 @@ export const useEditarValeViajes = () => {
           requisicion,
           notas_adicionales,
           id_precios_material,
+          id_precios_material_obra,
           tarifa_primer_km,
           tarifa_subsecuente,
           material:id_material (
@@ -206,6 +213,7 @@ export const useEditarValeViajes = () => {
             costo_viaje,
             folio_vale_fisico,
             id_precios_material,
+            id_precios_material_obra,
             tarifa_primer_km,
             tarifa_subsecuente,
             id_banco_override,
@@ -285,6 +293,7 @@ export const useEditarValeViajes = () => {
           `
           folio,
           estado,
+          id_obra,
           fecha_creacion,
           fecha_verificacion,
           fecha_completado,
@@ -586,6 +595,218 @@ export const useEditarValeViajes = () => {
     });
   }, [bancos, viajes]);
 
+  // ── Actualizar a la tarifa vigente (obra o sindicato) ───────────────────────
+
+  /**
+   * Resuelve la tarifa vigente para (obra, tipo de material, sindicato) del
+   * detalle actual: primero `precios_material_obra` (tarifa especial de esa
+   * obra), si no existe cae a `precios_material` (tarifa por defecto del
+   * sindicato). Misma regla de resolución que usa la app al crear el vale
+   * (ver appAcarreos/src/utils/preciosMaterial.js).
+   */
+  const obtenerTarifaVigente = useCallback(async () => {
+    const idObra = vale?.id_obra;
+    const idSindicato = detalle?.id_sindicato;
+    const idTipoMaterial = tipoMaterial;
+
+    if (!idSindicato || !idTipoMaterial) {
+      throw new Error(
+        "Falta el sindicato o el tipo de material del detalle para resolver la tarifa vigente.",
+      );
+    }
+
+    if (idObra) {
+      const { data: tarifaObra, error: errorObra } = await supabase
+        .from("precios_material_obra")
+        .select("*")
+        .eq("id_obra", idObra)
+        .eq("id_tipo_de_material", idTipoMaterial)
+        .eq("id_sindicato", idSindicato)
+        .eq("activo", true)
+        .maybeSingle();
+
+      if (errorObra) throw errorObra;
+      if (tarifaObra) return { ...tarifaObra, _origen: "obra" };
+    }
+
+    const { data: tarifasSindicato, error: errorSindicato } = await supabase
+      .from("precios_material")
+      .select("*")
+      .eq("id_tipo_de_material", idTipoMaterial)
+      .eq("id_sindicato", idSindicato);
+
+    if (errorSindicato) throw errorSindicato;
+
+    const tarifas = tarifasSindicato || [];
+
+    if (tarifas.length === 0) {
+      throw new Error(
+        "No hay ninguna tarifa configurada (ni de obra ni de sindicato) para este material.",
+      );
+    }
+
+    if (tarifas.length > 1) {
+      throw new Error(
+        "Hay tarifas duplicadas para este material y sindicato en Precios de Material. Pide al administrador que deje solo una.",
+      );
+    }
+
+    return { ...tarifas[0], _origen: "sindicato" };
+  }, [vale, detalle, tipoMaterial]);
+
+  /**
+   * Trae la tarifa vigente y recalcula precio_m3 y costo de todo el detalle
+   * (y sus viajes) como cambio PENDIENTE — igual que editar distancia o
+   * peso: no se guarda en BD hasta presionar "Guardar cambios".
+   *
+   * Existe porque la tarifa de un vale queda congelada al crearse
+   * (`precio_m3`/`tarifa_primer_km`/`tarifa_subsecuente`); si se captura o
+   * corrige una tarifa especial de obra DESPUÉS de emitidos los vales, esos
+   * vales se quedan con la tarifa vieja para siempre a menos que alguien los
+   * recalcule a mano aquí.
+   */
+  const actualizarTarifaVigente = useCallback(async () => {
+    if (!detalle) return;
+
+    try {
+      setActualizandoTarifa(true);
+      setError(null);
+      setAvisoTarifa(null);
+
+      const tarifa = await obtenerTarifaVigente();
+
+      const dist = Number(detalle.distancia_km);
+      const nuevoPrecioBase = calcularPrecioM3(
+        dist,
+        tarifa.primer_km,
+        tarifa.km_sub_int1,
+        tarifa.limite_int1,
+        tarifa.km_sub_int2,
+      );
+
+      if (!nuevoPrecioBase || nuevoPrecioBase <= 0) {
+        throw new Error(
+          "No se pudo calcular el precio/m³ con la tarifa vigente. Revisa la distancia del detalle.",
+        );
+      }
+
+      const tarifaSubsecuenteAplicada =
+        Number(tarifa.numero_de_intervalos) >= 2 &&
+        dist > Number(tarifa.limite_int1 || 0)
+          ? tarifa.km_sub_int2
+          : tarifa.km_sub_int1;
+
+      const esTarifaDeObra = tarifa._origen === "obra";
+      const nuevoIdPreciosMaterial = esTarifaDeObra
+        ? null
+        : tarifa.id_precios_material;
+      const nuevoIdPreciosMaterialObra = esTarifaDeObra
+        ? tarifa.id_precios_material_obra
+        : null;
+
+      const precioAnterior = Number(detalle.precio_m3) || 0;
+      const sinCambios =
+        Math.abs(precioAnterior - nuevoPrecioBase) < 0.005 &&
+        Number(detalle.tarifa_primer_km) === Number(tarifa.primer_km) &&
+        Number(detalle.tarifa_subsecuente) ===
+          Number(tarifaSubsecuenteAplicada);
+
+      if (sinCambios) {
+        setAvisoTarifa(
+          `La tarifa ya está actualizada (${esTarifaDeObra ? "tarifa de obra" : "tarifa de sindicato"}: $${nuevoPrecioBase.toFixed(2)}/m³). No hay cambios que aplicar.`,
+        );
+        return;
+      }
+
+      // Detalle
+      setDetalle((prev) => {
+        if (!prev) return prev;
+        const actualizado = {
+          ...prev,
+          precio_m3: nuevoPrecioBase,
+          tarifa_primer_km: Number(tarifa.primer_km),
+          tarifa_subsecuente: Number(tarifaSubsecuenteAplicada),
+          id_precios_material: nuevoIdPreciosMaterial,
+          id_precios_material_obra: nuevoIdPreciosMaterialObra,
+        };
+        // Tipo 2 sin viajes: recalcular costo_total de una vez (no hay
+        // viajes donde propagar el nuevo precio)
+        if (tipoMaterial === 2 && viajes.length === 0) {
+          actualizado.costo_total = calcularCostoTotalTipo2(actualizado);
+        }
+        return actualizado;
+      });
+
+      // Viajes (tipo 1, 2 con viajes, y 3)
+      if (viajes.length > 0) {
+        setViajes((prev) =>
+          prev.map((viaje) => {
+            const actualizado = {
+              ...viaje,
+              tarifa_primer_km: Number(tarifa.primer_km),
+              tarifa_subsecuente: Number(tarifaSubsecuenteAplicada),
+              id_precios_material: nuevoIdPreciosMaterial,
+              id_precios_material_obra: nuevoIdPreciosMaterialObra,
+            };
+
+            if (tipoMaterial === 3) {
+              // Precio base del viaje (sin override) siempre se actualiza
+              actualizado.precio_m3 = nuevoPrecioBase;
+              actualizado.costo_viaje = calcularCostoViaje(
+                viaje.volumen_m3,
+                nuevoPrecioBase,
+              );
+
+              // Si el viaje tiene distancia propia (override), recalcular
+              // el precio/costo override con esa distancia y la tarifa nueva
+              if (viaje.distancia_km_override) {
+                const precioOverride = calcularPrecioM3(
+                  Number(viaje.distancia_km_override),
+                  tarifa.primer_km,
+                  tarifa.km_sub_int1,
+                  tarifa.limite_int1,
+                  tarifa.km_sub_int2,
+                );
+                actualizado.precio_m3_override = precioOverride;
+                actualizado.costo_viaje_override = calcularCostoViaje(
+                  viaje.volumen_m3,
+                  precioOverride,
+                );
+              }
+            } else {
+              actualizado.precio_m3 = nuevoPrecioBase;
+              actualizado.costo_viaje = calcularCostoViaje(
+                viaje.volumen_m3,
+                nuevoPrecioBase,
+              );
+            }
+
+            return actualizado;
+          }),
+        );
+
+        setViajesEditados((prev) => {
+          const nuevo = new Set(prev);
+          viajes.forEach((v) => nuevo.add(v.id_viaje));
+          return nuevo;
+        });
+      }
+
+      setAvisoTarifa(
+        `Tarifa actualizada a $${nuevoPrecioBase.toFixed(2)}/m³ (antes $${precioAnterior.toFixed(2)}/m³) usando la ${esTarifaDeObra ? "tarifa especial de esta obra" : "tarifa del sindicato"}.` +
+          (viajes.length > 0
+            ? ` Se recalcularon ${viajes.length} viaje(s).`
+            : "") +
+          " Revisa los cambios y presiona \"Guardar cambios\" para confirmarlos.",
+      );
+    } catch (err) {
+      console.error("Error en actualizarTarifaVigente:", err);
+      setError(err.message);
+    } finally {
+      setActualizandoTarifa(false);
+    }
+  }, [detalle, viajes, tipoMaterial, obtenerTarifaVigente]);
+
   // ── Agregar viaje nuevo ────────────────────────────────────────────────────
 
   /**
@@ -812,12 +1033,24 @@ export const useEditarValeViajes = () => {
                 : null;
             // Actualizar costo_viaje base también si cambió el volumen
             camposUpdate.costo_viaje = Number(viaje.costo_viaje) || null;
+            camposUpdate.precio_m3 = Number(viaje.precio_m3) || null;
           } else {
             // Tipo 1 y 2: campos de peso
             camposUpdate.peso_ton = Number(viaje.peso_ton) || null;
             camposUpdate.precio_m3 = Number(viaje.precio_m3) || null;
             camposUpdate.costo_viaje = Number(viaje.costo_viaje) || null;
           }
+
+          // Común a todos los tipos: trazabilidad de la tarifa aplicada
+          // (se actualiza al editar peso/volumen/distancia o al usar
+          // "Actualizar tarifa vigente")
+          camposUpdate.tarifa_primer_km =
+            Number(viaje.tarifa_primer_km) || null;
+          camposUpdate.tarifa_subsecuente =
+            Number(viaje.tarifa_subsecuente) || null;
+          camposUpdate.id_precios_material = viaje.id_precios_material || null;
+          camposUpdate.id_precios_material_obra =
+            viaje.id_precios_material_obra || null;
 
           const { error } = await supabase
             .from("vale_material_viajes")
@@ -912,6 +1145,10 @@ export const useEditarValeViajes = () => {
           costo_total: totales.costo_total,
           distancia_km: Number(detalle.distancia_km),
           precio_m3: Number(detalle.precio_m3),
+          tarifa_primer_km: Number(detalle.tarifa_primer_km) || null,
+          tarifa_subsecuente: Number(detalle.tarifa_subsecuente) || null,
+          id_precios_material: detalle.id_precios_material || null,
+          id_precios_material_obra: detalle.id_precios_material_obra || null,
           notas_adicionales: notasAdicionales.trim() || null,
         };
         // Tipo 1 y 2: también actualizar peso_ton total
@@ -942,6 +1179,7 @@ export const useEditarValeViajes = () => {
           setError(errores.join("\n"));
         } else {
           setMensajeExito("Cambios guardados correctamente");
+          setAvisoTarifa(null);
           // Recargar datos frescos desde DB
           await cargarDetalle(detalle.id_detalle_material);
         }
@@ -981,6 +1219,7 @@ export const useEditarValeViajes = () => {
     setViajesAEliminar(new Set());
     setError(null);
     setMensajeExito(null);
+    setAvisoTarifa(null);
   }, [viajesOriginales, detalleOriginal]);
 
   // ── Flags de estado útiles para la UI ────────────────────────────────────
@@ -995,6 +1234,11 @@ export const useEditarValeViajes = () => {
       detalle.id_banco !== detalleOriginal.id_banco ||
       detalle.distancia_km !== detalleOriginal.distancia_km ||
       detalle.volumen_real_m3 !== detalleOriginal.volumen_real_m3 ||
+      Number(detalle.precio_m3) !== Number(detalleOriginal.precio_m3) ||
+      Number(detalle.tarifa_primer_km) !==
+        Number(detalleOriginal.tarifa_primer_km) ||
+      Number(detalle.tarifa_subsecuente) !==
+        Number(detalleOriginal.tarifa_subsecuente) ||
       !!detalle.es_viaje_ajuste !== !!detalleOriginal.es_viaje_ajuste ||
       (detalle.folio_vale_fisico || "") !== (detalleOriginal.folio_vale_fisico || "")
     ));
@@ -1023,6 +1267,10 @@ export const useEditarValeViajes = () => {
     viajesAEliminar,
     viajesNuevos,
 
+    // Tarifa vigente
+    avisoTarifa,
+    actualizandoTarifa,
+
     // Acciones
     cargarDetalle,
     editarCampoViaje,
@@ -1030,6 +1278,7 @@ export const useEditarValeViajes = () => {
     editarCampoDetalleTipo2,
     editarMaterialDetalle,
     editarBancoDetalle,
+    actualizarTarifaVigente,
     agregarViaje,
     eliminarViaje,
     cancelarEliminacion,

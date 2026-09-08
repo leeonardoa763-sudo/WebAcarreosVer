@@ -157,6 +157,12 @@
   color: #92400e;
 }
 
+.mev__alerta--info {
+  background: #eff6ff;
+  border-bottom: 1px solid #bfdbfe;
+  color: #1d4ed8;
+}
+
 .mev__error-detalle {
   font-family: "Courier New", monospace;
   font-size: 11px;
@@ -1335,13 +1341,48 @@
   border-bottom: 1px solid #e5e7eb;
 }
 
+.mev__seccion-material-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
 .mev__seccion-titulo {
   font-size: 13px;
   font-weight: 700;
   color: #2c3e50;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin: 0 0 12px;
+  margin: 0;
+}
+
+.mev__btn-tarifa {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1.5px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.mev__btn-tarifa:not(:disabled):hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.mev__btn-tarifa:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .mev__grid-3cols {

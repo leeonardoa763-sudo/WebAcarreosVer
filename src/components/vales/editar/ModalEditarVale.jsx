@@ -24,6 +24,7 @@ import {
   RotateCcw,
   AlertCircle,
   CheckCircle,
+  Info,
   Loader,
   PenLine,
   Calendar,
@@ -32,6 +33,7 @@ import {
   CheckSquare,
   XCircle,
   FileCheck,
+  RefreshCw,
 } from "lucide-react";
 
 // 3. Config
@@ -247,12 +249,15 @@ const ModalEditarVale = ({
     hayCambiosPendientes,
     viajesAEliminar,
     viajesNuevos,
+    avisoTarifa,
+    actualizandoTarifa,
     cargarDetalle,
     editarCampoViaje,
     editarDistanciaDetalle,
     editarCampoDetalleTipo2,
     editarMaterialDetalle,
     editarBancoDetalle,
+    actualizarTarifaVigente,
     agregarViaje,
     eliminarViaje,
     cancelarEliminacion,
@@ -358,6 +363,13 @@ const ModalEditarVale = ({
           </div>
         )}
 
+        {avisoTarifa && !error && (
+          <div className="mev__alerta mev__alerta--info">
+            <Info size={16} />
+            <span>{avisoTarifa}</span>
+          </div>
+        )}
+
         {/* Indicador de cambios pendientes */}
         {hayCambiosPendientes && !error && !mensajeExito && (
           <div className="mev__alerta mev__alerta--pendiente">
@@ -380,7 +392,24 @@ const ModalEditarVale = ({
               {/* ── Sección de información del material (editable) ──────────── */}
               {detalle && (
                 <div className="mev__seccion-material">
-                  <h3 className="mev__seccion-titulo">Información del material</h3>
+                  <div className="mev__seccion-material-header">
+                    <h3 className="mev__seccion-titulo">Información del material</h3>
+
+                    <button
+                      type="button"
+                      className="mev__btn-tarifa"
+                      onClick={actualizarTarifaVigente}
+                      disabled={guardando || actualizandoTarifa}
+                      title="Recalcula precio/m³ y costo de todos los viajes con la tarifa vigente (especial de esta obra, o la del sindicato si no tiene una propia)"
+                    >
+                      {actualizandoTarifa ? (
+                        <Loader size={14} className="mev__spinner" />
+                      ) : (
+                        <RefreshCw size={14} />
+                      )}
+                      Actualizar tarifa vigente
+                    </button>
+                  </div>
 
                   <div className="mev__grid-3cols">
                     {/* Material */}
