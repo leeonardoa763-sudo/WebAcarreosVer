@@ -518,7 +518,9 @@ const calcularEficiencia = (vales) => {
     const placas = vale.vehiculos?.placas || "Sin placas";
     (vale.vale_material_detalles || []).forEach((det) => {
       const material = det.material?.material || "Sin clasificar";
-      (det.vale_material_viajes || []).forEach((viaje) => {
+      const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
+      const viajes = det.vale_material_viajes || [];
+      viajes.forEach((viaje) => {
         if (!viaje.hora_registro) return;
         viajesConHora.push({
           hora: new Date(viaje.hora_registro),
@@ -529,6 +531,24 @@ const calcularEficiencia = (vales) => {
           material,
         });
       });
+      // Tipo 2 (Base Asfáltica): 1 vale = 1 viaje, sin filas en
+      // vale_material_viajes — sin este caso, sus viajes nunca aparecían en
+      // la distribución horaria. Se usa el timestamp del propio vale (fecha
+      // operativa = fecha_completado, con fallback a fecha_creacion).
+      if (tipoId === 2 && viajes.length === 0) {
+        const tieneDatos = det.volumen_real_m3 != null || det.costo_total != null;
+        const tsVale = vale.fecha_completado ?? vale.fecha_creacion;
+        if (tieneDatos && tsVale) {
+          viajesConHora.push({
+            hora: new Date(tsVale),
+            idVehiculo,
+            placas,
+            m3: Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0),
+            obra: vale.obras?.obra || "Sin obra",
+            material,
+          });
+        }
+      }
     });
   });
 

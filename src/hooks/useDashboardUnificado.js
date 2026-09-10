@@ -197,6 +197,12 @@ const calcularKpisDeVales = (lista) => {
   const m3PorMaterial = {};
   const viajesPorMaterial = {};
   let viajesRenta = 0;
+  // Tipo 2 (Base Asfáltica): 1 vale = 1 viaje, sin fila en vale_material_viajes,
+  // así que no hay "marcas" dentro de un mismo vale para medir el intervalo
+  // entre viajes. Se agrupan por vehículo + día usando el timestamp del vale
+  // (fecha_completado ?? fecha_creacion) para poder medir el ciclo igual que
+  // Pétreos/Corte, en vez de excluirlos silenciosamente del KPI.
+  const asfalticoPorVehiculoDia = new Map();
 
   for (const vale of lista) {
     if (vale._tipo === "renta") {
@@ -260,16 +266,30 @@ const calcularKpisDeVales = (lista) => {
           for (const ticket of vale.tickets_material ?? []) {
             if (ticket.fecha_impresion) marcas.push(new Date(ticket.fecha_impresion).getTime());
           }
-        } else {
-          const numViajes = det.vale_material_viajes?.length ?? 0;
+        } else if (tipoId === 2) {
           // Tipo 2 (Base Asfáltica): siempre 1 vale = 1 viaje. El viaje se
           // captura directo en el detalle, sin fila en vale_material_viajes.
-          const conteoViajes =
-            tipoId === 2 && numViajes === 0
-              ? (det.volumen_real_m3 != null || det.costo_total != null ? 1 : 0)
-              : numViajes;
+          const numViajes = det.vale_material_viajes?.length ?? 0;
+          const tieneDatos = det.volumen_real_m3 != null || det.costo_total != null;
+          const conteoViajes = numViajes === 0 ? (tieneDatos ? 1 : 0) : numViajes;
           totalViajes += conteoViajes;
           viajesPorMaterial[nombre] = (viajesPorMaterial[nombre] || 0) + conteoViajes;
+          for (const viaje of det.vale_material_viajes ?? []) {
+            if (viaje.hora_registro) marcas.push(new Date(viaje.hora_registro).getTime());
+          }
+          if (numViajes === 0 && tieneDatos) {
+            const tsVale = vale.fecha_completado ?? vale.fecha_creacion;
+            if (tsVale) {
+              const dia = vale.fecha_programada ?? vale.fecha_creacion?.substring(0, 10);
+              const clave = `${vale.id_vehiculo ?? "sv"}_${dia}`;
+              if (!asfalticoPorVehiculoDia.has(clave)) asfalticoPorVehiculoDia.set(clave, []);
+              asfalticoPorVehiculoDia.get(clave).push(new Date(tsVale).getTime());
+            }
+          }
+        } else {
+          const numViajes = det.vale_material_viajes?.length ?? 0;
+          totalViajes += numViajes;
+          viajesPorMaterial[nombre] = (viajesPorMaterial[nombre] || 0) + numViajes;
           for (const viaje of det.vale_material_viajes ?? []) {
             if (viaje.hora_registro) marcas.push(new Date(viaje.hora_registro).getTime());
           }
@@ -293,6 +313,18 @@ const calcularKpisDeVales = (lista) => {
       }
     }
     if (vale.estado === "en_proceso") enProceso++;
+  }
+
+  // Cierra el cálculo de eficiencia para Tipo 2 (Asfáltico): un intervalo
+  // promedio por vehículo/día con 2+ viajes registrados, igual criterio que
+  // "un promedio por vale" para Pétreos/Corte.
+  for (const marcas of asfalticoPorVehiculoDia.values()) {
+    if (marcas.length < 2) continue;
+    marcas.sort((a, b) => a - b);
+    let difTotal = 0;
+    for (let i = 1; i < marcas.length; i++) difTotal += marcas[i] - marcas[i - 1];
+    materialMinXViajeSuma += difTotal / (marcas.length - 1) / 60000; // ms → min
+    materialMinXViajeCount++;
   }
 
   const partes = [];
