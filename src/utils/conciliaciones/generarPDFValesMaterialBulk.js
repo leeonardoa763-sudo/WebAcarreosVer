@@ -3,10 +3,16 @@
  *
  * Genera un PDF tamaño carta con 4 vales de material por página (grid 2×2).
  * Replica el formato físico del vale impreso incluyendo QR, secciones
- * MATERIAL, OPERADOR, VIAJES REGISTRADOS y etiqueta COPIA BLANCA / ORIGINAL.
+ * MATERIAL, OPERADOR, VIAJES REGISTRADOS y etiqueta de copia (roja/blanca)
+ * según el estado real del vale.
+ *
+ * La tabla de VIAJES REGISTRADOS siempre muestra TODOS los viajes del vale
+ * (no se recorta a un máximo): la altura de fila y el tamaño de fuente se
+ * calculan dinámicamente según cuánto espacio libre quede en la celda tras
+ * el resto del contenido, para que quepan sin encimarse con la celda vecina.
  *
  * Dependencias: jspdf, qrcode
- * Usado en: ModalVistaPreviewConciliacion.jsx
+ * Usado en: ModalVistaPreviewConciliacion.jsx, DashboardUnificado.jsx
  */
 
 // 1. Imports
@@ -25,12 +31,30 @@ const PAGINA_ALTO = 279.4;
 const MARGEN_X = 8;
 const MARGEN_Y = 8;
 
-const CELDA_ANCHO = (PAGINA_ANCHO - MARGEN_X * 2) / 2;
-const CELDA_ALTO = PAGINA_ALTO - MARGEN_Y * 2;
+// Cada celda del grid 2×2
+const CELDA_ANCHO = (PAGINA_ANCHO - MARGEN_X * 2 - 4) / 2; // 4mm de gap entre columnas
+const CELDA_ALTO = (PAGINA_ALTO - MARGEN_Y * 2 - 4) / 2; // 4mm de gap entre filas
 
+// Posiciones de las 4 celdas (col, fila) → (x, y)
 const POSICIONES = [
-  { x: MARGEN_X + (PAGINA_ANCHO - MARGEN_X * 2) / 4, y: MARGEN_Y },
+  { x: MARGEN_X, y: MARGEN_Y }, // vale 1 (arriba izq)
+  { x: MARGEN_X + CELDA_ANCHO + 4, y: MARGEN_Y }, // vale 2 (arriba der)
+  { x: MARGEN_X, y: MARGEN_Y + CELDA_ALTO + 4 }, // vale 3 (abajo izq)
+  { x: MARGEN_X + CELDA_ANCHO + 4, y: MARGEN_Y + CELDA_ALTO + 4 }, // vale 4 (abajo der)
 ];
+
+// Padding interno de cada celda + interlineados base (usados también para
+// medir cuánto espacio fijo consume el contenido que NO es la tabla)
+const PAD = 2.5;
+const LH_SMALL = 3.0;
+const LH_MED = 3.6;
+
+// Rango de altura/fuente de las filas de la tabla de viajes: se calculan
+// dinámicamente entre estos límites según cuántos viajes haya que mostrar.
+const FILA_ALTURA_MAX = 3.1;
+const FILA_ALTURA_MIN = 1.55;
+const FILA_FUENTE_MAX = 4.5;
+const FILA_FUENTE_MIN = 2.7;
 
 // URL base para QR
 const BASE_URL = "https://web-acarreos.vercel.app/vale/";
@@ -85,6 +109,17 @@ const truncar = (texto, maxChars) => {
 };
 
 /**
+ * Etiqueta de copia según estado real del vale — replica la lógica de
+ * colorCopia de la app móvil (roja al crear / blanca al completar).
+ */
+const obtenerEtiquetaCopia = (estado) => {
+  if (estado === "cancelado") return { badge: "CANCELADO", sub: null };
+  if (estado === "en_proceso")
+    return { badge: "COPIA ROJA", sub: "BANCO DE MATERIAL" };
+  return { badge: "COPIA BLANCA", sub: "ORIGINAL" };
+};
+
+/**
  * Generar imagen QR como dataURL PNG
  */
 const generarQRDataURL = async (vale) => {
@@ -100,20 +135,60 @@ const generarQRDataURL = async (vale) => {
   }
 };
 
+/**
+ * "doc" de solo medición: no dibuja nada, cualquier método invocado es un
+ * no-op. Se usa para correr dibujarVale() una vez con altura de fila 0 y así
+ * saber cuánto espacio fijo (todo excepto las filas de viajes) consume el
+ * resto del contenido del vale.
+ */
+const crearDocDeMedicion = () => new Proxy({}, { get: () => () => {} });
+
+/**
+ * Calcula altura de fila y tamaño de fuente para que TODOS los viajes quepan
+ * en el espacio vertical libre de la celda. Con pocos viajes usa el tamaño
+ * cómodo (FILA_ALTURA_MAX); con muchos los reduce hasta FILA_ALTURA_MIN.
+ */
+const calcularDimensionesFilas = (vale, ox, oy, numViajes) => {
+  if (numViajes === 0) {
+    return { rowHeight: FILA_ALTURA_MAX, fontSize: FILA_FUENTE_MAX };
+  }
+
+  const yFijo = dibujarVale(crearDocDeMedicion(), vale, ox, oy, null, {
+    rowHeight: 0,
+    fontSize: FILA_FUENTE_MAX,
+  });
+  const alturaFija = yFijo - oy;
+  const alturaDisponible = CELDA_ALTO - PAD - alturaFija;
+
+  const rowHeight = Math.min(
+    FILA_ALTURA_MAX,
+    Math.max(FILA_ALTURA_MIN, alturaDisponible / numViajes),
+  );
+  const fontSize = Math.min(
+    FILA_FUENTE_MAX,
+    Math.max(FILA_FUENTE_MIN, rowHeight * 1.35),
+  );
+  return { rowHeight, fontSize };
+};
+
 // ─────────────────────────────────────────────
 // FUNCIÓN PRINCIPAL: DIBUJAR UN VALE EN UNA CELDA
 // ─────────────────────────────────────────────
 
 /**
- * Dibuja un vale de material dentro de la celda (ox, oy).
+ * Dibuja (o mide, si `doc` es un doc de medición) un vale de material dentro
+ * de la celda (ox, oy). Devuelve la posición Y final — se usa tanto para
+ * medir el espacio fijo disponible como, en el trazo real, informativamente.
  *
- * @param {jsPDF}  doc       - Instancia de jsPDF
- * @param {Object} vale      - Objeto vale con relaciones cargadas
- * @param {number} ox        - Origen X de la celda
- * @param {number} oy        - Origen Y de la celda
- * @param {string} qrDataURL - Imagen QR como dataURL (puede ser null)
+ * @param {jsPDF}  doc         - Instancia de jsPDF (o doc de medición)
+ * @param {Object} vale        - Objeto vale con relaciones cargadas
+ * @param {number} ox          - Origen X de la celda
+ * @param {number} oy          - Origen Y de la celda
+ * @param {string} qrDataURL   - Imagen QR como dataURL (puede ser null)
+ * @param {Object} filaViajes  - { rowHeight, fontSize } de cada fila de la
+ *                                tabla de viajes (calculado dinámicamente)
  */
-const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
+const dibujarVale = (doc, vale, ox, oy, qrDataURL, filaViajes) => {
   // ── Extraer datos del vale ──────────────────────────────────────────────
   // Un vale de material puede tener múltiples detalles pero normalmente es 1
   const detalle = vale.vale_material_detalles?.[0] || {};
@@ -130,8 +205,9 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
   const operador = vale.operadores?.nombre_completo || "—";
   const placas = vale.vehiculos?.placas || "—";
   const sindicato = vale.operadores?.sindicatos?.sindicato || "—";
+  const esTipo3 = detalle.material?.tipo_de_material?.id_tipo_de_material === 3;
 
-  // Viajes registrados en tabla hija
+  // Viajes registrados en tabla hija — se muestran TODOS
   const viajes = detalle.vale_material_viajes || [];
 
   // Totales
@@ -156,10 +232,7 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
 
   // ── Constantes de layout interno ───────────────────────────────────────
   const W = CELDA_ANCHO;
-  const PAD = 2.5;
   const CX = ox + W / 2;
-  const LH_SMALL = 3.2;
-  const LH_MED = 3.8;
   const colLabel = ox + PAD;
   const colValue = ox + W - PAD;
 
@@ -193,51 +266,35 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
   y += LH_SMALL;
 
   linea(y);
-  y += 1.5;
+  y += 1.3;
 
   // ── FECHAS ──────────────────────────────────────────────────────────────
   doc.setFontSize(5.2);
   doc.setFont("helvetica", "normal");
-  doc.text("Fecha creacion:", colLabel, y);
+  doc.text("Creacion:", colLabel, y);
   doc.text(fechaCreacion, colValue, y, { align: "right" });
   y += LH_SMALL;
 
-  doc.text("Fecha emision:", colLabel, y);
+  doc.text("Emision:", colLabel, y);
   doc.text(fechaEmision, colValue, y, { align: "right" });
-  y += LH_SMALL + 0.5;
+  y += LH_SMALL;
 
   linea(y);
-  y += 1.5;
+  y += 1.3;
 
-  // ── OBRA Y BANCO ────────────────────────────────────────────────────────
-  doc.setFontSize(5.5);
+  // ── OBRA Y BANCO (combinadas en una línea cada una) ─────────────────────
   doc.setFont("helvetica", "bold");
-  doc.text("OBRA:", colLabel, y);
+  doc.setFontSize(5.4);
+  doc.text(`OBRA: ${truncar(obra, 32)}`, colLabel, y);
   y += LH_SMALL;
 
-  doc.setFontSize(5.5);
-  doc.text(truncar(obra, 36), colLabel, y);
+  doc.text(`BANCO: ${truncar(banco, 32)}`, colLabel, y);
   y += LH_SMALL;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(5.2);
-  doc.text("BANCO:", colLabel, y);
-  y += LH_SMALL;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(5.5);
-  doc.text(truncar(banco, 36), colLabel, y);
-  y += LH_SMALL + 0.5;
 
   linea(y);
-  y += 1.5;
+  y += 1.3;
 
-  // ── SECCIÓN MATERIAL ────────────────────────────────────────────────────
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(5.8);
-  doc.text("MATERIAL", CX, y, { align: "center" });
-  y += LH_MED;
-
+  // ── SECCIÓN MATERIAL (sin título — ya es evidente por el contexto) ──────
   doc.setFont("helvetica", "normal");
   doc.setFontSize(5.2);
 
@@ -253,46 +310,37 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
 
   doc.text("Distancia:", colLabel, y);
   doc.text(distancia, colValue, y, { align: "right" });
-  y += LH_SMALL + 0.5;
+  y += LH_SMALL;
 
   linea(y);
-  y += 1.5;
+  y += 1.3;
 
-  // ── SECCIÓN OPERADOR ────────────────────────────────────────────────────
+  // ── SECCIÓN OPERADOR (sin título) ────────────────────────────────────────
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(5.8);
-  doc.text("OPERADOR", CX, y, { align: "center" });
-  y += LH_MED;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(5.5);
+  doc.setFontSize(5.4);
   doc.text(truncar(operador, 36), colLabel, y);
   y += LH_SMALL;
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(5.2);
-  doc.text("Placas:", colLabel, y);
-  doc.setFont("helvetica", "bold");
-  doc.text(placas, colValue, y, { align: "right" });
-  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5.1);
+  doc.text(`Placas: ${placas}`, colLabel, y);
+  doc.text(`Sind: ${truncar(sindicato, 14)}`, colValue, y, { align: "right" });
   y += LH_SMALL;
 
-  doc.text("Sindicato:", colLabel, y);
-  doc.text(truncar(sindicato, 22), colValue, y, { align: "right" });
-  y += LH_SMALL + 0.5;
-
   linea(y);
-  y += 1.5;
+  y += 1.3;
 
   // ── SECCIÓN VIAJES REGISTRADOS ──────────────────────────────────────────
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(5.8);
+  doc.setFontSize(5.6);
   doc.text("VIAJES REGISTRADOS", CX, y, { align: "center" });
-  y += LH_MED;
+  y += LH_MED - 0.3;
 
   if (viajes.length > 0) {
+    const { rowHeight, fontSize } = filaViajes;
+
     // Encabezado de la mini-tabla
-    doc.setFontSize(4.8);
+    doc.setFontSize(Math.max(fontSize, 3.6));
     doc.setFont("helvetica", "bold");
 
     const colBanco = colLabel;
@@ -302,22 +350,19 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
 
     doc.text("Banco", colBanco, y);
     doc.text("Rem.", colRem, y);
-    doc.text("m³", colM3, y);
+    doc.text(esTipo3 ? "—" : "m³", colM3, y);
     doc.text("Hora", colHora, y);
-    y += LH_SMALL * 0.8;
+    y += Math.max(rowHeight, 1.9);
 
     doc.setLineWidth(0.15);
-    doc.line(colLabel, y, ox + W - PAD, y);
-    y += 1;
+    doc.line(colLabel, y - 0.6, ox + W - PAD, y - 0.6);
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(4.5);
+    doc.setFontSize(fontSize);
 
-    // Máximo 6 viajes para no salirse de la celda
-    const viajesAMostrar = viajes.slice(0, 6);
-
-    viajesAMostrar.forEach((viaje) => {
-      const bancoTexto = truncar(banco, 14);
+    viajes.forEach((viaje) => {
+      const bancoViaje = viaje.bancos_override?.banco ?? banco;
+      const bancoTexto = truncar(bancoViaje, 13);
       const remision = viaje.folio_vale_fisico || "—";
       const m3Texto = Number(viaje.volumen_m3 || 0).toFixed(2);
       const horaTexto = formatearHora(
@@ -328,21 +373,12 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
       doc.text(truncar(remision, 8), colRem, y);
       doc.text(m3Texto, colM3, y);
       doc.text(horaTexto, colHora, y);
-      y += LH_SMALL;
+      y += rowHeight;
     });
 
-    // Si hay más de 6 viajes, indicarlo
-    if (viajes.length > 6) {
-      doc.setFontSize(4.2);
-      doc.setFont("helvetica", "italic");
-      doc.text(`... y ${viajes.length - 6} viaje(s) más`, colLabel, y);
-      y += LH_SMALL;
-    }
-
     // Totales de viajes
-    y += 0.5;
     linea(y);
-    y += 1.5;
+    y += 1.3;
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(5);
@@ -354,7 +390,7 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
     doc.text("Total m³", ox + W * 0.55, y);
     doc.setFont("helvetica", "bold");
     doc.text(`${totalM3.toFixed(2)} m³`, colValue, y, { align: "right" });
-    y += LH_SMALL + 0.5;
+    y += LH_SMALL;
   } else {
     // Sin viajes registrados aún
     doc.setFont("helvetica", "italic");
@@ -364,69 +400,76 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
   }
 
   linea(y);
-  y += 1.5;
+  y += 1.3;
 
-  // ── CREADO / COMPLETADO POR ─────────────────────────────────────────────
+  // ── CREADO / COMPLETADO POR (combinados en una sola línea) ─────────────
+  doc.setFontSize(4.6);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(4.8);
-  doc.text("Creado por:", colLabel, y);
-  doc.setFont("helvetica", "bold");
-  doc.text(truncar(creadoPor, 22), colValue, y, { align: "right" });
+  if (completadoPor) {
+    doc.text(`Creo: ${truncar(creadoPor, 16)}`, colLabel, y);
+    doc.text(`Complet: ${truncar(completadoPor, 15)}`, colValue, y, {
+      align: "right",
+    });
+  } else {
+    doc.text("Creado por:", colLabel, y);
+    doc.setFont("helvetica", "bold");
+    doc.text(truncar(creadoPor, 26), colValue, y, { align: "right" });
+  }
   y += LH_SMALL;
 
-  if (completadoPor) {
-    doc.setFont("helvetica", "normal");
-    doc.text("Completo por:", colLabel, y);
-    doc.setFont("helvetica", "bold");
-    doc.text(truncar(completadoPor, 20), colValue, y, { align: "right" });
-    y += LH_SMALL;
-  }
-
   linea(y);
-  y += 1.5;
+  y += 1.3;
 
   // ── QR ──────────────────────────────────────────────────────────────────
-  const qrSize = 12;
+  const qrSize = 10;
   const qrX = CX - qrSize / 2;
 
   if (qrDataURL) {
     doc.addImage(qrDataURL, "PNG", qrX, y, qrSize, qrSize);
   }
 
-  const yTextoQR = y + qrSize + 1.5;
-  doc.setFontSize(4.5);
+  const yTextoQR = y + qrSize + 1.2;
+  doc.setFontSize(4.3);
   doc.setFont("helvetica", "normal");
   doc.text("Escanear para verificar", CX, yTextoQR, { align: "center" });
 
-  const yUrl = yTextoQR + 3;
+  const yUrl = yTextoQR + 2.6;
   const urlImpresa = vale.qr_verification_url || `${BASE_URL}${vale.folio}`;
-  doc.setFontSize(4);
+  doc.setFontSize(3.8);
   doc.text(urlImpresa, CX, yUrl, { align: "center" });
 
-  const yLinea2 = yUrl + 2;
+  const yLinea2 = yUrl + 1.6;
   linea(yLinea2);
 
-  // ── ETIQUETA COPIA BLANCA / ORIGINAL ────────────────────────────────────
-  const yEtiqueta = yLinea2 + 2;
+  // ── ETIQUETA DE COPIA (según estado real del vale) ──────────────────────
+  const yEtiqueta = yLinea2 + 1.6;
+  const { badge, sub } = obtenerEtiquetaCopia(vale.estado);
+  const altoBadge = 3.5;
 
   doc.setFillColor(0, 0, 0);
-  doc.rect(ox + PAD, yEtiqueta, W - PAD * 2, 4, "F");
+  doc.rect(ox + PAD, yEtiqueta, W - PAD * 2, altoBadge, "F");
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(5.5);
+  doc.setFontSize(5.3);
   doc.setFont("helvetica", "bold");
-  doc.text("COPIA BLANCA", CX, yEtiqueta + 2.7, { align: "center" });
+  doc.text(badge, CX, yEtiqueta + altoBadge - 1.1, { align: "center" });
 
   doc.setTextColor(0, 0, 0);
 
-  const yOriginal = yEtiqueta + 5;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(5.5);
-  doc.text("ORIGINAL", CX, yOriginal, { align: "center" });
+  let yTrasEtiqueta = yEtiqueta + altoBadge;
+  if (sub) {
+    const ySub = yTrasEtiqueta + LH_SMALL - 0.6;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(5.3);
+    doc.text(sub, CX, ySub, { align: "center" });
+    yTrasEtiqueta = ySub;
+  }
 
-  const yEmitida = yOriginal + LH_SMALL + 0.5;
+  const yEmitida = yTrasEtiqueta + LH_SMALL - 0.6;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(4.5);
+  doc.setFontSize(4.3);
   doc.text(`Emitida: ${fechaEmision}`, CX, yEmitida, { align: "center" });
+
+  return yEmitida;
 };
 
 // ─────────────────────────────────────────────
@@ -435,7 +478,8 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
 
 /**
  * Generar PDF con todos los vales de material de una conciliación.
- * Imprime 4 vales por página en grid 2×2.
+ * Imprime 4 vales por página en grid 2×2. Cada vale muestra TODOS sus
+ * viajes — si son muchos, la tabla usa filas más chicas para que quepan.
  *
  * @param {Array}  vales     - Array de vales con relaciones cargadas:
  *                             vale_material_detalles (con vale_material_viajes),
@@ -462,20 +506,31 @@ export const generarPDFValesMaterialBulk = async (vales, folioConc) => {
     format: "letter",
   });
 
-  // 3. Dibujar vales en páginas
+  // 3. Dibujar vales en páginas (grid 2×2, 4 por página)
   for (let i = 0; i < vales.length; i++) {
-    // Nueva página cada 4 vales (excepto la primera)
-    if (i > 0) {
+    // Cada 4 vales, nueva página (excepto la primera)
+    if (i > 0 && i % 4 === 0) {
       doc.addPage();
     }
 
-    const posicion = POSICIONES[0];
-    dibujarVale(
-      doc,
-      vales[i],
+    const posicion = POSICIONES[i % 4];
+    const vale = vales[i];
+    const numViajes = (vale.vale_material_detalles?.[0]?.vale_material_viajes || [])
+      .length;
+    const filaViajes = calcularDimensionesFilas(
+      vale,
       posicion.x,
       posicion.y,
-      qrMap[vales[i].folio] || null,
+      numViajes,
+    );
+
+    dibujarVale(
+      doc,
+      vale,
+      posicion.x,
+      posicion.y,
+      qrMap[vale.folio] || null,
+      filaViajes,
     );
   }
 

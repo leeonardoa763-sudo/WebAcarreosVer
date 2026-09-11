@@ -38,6 +38,8 @@ import {
   Moon,
   CalendarClock,
   ShieldCheck,
+  Printer,
+  Loader2,
 } from "lucide-react";
 
 // 3. Config
@@ -430,6 +432,7 @@ const DashboardUnificado = () => {
   const [rangoFin, setRangoFin] = useState("");
   const [semanaValue, setSemanaValue] = useState("");
   const [mesValue, setMesValue] = useState("");
+  const [exportandoPDF, setExportandoPDF] = useState(false);
 
   // 2. Auth
   const { userProfile } = useAuth();
@@ -540,6 +543,49 @@ const DashboardUnificado = () => {
     );
   };
 
+  // 5.5 Export — PDF de vales (4 por hoja tamaño carta), respeta los filtros
+  // activos. Reutiliza los mismos generadores de conciliaciones — separa
+  // material (petreos/asfaltico/corte) y renta porque tienen layout distinto.
+  const handleExportarPDF = async () => {
+    if (exportandoPDF || valesFiltrados.length === 0) return;
+
+    if (valesFiltrados.length > 200) {
+      const continuar = window.confirm(
+        `Vas a generar el PDF de ${valesFiltrados.length} vales (~${Math.ceil(
+          valesFiltrados.length / 4,
+        )} hojas). Puede tardar unos segundos. ¿Continuar?`,
+      );
+      if (!continuar) return;
+    }
+
+    try {
+      setExportandoPDF(true);
+
+      const valesMaterial = valesFiltrados.filter((v) => v._tipo !== "renta");
+      const valesRenta = valesFiltrados.filter((v) => v._tipo === "renta");
+      const etiqueta = `${filtros.fechaInicio}_a_${filtros.fechaFin}`;
+
+      if (valesMaterial.length > 0) {
+        const { generarPDFValesMaterialBulk } = await import(
+          "../utils/conciliaciones/generarPDFValesMaterialBulk"
+        );
+        await generarPDFValesMaterialBulk(valesMaterial, etiqueta);
+      }
+
+      if (valesRenta.length > 0) {
+        const { generarPDFValesRentaBulk } = await import(
+          "../utils/conciliaciones/generarPDFValesRentaBulk"
+        );
+        await generarPDFValesRentaBulk(valesRenta, etiqueta);
+      }
+    } catch (err) {
+      console.error("[DashboardUnificado] Error al exportar vales PDF:", err);
+      alert("Error al generar el PDF de vales. Intenta de nuevo.");
+    } finally {
+      setExportandoPDF(false);
+    }
+  };
+
   // 6. Valores derivados
   const periodoLabel =
     filtros.periodoActivo === "hoy"
@@ -583,6 +629,19 @@ const DashboardUnificado = () => {
           >
             <Download size={15} />
             Excel
+          </button>
+          <button
+            className="du__btn-exportar-pdf"
+            onClick={handleExportarPDF}
+            disabled={loading || exportandoPDF || valesFiltrados.length === 0}
+            title={`Imprimir ${valesFiltrados.length} vales en PDF, 4 por hoja tamaño carta`}
+          >
+            {exportandoPDF ? (
+              <Loader2 size={15} className="du__spin" />
+            ) : (
+              <Printer size={15} />
+            )}
+            PDF
           </button>
           <button
             className="du__btn-refresh"

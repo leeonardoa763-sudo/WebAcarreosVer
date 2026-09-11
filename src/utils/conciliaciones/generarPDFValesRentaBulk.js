@@ -3,10 +3,11 @@
  *
  * Genera un PDF tamaño carta con 4 vales de renta por página (grid 2×2).
  * Replica el formato físico del vale impreso incluyendo QR, secciones
- * SERVICIO, TIEMPOS, OPERADOR y etiqueta COPIA BLANCO / ORIGINAL.
+ * SERVICIO, TIEMPOS, OPERADOR y etiqueta de copia (roja/blanca) según el
+ * estado real del vale.
  *
  * Dependencias: jspdf, qrcode
- * Usado en: ModalVistaPreviewConciliacion.jsx
+ * Usado en: ModalVistaPreviewConciliacion.jsx, DashboardUnificado.jsx
  */
 
 // 1. Imports
@@ -114,6 +115,17 @@ const truncar = (texto, maxChars) => {
   if (!texto) return "—";
   if (texto.length <= maxChars) return texto;
   return texto.substring(0, maxChars - 1) + "…";
+};
+
+/**
+ * Etiqueta de copia según estado real del vale — replica la lógica de
+ * colorCopia de la app móvil (roja al crear / blanca al completar).
+ */
+const obtenerEtiquetaCopia = (estado) => {
+  if (estado === "cancelado") return { badge: "CANCELADO", sub: null };
+  if (estado === "en_proceso")
+    return { badge: "COPIA ROJA", sub: "BANCO DE MATERIAL" };
+  return { badge: "COPIA BLANCA", sub: "ORIGINAL" };
 };
 
 /**
@@ -371,27 +383,31 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
   const yLinea2 = yUrl + 2;
   linea(yLinea2);
 
-  // ── ETIQUETA COPIA BLANCO / ORIGINAL ────────
+  // ── ETIQUETA DE COPIA (según estado real del vale) ──
   const yEtiqueta = yLinea2 + 2;
+  const { badge, sub } = obtenerEtiquetaCopia(vale.estado);
 
-  // Fondo negro para "COPIA BLANCO"
   doc.setFillColor(0, 0, 0);
   doc.rect(ox + PAD, yEtiqueta, W - PAD * 2, 4, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(5.5);
   doc.setFont("helvetica", "bold");
-  doc.text("COPIA BLANCO", CX, yEtiqueta + 2.7, { align: "center" });
+  doc.text(badge, CX, yEtiqueta + 2.7, { align: "center" });
 
   // Restaurar color de texto
   doc.setTextColor(0, 0, 0);
 
-  const yOriginal = yEtiqueta + 5;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(5.5);
-  doc.text("ORIGINAL", CX, yOriginal, { align: "center" });
+  let yTrasEtiqueta = yEtiqueta + 4;
+  if (sub) {
+    const ySub = yTrasEtiqueta + LH_SMALL;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(5.5);
+    doc.text(sub, CX, ySub, { align: "center" });
+    yTrasEtiqueta = ySub;
+  }
 
   // Fecha de emisión
-  const yEmitida = yOriginal + LH_SMALL + 0.5;
+  const yEmitida = yTrasEtiqueta + LH_SMALL + 0.5;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(4.5);
   doc.text(`Emitida: ${fechaHora}`, CX, yEmitida, { align: "center" });

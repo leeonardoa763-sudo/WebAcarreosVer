@@ -73,6 +73,32 @@
   cursor: not-allowed;
 }
 
+.du__btn-exportar-pdf {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  color: #1d4ed8;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.du__btn-exportar-pdf:hover:not(:disabled) {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.du__btn-exportar-pdf:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .du__btn-refresh {
   display: flex;
   align-items: center;
