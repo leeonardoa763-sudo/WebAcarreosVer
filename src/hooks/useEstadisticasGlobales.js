@@ -2040,9 +2040,12 @@ export const useEstadisticasGlobales = () => {
       const o = obraMap[obraId];
       o.vales += 1;
       (vale.vale_renta_detalle || []).forEach((det) => {
-        o.totalViajes += det.vale_renta_viajes?.length > 0
-          ? det.vale_renta_viajes.length
-          : (det.numero_viajes || 1);
+        // Sin fallback a numero_viajes: en pipas ese campo es el "1" fijo que
+        // ValeRentaScreen manda al crear el vale (placeholder de columna
+        // NOT NULL, no una meta ni un conteo real) — usarlo de respaldo
+        // sumaba un viaje fantasma por cada pipa aun sin repartir agua. Solo
+        // cuentan los viajes de agua realmente registrados en vale_renta_viajes.
+        o.totalViajes += det.vale_renta_viajes?.length || 0;
         if (vale.vehiculos?.capacidad_m3 != null) {
           o.capacidadSuma += Number(vale.vehiculos.capacidad_m3);
           o.capacidadCount += 1;

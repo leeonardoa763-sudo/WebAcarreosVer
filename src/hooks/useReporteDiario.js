@@ -399,7 +399,12 @@ const calcularPipasDelDia = (vales) => {
 
     vales_ += 1;
     rentaDetalles.forEach((det) => {
-      totalViajes += det.vale_renta_viajes?.length > 0 ? det.vale_renta_viajes.length : (det.numero_viajes || 0);
+      // Sin fallback a numero_viajes: en pipas ese campo es el "1" fijo que
+      // ValeRentaScreen manda al crear el vale (placeholder de columna NOT
+      // NULL, no una meta ni un conteo real) — usarlo de respaldo sumaba un
+      // viaje fantasma por cada pipa aun sin repartir agua ese día. Solo
+      // cuentan los viajes de agua realmente registrados en vale_renta_viajes.
+      totalViajes += det.vale_renta_viajes?.length || 0;
       if (vale.vehiculos?.capacidad_m3 != null) {
         capacidadSuma += Number(vale.vehiculos.capacidad_m3);
         capacidadCount += 1;
