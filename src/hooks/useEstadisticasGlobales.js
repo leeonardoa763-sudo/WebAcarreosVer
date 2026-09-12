@@ -514,7 +514,7 @@ export const useEstadisticasGlobales = () => {
       let queryConc = supabase
         .from("conciliaciones")
         .select(
-          "id_conciliacion, tipo_conciliacion, subtotal, iva_16_porciento, retencion_4_porciento, total_final, total_horas, total_dias, fecha_generacion, fecha_inicio, fecha_fin, folio, id_obra, id_empresa, id_sindicato, obras:id_obra (id_obra, obra, cc), sindicatos:id_sindicato (sindicato), empresas:id_empresa (empresa)"
+          "id_conciliacion, tipo_conciliacion, subtotal, iva_16_porciento, retencion_4_porciento, total_final, total_horas, total_dias, fecha_generacion, fecha_inicio, fecha_fin, folio, id_obra, id_empresa, id_sindicato, numero_orden_compra, numero_factura, obras:id_obra (id_obra, obra, cc), sindicatos:id_sindicato (sindicato), empresas:id_empresa (empresa)"
         )
         .neq("id_obra", 14)
         .neq("id_empresa", 4);
@@ -860,7 +860,8 @@ export const useEstadisticasGlobales = () => {
   // `valeRentaAConciliacion` y no tiene material, va en su propio grupo
   // "Renta" sin subdivisión. Forma: { [obraId]: { obraNombre, grupos:
   // { [tipoNombre]: { [materialNombre]: [{folio, fecha, fechaInicio,
-  // fechaFin, m3, vales, viajes, subtotal, totalFinal, numero}] } } } }.
+  // fechaFin, m3, vales, viajes, subtotal, totalFinal, numero, numeroOrdenCompra,
+  // numeroFactura}] } } } }.
   const conciliacionesPorObraTipo = useMemo(() => {
     const resultado = {};
     const addItem = (obraId, obraNombre, tipoNombre, materialNombre, item) => {
@@ -911,6 +912,8 @@ export const useEstadisticasGlobales = () => {
         viajes: s.viajes,
         subtotal: subtotal,
         totalFinal: subtotal + importeIVA - retencion,
+        numeroOrdenCompra: s.conc.numero_orden_compra || null,
+        numeroFactura: s.conc.numero_factura || null,
       });
     });
 
@@ -949,6 +952,8 @@ export const useEstadisticasGlobales = () => {
           viajes: s ? s.viajes : 0,
           subtotal: Number(c.subtotal) || 0,
           totalFinal: Number(c.total_final) || 0,
+          numeroOrdenCompra: c.numero_orden_compra || null,
+          numeroFactura: c.numero_factura || null,
         });
       });
 
@@ -2040,12 +2045,17 @@ export const useEstadisticasGlobales = () => {
       const o = obraMap[obraId];
       o.vales += 1;
       (vale.vale_renta_detalle || []).forEach((det) => {
-        // Sin fallback a numero_viajes: en pipas ese campo es el "1" fijo que
-        // ValeRentaScreen manda al crear el vale (placeholder de columna
-        // NOT NULL, no una meta ni un conteo real) — usarlo de respaldo
-        // sumaba un viaje fantasma por cada pipa aun sin repartir agua. Solo
-        // cuentan los viajes de agua realmente registrados en vale_renta_viajes.
-        o.totalViajes += det.vale_renta_viajes?.length || 0;
+        // numero_viajes es el conteo real: el checador lo declara al
+        // completar el vale (no hay hora por viaje capturada para pipas en
+        // la práctica, así que vale_renta_viajes casi siempre viene vacío).
+        // Esta tabla agrupa por rango de fecha_creacion (no por
+        // fecha_completado), así que a diferencia de useReporteDiario.js no
+        // hay riesgo de que una pipa de días atrás "salte" a un día que no
+        // le corresponde: aquí solo importa que haya sido creada dentro del
+        // rango, y basta con no contar dos veces si ya hay viajes reales.
+        o.totalViajes += det.vale_renta_viajes?.length > 0
+          ? det.vale_renta_viajes.length
+          : (det.numero_viajes || 1);
         if (vale.vehiculos?.capacidad_m3 != null) {
           o.capacidadSuma += Number(vale.vehiculos.capacidad_m3);
           o.capacidadCount += 1;

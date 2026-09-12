@@ -26,6 +26,7 @@
 | `notifications.css` | `NotificationBell.jsx` |
 | `ModalSolicitudDesver.css` | `ModalSolicitudDesver.jsx` |
 | `reporte-diario.css` | `ReporteDiario.jsx` (página aparte, no modal) — prefijo `rpd__` |
+| `reporte-semanal.css` | `ReporteSemanal.jsx` (página aparte, no modal) — prefijo `rps__` |
 
 ## Variables de global.css
 
@@ -55,6 +56,7 @@
 | `mcv__` | `ModalCancelarVale` |
 | `atv__` | `AutorizarVales` (usa también `mcv__` para `ModalDesautorizarVale`, reutiliza `modal-cancelar-vale.css`) |
 | `rpd__` | `ReporteDiario` (página) |
+| `rps__` | `ReporteSemanal` (página) |
 
 Al crear un componente nuevo con modal/tabla compleja, definir un prefijo de 3-4 letras único y agregarlo aquí.
 

@@ -30,6 +30,7 @@ import VisualizarConciliacion from "./pages/VisualizarConciliacion";
 import HistorialConciliaciones from "./pages/HistorialConciliaciones";
 import EstadisticasGlobales from "./pages/EstadisticasGlobales";
 import ReporteDiario from "./pages/ReporteDiario";
+import ReporteSemanal from "./pages/ReporteSemanal";
 
 // 5. Estilos
 import "./styles/global.css";
@@ -125,6 +126,19 @@ const App = () => {
               <ProtectedRoute requiredRole={["Administrador", "Gerencia", "Residente"]}>
                 <Layout>
                   <ReporteDiario />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Reporte Semanal - mismos roles que Reporte Diario, página aparte
+              (se abre en pestaña nueva) para exportarse como imagen */}
+          <Route
+            path="/reporte-semanal"
+            element={
+              <ProtectedRoute requiredRole={["Administrador", "Gerencia", "Residente"]}>
+                <Layout>
+                  <ReporteSemanal />
                 </Layout>
               </ProtectedRoute>
             }

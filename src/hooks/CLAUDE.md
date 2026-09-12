@@ -44,6 +44,7 @@ hooks/
 | `useEstadisticasGlobales.js` | `EstadisticasGlobales.jsx` | KPIs desde conciliaciones; desglose por material con m³, viajes, importe |
 | `useIndicadoresEficiencia.js` | `EstadisticasGlobales.jsx` | Indicadores de eficiencia/oportunidad (banco, ruta, renta) — recibe `valesReporteFiltrados` de `useEstadisticasGlobales`, no vuelve a pedir vales |
 | `useReporteDiario.js` | `ReporteDiario.jsx` | KPIs de un día específico + comparativa vs. día anterior, materiales/renta del día (para gráficas), desglose por obra y eficiencia operativa |
+| `useReporteSemanal.js` | `ReporteSemanal.jsx` | Igual que `useReporteDiario` pero para la semana (lunes-domingo, `calcularSemanaISO`) + comparativa vs. semana anterior; además `indicadoresSemana` — versión compacta a nivel compañía (sin desglose por obra) de índice de posición, flete evitado y renta no aprovechada |
 | `useDashboardUnificado.js` | `DashboardUnificado.jsx` | Vista unificada con paginación y KPIs |
 | `useMvStats.js` | `Dashboard.jsx` | Vistas materializadas históricas (mv_stats_*) |
 | `useNotifications.js` | `NotificationBell.jsx` | Realtime: vales nuevos vía Supabase Realtime |

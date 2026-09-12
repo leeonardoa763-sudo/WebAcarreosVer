@@ -116,6 +116,15 @@ const formatFechaHoraGeneracion = () =>
     timeZone: "America/Mexico_City",
   });
 
+// Minutos crudos a "Xh Ymin" pasado 60 min, más legible que "287 min".
+const formatMinutosHoras = (min) => {
+  if (min == null) return "—";
+  if (min < 60) return `${formatearNumero(min, 0)} min`;
+  const horas = Math.floor(min / 60);
+  const minutos = Math.round(min % 60);
+  return minutos > 0 ? `${horas}h ${minutos}min` : `${horas}h`;
+};
+
 // Etiqueta de obra con su CC al inicio: "CC 123 · Nombre de la obra"
 const formatearObra = (obra, cc) => (cc != null ? `CC ${cc} · ${obra || "Sin obra"}` : obra || "Sin obra");
 
@@ -607,9 +616,7 @@ const ReporteDiario = () => {
               <Clock size={16} />
               <div>
                 <div className="rpd__stat-value">
-                  {eficiencia.tiempoPromedioEntreViajesMin != null
-                    ? `${formatearNumero(eficiencia.tiempoPromedioEntreViajesMin, 0)} min`
-                    : "—"}
+                  {formatMinutosHoras(eficiencia.tiempoPromedioEntreViajesMin)}
                 </div>
                 <div className="rpd__stat-label">Promedio entre viajes</div>
               </div>

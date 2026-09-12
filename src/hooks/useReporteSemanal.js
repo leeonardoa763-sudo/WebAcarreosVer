@@ -1,54 +1,37 @@
 /**
- * src/hooks/useReporteDiario.js
+ * src/hooks/useReporteSemanal.js
  *
- * Reporte operativo de un día específico: KPIs, comparativa vs. día anterior,
- * materiales del día (materialesDelDia, m³/importe por tipo de material,
- * compañía completa) y renta del día (rentaPorEquipo, importe/viajes por
- * tipo de equipo, con clasificación de eficiencia por viajes/día — excluye
- * pipas de agua, ver pipasDelDia) para las gráficas del reporte, desglose
- * por material y por renta agrupado por obra (con su CC), cada material del
- * desglose trae también `acumuladoM3` — el m3_consumidos histórico de
- * presupuesto_material_obra para ese par obra/material — y `pctPresupuestoUsado`
- * (m3_consumidos ÷ m3_presupuestados), ambos null si no hay presupuesto
- * configurado; cada material del desglose también trae `viajesPlanta`/
- * `m3Planta` — cuánto de ese material (de cualquier sindicato, no solo
- * GEEM) se registró con es_planta_asfaltos, para la nota "→ Planta de
- * Asfaltos" en el chip; cada obra del desglose de renta trae su propio
- * `pctPresupuestoUsado` contra presupuesto_renta_obra (monto_consumido ÷
- * monto_presupuestado — a diferencia del de material, es un monto único por
- * obra, sin desglose por tipo de equipo) — ranking por obra (resumenPorObra, combina
- * material+renta por importe) para la vista secundaria "Obras del Día",
- * resumen de flota propia (flotaPropia: viajes GEEM, viajes a planta de
- * asfaltos con su desglose de material, y ahorro estimado a tarifa de
- * sindicato CTM), resumen de pipas de agua (pipasDelDia: viajes y capacidad
- * aproximada, separado de renta de equipo porque no consume su presupuesto
- * ni se mide igual) y métricas de eficiencia (tiempos entre viajes, hora
- * pico, distribución horaria por material, rendimiento por vehículo).
+ * Reporte operativo de una semana (lunes a domingo, ISO 8601 — ver
+ * utils/dateUtils.js): mismos KPIs y gráficas que useReporteDiario.js
+ * (materiales de la semana, renta por equipo, pipas de agua, flota propia,
+ * desglose por obra con presupuesto y eficiencia operativa), con
+ * comparativa vs. la semana anterior, más un bloque compacto de
+ * `indicadoresSemana` — versión resumida a nivel compañía (sin desglose por
+ * obra, para que quepa en una imagen digerible) de 3 de los indicadores de
+ * "Análisis Avanzado" de EstadisticasGlobales.jsx: índice de posición
+ * promedio ponderado por m³, flete evitado por flota propia (GRUPO GEEM,
+ * revaluado a tarifa real de sindicato CTM) y renta no aprovechada (importe
+ * pagado en equipos con ritmo de "Poca Eficiencia", 1-3 viajes/día).
  *
- * El día de un vale es su fecha efectiva (obtenerFechaEfectiva):
- * fecha_completado si ya se cerró (fecha operacional real, sin importar
- * cuándo se planeó o se creó el registro — mismo criterio que
- * appAcarreos/useEstadisticasMaterialTendencia.js), si no fecha_programada
- * cuando fue planeado con anticipación (en_proceso, aún sin cerrar), y
- * fecha_creacion como último recurso. Así el reporte del día seleccionado
- * incluye tanto los vales planeados para ese día como los que se
- * completaron ese día aunque se hayan planeado para otro.
+ * La eficiencia operativa reemplaza "hora pico"/distribución horaria (poco
+ * útil en una ventana de 7 días) por distribución de viajes por día
+ * calendario de la semana y "día más activo" — mismo criterio de resto
+ * (tiempo promedio entre viajes, m³ promedio por viaje, vehículo top).
  *
- * EXCEPCIÓN — pipas de agua (pipasDelDia, ver valesDiaPipas): se agrupan por
- * fecha_creacion, no por obtenerFechaEfectiva. Una pipa puede quedar
- * "en_proceso" varios días (no hay hora por viaje capturada en la práctica,
- * numero_viajes es un total acumulado sin desglose por día); agruparla por
- * fecha_completado le suma TODOS sus viajes acumulados al día en que por fin
- * se cierra, inflando ese día con trabajo de días anteriores.
+ * El día efectivo de un vale (obtenerFechaEfectiva) y la excepción de pipas
+ * de agua (agrupadas por fecha_creacion, no por fecha_completado) siguen el
+ * mismo criterio que useReporteDiario.js — ver comentarios ahí.
  *
- * Dependencias: supabase, utils/cotizarFlete, SINDICATO_TARIFAS_REPORTE de
+ * Dependencias: supabase, utils/cotizarFlete, utils/dateUtils
+ * (calcularSemanaISO), utils/rentaMaterial, SINDICATO_TARIFAS_REPORTE de
  * hooks/useEstadisticasGlobales
- * Usado en: ReporteDiario.jsx
+ * Usado en: ReporteSemanal.jsx
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../config/supabase";
 import { cotizarFleteM3 } from "../utils/cotizarFlete";
+import { calcularSemanaISO } from "../utils/dateUtils";
 import { SINDICATO_TARIFAS_REPORTE } from "./useEstadisticasGlobales";
 import { materialLabelDetalle } from "../utils/rentaMaterial";
 
@@ -60,24 +43,23 @@ export const formatFechaLocal = (date) => {
   return `${y}-${m}-${d}`;
 };
 
-const calcularRango = (fechaStr) => {
-  const [y, m, d] = fechaStr.split("-").map(Number);
-  const inicioSeleccionado = new Date(y, m - 1, d);
-  const finSeleccionado = new Date(inicioSeleccionado.getTime() + 86400000);
-  const inicioAnterior = new Date(inicioSeleccionado.getTime() - 86400000);
-  return { inicioAnterior, inicioSeleccionado, finSeleccionado };
+// Día calendario (YYYY-MM-DD) en horario de México, para agrupar por día de
+// la semana sin drift de zona horaria (mismo truco que el resto del repo:
+// derivar el día en México y reconstruir a mediodía antes de leer getDay()).
+const diaMexico = (iso) =>
+  iso ? new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" }) : null;
+
+const calcularRango = (fechaRef) => {
+  const semana = calcularSemanaISO(fechaRef);
+  const inicioSeleccionado = new Date(`${semana.fechaInicio}T00:00:00`);
+  const finSeleccionado = new Date(new Date(`${semana.fechaFin}T00:00:00`).getTime() + 86400000);
+  const inicioAnterior = new Date(inicioSeleccionado.getTime() - 7 * 86400000);
+  return { semana, inicioAnterior, inicioSeleccionado, finSeleccionado };
 };
 
-// Fecha efectiva de un vale para el reporte, en orden de prioridad:
-// 1. fecha_completado — la fecha operacional real (appAcarreos/schema.sql:
-//    "fecha_creacion: NO usar para estadísticas — fecha_completado: USAR
-//    para estadísticas"). Se graba cuando el checador cierra el vale y pasa
-//    a estado 'emitido' (useViajesMaterial.js / ValeDetalleRenta.js), sin
-//    importar qué día se planeó o se creó el registro.
-// 2. fecha_programada — el vale fue planeado con anticipación (en_proceso)
-//    pero aún no se completa: cuenta en el día para el que se planeó.
-// 3. fecha_creacion — fallback para el resto (vale creado y completado el
-//    mismo día, o sin ninguno de los dos campos anteriores).
+// Fecha efectiva de un vale para el reporte — mismo criterio y misma
+// prioridad que useReporteDiario.js: fecha_completado (real) →
+// fecha_programada (planeado, aún no cerrado) → fecha_creacion (fallback).
 const obtenerFechaEfectiva = (vale) => {
   if (vale.fecha_completado) return new Date(vale.fecha_completado);
   if (vale.fecha_programada) return new Date(`${vale.fecha_programada}T12:00:00`);
@@ -91,21 +73,10 @@ const round2 = (n) => Math.round(n * 100) / 100;
 
 const coincideSindicato = (nombre, buscado) => (nombre || "").toUpperCase().includes(buscado);
 
-// Flota propia (GRUPO GEEM): mismo criterio que useEstadisticasGlobales.js —
-// sus viajes sí cuentan en m³ y en el conteo de viajes (el material se movió
-// de verdad), pero no en importe (no hay factura real, es transporte con
-// camiones propios).
 const SINDICATO_FLOTA_PROPIA = "GRUPO GEEM";
 const esFlotaPropia = (sindicato) => coincideSindicato(sindicato, SINDICATO_FLOTA_PROPIA);
 
-// ── Registros de material de un vale (compartido por KPIs, materiales del
-// día, desglose por obra y flota propia) ─────────────────────────────────
-// Un "registro" = una unidad de actividad real: un viaje (Tipo 1), un grupo
-// de tickets físicos (Tipo 3, no se puede repartir m³/importe entre
-// tickets individuales) o el detalle completo (Tipo 2, sin filas propias en
-// vale_material_viajes). Centralizar esto evita que la exclusión de importe
-// de flota propia (o el resto de reglas) se tenga que repetir y mantener
-// igual en varios sitios.
+// ── Registros de material de un vale (mismo criterio que useReporteDiario) ──
 const expandirRegistrosMaterial = (vale) => {
   const registros = [];
 
@@ -118,7 +89,6 @@ const expandirRegistrosMaterial = (vale) => {
     const distanciaKmDetalle = Number(det.distancia_km || 0);
 
     if (tipoId === 3) {
-      // Tipo 3 (Tepetate/Corte): volumen medido, viajes = tickets físicos
       const tickets = vale.tickets_material?.length || 0;
       registros.push({
         material,
@@ -135,7 +105,6 @@ const expandirRegistrosMaterial = (vale) => {
     } else {
       const viajes = det.vale_material_viajes || [];
       if (viajes.length > 0) {
-        // Tipo 1 (Pétreos): volumen y costo por viaje individual
         viajes.forEach((viaje) => {
           const vol = Number(viaje.volumen_m3 || 0);
           registros.push({
@@ -143,7 +112,6 @@ const expandirRegistrosMaterial = (vale) => {
             idMaterial,
             tipoId,
             m3: vol,
-            // Prioridad de costo por viaje: override directo → precio_m3 override × vol → precio_m3 del detalle × vol
             importe:
               viaje.costo_viaje_override != null
                 ? Number(viaje.costo_viaje_override)
@@ -155,11 +123,10 @@ const expandirRegistrosMaterial = (vale) => {
             esGeem,
             esPlanta,
             tuvoActividad: true,
+            horaRegistro: viaje.hora_registro || null,
           });
         });
       } else {
-        // Tipo 2 (Base Asfáltica): el volumen se captura directo en el
-        // detalle, sin filas individuales en vale_material_viajes
         registros.push({
           material,
           idMaterial,
@@ -179,7 +146,6 @@ const expandirRegistrosMaterial = (vale) => {
   return registros;
 };
 
-// ── Volumen/costo/actividad de un vale (compartido entre KPIs y desglose) ──
 const calcularVolumenYCosto = (vale) => {
   let m3 = 0;
   let importe = 0;
@@ -203,7 +169,7 @@ const calcularVolumenYCosto = (vale) => {
   return { m3, importe, viajesCount, tuvoActividad };
 };
 
-// ── KPIs del día ───────────────────────────────────────────────────────
+// ── KPIs de la semana ──────────────────────────────────────────────────
 const calcularKpis = (vales) => {
   const vehiculosActivos = new Set();
   let materialM3 = 0;
@@ -281,10 +247,6 @@ const calcularDesgloseMaterial = (vales) => {
       s.m3Total += r.m3;
       if (!r.esGeem) s.importe += r.importe;
       s.viajes += r.viajes;
-      // Nota de viajes a planta de asfaltos — es_planta_asfaltos es un sello
-      // del detalle, independiente de si es flota propia (GEEM) o no; aquí
-      // se marca para cualquier material/obra, a diferencia de flotaPropia
-      // (calcularFlotaPropia) que solo lo desglosa para GEEM.
       if (r.esPlanta) {
         s.m3Planta += r.m3;
         s.viajesPlanta += r.viajes;
@@ -295,8 +257,6 @@ const calcularDesgloseMaterial = (vales) => {
   return Object.values(obraMap)
     .map(({ obraId, obra, cc, empresa, matMap }) => {
       const materiales = Object.values(matMap)
-        // Descarta materiales sin actividad real ese día (detalle del vale
-        // existe pero no se registró ningún viaje/ticket con volumen o costo)
         .filter((m) => m.m3Total > 0 || m.importe > 0)
         .map((m) => ({ ...m, m3Total: round2(m.m3Total), importe: round2(m.importe), m3Planta: round2(m.m3Planta) }))
         .sort((a, b) => b.m3Total - a.m3Total);
@@ -314,10 +274,8 @@ const calcularDesgloseMaterial = (vales) => {
     .sort((a, b) => b.subtotal.m3Total - a.subtotal.m3Total);
 };
 
-// ── Materiales del día (compañía completa, sin agrupar por obra) ────────
-// Responde directamente "cuánto moví de grava hoy": un solo mapa por
-// nombre de material, para la gráfica principal del reporte.
-const calcularMaterialesDelDia = (vales) => {
+// ── Materiales de la semana (compañía completa, sin agrupar por obra) ───
+const calcularMaterialesSemana = (vales) => {
   const matMap = {};
 
   vales.forEach((vale) => {
@@ -336,15 +294,7 @@ const calcularMaterialesDelDia = (vales) => {
     .sort((a, b) => b.m3Total - a.m3Total);
 };
 
-// ── Flota propia (GRUPO GEEM) del día ─────────────────────────────────────
-// Sus viajes no traen factura (por eso se excluyen del importe en todo lo
-// demás), pero siguen siendo actividad real de la operación. Además del
-// conteo de viajes, revalúa cada uno a la tarifa real de sindicato CTM para
-// el mismo material+distancia (mismo criterio que
-// useIndicadoresEficiencia.calcularFleteEvitadoFlotaPropia): la tarifa
-// técnica de $1/km que trae el vale de GEEM no es dinero real, el ahorro es
-// el valor completo a tarifa de sindicato. También separa qué se llevó a
-// planta de asfaltos y cuánto.
+// ── Flota propia (GRUPO GEEM) de la semana ──────────────────────────────
 const calcularFlotaPropia = (vales, preciosMaterialTodos) => {
   const tarifaCTM = (tipoMaterialId) =>
     preciosMaterialTodos.find(
@@ -386,16 +336,11 @@ const calcularFlotaPropia = (vales, preciosMaterialTodos) => {
   };
 };
 
-// ── Pipas de agua del día ──────────────────────────────────────────────
-// `es_pipa_agua` es el sello de cabecera del vale — las pipas se cobran
-// por hora/día igual que la renta de equipo pero no consumen su
-// presupuesto (mismo criterio que tablaObraPipasAcumulado en
-// useEstadisticasGlobales.js), así que viven aparte de rentaPorEquipo/
-// desgloseRenta. No hay m³ medido: la capacidad aproximada sale de
-// capacidad_m3 del vehículo (mismo criterio que renta de equipo).
-// Recibe `valesDiaPipas` (ya filtrado por es_pipa_agua + fecha_creacion —
-// ver comentario ahí sobre por qué es fecha_creacion y no fecha_completado).
-const calcularPipasDelDia = (vales) => {
+// ── Pipas de agua de la semana ──────────────────────────────────────────
+// Igual que useReporteDiario.js: agrupadas por fecha_creacion, no por
+// fecha_completado (evita inflar la semana en que por fin se cierra una pipa
+// que quedó "en_proceso" varios días).
+const calcularPipasDeLaSemana = (vales) => {
   let vales_ = 0;
   let totalViajes = 0;
   let capacidadSuma = 0;
@@ -407,11 +352,6 @@ const calcularPipasDelDia = (vales) => {
 
     vales_ += 1;
     rentaDetalles.forEach((det) => {
-      // numero_viajes es el conteo real: el checador lo declara al completar
-      // el vale (no hay hora por viaje capturada para pipas en la práctica,
-      // así que vale_renta_viajes casi siempre viene vacío). Fallback a 0
-      // (no a numero_viajes) solo cuando ya hay viajes reales registrados en
-      // vale_renta_viajes, para no contarlos dos veces.
       totalViajes += det.vale_renta_viajes?.length > 0
         ? det.vale_renta_viajes.length
         : (det.numero_viajes || 0);
@@ -431,12 +371,7 @@ const calcularPipasDelDia = (vales) => {
   };
 };
 
-// ── Renta del día por tipo de equipo (compañía completa, sin pipas) ──────
-// Clasifica cada tipo de equipo por su ritmo del día (viajes ÷ días) en el
-// mismo espectro de eficiencia que useIndicadoresEficiencia.calcularRentaNoAprovechada
-// (constante de negocio confirmada con Bruno: meta_viajes_dia_renta = 7).
-// Las claves internas se conservan por compatibilidad (desperdiciado/ideal),
-// solo cambian las etiquetas mostradas.
+// ── Renta de la semana por tipo de equipo (compañía completa, sin pipas) ──
 const META_VIAJES_DIA_RENTA = 7;
 const RANGOS_EFICIENCIA_RENTA = [
   { key: "desperdiciado", label: "Poca Eficiencia", max: META_VIAJES_DIA_RENTA - 4 },
@@ -500,7 +435,7 @@ const calcularDesgloseRenta = (vales) => {
         obraId,
         obra: vale.obras?.obra || "Sin obra",
         cc: vale.obras?.cc ?? null,
-        empresa: vale.empresas?.empresa || null,
+        empresa: vale.obras?.empresas?.empresa || null,
         vales: 0,
         horas: 0,
         dias: 0,
@@ -517,15 +452,94 @@ const calcularDesgloseRenta = (vales) => {
   });
 
   return Object.values(obraMap)
-    // Descarta obras sin actividad real ese día (vale con detalle de renta
-    // pero sin horas, días ni costo registrado)
     .filter((o) => o.horas > 0 || o.dias > 0 || o.importe > 0)
     .map((o) => ({ ...o, horas: round2(o.horas), dias: round2(o.dias), importe: round2(o.importe) }))
     .sort((a, b) => b.importe - a.importe);
 };
 
-// ── Eficiencia operativa ─────────────────────────────────────────────────
-const calcularEficiencia = (vales) => {
+// ── Indicadores de eficiencia de la semana (versión compañía completa) ──
+// Réplica compacta (sin desglose por obra) de 3 de los 4 indicadores de
+// useIndicadoresEficiencia.js — pensada para caber en 3 tarjetas dentro de
+// una imagen, no para reemplazar el detalle por obra de Estadísticas
+// Globales. Viabilidad de flota (camiones/día + top camioneros) se deja
+// fuera a propósito para no saturar el reporte semanal.
+const calcularIndicadoresSemana = (vales, preciosMaterialTodos) => {
+  // Índice de posición: Σ(m³ × distancia_km) ÷ Σm³, compañía completa.
+  let sumaM3PorKm = 0;
+  let m3TotalIndice = 0;
+  vales.forEach((vale) => {
+    (vale.vale_material_detalles || []).forEach((det) => {
+      const viajes = det.vale_material_viajes || [];
+      const registros = viajes.length > 0
+        ? viajes.map((v) => ({ m3: Number(v.volumen_m3 ?? 0), distanciaKm: Number(v.distancia_km_override ?? det.distancia_km ?? 0) }))
+        : [{ m3: Number(det.volumen_real_m3 ?? 0), distanciaKm: Number(det.distancia_km ?? 0) }];
+      registros.forEach(({ m3, distanciaKm }) => {
+        if (m3 <= 0 || distanciaKm <= 0) return;
+        sumaM3PorKm += m3 * distanciaKm;
+        m3TotalIndice += m3;
+      });
+    });
+  });
+  const indicePosicionPromedio = m3TotalIndice > 0 ? sumaM3PorKm / m3TotalIndice : null;
+
+  // Flete evitado por flota propia (GRUPO GEEM), revaluado a tarifa CTM.
+  const tarifaCTM = (tipoMaterialId) =>
+    preciosMaterialTodos.find(
+      (t) => t.id_tipo_de_material === tipoMaterialId && coincideSindicato(t.sindicatos?.sindicato, SINDICATO_TARIFAS_REPORTE)
+    ) || null;
+  let fleteEvitadoTotal = 0;
+  let viajesGeemTotal = 0;
+  vales.forEach((vale) => {
+    expandirRegistrosMaterial(vale).forEach((r) => {
+      if (!r.esGeem) return;
+      viajesGeemTotal += r.viajes;
+      if (r.m3 <= 0) return;
+      const tarifa = tarifaCTM(r.tipoId);
+      const valorM3 = tarifa ? cotizarFleteM3(r.distanciaKm, tarifa) : null;
+      if (valorM3 != null) fleteEvitadoTotal += valorM3 * r.m3;
+    });
+  });
+
+  // Renta no aprovechada: importe pagado en vale_renta_detalle cuyo ritmo
+  // real (viajes ÷ días) cae en el espectro "Poca Eficiencia".
+  let totalImporteRenta = 0;
+  let totalValesRenta = 0;
+  let rentaDesperdiciadaTotal = 0;
+  let valesPocaEficiencia = 0;
+  vales.forEach((vale) => {
+    if (vale.es_pipa_agua) return;
+    (vale.vale_renta_detalle || []).forEach((det) => {
+      const totalDias = Number(det.total_dias || 0);
+      if (totalDias <= 0) return;
+      const viajes = det.vale_renta_viajes?.length > 0 ? det.vale_renta_viajes.length : (det.numero_viajes || 1);
+      if (viajes <= 0) return;
+      const importe = Number(det.costo_total || 0);
+      totalImporteRenta += importe;
+      totalValesRenta += 1;
+      if (clasificarRangoRenta(viajes / totalDias) === "desperdiciado") {
+        rentaDesperdiciadaTotal += importe;
+        valesPocaEficiencia += 1;
+      }
+    });
+  });
+
+  return {
+    indicePosicionPromedio: indicePosicionPromedio != null ? round2(indicePosicionPromedio) : null,
+    fleteEvitadoTotal: round2(fleteEvitadoTotal),
+    viajesGeemTotal,
+    rentaDesperdiciadaTotal: round2(rentaDesperdiciadaTotal),
+    totalImporteRentaSemana: round2(totalImporteRenta),
+    pctPocaEficienciaRenta: totalValesRenta > 0 ? Math.round((valesPocaEficiencia / totalValesRenta) * 100) : null,
+  };
+};
+
+// ── Eficiencia operativa de la semana ────────────────────────────────────
+// A diferencia de useReporteDiario.js (distribución por hora del día), aquí
+// se distribuye por día calendario de la semana — más útil en una ventana
+// de 7 días — y "día más activo" reemplaza a "hora pico".
+const DIAS_SEMANA_LABEL = { 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie", 6: "Sáb", 0: "Dom" };
+
+const calcularEficiencia = (vales, fechaInicioSemana) => {
   const viajesConHora = [];
 
   vales.forEach((vale) => {
@@ -546,10 +560,6 @@ const calcularEficiencia = (vales) => {
           material,
         });
       });
-      // Tipo 2 (Base Asfáltica): 1 vale = 1 viaje, sin filas en
-      // vale_material_viajes — sin este caso, sus viajes nunca aparecían en
-      // la distribución horaria. Se usa el timestamp del propio vale (fecha
-      // operativa = fecha_completado, con fallback a fecha_creacion).
       if (tipoId === 2 && viajes.length === 0) {
         const tieneDatos = det.volumen_real_m3 != null || det.costo_total != null;
         const tsVale = vale.fecha_completado ?? vale.fecha_creacion;
@@ -567,28 +577,34 @@ const calcularEficiencia = (vales) => {
     });
   });
 
-  // Distribución de viajes por hora del día (hora local), desglosada por
-  // material para que la gráfica se pueda colorear/leyendar por tipo.
+  // Distribución de viajes por día calendario de la semana (Lun→Dom),
+  // desglosada por material para colorear/leyendar igual que la del día.
   const materialesDistintos = [...new Set(viajesConHora.map((x) => x.material))].sort();
-  const horasMap = {};
-  for (let h = 0; h < 24; h++) {
-    horasMap[h] = { hora: h, label: `${String(h).padStart(2, "0")}:00` };
-    materialesDistintos.forEach((m) => { horasMap[h][m] = 0; });
+  const diasMap = {};
+  const inicio = new Date(`${fechaInicioSemana}T00:00:00`);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(inicio.getTime() + i * 86400000);
+    const key = formatFechaLocal(d);
+    diasMap[key] = { fecha: key, label: `${DIAS_SEMANA_LABEL[d.getDay()]} ${String(d.getDate()).padStart(2, "0")}` };
+    materialesDistintos.forEach((m) => { diasMap[key][m] = 0; });
   }
   viajesConHora.forEach((x) => {
-    const h = x.hora.getHours();
-    horasMap[h][x.material] = (horasMap[h][x.material] || 0) + 1;
+    const key = diaMexico(x.hora.toISOString());
+    if (!diasMap[key]) return;
+    diasMap[key][x.material] = (diasMap[key][x.material] || 0) + 1;
   });
-  const distribucionHoraria = Object.values(horasMap);
-  const horaPico = distribucionHoraria.reduce(
-    (max, row) => {
-      const total = materialesDistintos.reduce((s, m) => s + row[m], 0);
-      return total > max.viajes ? { viajes: total, label: row.label } : max;
-    },
+  // `total` por día (suma de todos los materiales) — se usa tanto para
+  // encontrar el día pico como para la etiqueta de total sobre cada barra.
+  const distribucionDiaria = Object.values(diasMap).map((row) => ({
+    ...row,
+    total: materialesDistintos.reduce((s, m) => s + (row[m] || 0), 0),
+  }));
+  const diaPico = distribucionDiaria.reduce(
+    (max, row) => (row.total > max.viajes ? { viajes: row.total, label: row.label } : max),
     { viajes: 0, label: "—" }
   );
 
-  // Tiempo promedio entre viajes consecutivos, por vehículo
+  // Tiempo promedio entre viajes consecutivos, por vehículo, en toda la semana
   const porVehiculo = {};
   viajesConHora.forEach((x) => {
     if (x.idVehiculo == null) return;
@@ -617,36 +633,27 @@ const calcularEficiencia = (vales) => {
     ? { placas: vehiculoTopRaw.placas, m3Total: round2(vehiculoTopRaw.m3Total), viajes: vehiculoTopRaw.viajes }
     : null;
 
-  const porObraM3 = {};
-  viajesConHora.forEach((x) => { porObraM3[x.obra] = (porObraM3[x.obra] || 0) + x.m3; });
-  const obraTopEntry = Object.entries(porObraM3).sort((a, b) => b[1] - a[1])[0];
-  const obraTop = obraTopEntry ? { obra: obraTopEntry[0], m3Total: round2(obraTopEntry[1]) } : null;
-
   const totalM3Material = viajesConHora.reduce((acc, x) => acc + x.m3, 0);
   const m3PromedioPorViaje = viajesConHora.length > 0 ? round2(totalM3Material / viajesConHora.length) : 0;
 
   return {
-    distribucionHoraria,
+    distribucionDiaria,
     materialesDistintos,
-    horaPico: horaPico.viajes > 0 ? horaPico : null,
+    diaPico: diaPico.viajes > 0 ? diaPico : null,
     tiempoPromedioEntreViajesMin,
     m3PromedioPorViaje,
     vehiculoTop,
-    obraTop,
   };
 };
 
 // ── Hook principal ────────────────────────────────────────────────────
-export const useReporteDiario = () => {
-  const [fecha, setFecha] = useState(() => formatFechaLocal(new Date()));
+export const useReporteSemanal = () => {
+  const [fechaRef, setFechaRef] = useState(() => formatFechaLocal(new Date()));
   const [rawVales, setRawVales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Tarifas de sindicato (todas, no solo CTM) — tabla de referencia chica,
-  // independiente de la fecha seleccionada, se pide una sola vez.
   const [preciosMaterialTodos, setPreciosMaterialTodos] = useState([]);
-
   useEffect(() => {
     let activo = true;
     supabase
@@ -659,7 +666,7 @@ export const useReporteDiario = () => {
       .then(({ data, error: err }) => {
         if (!activo) return;
         if (err) {
-          console.error("Error al cargar precios_material en useReporteDiario:", err.message);
+          console.error("Error al cargar precios_material en useReporteSemanal:", err.message);
           return;
         }
         setPreciosMaterialTodos(data || []);
@@ -667,12 +674,7 @@ export const useReporteDiario = () => {
     return () => { activo = false; };
   }, []);
 
-  // Acumulado histórico de presupuesto por obra/material (m3_consumidos ya es
-  // el corte acumulado a la fecha, actualizado por trigger en BD — no depende
-  // del día seleccionado), para mostrar contexto junto al material del día en
-  // "Obras del Día". Igual que preciosMaterialTodos, se pide una sola vez.
   const [presupuestosMaterial, setPresupuestosMaterial] = useState([]);
-
   useEffect(() => {
     let activo = true;
     supabase
@@ -681,7 +683,7 @@ export const useReporteDiario = () => {
       .then(({ data, error: err }) => {
         if (!activo) return;
         if (err) {
-          console.error("Error al cargar presupuesto_material_obra en useReporteDiario:", err.message);
+          console.error("Error al cargar presupuesto_material_obra en useReporteSemanal:", err.message);
           return;
         }
         setPresupuestosMaterial(data || []);
@@ -700,11 +702,7 @@ export const useReporteDiario = () => {
     return map;
   }, [presupuestosMaterial]);
 
-  // Presupuesto de renta por obra (a diferencia del de material, no se
-  // desglosa por equipo — presupuesto_renta_obra es un monto único por obra,
-  // mismo criterio que tablaObraRentaAcumulado en useEstadisticasGlobales.js).
   const [presupuestosRenta, setPresupuestosRenta] = useState([]);
-
   useEffect(() => {
     let activo = true;
     supabase
@@ -713,7 +711,7 @@ export const useReporteDiario = () => {
       .then(({ data, error: err }) => {
         if (!activo) return;
         if (err) {
-          console.error("Error al cargar presupuesto_renta_obra en useReporteDiario:", err.message);
+          console.error("Error al cargar presupuesto_renta_obra en useReporteSemanal:", err.message);
           return;
         }
         setPresupuestosRenta(data || []);
@@ -732,14 +730,14 @@ export const useReporteDiario = () => {
     return map;
   }, [presupuestosRenta]);
 
-  const rango = useMemo(() => calcularRango(fecha), [fecha]);
+  const rango = useMemo(() => calcularRango(fechaRef), [fechaRef]);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const { inicioAnterior, finSeleccionado } = calcularRango(fecha);
+      const { inicioAnterior, finSeleccionado } = calcularRango(fechaRef);
       const programadaInicio = formatFechaLocal(inicioAnterior);
       const programadaFin = formatFechaLocal(finSeleccionado);
 
@@ -769,13 +767,6 @@ export const useReporteDiario = () => {
             vale_renta_viajes (id_viaje, hora_registro)
           )
         `)
-        // Trae vales por fecha_creacion (caso normal) O por fecha_programada
-        // (vale planeado con anticipación, aún no completado) O por
-        // fecha_completado (vale planeado para otro día pero cerrado en
-        // este rango — ver obtenerFechaEfectiva, fecha_completado manda).
-        // Sin las tres, un vale planeado el sábado y completado hoy no
-        // tendría ningún campo de fecha en la ventana de "hoy" y se
-        // perdería del reporte por completo.
         .or(
           `and(fecha_creacion.gte.${inicioAnterior.toISOString()},fecha_creacion.lt.${finSeleccionado.toISOString()}),` +
             `and(fecha_programada.gte.${programadaInicio},fecha_programada.lt.${programadaFin}),` +
@@ -786,18 +777,18 @@ export const useReporteDiario = () => {
       if (err) throw err;
       setRawVales(data || []);
     } catch (err) {
-      console.error("Error en useReporteDiario.fetchData:", err);
-      setError(err.message || "Error al cargar el reporte diario");
+      console.error("Error en useReporteSemanal.fetchData:", err);
+      setError(err.message || "Error al cargar el reporte semanal");
     } finally {
       setLoading(false);
     }
-  }, [fecha]);
+  }, [fechaRef]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  const valesDia = useMemo(() => {
+  const valesSemana = useMemo(() => {
     const { inicioSeleccionado, finSeleccionado } = rango;
     return rawVales.filter((v) => {
       if (!esValeReal(v) || !v.fecha_creacion) return false;
@@ -806,7 +797,7 @@ export const useReporteDiario = () => {
     });
   }, [rawVales, rango]);
 
-  const valesDiaAnterior = useMemo(() => {
+  const valesSemanaAnterior = useMemo(() => {
     const { inicioAnterior, inicioSeleccionado } = rango;
     return rawVales.filter((v) => {
       if (!esValeReal(v) || !v.fecha_creacion) return false;
@@ -815,16 +806,7 @@ export const useReporteDiario = () => {
     });
   }, [rawVales, rango]);
 
-  // Pipas: por fecha_creacion, NO por obtenerFechaEfectiva (fecha_completado).
-  // Una pipa se abre cuando el camión sale a repartir agua y puede quedar
-  // "en_proceso" varios días antes de cerrarse (no hay vale_renta_viajes con
-  // hora por viaje para pipas en la práctica — numero_viajes es un total
-  // acumulado sin desglose por día). Si se agrupara por fecha_completado, el
-  // día en que por fin se cierra una pipa de hace 3 días le suma TODOS sus
-  // viajes acumulados al reporte de HOY, inflando el total. Agrupar por
-  // fecha_creacion es la única atribución que no duplica ni desplaza viajes
-  // entre días.
-  const valesDiaPipas = useMemo(() => {
+  const valesSemanaPipas = useMemo(() => {
     const { inicioSeleccionado, finSeleccionado } = rango;
     return rawVales.filter((v) => {
       if (!esValeReal(v) || !v.es_pipa_agua || !v.fecha_creacion) return false;
@@ -833,24 +815,21 @@ export const useReporteDiario = () => {
     });
   }, [rawVales, rango]);
 
-  const kpis = useMemo(() => calcularKpis(valesDia), [valesDia]);
-  const kpisAnterior = useMemo(() => calcularKpis(valesDiaAnterior), [valesDiaAnterior]);
+  const kpis = useMemo(() => calcularKpis(valesSemana), [valesSemana]);
+  const kpisAnterior = useMemo(() => calcularKpis(valesSemanaAnterior), [valesSemanaAnterior]);
   const comparativa = useMemo(() => calcularComparativa(kpis, kpisAnterior), [kpis, kpisAnterior]);
-  const materialesDelDia = useMemo(() => calcularMaterialesDelDia(valesDia), [valesDia]);
-  const rentaPorEquipo = useMemo(() => calcularRentaPorEquipo(valesDia), [valesDia]);
-  const pipasDelDia = useMemo(() => calcularPipasDelDia(valesDiaPipas), [valesDiaPipas]);
+  const materialesSemana = useMemo(() => calcularMaterialesSemana(valesSemana), [valesSemana]);
+  const rentaPorEquipo = useMemo(() => calcularRentaPorEquipo(valesSemana), [valesSemana]);
+  const pipasDeLaSemana = useMemo(() => calcularPipasDeLaSemana(valesSemanaPipas), [valesSemanaPipas]);
   const flotaPropia = useMemo(
-    () => calcularFlotaPropia(valesDia, preciosMaterialTodos),
-    [valesDia, preciosMaterialTodos]
+    () => calcularFlotaPropia(valesSemana, preciosMaterialTodos),
+    [valesSemana, preciosMaterialTodos]
   );
-  const desgloseMaterialSinAcumulado = useMemo(() => calcularDesgloseMaterial(valesDia), [valesDia]);
-  // Cruza cada material del desglose con su acumulado histórico de
-  // presupuesto (obra + material) — contexto de "cuánto llevamos de esto en
-  // la obra", no solo lo del día. También calcula qué % del presupuesto ya
-  // se surtió (redondeado a entero, para caber en el chip sin ocupar más
-  // espacio). Ambos se omiten cuando no hay presupuesto configurado para ese
-  // par obra/material, o cuando m3_presupuestados es 0 (evita división entre
-  // cero).
+  const indicadoresSemana = useMemo(
+    () => calcularIndicadoresSemana(valesSemana, preciosMaterialTodos),
+    [valesSemana, preciosMaterialTodos]
+  );
+  const desgloseMaterialSinAcumulado = useMemo(() => calcularDesgloseMaterial(valesSemana), [valesSemana]);
   const desgloseMaterial = useMemo(
     () =>
       desgloseMaterialSinAcumulado.map((o) => ({
@@ -867,9 +846,7 @@ export const useReporteDiario = () => {
       })),
     [desgloseMaterialSinAcumulado, acumuladoMaterialMap]
   );
-  const desgloseRentaSinPresupuesto = useMemo(() => calcularDesgloseRenta(valesDia), [valesDia]);
-  // Mismo cruce que desgloseMaterial, pero contra presupuesto_renta_obra
-  // (monto en $, por obra completa — no hay desglose por tipo de equipo).
+  const desgloseRentaSinPresupuesto = useMemo(() => calcularDesgloseRenta(valesSemana), [valesSemana]);
   const desgloseRenta = useMemo(
     () =>
       desgloseRentaSinPresupuesto.map((o) => {
@@ -883,12 +860,11 @@ export const useReporteDiario = () => {
       }),
     [desgloseRentaSinPresupuesto, presupuestoRentaMap]
   );
-  const eficiencia = useMemo(() => calcularEficiencia(valesDia), [valesDia]);
+  const eficiencia = useMemo(
+    () => calcularEficiencia(valesSemana, rango.semana.fechaInicio),
+    [valesSemana, rango.semana.fechaInicio]
+  );
 
-  // Ranking por obra para la vista visual (reemplaza las tablas de desglose):
-  // combina material + renta con el importe como denominador común, ya que m³
-  // y horas no son comparables entre sí. m3Total/horasRenta se conservan como
-  // dato de apoyo (caption) bajo cada barra, no como criterio de orden.
   const resumenPorObra = useMemo(() => {
     const map = {};
     const clave = (o) => `${o.obra}__${o.cc}`;
@@ -908,16 +884,18 @@ export const useReporteDiario = () => {
   }, [desgloseMaterial, desgloseRenta]);
 
   return {
-    fecha,
-    setFecha,
+    semana: rango.semana,
+    fechaRef,
+    setFechaRef,
     loading,
     error,
     kpis,
     comparativa,
-    materialesDelDia,
+    materialesSemana,
     rentaPorEquipo,
-    pipasDelDia,
+    pipasDeLaSemana,
     flotaPropia,
+    indicadoresSemana,
     desgloseMaterial,
     desgloseRenta,
     resumenPorObra,

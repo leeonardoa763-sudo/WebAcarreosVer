@@ -1313,21 +1313,26 @@ const dibujarSeccionTendencias = (doc, yPosInicial, seriesImporteTiempo, seriesC
 // ── Tabla de conciliaciones vinculadas, agrupada por material ──────────
 // Antes solo se listaban los números de conciliación como vínculos sueltos;
 // ahora cada fila trae el detalle que explica ese importe (periodo, m³,
-// vales, viajes) y un link de soporte que abre la misma página pública a la
-// que lleva el QR de esa conciliación. `label` es el nombre del material
+// vales, viajes, orden de compra, factura) y un link de soporte que abre la
+// misma página pública a la que lleva el QR de esa conciliación. Orden de
+// compra/factura salen de `conciliaciones.numero_orden_compra`/`numero_factura`
+// (capturados al marcar la conciliación como pagada en Contabilidad) y se
+// dejan en blanco cuando aún no se capturan. `label` es el nombre del material
 // (null para omitir el subtítulo, caso "Renta" que no se subdivide por
 // material). El importe de material ya viene recalculado por material (no
 // es el subtotal completo de la conciliación) — ver conciliacionesPorObraTipo
 // en useEstadisticasGlobales.js. ───────────────────────────────────────
 const COLUMNAS_TABLA_CONCILIACIONES = [
-  { key: "numero", label: "#", width: 7, align: "left" },
-  { key: "periodo", label: "PERIODO", width: 33, align: "left" },
-  { key: "importe", label: "IMPORTE", width: 27, align: "right" },
-  { key: "totalFinal", label: "IMPORTE C/IVA-RET.", width: 30, align: "right" },
-  { key: "m3", label: "M³", width: 22, align: "right" },
-  { key: "vales", label: "VALES", width: 16, align: "right" },
-  { key: "viajes", label: "VIAJES", width: 18, align: "right" },
-  { key: "link", label: "SOPORTE", width: 22, align: "left" },
+  { key: "numero", label: "#", width: 6, align: "left" },
+  { key: "periodo", label: "PERIODO", width: 34, align: "left" },
+  { key: "importe", label: "IMPORTE", width: 22, align: "right" },
+  { key: "totalFinal", label: "TOTAL FINAL", width: 24, align: "right" },
+  { key: "m3", label: "M³", width: 18, align: "right" },
+  { key: "vales", label: "VALES", width: 13, align: "right" },
+  { key: "viajes", label: "VIAJES", width: 15, align: "right" },
+  { key: "ordenCompra", label: "O. COMPRA", width: 17, align: "left" },
+  { key: "factura", label: "FACTURA", width: 16, align: "left" },
+  { key: "link", label: "SOPORTE", width: 20, align: "left" },
 ];
 
 const dibujarEncabezadoTablaConciliaciones = (doc, yPos) => {
@@ -1386,6 +1391,8 @@ const dibujarTablaConciliaciones = (doc, yPosInicial, label, items) => {
       m3: item.m3 != null ? `${formatearNumero(item.m3, 2)} m³` : "—",
       vales: formatearNumero(item.vales),
       viajes: formatearNumero(item.viajes),
+      ordenCompra: item.numeroOrdenCompra || "",
+      factura: item.numeroFactura || "",
       link: "Ver soporte",
     };
 

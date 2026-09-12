@@ -1,0 +1,653 @@
+/*
+ * src/styles/reporte-semanal.css
+ *
+ * Estilos de la página "Reporte Semanal" (prefijo BEM: rps__ para el
+ * contenido del reporte —lo que se captura como imagen—, rps-page__ para
+ * el chrome de la página que NO se captura: la barra de semana/exportar).
+ * Calcado de reporte-diario.css (rpd__) con una sección propia para los
+ * indicadores de eficiencia de la semana.
+ * Usado en: ReporteSemanal.jsx
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Barlow+Condensed:wght@500;600;700&display=swap');
+
+.rps-page {
+  min-height: 100%;
+  background: #eef2f7;
+  padding-bottom: 48px;
+  font-family: 'Outfit', system-ui, sans-serif;
+}
+
+/* ── Barra de herramientas (fuera de la captura) ──────────────── */
+.rps-page__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 28px;
+  background: linear-gradient(135deg, #0a1f3d 0%, #004e89 100%);
+  flex-wrap: wrap;
+}
+
+.rps-page__toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.rps-page__toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rps__date-quick {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+}
+
+.rps__date-quick-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.rps__date-quick-btn:hover {
+  color: #ffffff;
+}
+
+.rps__date-quick-btn--active {
+  background: #ffffff;
+  color: #004e89;
+}
+
+.rps__date-input {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 13px;
+  color-scheme: dark;
+}
+
+.rps__export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #1a936f;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  white-space: nowrap;
+}
+
+.rps__export-btn:hover:not(:disabled) {
+  background: #157a5c;
+}
+
+.rps__export-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rps__export-btn--pdf {
+  background: #dc2626;
+}
+
+.rps__export-btn--pdf:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+/* ── Estados (fuera de la captura) ───────────────────────────── */
+.rps__loading,
+.rps__empty {
+  padding: 32px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13px;
+  background: #f5f6fa;
+  border-radius: 12px;
+}
+
+.rps__loading {
+  max-width: 1080px;
+  margin: 24px auto 0;
+}
+
+.rps__error {
+  max-width: 1080px;
+  margin: 24px auto 0;
+  padding: 16px;
+  border-radius: 12px;
+  background: #fee2e2;
+  color: #dc2626;
+  text-align: center;
+}
+
+.rps__error button {
+  margin-top: 8px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #dc2626;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* ── Tarjeta del reporte (esto sí se captura como imagen) ─────── */
+.rps-page__report {
+  max-width: 1080px;
+  margin: 24px auto 0;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 16px 48px rgba(0, 78, 137, 0.12), 0 4px 16px rgba(0, 0, 0, 0.05);
+  padding: 28px 30px 34px;
+}
+
+.rps-page__report-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 18px;
+  border-bottom: 2px solid rgba(0, 78, 137, 0.08);
+  flex-wrap: wrap;
+}
+
+.rps-page__title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #1a2332;
+}
+
+.rps-page__subtitle {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.rps-page__report-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.rps-page__fecha {
+  font-size: 14px;
+  font-weight: 700;
+  color: #004e89;
+  text-transform: capitalize;
+}
+
+.rps-page__generado {
+  font-size: 10.5px;
+  color: #94a3b8;
+}
+
+/* ── KPIs ───────────────────────────────────────────────── */
+.rps__kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.rps__kpi {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, #0f2a4a 0%, #0a1f3d 100%);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 8px 22px rgba(0, 78, 137, 0.16);
+}
+
+.rps__kpi::after {
+  content: "";
+  position: absolute;
+  top: -30%;
+  right: -20%;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
+}
+
+.rps__kpi-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.rps__kpi-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  z-index: 1;
+}
+
+.rps__kpi-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ffffff;
+  z-index: 1;
+}
+
+.rps__kpi-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 20px;
+  z-index: 1;
+}
+
+.rps__kpi-trend--up { color: #34d399; background: rgba(52, 211, 153, 0.15); }
+.rps__kpi-trend--down { color: #f87171; background: rgba(248, 113, 113, 0.15); }
+
+/* ── Secciones ──────────────────────────────────────────── */
+.rps__section-header {
+  margin: 26px 0 12px;
+}
+
+.rps__section-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #004e89;
+}
+
+.rps__section-header p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* ── Gráficas (material / renta / distribución diaria) ─────── */
+.rps__chart-card {
+  background: #f5f6fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.rps__chart-card--full {
+  margin-top: 16px;
+}
+
+.rps__chart-card h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a2332;
+}
+
+/* ── Eficiencia de renta por equipo (viajes/día) ────────────── */
+.rps__renta-eficiencia {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.rps__renta-eficiencia-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 20px;
+  background: #f5f6fa;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 11px;
+}
+
+.rps__renta-eficiencia-chip--red {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.25);
+}
+
+.rps__renta-eficiencia-chip--yellow {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.rps__renta-eficiencia-chip--green {
+  background: rgba(26, 147, 111, 0.1);
+  border-color: rgba(26, 147, 111, 0.28);
+}
+
+.rps__renta-eficiencia-nombre {
+  font-weight: 700;
+  color: #1a2332;
+}
+
+.rps__renta-eficiencia-nivel {
+  font-weight: 700;
+}
+
+.rps__renta-eficiencia-chip--red .rps__renta-eficiencia-nivel { color: #dc2626; }
+.rps__renta-eficiencia-chip--yellow .rps__renta-eficiencia-nivel { color: #b45309; }
+.rps__renta-eficiencia-chip--green .rps__renta-eficiencia-nivel { color: #1a936f; }
+
+.rps__renta-eficiencia-ratio {
+  color: #64748b;
+}
+
+/* ── Flota propia (Grupo GEEM) y Pipas de Agua ──────────────── */
+.rps__flota-propia {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 14px 0 26px;
+}
+
+.rps__info-card {
+  background: rgba(0, 78, 137, 0.05);
+  border: 1px solid rgba(0, 78, 137, 0.12);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rps__info-card-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #004e89;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rps__info-card-stats {
+  display: flex;
+  gap: 20px;
+}
+
+.rps__info-card-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.rps__info-card-stat-val {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #1a2332;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+
+.rps__info-card-stat-val--money {
+  color: #1a936f;
+}
+
+.rps__info-card-stat-lbl {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #64748b;
+}
+
+.rps__info-card-nota {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 10.5px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.rps__info-card-nota svg {
+  flex-shrink: 0;
+  color: #94a3b8;
+}
+
+/* ── Indicadores de Eficiencia de la Semana (Índice de Posición,
+   Flete Evitado, Renta No Aprovechada) — versión compacta a nivel
+   compañía de la última sección de Estadísticas Globales. ──────── */
+.rps__indicadores-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.rps__indicador-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.rps__indicador-card--azul { background: rgba(0, 78, 137, 0.06); border-color: rgba(0, 78, 137, 0.15); }
+.rps__indicador-card--verde { background: rgba(26, 147, 111, 0.07); border-color: rgba(26, 147, 111, 0.2); }
+.rps__indicador-card--rojo { background: rgba(220, 38, 38, 0.06); border-color: rgba(220, 38, 38, 0.18); }
+
+.rps__indicador-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.rps__indicador-card--azul .rps__indicador-icon { background: rgba(0, 78, 137, 0.14); color: #004e89; }
+.rps__indicador-card--verde .rps__indicador-icon { background: rgba(26, 147, 111, 0.16); color: #1a936f; }
+.rps__indicador-card--rojo .rps__indicador-icon { background: rgba(220, 38, 38, 0.14); color: #dc2626; }
+
+.rps__indicador-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a2332;
+}
+
+.rps__indicador-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #1a2332;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+
+.rps__indicador-sub {
+  font-size: 10.5px;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+/* ── Ranking de obras ───────────────────────────────────── */
+.rps__obra-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rps__obra-row {
+  background: #f5f6fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.rps__obra-row-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.rps__obra-row-nombre {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a2332;
+}
+
+.rps__obra-row-importe {
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.rps__obra-row-bar-track {
+  width: 100%;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.rps__obra-row-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.rps__obra-row-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.rps__obra-row-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.rps__obra-row-chip-nombre {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a2332;
+}
+
+.rps__obra-row-chip-stats {
+  font-size: 10.5px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.rps__obra-row-chip-acumulado {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #0b0f14;
+  white-space: nowrap;
+}
+
+.rps__obra-row-chip-planta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.rps__obra-row-chip-presupuesto {
+  margin-top: 5px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.12);
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.rps__obra-row-chip-presupuesto--green  { color: #059669; }
+.rps__obra-row-chip-presupuesto--yellow { color: #d97706; }
+.rps__obra-row-chip-presupuesto--red    { color: #dc2626; }
+
+.rps__obra-rank-mas {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  font-style: italic;
+  color: #64748b;
+  text-align: center;
+}
+
+/* ── Eficiencia ─────────────────────────────────────────── */
+.rps__eficiencia-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.rps__stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f5f6fa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #004e89;
+}
+
+.rps__stat-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a2332;
+}
+
+.rps__stat-label {
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .rps__kpi-grid,
+  .rps__eficiencia-grid,
+  .rps__indicadores-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .rps-page__report {
+    padding: 20px 18px 26px;
+  }
+}

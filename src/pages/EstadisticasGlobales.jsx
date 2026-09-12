@@ -1947,6 +1947,10 @@ const EstadisticasGlobales = () => {
     window.open("/reporte-diario", "_blank", "noopener,noreferrer");
   };
 
+  const handleAbrirReporteSemanal = () => {
+    window.open("/reporte-semanal", "_blank", "noopener,noreferrer");
+  };
+
   // Refresca solo los dominios que ya se cargaron alguna vez (no tiene caso
   // pedir datos de una sección que el usuario nunca ha desplegado).
   const handleActualizar = () => {
@@ -2249,6 +2253,10 @@ const EstadisticasGlobales = () => {
           <button className="eg__report-btn" onClick={handleAbrirReporteDiario}>
             <CalendarDays size={14} />
             Reporte Diario
+          </button>
+          <button className="eg__report-btn" onClick={handleAbrirReporteSemanal}>
+            <CalendarDays size={14} />
+            Reporte Semanal
           </button>
           <button
             className="eg__export-btn"
