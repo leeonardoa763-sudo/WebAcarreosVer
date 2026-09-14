@@ -70,7 +70,6 @@ const HACE_7_DIAS = formatFechaLocal(new Date(Date.now() - 7 * 86400000));
 // Mismo orden validado (separación CVD) que ReporteDiario.jsx — ver ahí el
 // porqué del orden azul/naranja/cian antes que naranja/azul/verde.
 const PALETA = ["#004E89", "#FF6B35", "#06B6D4", "#1A936F", "#F59E0B", "#8B5CF6", "#EF4444", "#10B981"];
-const MAX_OBRAS_VISIBLES = 6;
 
 const colorPorEmpresa = (empresa) => {
   const e = (empresa || "").toUpperCase();
@@ -166,7 +165,7 @@ const KpiCard = ({ icon: Icon, label, value, comparativa, color }) => {
   );
 };
 
-const IndicadorCard = ({ icon: Icon, tono, label, value, sub }) => (
+const IndicadorCard = ({ icon: Icon, tono, label, value, sub, children }) => (
   <div className={`rps__indicador-card rps__indicador-card--${tono}`}>
     <div className="rps__indicador-icon">
       <Icon size={15} />
@@ -174,8 +173,35 @@ const IndicadorCard = ({ icon: Icon, tono, label, value, sub }) => (
     <span className="rps__indicador-label">{label}</span>
     <span className="rps__indicador-value">{value}</span>
     {sub && <span className="rps__indicador-sub">{sub}</span>}
+    {children}
   </div>
 );
+
+// Trazabilidad del KPI "Renta No Aprovechada" — este indicador es un
+// resumen a nivel compañía (sin desglose por obra, ver
+// calcularIndicadoresSemana en useReporteSemanal.js), así que sin esta
+// lista no había forma de saber a qué obra/día ir a revisar. Muestra hasta
+// 4 vales (los de mayor importe); el resto solo se cuenta.
+const DetalleRentaDesperdiciada = ({ detalle }) => {
+  if (!detalle || detalle.length === 0) return null;
+  const visibles = detalle.slice(0, 4);
+  const restantes = detalle.length - visibles.length;
+  return (
+    <ul className="rps__indicador-detalle">
+      {visibles.map((v, i) => (
+        <li key={`${v.folio || "sf"}-${i}`}>
+          <span className="rps__indicador-detalle-dia">{v.fechaLabel}</span>
+          <span className="rps__indicador-detalle-obra">{v.obra}</span>
+          <span className="rps__indicador-detalle-equipo">{v.equipo}</span>
+          <span className="rps__indicador-detalle-importe">{formatearMoneda(v.importe)}</span>
+        </li>
+      ))}
+      {restantes > 0 && (
+        <li className="rps__indicador-detalle-mas">+{restantes} vale{restantes === 1 ? "" : "s"} más</li>
+      )}
+    </ul>
+  );
+};
 
 const ReporteSemanal = () => {
   const [searchParams] = useSearchParams();
@@ -250,8 +276,10 @@ const ReporteSemanal = () => {
   };
 
   const claveObra = (o) => `${o.obra}__${o.cc}`;
-  const obrasVisibles = resumenPorObra.slice(0, MAX_OBRAS_VISIBLES);
-  const obrasRestantes = resumenPorObra.length - obrasVisibles.length;
+  // Se muestran todas las obras con actividad en la semana — a diferencia
+  // de un top acotado, aquí no hay "obras que no se ven": el reporte crece
+  // verticalmente si hubo muchas obras trabajadas.
+  const obrasVisibles = resumenPorObra;
   const maxImporteObra = Math.max(...resumenPorObra.map((o) => o.importeTotal), 1);
   const detalleMaterialPorObra = Object.fromEntries(desgloseMaterial.map((o) => [claveObra(o), o]));
   const detalleRentaPorObra = Object.fromEntries(desgloseRenta.map((o) => [claveObra(o), o]));
@@ -596,11 +624,6 @@ const ReporteSemanal = () => {
                   </div>
                 );
               })}
-              {obrasRestantes > 0 && (
-                <p className="rps__obra-rank-mas">
-                  + {obrasRestantes} obra{obrasRestantes === 1 ? "" : "s"} más con actividad esta semana
-                </p>
-              )}
             </div>
           )}
         </div>
@@ -639,7 +662,9 @@ const ReporteSemanal = () => {
                   ? `${indicadoresSemana.pctPocaEficienciaRenta}% de los vales de renta con 1-3 viajes/día`
                   : "Vales de renta con 1-3 viajes/día"
               }
-            />
+            >
+              <DetalleRentaDesperdiciada detalle={indicadoresSemana.detalleRentaDesperdiciada} />
+            </IndicadorCard>
           </div>
 
           {/* Eficiencia operativa */}
@@ -679,7 +704,7 @@ const ReporteSemanal = () => {
             {eficiencia.materialesDistintos.length === 0 ? (
               <div className="rps__empty">Sin viajes con hora registrada esta semana.</div>
             ) : (
-              <ResponsiveContainer width="100%" height={220}>
+              <ResponsiveContainer width="100%" height={320}>
                 <BarChart data={eficiencia.distribucionDiaria} margin={{ top: 22, right: 8, left: -8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 4" stroke="rgba(0,78,137,0.07)" vertical={false} />
                   <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#64748B" }} axisLine={false} tickLine={false} />

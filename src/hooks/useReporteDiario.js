@@ -544,6 +544,7 @@ const calcularEficiencia = (vales) => {
           m3: Number(viaje.volumen_m3 || 0),
           obra: vale.obras?.obra || "Sin obra",
           material,
+          tipoId,
         });
       });
       // Tipo 2 (Base Asfáltica): 1 vale = 1 viaje, sin filas en
@@ -561,6 +562,7 @@ const calcularEficiencia = (vales) => {
             m3: Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0),
             obra: vale.obras?.obra || "Sin obra",
             material,
+            tipoId,
           });
         }
       }
@@ -600,10 +602,23 @@ const calcularEficiencia = (vales) => {
     porVehiculo[x.idVehiculo].viajes += 1;
   });
 
+  // "Promedio entre viajes" solo tiene sentido para material con viajes
+  // seguidos del mismo camión (Tipo 1/3): el asfáltico (Tipo 2) es un evento
+  // único por vale, sin secuencia que medir, y mezclarlo metía huecos de
+  // varias horas al mismo promedio que los huecos de minutos entre viajes
+  // reales (ver misma corrección en useReporteSemanal.js). `porVehiculo`
+  // arriba sigue incluyendo todo (se usa para vehiculoTop por m3).
+  const horasPorVehiculoSinAsfaltico = {};
+  viajesConHora.forEach((x) => {
+    if (x.idVehiculo == null || x.tipoId === 2) return;
+    if (!horasPorVehiculoSinAsfaltico[x.idVehiculo]) horasPorVehiculoSinAsfaltico[x.idVehiculo] = [];
+    horasPorVehiculoSinAsfaltico[x.idVehiculo].push(x.hora.getTime());
+  });
+
   let sumaDeltasMs = 0;
   let countDeltas = 0;
-  Object.values(porVehiculo).forEach((veh) => {
-    const horasOrdenadas = [...veh.horas].sort((a, b) => a - b);
+  Object.values(horasPorVehiculoSinAsfaltico).forEach((horas) => {
+    const horasOrdenadas = [...horas].sort((a, b) => a - b);
     for (let i = 1; i < horasOrdenadas.length; i++) {
       sumaDeltasMs += horasOrdenadas[i] - horasOrdenadas[i - 1];
       countDeltas += 1;

@@ -42,8 +42,14 @@ const diaMexico = (iso) =>
   iso ? new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" }) : null;
 
 // ── Índice de posición de la obra ───────────────────────────────────
-// Σ(m³ × distancia_km) ÷ Σm³ por obra. Misma resolución banco/distancia por
-// viaje que el resto del reporte (viaje.*_override ?? detalle.*).
+// Σ(m³ × distancia_km) ÷ Σm³ por obra, solo sobre viajes con distancia > 0
+// (`m3ConDistancia`) — un viaje sin distancia capturada no cuenta como si
+// hubiera viajado 0 km. `m3Total` es el volumen real completo de la obra
+// (incluye esos viajes) y se usa para `pctVol`, no para el índice. Misma
+// resolución banco/distancia por viaje que el resto del reporte
+// (viaje.*_override ?? detalle.*), y mismo criterio de exclusión que
+// calcularIndicadoresSemana en useReporteSemanal.js (versión compacta de
+// este mismo indicador).
 //
 // Además del número agregado, arma tres cosas para que la tabla explique el
 // número en vez de solo mostrarlo:
@@ -89,6 +95,7 @@ const calcularIndicePosicionObra = (valesMaterial) => {
           empresa: vale.obras?.empresas?.empresa || null,
           sumaM3PorKm: 0,
           m3Total: 0,
+          m3ConDistancia: 0,
           bancos: {},
           materiales: {},
           meses: {},
@@ -98,10 +105,20 @@ const calcularIndicePosicionObra = (valesMaterial) => {
 
       registros.forEach(({ m3, distanciaKm, banco, precioM3, mesKey }) => {
         if (m3 <= 0) return;
-        o.sumaM3PorKm += m3 * distanciaKm;
         o.m3Total += m3;
 
+        // El índice de posición (m³ × km ÷ m³) solo debe promediar viajes
+        // con distancia capturada — sin este filtro, un viaje sin distancia
+        // (0 o vacía) contaba como si hubiera viajado 0 km, jalando el
+        // índice hacia abajo artificialmente (mismo criterio que
+        // calcularIndicadoresSemana en useReporteSemanal.js, la versión
+        // compacta de este mismo indicador). `m3Total` arriba no se toca —
+        // sigue siendo el volumen real completo de la obra, usado también
+        // como base de `pctVol` de cada banco.
         if (distanciaKm > 0) {
+          o.sumaM3PorKm += m3 * distanciaKm;
+          o.m3ConDistancia += m3;
+
           if (!o.bancos[banco]) o.bancos[banco] = { banco, m3: 0, sumaM3PorKm: 0, viajes: 0 };
           o.bancos[banco].m3 += m3;
           o.bancos[banco].sumaM3PorKm += m3 * distanciaKm;
@@ -133,8 +150,8 @@ const calcularIndicePosicionObra = (valesMaterial) => {
 
   const conIndice = Object.values(obraMap)
     .map((o) => {
-      if (o.m3Total <= 0) return null;
-      const indicePosicion = o.sumaM3PorKm / o.m3Total;
+      if (o.m3Total <= 0 || o.m3ConDistancia <= 0) return null;
+      const indicePosicion = o.sumaM3PorKm / o.m3ConDistancia;
 
       const bancos = Object.values(o.bancos)
         .map((b) => ({
@@ -604,8 +621,13 @@ export const useIndicadoresEficiencia = (valesReporteFiltrados, filtroTipoMateri
       })
       .filter(Boolean);
   }, [valesReporteFiltrados, filtroTipoMaterial, modoTipoMaterial]);
+  // Pipas de agua quedan fuera: la meta de 7 viajes/día es de renta de
+  // EQUIPO (payloaders, excavadoras, etc.) — una pipa hace pocos viajes/día
+  // por naturaleza (riego), no por estar desaprovechada. Sin este filtro se
+  // contaba como "Poca Eficiencia" gasto normal de pipas (inconsistente con
+  // calcularIndicadoresSemana en useReporteSemanal.js, que sí las excluye).
   const valesRenta = useMemo(
-    () => valesReporteFiltrados.filter((v) => v.tipo_vale === "renta"),
+    () => valesReporteFiltrados.filter((v) => v.tipo_vale === "renta" && !v.es_pipa_agua),
     [valesReporteFiltrados]
   );
 

@@ -501,11 +501,20 @@ const calcularIndicadoresSemana = (vales, preciosMaterialTodos) => {
   });
 
   // Renta no aprovechada: importe pagado en vale_renta_detalle cuyo ritmo
-  // real (viajes ÷ días) cae en el espectro "Poca Eficiencia".
+  // real (viajes ÷ días) cae en el espectro "Poca Eficiencia". Pipas de agua
+  // quedan fuera (mismo criterio que calcularRentaPorEquipo/
+  // calcularDesgloseRenta arriba, y ahora useIndicadoresEficiencia.js): la
+  // meta de 7 viajes/día es de renta de EQUIPO, no de riego — sin este
+  // filtro se contaba como "desaprovechado" gasto normal de pipas.
+  //
+  // `detalleRentaDesperdiciada` trae obra + día de cada vale en ese
+  // espectro para que el KPI compacto sea trazable (a qué obra y qué día
+  // ir a revisar), sin necesitar el desglose completo por obra.
   let totalImporteRenta = 0;
   let totalValesRenta = 0;
   let rentaDesperdiciadaTotal = 0;
   let valesPocaEficiencia = 0;
+  const detalleRentaDesperdiciada = [];
   vales.forEach((vale) => {
     if (vale.es_pipa_agua) return;
     (vale.vale_renta_detalle || []).forEach((det) => {
@@ -519,6 +528,16 @@ const calcularIndicadoresSemana = (vales, preciosMaterialTodos) => {
       if (clasificarRangoRenta(viajes / totalDias) === "desperdiciado") {
         rentaDesperdiciadaTotal += importe;
         valesPocaEficiencia += 1;
+        const fecha = obtenerFechaEfectiva(vale);
+        const labelDetalle = materialLabelDetalle(det);
+        detalleRentaDesperdiciada.push({
+          folio: vale.folio || null,
+          obra: vale.obras?.obra || "Sin obra",
+          equipo: labelDetalle === "—" ? "Sin clasificar" : labelDetalle,
+          fechaLabel: `${DIAS_SEMANA_LABEL[fecha.getDay()]} ${String(fecha.getDate()).padStart(2, "0")}`,
+          viajesPorDiaReal: round2(viajes / totalDias),
+          importe: round2(importe),
+        });
       }
     });
   });
@@ -530,6 +549,7 @@ const calcularIndicadoresSemana = (vales, preciosMaterialTodos) => {
     rentaDesperdiciadaTotal: round2(rentaDesperdiciadaTotal),
     totalImporteRentaSemana: round2(totalImporteRenta),
     pctPocaEficienciaRenta: totalValesRenta > 0 ? Math.round((valesPocaEficiencia / totalValesRenta) * 100) : null,
+    detalleRentaDesperdiciada: detalleRentaDesperdiciada.sort((a, b) => b.importe - a.importe),
   };
 };
 
@@ -558,6 +578,7 @@ const calcularEficiencia = (vales, fechaInicioSemana) => {
           m3: Number(viaje.volumen_m3 || 0),
           obra: vale.obras?.obra || "Sin obra",
           material,
+          tipoId,
         });
       });
       if (tipoId === 2 && viajes.length === 0) {
@@ -571,6 +592,7 @@ const calcularEficiencia = (vales, fechaInicioSemana) => {
             m3: Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0),
             obra: vale.obras?.obra || "Sin obra",
             material,
+            tipoId,
           });
         }
       }
@@ -616,10 +638,25 @@ const calcularEficiencia = (vales, fechaInicioSemana) => {
     porVehiculo[x.idVehiculo].viajes += 1;
   });
 
+  // "Promedio entre viajes" solo tiene sentido para material con viajes
+  // seguidos del mismo camión el mismo día (Tipo 1/3): el asfáltico (Tipo 2)
+  // es un evento único por vale, sin secuencia que medir, y mezclarlo con
+  // tepetate/pétreos metía huecos de varias horas al mismo promedio que los
+  // huecos de minutos entre viajes reales. Tampoco se cruza la medianoche —
+  // el hueco entre el último viaje de un día y el primero del siguiente es
+  // tiempo sin operar, no "tiempo entre viajes".
+  const porVehiculoDia = {};
+  viajesConHora.forEach((x) => {
+    if (x.idVehiculo == null || x.tipoId === 2) return;
+    const key = `${x.idVehiculo}::${diaMexico(x.hora.toISOString())}`;
+    if (!porVehiculoDia[key]) porVehiculoDia[key] = [];
+    porVehiculoDia[key].push(x.hora.getTime());
+  });
+
   let sumaDeltasMs = 0;
   let countDeltas = 0;
-  Object.values(porVehiculo).forEach((veh) => {
-    const horasOrdenadas = [...veh.horas].sort((a, b) => a - b);
+  Object.values(porVehiculoDia).forEach((horas) => {
+    const horasOrdenadas = [...horas].sort((a, b) => a - b);
     for (let i = 1; i < horasOrdenadas.length; i++) {
       sumaDeltasMs += horasOrdenadas[i] - horasOrdenadas[i - 1];
       countDeltas += 1;

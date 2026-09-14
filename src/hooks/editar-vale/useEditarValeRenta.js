@@ -2,9 +2,9 @@
  * src/hooks/editar-vale/useEditarValeRenta.js
  *
  * Lógica para editar un vale de renta: tipo de renta (día completo, medio
- * día, horas) y sus viajes internos (vale_renta_viajes). Actualiza
- * es_renta_por_dia, total_dias, total_horas, numero_viajes y recalcula
- * costo_total.
+ * día, horas), notas adicionales y sus viajes internos (vale_renta_viajes).
+ * Actualiza es_renta_por_dia, total_dias, total_horas, numero_viajes,
+ * notas_adicionales y recalcula costo_total.
  *
  * Pipas de agua (es_pipa_agua, vía vales:id_vale) siguen con material fijo a
  * nivel detalle (id_material, editable con editarMaterialDetalle) y tickets
@@ -93,6 +93,9 @@ export const useEditarValeRenta = () => {
   // Horas ingresadas manualmente (solo aplica cuando opcion === 'horas')
   const [totalHorasInput, setTotalHorasInput] = useState("");
 
+  // Notas adicionales del detalle (notas_adicionales)
+  const [notasAdicionales, setNotasAdicionales] = useState("");
+
   // Catálogo de materiales disponibles (para editar el material del detalle
   // en pipas, o el material por viaje en renta normal)
   const [materiales, setMateriales] = useState([]);
@@ -144,6 +147,7 @@ export const useEditarValeRenta = () => {
           total_horas,
           numero_viajes,
           costo_total,
+          notas_adicionales,
           hora_inicio,
           hora_fin,
           costo_hr_aplicado,
@@ -235,6 +239,7 @@ export const useEditarValeRenta = () => {
         opcionActual === "horas" ? String(data.total_horas || "") : "",
       );
       setIdMaterialOriginal(data.id_material);
+      setNotasAdicionales(data.notas_adicionales || "");
       setViajesOriginales(viajesOrdenados);
       setViajes(viajesOrdenados.map((v) => ({ ...v })));
     } catch (err) {
@@ -510,7 +515,10 @@ export const useEditarValeRenta = () => {
           (v) => !viajesAEliminar.has(v.id_viaje),
         ).length;
 
-        let payload = { numero_viajes: numeroViajesFinal };
+        let payload = {
+          numero_viajes: numeroViajesFinal,
+          notas_adicionales: notasAdicionales.trim() || null,
+        };
         // El material a nivel detalle solo existe para pipas — renta normal
         // ya no fija material al vale (id_material se queda null siempre,
         // ver categoria_planeada y el material por viaje).
@@ -570,6 +578,7 @@ export const useEditarValeRenta = () => {
       detalle,
       opcionSeleccionada,
       totalHorasInput,
+      notasAdicionales,
       viajes,
       viajesEditados,
       viajesNuevos,
@@ -594,6 +603,7 @@ export const useEditarValeRenta = () => {
     setViajesEditados(new Set());
     setViajesNuevos(new Set());
     setViajesAEliminar(new Set());
+    setNotasAdicionales(detalle.notas_adicionales || "");
     setDetalle((prev) => {
       if (!prev) return prev;
       const materialOriginal = materiales.find(
@@ -622,6 +632,7 @@ export const useEditarValeRenta = () => {
       return true;
     }
     if (detalle.id_material !== idMaterialOriginal) return true;
+    if (notasAdicionales !== (detalle.notas_adicionales || "")) return true;
     return (
       viajesEditados.size > 0 || viajesNuevos.size > 0 || viajesAEliminar.size > 0
     );
@@ -632,6 +643,8 @@ export const useEditarValeRenta = () => {
     esPipaAgua: !!detalle?.vales?.es_pipa_agua,
     opcionSeleccionada,
     totalHorasInput,
+    notasAdicionales,
+    setNotasAdicionales,
     costoPreview,
     materiales,
     bancosSugeridos,

@@ -13,7 +13,7 @@
 | `ValeFilters.jsx` | Panel de filtros avanzados (obra, material, sindicato, estado, fechas) |
 | `ModalValeDetalle.jsx` | Modal principal de detalle — punto de entrada a todos los sub-modales |
 | `ModalEditarVale.jsx` | Edición de viajes de material (Tipos 1, 2, 3) — solo Administrador |
-| `ModalEditarValeRenta.jsx` | Edición de tipo renta (día completo / medio día / por horas) — solo Admin |
+| `ModalEditarValeRenta.jsx` | Edición de tipo renta (día completo / medio día / por horas) y notas adicionales — solo Admin |
 | `ModalCancelarVale.jsx` | Confirmación de cancelación con campo de motivo requerido — solo Admin |
 | `ModalSolicitudDesver.jsx` | Crear (Admin) o responder (Sindicato) solicitud de desverificación |
 | `editar/TablaEditarViajes.jsx` | Tabla editable de viajes dentro de `ModalEditarVale` |

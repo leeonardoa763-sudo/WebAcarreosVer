@@ -2,9 +2,9 @@
  * src/components/vales/editar/ModalEditarValeRenta.jsx
  *
  * Modal para editar un vale de renta: tipo de renta (día completo, medio día,
- * por horas) y sus viajes (agregar/editar hora/eliminar). Pipas de agua
- * (esPipaAgua) también editan aquí el material fijo del vale; renta normal
- * edita material/carga/banco por viaje en vez de eso (ver
+ * por horas), notas adicionales y sus viajes (agregar/editar hora/eliminar).
+ * Pipas de agua (esPipaAgua) también editan aquí el material fijo del vale;
+ * renta normal edita material/carga/banco por viaje en vez de eso (ver
  * TablaEditarViajesRenta). Solo visible para Administrador. Bloqueado si el
  * vale está conciliado o verificado.
  *
@@ -77,6 +77,8 @@ const ModalEditarValeRenta = ({
     esPipaAgua,
     opcionSeleccionada,
     totalHorasInput,
+    notasAdicionales,
+    setNotasAdicionales,
     costoPreview,
     materiales,
     bancosSugeridos,
@@ -382,6 +384,26 @@ const ModalEditarValeRenta = ({
               onEliminarViaje={eliminarViaje}
               onCancelarEliminacion={cancelarEliminacionViaje}
             />
+          </div>
+
+          {/* Notas adicionales */}
+          <div className="mev__notas-section">
+            <label className="mev__notas-label" htmlFor="mer-notas">
+              Notas adicionales
+            </label>
+            <textarea
+              id="mer-notas"
+              className="mev__notas-textarea"
+              value={notasAdicionales}
+              onChange={(e) => setNotasAdicionales(e.target.value)}
+              placeholder="Escribe observaciones o notas del vale..."
+              maxLength={500}
+              rows={3}
+              disabled={guardando}
+            />
+            <span className="mev__notas-contador">
+              {notasAdicionales.length}/500
+            </span>
           </div>
 
           {/* Mensaje de error */}
