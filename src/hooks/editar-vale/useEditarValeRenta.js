@@ -535,18 +535,31 @@ export const useEditarValeRenta = () => {
             costo_total: calcularCosto("dia", null, costo_dia, costo_hr),
           };
         } else if (opcionSeleccionada === "medio_dia") {
+          // El trigger calcular_totales_vale_renta (BD) solo recalcula
+          // cuando es_renta_por_dia = true (fuerza total_dias = 1, día
+          // completo) o cuando es false con hora_fin presente (recalcula
+          // por horas). "Medio día" debe mandarse con es_renta_por_dia =
+          // false y hora_fin = null para que el trigger no entre a
+          // ninguna rama y respete el total_dias = 0.5 que manda la app —
+          // ver comentario en funciones_triggers_vistas.sql.
           payload = {
             ...payload,
-            es_renta_por_dia: true,
+            es_renta_por_dia: false,
+            hora_fin: null,
             total_dias: 0.5,
-            total_horas: null,
+            total_horas: 0,
             costo_total: calcularCosto("medio_dia", null, costo_dia, costo_hr),
           };
         } else {
+          // "Por horas" en este modal es un total manual (no hay hora_fin
+          // real que editar aquí) — se manda hora_fin = null para que el
+          // trigger no lo recalcule a partir de una hora_fin vieja y pise
+          // el valor que el admin acaba de escribir.
           const horas = Number(totalHorasInput);
           payload = {
             ...payload,
             es_renta_por_dia: false,
+            hora_fin: null,
             total_dias: null,
             total_horas: horas,
             costo_total: calcularCosto("horas", horas, costo_dia, costo_hr),
