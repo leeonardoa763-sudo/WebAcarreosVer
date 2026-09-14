@@ -3,8 +3,13 @@
  *
  * Genera un PDF tamaño carta con 4 vales de renta por página (grid 2×2).
  * Replica el formato físico del vale impreso incluyendo QR, secciones
- * SERVICIO, TIEMPOS, OPERADOR y etiqueta de copia (roja/blanca) según el
- * estado real del vale.
+ * SERVICIO, TIEMPOS, OPERADOR, VIAJES REGISTRADOS y etiqueta de copia
+ * (roja/blanca) según el estado real del vale.
+ *
+ * La tabla de VIAJES REGISTRADOS siempre muestra TODOS los viajes del vale
+ * (no se recorta a un máximo): la altura de fila y el tamaño de fuente se
+ * calculan dinámicamente según cuánto espacio libre quede en la celda tras
+ * el resto del contenido, igual que en generarPDFValesMaterialBulk.js.
  *
  * Dependencias: jspdf, qrcode
  * Usado en: ModalVistaPreviewConciliacion.jsx, DashboardUnificado.jsx
@@ -37,6 +42,18 @@ const POSICIONES = [
   { x: MARGEN_X, y: MARGEN_Y + CELDA_ALTO + 4 }, // vale 3 (abajo izq)
   { x: MARGEN_X + CELDA_ANCHO + 4, y: MARGEN_Y + CELDA_ALTO + 4 }, // vale 4 (abajo der)
 ];
+
+// Padding interno de cada celda + interlineados base
+const PAD = 2.5;
+const LH_SMALL = 3.2;
+const LH_MED = 3.8;
+
+// Rango de altura/fuente de las filas de la tabla de viajes: se calculan
+// dinámicamente entre estos límites según cuántos viajes haya que mostrar.
+const FILA_ALTURA_MAX = 3.1;
+const FILA_ALTURA_MIN = 1.55;
+const FILA_FUENTE_MAX = 4.5;
+const FILA_FUENTE_MIN = 2.7;
 
 // URL base para QR — fallback si qr_verification_url no está en la BD
 const BASE_URL = "https://web-acarreos.vercel.app/vale/";
@@ -118,6 +135,33 @@ const truncar = (texto, maxChars) => {
 };
 
 /**
+ * Trunca por ANCHO real en mm (vs. `truncar`, que corta a N caracteres fijos
+ * sin importar cuánto espacio hay). Necesario en la tabla de viajes: nombres
+ * cortos ("Agua") desperdiciaban columna y nombres largos ("Material Pétreo
+ * (100%)") se cortaban aunque sobrara espacio en pantalla. Requiere que el
+ * font/tamaño ya estén fijados en `doc` antes de llamarla (usa getTextWidth
+ * del estado actual). Con el doc de medición (getTextWidth === undefined)
+ * cae directo al peor caso sin tronar.
+ */
+const truncarAncho = (doc, texto, maxWidthMm) => {
+  if (!texto) return "—";
+  if (doc.getTextWidth(texto) <= maxWidthMm) return texto;
+
+  let low = 0;
+  let high = texto.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    const candidato = texto.substring(0, mid) + "…";
+    if (doc.getTextWidth(candidato) <= maxWidthMm) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return low > 0 ? texto.substring(0, low) + "…" : "…";
+};
+
+/**
  * Etiqueta de copia según estado real del vale — replica la lógica de
  * colorCopia de la app móvil (roja al crear / blanca al completar).
  */
@@ -148,21 +192,60 @@ const generarQRDataURL = async (vale) => {
   }
 };
 
+/**
+ * "doc" de solo medición: no dibuja nada, cualquier método invocado es un
+ * no-op. Se usa para correr dibujarVale() una vez con altura de fila 0 y así
+ * saber cuánto espacio fijo (todo excepto las filas de viajes) consume el
+ * resto del contenido del vale.
+ */
+const crearDocDeMedicion = () => new Proxy({}, { get: () => () => {} });
+
+/**
+ * Calcula altura de fila y tamaño de fuente para que TODOS los viajes quepan
+ * en el espacio vertical libre de la celda. Con pocos viajes usa el tamaño
+ * cómodo (FILA_ALTURA_MAX); con muchos los reduce hasta FILA_ALTURA_MIN.
+ */
+const calcularDimensionesFilas = (vale, ox, oy, numViajes) => {
+  if (numViajes === 0) {
+    return { rowHeight: FILA_ALTURA_MAX, fontSize: FILA_FUENTE_MAX };
+  }
+
+  const yFijo = dibujarVale(crearDocDeMedicion(), vale, ox, oy, null, {
+    rowHeight: 0,
+    fontSize: FILA_FUENTE_MAX,
+  });
+  const alturaFija = yFijo - oy;
+  const alturaDisponible = CELDA_ALTO - PAD - alturaFija;
+
+  const rowHeight = Math.min(
+    FILA_ALTURA_MAX,
+    Math.max(FILA_ALTURA_MIN, alturaDisponible / numViajes),
+  );
+  const fontSize = Math.min(
+    FILA_FUENTE_MAX,
+    Math.max(FILA_FUENTE_MIN, rowHeight * 1.35),
+  );
+  return { rowHeight, fontSize };
+};
+
 // ─────────────────────────────────────────────
 // FUNCIÓN PRINCIPAL: DIBUJAR UN VALE EN UNA CELDA
 // ─────────────────────────────────────────────
 
 /**
- * Dibuja un vale de renta dentro de la celda (ox, oy).
- * Retorna la cantidad de mm usados verticalmente (por si se necesita ajustar).
+ * Dibuja (o mide, si `doc` es un doc de medición) un vale de renta dentro de
+ * la celda (ox, oy). Retorna la posición Y final — se usa tanto para medir
+ * el espacio fijo disponible como, en el trazo real, informativamente.
  *
- * @param {jsPDF} doc       - Instancia de jsPDF
+ * @param {jsPDF} doc       - Instancia de jsPDF (o doc de medición)
  * @param {Object} vale     - Objeto vale con relaciones cargadas
  * @param {number} ox       - Origen X de la celda
  * @param {number} oy       - Origen Y de la celda
  * @param {string} qrDataURL - Imagen QR como dataURL (puede ser null)
+ * @param {Object} filaViajes - { rowHeight, fontSize } de cada fila de la
+ *                                tabla de viajes (calculado dinámicamente)
  */
-const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
+const dibujarVale = (doc, vale, ox, oy, qrDataURL, filaViajes) => {
   // ── Extraer datos del vale ──────────────────
   const detalle = vale.vale_renta_detalle?.[0] || {};
   const empresa = vale.obras?.empresas?.empresa || "—";
@@ -170,11 +253,13 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
     ? `${vale.obras.cc || ""} - ${vale.obras.obra || ""}`.trim()
     : "—";
   const sindicato = vale.operadores?.sindicatos?.sindicato || "—";
-  const material = detalle.material?.material || "—";
-  const capacidad =
-    detalle.capacidad_m3 != null ? `${detalle.capacidad_m3} m³` : "—";
-  const viajes =
-    detalle.numero_viajes != null ? String(detalle.numero_viajes) : "—";
+  const material =
+    detalle.material?.material || detalle.categoria_planeada?.categoria || "—";
+  // La capacidad puede no quedar fijada en el detalle (vale creado antes de
+  // asignar vehículo) — igual que pdfRentaGeneratorRecibo.js, se prefiere la
+  // capacidad real del vehículo asignado y se cae al detalle si no hay.
+  const capacidadRaw = vale.vehiculos?.capacidad_m3 ?? detalle.capacidad_m3;
+  const capacidad = capacidadRaw != null ? `${capacidadRaw} m³` : "—";
   const horaInicio = formatearHora(detalle.hora_inicio);
   const horaFin = detalle.es_renta_por_dia
     ? Number(detalle.total_dias) === 0.5
@@ -185,6 +270,23 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
   const totalDias = formatearDias(detalle.total_dias);
   const operador = vale.operadores?.nombre_completo || "—";
   const placas = vale.vehiculos?.placas || "—";
+
+  // Viajes registrados en tabla hija — se muestran TODOS
+  const viajesRenta = detalle.vale_renta_viajes || [];
+  const totalViajes = viajesRenta.length || detalle.numero_viajes || 0;
+  // Pipas de agua: la columna destino es el POZO al que se rellena, no un banco.
+  const esPipa = !!vale?.es_pipa_agua;
+
+  // El viaje normal guarda su propio banco_descarga/material; los vales
+  // viejos y las pipas lo resuelven por el ticket de descarga impreso
+  // (mismo patrón que pdfRentaGeneratorRecibo.js — cruce por numero_ticket
+  // === numero_viaje). Sin este fallback, banco_descarga sale null y la
+  // columna queda en "—" aunque el vale sí tenga ticket de pozo/descarga.
+  const ticketsDescarga = vale.tickets_descarga || [];
+  const ticketMap = {};
+  ticketsDescarga.forEach((t) => {
+    ticketMap[t.numero_ticket] = t;
+  });
 
   // persona es id_persona_creador → tiene nombre/primer_apellido/segundo_apellido
   const p = vale.persona;
@@ -202,10 +304,7 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
 
   // ── Constantes de tipografía y layout interno ─
   const W = CELDA_ANCHO; // ancho útil de la celda
-  const PAD = 2.5; // padding interno
   const CX = ox + W / 2; // centro X de la celda
-  const LH_SMALL = 3.2; // interlineado pequeño
-  const LH_MED = 3.8; // interlineado medio
   const colLabel = ox + PAD;
   const colValue = ox + W - PAD;
 
@@ -284,10 +383,6 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
 
   doc.text("Capacidad:", colLabel, y);
   doc.text(capacidad, colValue, y, { align: "right" });
-  y += LH_SMALL;
-
-  doc.text("Viajes:", colLabel, y);
-  doc.text(viajes, colValue, y, { align: "right" });
   y += LH_SMALL + 0.5;
 
   linea(y);
@@ -342,6 +437,89 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
   doc.text(placas, colValue, y, { align: "right" });
   doc.setFont("helvetica", "normal");
   y += LH_SMALL + 0.5;
+
+  linea(y);
+  y += 1.5;
+
+  // ── SECCIÓN VIAJES REGISTRADOS ──────────────
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(5.6);
+  doc.text("VIAJES REGISTRADOS", CX, y, { align: "center" });
+  y += LH_MED - 0.3;
+
+  if (viajesRenta.length > 0) {
+    const { rowHeight, fontSize } = filaViajes;
+
+    // Encabezado de la mini-tabla
+    doc.setFontSize(Math.max(fontSize, 3.6));
+    doc.setFont("helvetica", "bold");
+
+    // Columnas por posición Y ANCHO real (no por conteo de caracteres): con
+    // ancho fijo, "Material" y "Banco" se recortaban aunque sobrara espacio
+    // en pantalla (nombres cortos) y se cortaban de más con nombres largos.
+    const colNum = colLabel;
+    const colHora = ox + W * 0.09;
+    const colMaterial = ox + W * 0.22;
+    const colDestino = ox + W * 0.62;
+    const anchoMaterial = colDestino - colMaterial - 1.5;
+    const anchoDestino = ox + W - PAD - colDestino;
+
+    doc.text("#", colNum, y);
+    doc.text("Hora", colHora, y);
+    doc.text("Material", colMaterial, y);
+    doc.text(esPipa ? "Pozo" : "Banco", colDestino, y);
+    y += Math.max(rowHeight, 1.9);
+
+    doc.setLineWidth(0.15);
+    doc.line(colLabel, y - 0.6, ox + W - PAD, y - 0.6);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(fontSize);
+
+    viajesRenta
+      .slice()
+      .sort((a, b) => (a.numero_viaje ?? 0) - (b.numero_viaje ?? 0))
+      .forEach((viaje) => {
+        const horaTexto = formatearHora(viaje.hora_registro);
+        const ticket = ticketMap[viaje.numero_viaje];
+        const materialBase =
+          viaje.material?.material || ticket?.material_ticket?.material || material;
+        const matTexto = viaje.carga_porcentaje
+          ? `${materialBase} (${viaje.carga_porcentaje}%)`
+          : materialBase;
+        const destinoTexto = viaje.banco_descarga || ticket?.banco_descarga || "—";
+
+        doc.text(String(viaje.numero_viaje ?? "—"), colNum, y);
+        doc.text(horaTexto, colHora, y);
+        doc.text(truncarAncho(doc, matTexto, anchoMaterial), colMaterial, y);
+        doc.text(truncarAncho(doc, destinoTexto, anchoDestino), colDestino, y);
+        y += rowHeight;
+      });
+
+    // Totales de viajes
+    linea(y);
+    y += 1.3;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(5);
+    doc.text("Viajes registrados", colLabel, y);
+    doc.setFont("helvetica", "bold");
+    doc.text(String(viajesRenta.length), colValue, y, { align: "right" });
+    y += LH_SMALL;
+  } else {
+    // Sin viajes registrados aún
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(4.8);
+    doc.text(
+      totalViajes > 0
+        ? `${totalViajes} viaje(s) — sin detalle`
+        : "Sin viajes registrados",
+      CX,
+      y,
+      { align: "center" },
+    );
+    y += LH_MED;
+  }
 
   linea(y);
   y += 1.5;
@@ -411,6 +589,8 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(4.5);
   doc.text(`Emitida: ${fechaHora}`, CX, yEmitida, { align: "center" });
+
+  return yEmitida;
 };
 
 // ─────────────────────────────────────────────
@@ -419,11 +599,12 @@ const dibujarVale = (doc, vale, ox, oy, qrDataURL) => {
 
 /**
  * Generar PDF con todos los vales de renta de una conciliación.
- * Imprime 4 vales por página en grid 2×2.
+ * Imprime 4 vales por página en grid 2×2. Cada vale muestra TODOS sus
+ * viajes — si son muchos, la tabla usa filas más chicas para que quepan.
  *
  * @param {Array}  vales         - Array de vales con relaciones cargadas:
- *                                 vale_renta_detalle, vehiculos, operadores,
- *                                 obras, persona, persona_completo
+ *                                 vale_renta_detalle (con vale_renta_viajes),
+ *                                 vehiculos, operadores, obras, persona
  * @param {string} folioConc     - Folio de la conciliación (para nombre del archivo)
  */
 export const generarPDFValesRentaBulk = async (vales, folioConc) => {
@@ -456,8 +637,16 @@ export const generarPDFValesRentaBulk = async (vales, folioConc) => {
     const posicion = POSICIONES[i % 4];
     const vale = vales[i];
     const qr = qrMap[vale.folio] || null;
+    const numViajes = (vale.vale_renta_detalle?.[0]?.vale_renta_viajes || [])
+      .length;
+    const filaViajes = calcularDimensionesFilas(
+      vale,
+      posicion.x,
+      posicion.y,
+      numViajes,
+    );
 
-    dibujarVale(doc, vale, posicion.x, posicion.y, qr);
+    dibujarVale(doc, vale, posicion.x, posicion.y, qr, filaViajes);
   }
 
   // 4. Descargar

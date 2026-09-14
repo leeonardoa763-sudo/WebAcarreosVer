@@ -1992,21 +1992,21 @@ export const generarPDFReporteEstadisticas = (datos) => {
       color: COLOR_BLUE,
     },
     {
-      label: "Importe Total",
+      label: "Importe de Material (Fletes)",
       value: formatearMonedaCorta(resumen?.totalImporte),
       sublabel: formatearMoneda(resumen?.totalImporte),
       color: COLOR_ORANGE,
     },
     {
-      label: "Horas de Renta",
-      value: formatearNumero(resumen?.totalHorasRenta, 1),
-      sublabel: "Horas acumuladas",
+      label: "Importe de Renta",
+      value: formatearMonedaCorta(resumen?.totalImporteRenta),
+      sublabel: formatearMoneda(resumen?.totalImporteRenta),
       color: COLOR_GREEN,
     },
     {
       label: "Días de Renta",
       value: formatearNumero(resumen?.totalDiasRenta, 1),
-      sublabel: "Días acumulados",
+      sublabel: `${formatearNumero(resumen?.totalHorasRenta, 1)} horas acumuladas`,
       color: COLOR_AMBER,
     },
   ];

@@ -1108,10 +1108,12 @@ export const useEstadisticasGlobales = () => {
 
     let totalHorasRenta = 0;
     let totalDiasRenta = 0;
+    let totalImporteRenta = 0;
     concsFiltradas.forEach((c) => {
       if (c.tipo_conciliacion === "renta") {
         totalHorasRenta += Number(c.total_horas || 0);
         totalDiasRenta += Number(c.total_dias || 0);
+        totalImporteRenta += Number(c.total_final || 0);
       }
     });
 
@@ -1123,6 +1125,7 @@ export const useEstadisticasGlobales = () => {
       totalImporte,
       totalHorasRenta,
       totalDiasRenta,
+      totalImporteRenta,
       totalConciliaciones: concsFiltradas.length,
     };
   }, [

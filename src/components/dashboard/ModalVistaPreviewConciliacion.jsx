@@ -81,6 +81,7 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
               fecha_programada,
               fecha_completado,
               qr_verification_url,
+              es_pipa_agua,
               obras:id_obra (
                 id_obra,
                 obra,
@@ -91,7 +92,8 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                 )
               ),
               vehiculos:id_vehiculo (
-                placas
+                placas,
+                capacidad_m3
               ),
               operadores:id_operador (
                 nombre_completo,
@@ -108,6 +110,13 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                 nombre,
                 primer_apellido,
                 segundo_apellido
+              ),
+              tickets_descarga (
+                numero_ticket,
+                banco_descarga,
+                material_ticket:id_material_ticket (
+                  material
+                )
               ),
               vale_renta_detalle (
                 capacidad_m3,
@@ -131,6 +140,18 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                 precios_renta:id_precios_renta (
                   costo_hr,
                   costo_dia
+                ),
+                vale_renta_viajes (
+                  id_viaje,
+                  numero_viaje,
+                  hora_registro,
+                  id_material,
+                  carga_porcentaje,
+                  banco_descarga,
+                  material:id_material (
+                    id_material,
+                    material
+                  )
                 )
               )
             `,
