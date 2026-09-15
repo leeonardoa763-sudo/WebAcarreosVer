@@ -846,6 +846,9 @@ const VisualizarConciliacion = () => {
   const esMaterial = conciliacion.tipo_conciliacion === "material";
   const tituloTipo = esMaterial ? "CONCILIACIÓN DE MATERIAL" : "CONCILIACIÓN DE RENTA";
   const tieneRetencion = Number(conciliacion.retencion_4_porciento) > 0;
+  // Material siempre es 4%; renta reutiliza la misma columna para el 10.667%
+  // opcional por sindicato (ver sindicatos.aplica_retencion_renta)
+  const labelRetencion = esMaterial ? "Retención 4%" : "Retención 10.667%";
 
   const formatearPeriodo = () => {
     const fi = conciliacion.fecha_inicio;
@@ -1091,7 +1094,7 @@ const VisualizarConciliacion = () => {
             </div>
             {tieneRetencion && (
               <div className="vc-financiero-row vc-financiero-row--retencion">
-                <span className="vc-financiero-label">Retención 4%</span>
+                <span className="vc-financiero-label">{labelRetencion}</span>
                 <span className="vc-financiero-value">
                   -{formatearMonedaMXN(conciliacion.retencion_4_porciento)}
                 </span>

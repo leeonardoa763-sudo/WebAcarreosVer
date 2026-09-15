@@ -705,11 +705,29 @@ export const useEditarValeViajes = () => {
         : null;
 
       const precioAnterior = Number(detalle.precio_m3) || 0;
-      const sinCambios =
+      const detalleActualizado =
         Math.abs(precioAnterior - nuevoPrecioBase) < 0.005 &&
         Number(detalle.tarifa_primer_km) === Number(tarifa.primer_km) &&
         Number(detalle.tarifa_subsecuente) ===
           Number(tarifaSubsecuenteAplicada);
+
+      // No basta con comparar el detalle: cada viaje congela su propia
+      // tarifa al registrarse (tarifa_primer_km/tarifa_subsecuente propios
+      // en vale_material_viajes). Si el vale mezcla viajes capturados antes
+      // y después de un cambio de tarifa, el detalle puede coincidir con la
+      // vigente (p.ej. porque refleja el último viaje) mientras otros viajes
+      // se quedan con la tarifa vieja — hay que revisar viaje por viaje.
+      const hayViajeDesactualizado = viajes.some((viaje) => {
+        const precioViaje = Number(viaje.precio_m3) || 0;
+        return (
+          Math.abs(precioViaje - nuevoPrecioBase) >= 0.005 ||
+          Number(viaje.tarifa_primer_km) !== Number(tarifa.primer_km) ||
+          Number(viaje.tarifa_subsecuente) !==
+            Number(tarifaSubsecuenteAplicada)
+        );
+      });
+
+      const sinCambios = detalleActualizado && !hayViajeDesactualizado;
 
       if (sinCambios) {
         setAvisoTarifa(

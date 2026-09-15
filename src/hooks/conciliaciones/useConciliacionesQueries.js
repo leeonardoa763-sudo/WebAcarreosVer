@@ -70,7 +70,8 @@ export const useConciliacionesQueries = () => {
               nombre_completo,
               sindicatos:id_sindicato (
                 id_sindicato,
-                sindicato
+                sindicato,
+                aplica_retencion_renta
               )
             ),
             vehiculos:id_vehiculo (

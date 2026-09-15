@@ -193,6 +193,15 @@ const VistaPreviewRenta = ({ conciliacion, valesAgrupados }) => {
           </span>
         </div>
 
+        {Number(conciliacion.retencion_4_porciento) > 0 && (
+          <div className="total-row">
+            <span className="total-label">Retención 10.667%:</span>
+            <span className="total-value">
+              -{formatearMoneda(conciliacion.retencion_4_porciento)}
+            </span>
+          </div>
+        )}
+
         <div className="total-row total-row--final">
           <span className="total-label">TOTAL:</span>
           <span className="total-value">

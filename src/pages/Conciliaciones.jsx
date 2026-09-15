@@ -361,6 +361,7 @@ const Conciliaciones = () => {
               filtros={hookActivo.filtros}
               onFiltrosChange={hookActivo.updateFiltros}
               onCargarVistaPrevia={hookActivo.cargarVistaPrevia}
+              onToggleRetencionRenta={hookActivo.toggleAplicaRetencionRenta}
               loadingCatalogos={hookActivo.loadingCatalogos}
               disabled={false}
               tipoActivo={tabActivo}

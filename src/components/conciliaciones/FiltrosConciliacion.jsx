@@ -8,6 +8,7 @@
  * - Selector de obra (solo obras con vales en la semana)
  * - Selector de material (solo para Material, solo materiales con vales en obra/semana)
  * - Selector de sindicato (solo para Admin)
+ * - Toggle de retención de renta 10.667% por sindicato (solo Admin, tab Renta)
  * - Botón para cargar vista previa
  *
  * Usado en: Conciliaciones.jsx
@@ -17,7 +18,14 @@
 import { useState } from "react";
 
 // 2. Icons
-import { Calendar, Building2, Users, Search, Package } from "lucide-react";
+import {
+  Calendar,
+  Building2,
+  Users,
+  Search,
+  Package,
+  ShieldCheck,
+} from "lucide-react";
 
 // 3. Hooks personalizados
 import { useAuth } from "../../hooks/useAuth";
@@ -33,12 +41,30 @@ const FiltrosConciliacion = ({
   filtros,
   onFiltrosChange,
   onCargarVistaPrevia,
+  onToggleRetencionRenta,
   loadingCatalogos,
   disabled,
   tipoActivo, // 👈 NUEVO: 'renta' o 'material'
 }) => {
   const { hasRole } = useAuth();
+  const esAdmin = hasRole("Administrador");
   const [errors, setErrors] = useState({});
+  const [guardandoRetencion, setGuardandoRetencion] = useState(false);
+
+  const sindicatoSeleccionadoObj = sindicatos?.find(
+    (s) => s.id_sindicato === filtros.sindicatoSeleccionado,
+  );
+
+  const handleToggleRetencionRenta = async () => {
+    if (!sindicatoSeleccionadoObj || !onToggleRetencionRenta) return;
+
+    setGuardandoRetencion(true);
+    await onToggleRetencionRenta(
+      sindicatoSeleccionadoObj.id_sindicato,
+      !sindicatoSeleccionadoObj.aplica_retencion_renta,
+    );
+    setGuardandoRetencion(false);
+  };
 
   const handleSemanaChange = (e) => {
     const semanaId = e.target.value;
@@ -161,6 +187,29 @@ const FiltrosConciliacion = ({
                 </option>
               ))}
             </select>
+          </div>
+        )}
+
+        {/* Toggle de retención de renta 10.667% (solo Admin, tab Renta, con sindicato elegido) */}
+        {esAdmin && tipoActivo === "renta" && sindicatoSeleccionadoObj && (
+          <div className="filtros-conciliacion__field">
+            <label className="filtros-conciliacion__label">
+              <ShieldCheck size={16} aria-hidden="true" />
+              <span>Retención de renta</span>
+            </label>
+            <label className="filtros-conciliacion__retencion-toggle">
+              <input
+                type="checkbox"
+                checked={Boolean(sindicatoSeleccionadoObj.aplica_retencion_renta)}
+                onChange={handleToggleRetencionRenta}
+                disabled={guardandoRetencion || disabled || loadingCatalogos}
+              />
+              <span>
+                Aplicar retención del 10.667% a{" "}
+                {sindicatoSeleccionadoObj.sindicato}
+                {guardandoRetencion && " (guardando...)"}
+              </span>
+            </label>
           </div>
         )}
 

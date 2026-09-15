@@ -64,7 +64,9 @@ const prepararDatosParaExcel = (conciliaciones) => {
       "Precio por M³": obtenerPrecioM3(conc),
       Subtotal: subtotal.toFixed(2),
       "IVA 16%": iva.toFixed(2),
-      "Retención 4%": retencion.toFixed(2),
+      // Columna mixta: en material siempre es 4%, en renta puede ser 10.667%
+      // opcional por sindicato (misma columna de BD, ver aplica_retencion_renta)
+      Retención: retencion.toFixed(2),
       "Total Final": totalFinal.toFixed(2),
       Estado: conc.estado || "N/A",
       "Fecha Generación": formatearFechaCorta(conc.fecha_generacion) || "N/A",

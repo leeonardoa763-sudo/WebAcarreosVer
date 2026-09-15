@@ -7,9 +7,12 @@
  * - Cargar todos los sindicatos disponibles
  * - Solo se ejecuta para usuarios Admin
  * - Proporciona estado de loading y error
+ * - Permite a un Admin prender/apagar la retención de renta (10.667%) por
+ *   sindicato — algunos (ej. CTM) a veces la manejan y a veces no
  *
  * USADO EN:
  * - useConciliaciones.js
+ * - useConciliacionesMaterial.js
  */
 
 import { useState, useCallback } from "react";
@@ -30,7 +33,9 @@ export const useSindicatos = () => {
 
       const { data, error: supabaseError } = await supabase
         .from("sindicatos")
-        .select("id_sindicato, sindicato, nombre_completo")
+        .select(
+          "id_sindicato, sindicato, nombre_completo, aplica_retencion_renta",
+        )
         .order("sindicato", { ascending: true });
 
       if (supabaseError) {
@@ -65,11 +70,46 @@ export const useSindicatos = () => {
     setError(null);
   }, []);
 
+  /**
+   * Prende/apaga la retención de renta (10.667%) para un sindicato.
+   * Solo Administrador puede escribir (política RLS "admin_update_sindicato").
+   */
+  const toggleAplicaRetencionRenta = useCallback(
+    async (idSindicato, nuevoValor) => {
+      try {
+        const { error: supabaseError } = await supabase
+          .from("sindicatos")
+          .update({ aplica_retencion_renta: nuevoValor })
+          .eq("id_sindicato", idSindicato);
+
+        if (supabaseError) throw supabaseError;
+
+        setSindicatos((prev) =>
+          prev.map((s) =>
+            s.id_sindicato === idSindicato
+              ? { ...s, aplica_retencion_renta: nuevoValor }
+              : s,
+          ),
+        );
+
+        return { success: true };
+      } catch (err) {
+        console.error(
+          "[useSindicatos] Error en toggleAplicaRetencionRenta:",
+          err.message,
+        );
+        return { success: false, error: err.message };
+      }
+    },
+    [],
+  );
+
   return {
     sindicatos,
     loading,
     error,
     loadSindicatos,
     clearSindicatos,
+    toggleAplicaRetencionRenta,
   };
 };

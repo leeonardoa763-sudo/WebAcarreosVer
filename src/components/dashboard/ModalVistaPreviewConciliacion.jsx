@@ -168,11 +168,14 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
           const grupos = agruparPorPlacasRenta(vales);
           setValesAgrupados(grupos);
 
-          // Totales para reimprimir PDF (renta no tiene retención)
+          // Totales para reimprimir PDF (retencion_4_porciento puede traer el
+          // monto del 10.667% de renta si el sindicato la tenía activada al
+          // generarse — ver sindicatos.aplica_retencion_renta)
           const gruposArr = Object.values(grupos);
           setTotalesPDF({
             subtotal: conciliacion.subtotal,
             iva: conciliacion.iva_16_porciento,
+            retencion: conciliacion.retencion_4_porciento,
             total: conciliacion.total_final,
             totalDias: gruposArr.reduce((s, g) => s + g.totalDias, 0),
             totalHoras: gruposArr.reduce((s, g) => s + g.totalHoras, 0),

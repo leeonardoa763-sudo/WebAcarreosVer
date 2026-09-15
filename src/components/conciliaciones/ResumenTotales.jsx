@@ -72,6 +72,16 @@ const ResumenTotales = ({ totales }) => {
           </span>
         </div>
 
+        {/* Retención 10.667% (solo si el sindicato la tiene activada) */}
+        {totales.retencion > 0 && (
+          <div className="resumen-totales__row resumen-totales__row--retencion">
+            <span className="resumen-totales__label">Retención 10.667%:</span>
+            <span className="resumen-totales__value resumen-totales__value--retencion">
+              - {formatearMoneda(totales.retencion)}
+            </span>
+          </div>
+        )}
+
         <div className="resumen-totales__divider resumen-totales__divider--bold"></div>
 
         {/* Total */}

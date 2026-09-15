@@ -5,7 +5,7 @@
  *
  * Funcionalidades:
  * - Agrupar vales por placas
- * - Calcular totales generales
+ * - Calcular totales generales (retención 10.667% opcional, por sindicato)
  * - Formatear datos para exportación
  * - Validaciones
  *
@@ -14,6 +14,10 @@
 
 // Utils
 import { materialLabelDetalle } from "../../utils/rentaMaterial";
+
+// Retención opcional de renta — algunos sindicatos (ej. CTM) la manejan y
+// otros no; se activa por sindicato desde useSindicatos.toggleAplicaRetencionRenta
+const RETENCION_RENTA_PORCENTAJE = 0.10667;
 
 /**
  * Hook para funciones auxiliares de conciliaciones
@@ -57,8 +61,13 @@ export const useConciliacionesHelpers = () => {
 
   /**
    * Calcular totales generales de la conciliación
+   *
+   * @param {object} gruposPorPlacas
+   * @param {boolean} aplicaRetencion - true si el sindicato tiene activada
+   *   la retención de renta (10.667%). Se resuelve del sindicato real de los
+   *   vales (operadores.sindicatos.aplica_retencion_renta), no de un flag fijo.
    */
-  const calcularTotalesGenerales = (gruposPorPlacas) => {
+  const calcularTotalesGenerales = (gruposPorPlacas, aplicaRetencion = false) => {
     let subtotal = 0;
     let totalDias = 0;
     let totalHoras = 0;
@@ -69,12 +78,17 @@ export const useConciliacionesHelpers = () => {
       totalHoras += grupo.totalHoras;
     });
 
-    const iva = subtotal * 0.16;
-    const total = subtotal + iva;
+    const subtotalFinal = Number(subtotal.toFixed(2));
+    const iva = Number((subtotalFinal * 0.16).toFixed(2));
+    const retencion = aplicaRetencion
+      ? Number((subtotalFinal * RETENCION_RENTA_PORCENTAJE).toFixed(2))
+      : 0;
+    const total = subtotalFinal + iva - retencion;
 
     return {
-      subtotal: Number(subtotal.toFixed(2)),
-      iva: Number(iva.toFixed(2)),
+      subtotal: subtotalFinal,
+      iva,
+      retencion,
       total: Number(total.toFixed(2)),
       totalDias,
       totalHoras: Number(totalHoras.toFixed(2)),
@@ -153,7 +167,10 @@ export const useConciliacionesHelpers = () => {
       fecha_fin: filtros.semanaSeleccionada.fechaFin,
       subtotal: totales.subtotal,
       iva_16_porciento: totales.iva,
-      retencion_4_porciento: 0,
+      // Columna reutilizada de material: aquí guarda el monto de la
+      // retención de renta (10.667%) cuando el sindicato la tiene activada,
+      // 0 si no. El nombre quedó desactualizado para renta.
+      retencion_4_porciento: totales.retencion,
       total_final: totales.total,
       total_dias: totales.totalDias,
       total_horas: totales.totalHoras,

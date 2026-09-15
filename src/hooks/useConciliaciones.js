@@ -38,6 +38,7 @@ export const useConciliaciones = () => {
     loading: loadingSindicatos,
     loadSindicatos,
     clearSindicatos,
+    toggleAplicaRetencionRenta,
   } = useSindicatos();
 
   // Memoizar valores estables
@@ -118,7 +119,17 @@ export const useConciliaciones = () => {
 
       const gruposPorPlacas = helpers.agruparValesPorPlacas(resultado.data);
 
-      const totales = helpers.calcularTotalesGenerales(gruposPorPlacas);
+      // La retención se resuelve del sindicato real de los vales (no de un
+      // flag fijo): todos los vales de esta vista previa son del mismo
+      // sindicato porque la query ya filtró por sindicatoFiltro.
+      const aplicaRetencion = Boolean(
+        resultado.data[0]?.operadores?.sindicatos?.aplica_retencion_renta,
+      );
+
+      const totales = helpers.calcularTotalesGenerales(
+        gruposPorPlacas,
+        aplicaRetencion,
+      );
 
       setVistaPrevia({
         valesAgrupados: gruposPorPlacas,
@@ -272,5 +283,6 @@ export const useConciliaciones = () => {
     loadHistorial,
     helpers,
     loadSemanas,
+    toggleAplicaRetencionRenta,
   };
 };

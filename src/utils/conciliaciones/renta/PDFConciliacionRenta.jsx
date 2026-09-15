@@ -6,7 +6,8 @@
  * CARACTERÍSTICAS:
  * - Renta de equipo y maquinaria
  * - Columnas: Placas, Folio, Fecha, Material Movido, Viajes, Días, Horas, Importe
- * - SIN: Retención (solo Subtotal + IVA)
+ * - Retención 10.667% opcional (solo si el sindicato la tiene activada, ver
+ *   sindicatos.aplica_retencion_renta) — normalmente es solo Subtotal + IVA
  *
  * Nota: Usa fecha_programada si existe, si no fecha_creacion
  *
@@ -294,6 +295,17 @@ const PDFConciliacionRenta = ({ conciliacion, valesAgrupados, totales, qrDataUrl
                     ${formatearNumero(totales.iva)}
                   </Text>
                 </View>
+
+                {totales.retencion > 0 && (
+                  <View style={sharedStyles.totalRow}>
+                    <Text style={sharedStyles.totalLabel}>
+                      Retención 10.667%:
+                    </Text>
+                    <Text style={sharedStyles.totalValue}>
+                      -${formatearNumero(totales.retencion)}
+                    </Text>
+                  </View>
+                )}
 
                 <View style={[sharedStyles.totalRow, sharedStyles.totalFinal]}>
                   <Text style={sharedStyles.totalLabel}>TOTAL:</Text>
