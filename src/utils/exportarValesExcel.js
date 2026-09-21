@@ -1,31 +1,33 @@
 /**
  * src/utils/exportarValesExcel.js
  *
- * Export a Excel de la pestaña Vales, normalizado en hojas: cada hoja es una
- * tabla con un solo nivel de detalle, unidas por el folio del vale.
+ * Export a Excel de la pestaña Vales, normalizado en hojas, unidas por el
+ * folio del vale.
  *
  *   Vales            1 fila por vale          PK  Folio
- *   Material         1 fila por detalle       FK  Folio  ·  PK  Folio + Detalle
- *   Renta            1 fila por detalle       FK  Folio
  *   Viajes material  1 fila por viaje         FK  Folio + Detalle
  *   Viajes renta     1 fila por viaje         FK  Folio
  *
- * Se separan porque una sola tabla obliga a dejar en blanco todo lo que no
- * aplica: las columnas de renta vacías en las filas de material, las de
- * material vacías en las de renta, y los totales del vale vacíos en todas menos
- * la primera. Cada hoja aquí está llena.
+ * "Viajes material" fusiona lo que antes eran dos hojas (Material + Viajes
+ * material) y "Viajes renta" fusiona (Renta + Viajes renta): tener el detalle
+ * separado del viaje obligaba a cruzar dos hojas a mano para ver, por
+ * ejemplo, la requisición de un viaje. Cada fila de viaje arrastra las
+ * columnas de su detalle (material, banco pedido, requisición, capacidad,
+ * notas, etc.) aunque se repitan en cada viaje del mismo detalle — el detalle
+ * ya no tiene hoja propia, así que perderlas sería perder el dato. Un detalle
+ * sin viajes registrados todavía (o una renta sin viajes con rastro) emite
+ * una fila sintética con sus propios datos para no desaparecer del libro.
  *
- * Lo que sí se repite en todas las hojas son los datos de identificación del
+ * Lo que se repite en todas las hojas son los datos de identificación del
  * vale (folio, tipo, estado, empresa, CC, obra, fecha, operador, placas,
- * sindicato) y, en las hojas de viajes, los del detalle del que cuelgan
- * (material, tipo de material, banco pedido / equipo rentado). Son columnas
- * llenas en cada fila, así que no reintroducen huecos, y evitan tener que
- * cruzar a mano contra la hoja Vales para filtrar por obra o por sindicato.
+ * sindicato). Son columnas llenas en cada fila, así que no reintroducen
+ * huecos, y evitan tener que cruzar a mano contra la hoja Vales para filtrar
+ * por obra o por sindicato.
  *
- * Cada hoja suma por su cuenta el total del vale: el importe de la hoja Vales,
- * el de Material por detalle y el de Viajes material por viaje dan la misma
- * cifra. La excepción es un vale de corte cuyos viajes nunca se registraron
- * (solo se imprimieron tickets): ahí la cantidad solo existe en Material.
+ * Cada hoja suma por su cuenta el total del vale: el importe de la hoja Vales
+ * y el de Viajes material por viaje dan la misma cifra. La excepción es un
+ * vale de corte cuyos viajes nunca se registraron (solo se imprimieron
+ * tickets): ahí la cantidad viene del ticket, no de un viaje medido.
  *
  * Dependencias: exportToExcel.js, excelFechas.js
  * Usado en: pages/DashboardUnificado.jsx
@@ -238,74 +240,12 @@ const filaVale = (vale, viajesRegistrados) => {
   };
 };
 
-// ─── Hoja "Material" ────────────────────────────────────────────────────────
-
-const FORMATOS_MATERIAL = {
-  ...FORMATOS_GENERALES,
-  "Precio m³": FMT_MONEDA,
-  Importe: FMT_MONEDA,
-};
-
-const filaDetalleMaterial = (vale, det, numeroDetalle) => ({
-  ...datosGeneralesVale(vale),
-  Detalle: numeroDetalle,
-  Material: texto(det.material?.material),
-  "Tipo material": texto(det.material?.tipo_de_material?.tipo_de_material),
-  Banco: texto(det.bancos?.banco),
-  "Planta asfaltos": siNo(det.es_planta_asfaltos),
-  "Distancia km": num(det.distancia_km),
-  "Capacidad m³": num(det.capacidad_m3),
-  "Cantidad pedida m³": num(det.cantidad_pedida_m3),
-  "m³": num(det.volumen_real_m3),
-  Toneladas: num(det.peso_ton),
-  "Precio m³": num(det.precio_m3),
-  Importe: num(det.costo_total),
-  "Folio banco": texto(det.folio_banco),
-  Remisión: texto(det.folio_vale_fisico),
-  Requisición: texto(det.requisicion),
-  // Excepción a nivel detalle: el Tipo 2 y la renta no generan filas de viaje,
-  // así que su foto omitida se declara aquí.
-  "Foto omitida": siNo(det.foto_omitida),
-  "Motivo sin foto": motivoSinFoto(det),
-  "Notas adicionales": texto(det.notas_adicionales),
-});
-
-// ─── Hoja "Renta" ───────────────────────────────────────────────────────────
-
-const FORMATOS_RENTA = {
-  ...FORMATOS_GENERALES,
-  "Costo/día": FMT_MONEDA,
-  "Costo/hr": FMT_MONEDA,
-  Importe: FMT_MONEDA,
-  "Hora inicio": FMT_HORA,
-  "Hora fin": FMT_HORA,
-};
-
-const filaDetalleRenta = (vale, det) => {
-  const porDia = esRentaPorDia(det);
-  const tarifa = tarifaRentaEfectiva(det);
-
-  return {
-    ...datosGeneralesVale(vale),
-    "Equipo / Material": texto(materialLabelDetalle(det)),
-    Cobro: porDia ? "Por día" : "Por hora",
-    Días: porDia ? num(det.total_dias) : "",
-    Horas: porDia ? "" : num(det.total_horas),
-    "Costo/día": porDia ? num(tarifa.costo_dia) : "",
-    "Costo/hr": porDia ? "" : num(tarifa.costo_hr),
-    Importe: num(det.costo_total),
-    "Capacidad m³": num(det.capacidad_m3),
-    "Viajes declarados": num(det.numero_viajes),
-    "Turno nocturno": siNo(det.es_turno_nocturno),
-    "Hora inicio": horaExcel(det.hora_inicio),
-    "Hora fin": horaExcel(det.hora_fin),
-    "Foto omitida": siNo(det.foto_omitida),
-    "Motivo sin foto": motivoSinFoto(det),
-    "Notas adicionales": texto(det.notas_adicionales),
-  };
-};
-
 // ─── Hoja "Viajes material" ─────────────────────────────────────────────────
+// Fusiona el antiguo par Material + Viajes material: cada fila es un viaje y
+// arrastra las columnas propias del detalle del que cuelga (material, banco
+// pedido, requisición, cantidad pedida, folio banco, notas...) para no
+// perderlas al quitar la hoja Material. Se repiten adrede en cada viaje del
+// mismo detalle.
 
 const FORMATOS_VIAJES_MATERIAL = {
   ...FORMATOS_GENERALES,
@@ -315,16 +255,16 @@ const FORMATOS_VIAJES_MATERIAL = {
   Importe: FMT_MONEDA,
 };
 
-// `det` es el detalle del que cuelga el viaje: sus datos se repiten en la fila
-// para que la hoja se pueda filtrar por material o por banco pedido sin volver
-// a la hoja Material.
 const filaViajeMaterial = (vale, det, viaje) => ({
   ...datosGeneralesVale(vale),
   Detalle: viaje.detalle,
   Material: texto(det.material?.material),
   "Tipo material": texto(det.material?.tipo_de_material?.tipo_de_material),
   "Banco pedido": texto(det.bancos?.banco),
-  Viaje: num(viaje.numero),
+  "Planta asfaltos": siNo(det.es_planta_asfaltos),
+  "Capacidad m³": num(det.capacidad_m3),
+  "Cantidad pedida m³": num(det.cantidad_pedida_m3),
+  Viaje: viaje.numero != null ? num(viaje.numero) : VACIO,
   Banco: texto(viaje.banco),
   "Cambio de banco": siNo(viaje.cambioDeBanco),
   "Distancia km": num(viaje.distanciaKm),
@@ -332,7 +272,9 @@ const filaViajeMaterial = (vale, det, viaje) => ({
   Toneladas: num(viaje.toneladas),
   "Precio m³": num(viaje.precioM3),
   Importe: num(viaje.importe),
+  "Folio banco": texto(det.folio_banco),
   Remisión: texto(viaje.remision),
+  Requisición: texto(det.requisicion),
   Ticket: texto(viaje.ticket),
   "Fecha registro": fechaExcel(viaje.horaRegistro),
   "Hora registro": horaExcel(viaje.horaRegistro),
@@ -345,7 +287,22 @@ const filaViajeMaterial = (vale, det, viaje) => ({
   "Motivo anticipado": viaje.motivoAnticipado ?? VACIO,
   "Foto omitida": siNo(viaje.fotoOmitida),
   "Motivo sin foto": viaje.motivoSinFoto ?? VACIO,
+  "Notas adicionales": texto(det.notas_adicionales),
 });
+
+const tipoMaterialId = (det) => det.material?.tipo_de_material?.id_tipo_de_material;
+
+// Cuántos viajes realmente se registraron (o se infieren de tickets) para un
+// detalle — a diferencia de filasViajesDeDetalle, no cuenta la fila sintética
+// de un detalle sin viajes todavía, para que "Viajes registrados" en la hoja
+// Vales siga reflejando viajes reales.
+const contarViajesReales = (det, tickets) => {
+  const viajes = det.vale_material_viajes?.length ?? 0;
+  if (viajes > 0) return viajes;
+  if (tipoMaterialId(det) === 3 && tickets.size > 0) return tickets.size;
+  if (tipoMaterialId(det) === 2) return 1;
+  return 0;
+};
 
 /**
  * Viajes de un detalle de material.
@@ -354,10 +311,10 @@ const filaViajeMaterial = (vale, det, viaje) => ({
  * justo donde la app permite cambiar de banco viaje por viaje. Los tickets solo
  * arman las filas cuando el vale de corte tiene tickets impresos pero ningún
  * viaje registrado; ahí el ticket es el único rastro del viaje y las cantidades
- * viven en la hoja Material, no por viaje.
+ * viven en el detalle, no por viaje.
  */
 const filasViajesDeDetalle = (vale, det, numeroDetalle, tickets) => {
-  const tipoId = det.material?.tipo_de_material?.id_tipo_de_material;
+  const tipoId = tipoMaterialId(det);
   const viajes = [...(det.vale_material_viajes ?? [])].sort(
     (a, b) => (a.numero_viaje ?? 0) - (b.numero_viaje ?? 0),
   );
@@ -431,17 +388,75 @@ const filasViajesDeDetalle = (vale, det, numeroDetalle, tickets) => {
     ];
   }
 
-  // Vale de material sin viajes todavía: no se inventa una fila de viaje. El
-  // vale ya aparece en las hojas Vales y Material.
-  return [];
+  // Detalle sin viajes ni tickets todavía: sin hoja Material aparte, hay que
+  // emitir una fila sintética con los datos del detalle para no perderlo.
+  return [
+    filaViajeMaterial(vale, det, {
+      detalle: numeroDetalle,
+      numero: null,
+      banco: det.bancos?.banco,
+      cambioDeBanco: false,
+      distanciaKm: det.distancia_km,
+      m3: det.volumen_real_m3,
+      toneladas: det.peso_ton,
+      precioM3: det.precio_m3,
+      importe: det.costo_total,
+      remision: det.folio_vale_fisico,
+      fotoOmitida: det.foto_omitida,
+      motivoSinFoto: motivoSinFoto(det),
+    }),
+  ];
 };
 
 // ─── Hoja "Viajes renta" ────────────────────────────────────────────────────
+// Fusiona el antiguo par Renta + Viajes renta: cada fila es un viaje y
+// arrastra las columnas propias del detalle del que cuelga (equipo, cobro,
+// capacidad, turno, horario, notas...) para no perderlas al quitar la hoja
+// Renta. Se repiten adrede en cada viaje del mismo detalle.
 
 const FORMATOS_VIAJES_RENTA = {
   ...FORMATOS_GENERALES,
+  "Costo/día": FMT_MONEDA,
+  "Costo/hr": FMT_MONEDA,
+  Importe: FMT_MONEDA,
+  "Hora inicio": FMT_HORA,
+  "Hora fin": FMT_HORA,
   "Fecha registro": FMT_FECHA,
   "Hora registro": FMT_HORA,
+};
+
+const filaViajeRenta = (vale, det, v) => {
+  const porDia = esRentaPorDia(det);
+  const tarifa = tarifaRentaEfectiva(det);
+  const materialPedido = materialLabelDetalle(det);
+
+  return {
+    ...datosGeneralesVale(vale),
+    "Equipo / Material": texto(materialPedido),
+    Cobro: porDia ? "Por día" : "Por hora",
+    Días: porDia ? num(det.total_dias) : "",
+    Horas: porDia ? "" : num(det.total_horas),
+    "Costo/día": porDia ? num(tarifa.costo_dia) : "",
+    "Costo/hr": porDia ? "" : num(tarifa.costo_hr),
+    Importe: num(det.costo_total),
+    "Capacidad m³": num(det.capacidad_m3),
+    "Viajes declarados": num(det.numero_viajes),
+    "Turno nocturno": siNo(det.es_turno_nocturno),
+    "Hora inicio": horaExcel(det.hora_inicio),
+    "Hora fin": horaExcel(det.hora_fin),
+    Viaje: v.numero != null ? num(v.numero) : VACIO,
+    "Material descargado": texto(v.material ?? materialPedido),
+    "Carga %": v.carga != null ? num(v.carga) : "",
+    "Banco de descarga": texto(v.banco),
+    Ticket: texto(v.ticket),
+    "Fecha registro": fechaExcel(v.horaRegistro),
+    "Hora registro": horaExcel(v.horaRegistro),
+    "Registró viaje": nombrePersona(v.personaRegistro),
+    // La renta declara la foto omitida a nivel detalle, no por viaje.
+    "Foto omitida": siNo(det.foto_omitida),
+    "Motivo sin foto": motivoSinFoto(det),
+    "Notas adicionales": texto(det.notas_adicionales),
+  };
 };
 
 /**
@@ -452,15 +467,15 @@ const FORMATOS_VIAJES_RENTA = {
  *   (`tickets_descarga`, cruzado por numero_ticket = numero_viaje) — no
  *   tienen carga_porcentaje.
  *
- * Solo se listan los viajes con rastro. Cuántos se declararon al crear el vale
- * está en la hoja Renta ("Viajes declarados"): rellenar hasta ese número
- * generaría filas vacías que no corresponden a ningún viaje registrado.
+ * Un detalle sin ningún viaje con rastro todavía emite una fila sintética con
+ * sus propios datos, para no perderlo al quitar la hoja Renta. `reales` no la
+ * cuenta, para que "Viajes registrados" en la hoja Vales siga reflejando
+ * viajes reales.
  */
 const filasViajesRenta = (vale) => {
   const det = vale.vale_renta_detalle?.[0];
-  if (!det) return [];
+  if (!det) return { filas: [], reales: 0 };
 
-  const materialPedido = materialLabelDetalle(det);
   const porNumero = new Map();
   const obtener = (numero) => {
     if (!porNumero.has(numero)) porNumero.set(numero, { numero });
@@ -484,21 +499,14 @@ const filasViajesRenta = (vale) => {
     if (!item.personaRegistro) item.personaRegistro = t.persona_registro;
   }
 
-  return [...porNumero.values()]
+  const reales = porNumero.size;
+  if (reales === 0) obtener(null);
+
+  const filas = [...porNumero.values()]
     .sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0))
-    .map((v) => ({
-      ...datosGeneralesVale(vale),
-      "Equipo rentado": texto(materialPedido),
-      Cobro: esRentaPorDia(det) ? "Por día" : "Por hora",
-      Viaje: num(v.numero),
-      "Material descargado": texto(v.material ?? materialPedido),
-      "Carga %": v.carga != null ? num(v.carga) : "",
-      "Banco de descarga": texto(v.banco),
-      Ticket: texto(v.ticket),
-      "Fecha registro": fechaExcel(v.horaRegistro),
-      "Hora registro": horaExcel(v.horaRegistro),
-      "Registró viaje": nombrePersona(v.personaRegistro),
-    }));
+    .map((v) => filaViajeRenta(vale, det, v));
+
+  return { filas, reales };
 };
 
 // ─── Hoja "Desverificaciones" ───────────────────────────────────────────────
@@ -536,14 +544,12 @@ const filasDesverificaciones = (vale) =>
  * inspeccionar el resultado sin generar el archivo.
  *
  * @param {Array} vales - vales enriquecidos por useDashboardUnificado
- * @returns {{vales: Array, material: Array, renta: Array,
- *            viajesMaterial: Array, viajesRenta: Array}}
+ * @returns {{vales: Array, viajesMaterial: Array, viajesRenta: Array,
+ *            desverificaciones: Array}}
  */
 export const construirHojasVales = (vales) => {
   const hojas = {
     vales: [],
-    material: [],
-    renta: [],
     viajesMaterial: [],
     viajesRenta: [],
     desverificaciones: [],
@@ -554,12 +560,9 @@ export const construirHojasVales = (vales) => {
     hojas.desverificaciones.push(...filasDesverificaciones(vale));
 
     if (vale.tipo_vale === "renta") {
-      const det = vale.vale_renta_detalle?.[0];
-      if (det) hojas.renta.push(filaDetalleRenta(vale, det));
-
-      const viajes = filasViajesRenta(vale);
-      hojas.viajesRenta.push(...viajes);
-      viajesDelVale = viajes.length;
+      const { filas, reales } = filasViajesRenta(vale);
+      hojas.viajesRenta.push(...filas);
+      viajesDelVale = reales;
     } else {
       // Los tickets físicos cuelgan del vale, no del detalle. En Tipo 3 se
       // imprime un ticket por viaje (ticket N ↔ viaje N).
@@ -569,18 +572,13 @@ export const construirHojasVales = (vales) => {
 
       (vale.vale_material_detalles ?? []).forEach((det, indice) => {
         const numeroDetalle = indice + 1;
-        hojas.material.push(filaDetalleMaterial(vale, det, numeroDetalle));
-
         // Los tickets se consumen una sola vez: un segundo detalle no debe
         // volver a emitir los mismos tickets como si fueran otros viajes.
-        const viajes = filasViajesDeDetalle(
-          vale,
-          det,
-          numeroDetalle,
-          indice === 0 ? tickets : new Map(),
-        );
+        const ticketsDetalle = indice === 0 ? tickets : new Map();
+
+        const viajes = filasViajesDeDetalle(vale, det, numeroDetalle, ticketsDetalle);
         hojas.viajesMaterial.push(...viajes);
-        viajesDelVale += viajes.length;
+        viajesDelVale += contarViajesReales(det, ticketsDetalle);
       });
     }
 
@@ -602,8 +600,6 @@ export const exportarValesExcel = (vales, fileName) => {
   exportMultipleSheetsToExcel(
     [
       { name: "Vales", data: hojas.vales, formatos: FORMATOS_VALES },
-      { name: "Material", data: hojas.material, formatos: FORMATOS_MATERIAL },
-      { name: "Renta", data: hojas.renta, formatos: FORMATOS_RENTA },
       {
         name: "Viajes material",
         data: hojas.viajesMaterial,

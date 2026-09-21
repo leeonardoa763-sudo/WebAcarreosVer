@@ -12,7 +12,7 @@
 | `qrDecoder.js` | `decodeQRFromCanvas`, `extractFolioFromQRData` | Decodificar QR con jsQR |
 | `exportToExcel.js` | `exportToExcel(data, fileName, sheetName, opciones)` | Exportar array de objetos planos a `.xlsx`. `opciones = { formatos, autoFiltro }` |
 | `excelFechas.js` | `fechaExcel`, `fechaHoraExcel`, `horaExcel`, `FMT_FECHA`, `FMT_FECHA_HORA`, `FMT_HORA` | Fechas/horas como número de serie de Excel (hora de México) |
-| `exportarValesExcel.js` | `exportarValesExcel(vales, fileName)`, `construirHojasVales(vales)` | Export de la pestaña Vales, **normalizado en 6 hojas** unidas por folio |
+| `exportarValesExcel.js` | `exportarValesExcel(vales, fileName)`, `construirHojasVales(vales)` | Export de la pestaña Vales, **normalizado en 4 hojas** unidas por folio |
 | `pdfPublicGenerator.js` | `generarPDFMaterialPublico`, `generarPDFRentaPublico` | PDF para vista pública `/vale/:folio` con marca de agua |
 | `exportConciliacionesDashboard.js` | `exportarConciliacionesDashboard(conciliaciones, tipo, cb)` | Carga vales bajo demanda y genera Excel de conciliaciones |
 | `exportarReporteEstadisticas.js` | `generarPDFReporteEstadisticas(datos)` | PDF de Estadísticas Globales (jsPDF imperativo) |
@@ -48,19 +48,18 @@
 | Hoja | Grano | Llave |
 |---|---|---|
 | `Vales` | 1 fila por vale | `Folio` |
-| `Material` | 1 fila por `vale_material_detalles` | `Folio` + `Detalle` |
-| `Renta` | 1 fila por `vale_renta_detalle` | `Folio` |
 | `Viajes material` | 1 fila por viaje | `Folio` + `Detalle` |
 | `Viajes renta` | 1 fila por viaje | `Folio` |
 | `Desverificaciones` | 1 fila por solicitud | `Folio` |
 
-Una sola hoja obligaba a repetir los datos del vale en cada viaje y a dejar en blanco lo que no aplica (columnas de renta en filas de material y viceversa, totales del vale en todas menos la primera). Las hojas vacías se omiten del libro.
+`Viajes material` fusiona lo que antes eran dos hojas (`Material` + `Viajes material`) y `Viajes renta` fusiona (`Renta` + `Viajes renta`): tener el detalle separado del viaje obligaba a cruzar dos hojas a mano para ver, por ejemplo, la requisición de un viaje. Cada fila de viaje arrastra las columnas de su detalle (material, banco pedido, requisición, capacidad, notas, etc.), repetidas a propósito en cada viaje del mismo detalle — el detalle ya no tiene hoja propia, así que no repetirlas sería perder el dato. Las hojas vacías se omiten del libro.
 
 - **`vale_material_viajes` manda siempre, en los tres tipos** (ver CLAUDE.md raíz, "Tipos de material"). `tickets_material` solo arma filas cuando un vale de corte tiene tickets impresos pero ningún viaje registrado. Ramificar por tipo aquí fue un error real: mandaba las filas del Tipo 3 por los tickets y perdía el override de banco por viaje, reportando el banco con el que se creó el vale.
 - **Banco, distancia, precio y costo salen del viaje** (`getBancoViaje` y los `*_override ?? detalle.*`). La columna `Cambio de banco` marca los viajes con override.
 - **Tres folios distintos, tres columnas:** `Remisión` = `folio_vale_fisico` (la remisión física del banco); `Folio banco` = `folio_banco` del detalle; `Ticket` = `folio_ticket` del ticket impreso, cruzado por `numero_ticket = numero_viaje`.
-- **Cada hoja suma por su cuenta el total del vale.** El importe de `Vales`, el de `Material`+`Renta` y el de `Viajes material` dan la misma cifra porque la app acumula `costo_viaje_override ?? costo_viaje` en `vale_material_detalles.costo_total` (`useViajesMaterial.js`). Las excepciones son las que no tienen medición por viaje: renta (el importe es del vale), corte sin viajes registrados y viajes sin cantidad capturada.
-- **Las notas y motivos van en la tabla que los guarda:** `notas_adicionales` + `foto_omitida`/`motivo_sin_foto_*` en `Material` y `Renta`; los motivos por viaje (`registro_anticipado`, `motivo_anticipado_*`, `motivo_sin_foto_*`) en `Viajes material`; `motivo_cancelacion` en `Vales`; los motivos de solicitud y respuesta en `Desverificaciones`. Los códigos se traducen con `motivoLegibleDe` de `excepcionesVale.js` — no duplicar el catálogo aquí.
-- **El Tipo 2 sí emite fila de viaje** (una, con los datos del detalle) para que `Viajes material` sea el ledger completo de viajes y `Viajes registrados` de la hoja `Vales` cuadre con él. Es el único caso donde una fila de viaje repite valores del detalle: ahí el detalle *es* el viaje.
+- **Un detalle sin viajes registrados todavía (o una renta sin viajes con rastro) emite una fila sintética** con `Viaje` en blanco (`—`) y las cantidades del detalle, para que el detalle no desaparezca del libro. `contarViajesReales` (material) y el campo `reales` de `filasViajesRenta` excluyen esa fila sintética al calcular `Viajes registrados` en `Vales`, para no inflar el conteo con viajes que no ocurrieron.
+- **Cada hoja suma por su cuenta el total del vale.** El importe de `Vales` y el de `Viajes material` por viaje dan la misma cifra porque la app acumula `costo_viaje_override ?? costo_viaje` en `vale_material_detalles.costo_total` (`useViajesMaterial.js`). Las excepciones son las que no tienen medición por viaje: renta (el importe es del vale, repetido en cada fila de viaje), corte sin viajes registrados y viajes sin cantidad capturada.
+- **Las notas y motivos van en la tabla que los guarda:** `notas_adicionales` + `foto_omitida`/`motivo_sin_foto_*` a nivel detalle, repetidos en cada fila de viaje de `Viajes material`/`Viajes renta`; los motivos por viaje (`registro_anticipado`, `motivo_anticipado_*`, `motivo_sin_foto_*` del propio viaje) van además en columnas propias de `Viajes material`; `motivo_cancelacion` en `Vales`; los motivos de solicitud y respuesta en `Desverificaciones`. Los códigos se traducen con `motivoLegibleDe` de `excepcionesVale.js` — no duplicar el catálogo aquí.
+- **El Tipo 2 sí emite fila de viaje** (una, con los datos del detalle) para que `Viajes material` sea el ledger completo de viajes y `Viajes registrados` de la hoja `Vales` cuadre con él. Es el único caso donde una fila de viaje repite valores del detalle porque ahí el detalle *es* el viaje (a diferencia de la fila sintética de "sin viajes todavía", esta sí cuenta como viaje real).
 
 **Dos motores de PDF:** Renta usa jsPDF (imperativo), Material usa @react-pdf/renderer (declarativo con JSX). No mezclar sin justificación.

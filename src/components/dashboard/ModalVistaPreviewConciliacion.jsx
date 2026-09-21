@@ -371,8 +371,13 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
               ? grupos[placas].totalesTipo1
               : grupos[placas].totalesTipo2;
 
+          // En un viaje de ajuste se cobró capacidad_m3, no volumen_real_m3:
+          // el Total m³ del resumen usa lo facturado para que Precio/m³
+          // siga cuadrando con la tarifa (ver useConciliacionesMaterialHelpers).
           targetTipo.totalViajes += numViajes;
-          targetTipo.totalM3 += Number(detalle.volumen_real_m3 || 0);
+          targetTipo.totalM3 += detalle.es_viaje_ajuste
+            ? Number(detalle.capacidad_m3 ?? detalle.volumen_real_m3 ?? 0)
+            : Number(detalle.volumen_real_m3 || 0);
           targetTipo.totalToneladas += Number(detalle.peso_ton || 0);
         } else if (idTipo === 3) {
           // Tipo 3 (corte) registra sus viajes como tickets_material,

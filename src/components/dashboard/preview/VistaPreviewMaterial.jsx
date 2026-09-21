@@ -91,7 +91,7 @@ const VistaPreviewMaterial = ({ conciliacion, valesAgrupados }) => {
               <span className="total-value">{totales.totalViajesTipo1}</span>
             </div>
             <div className="total-row">
-              <span className="total-label">Total m³ Reales:</span>
+              <span className="total-label">Total m³:</span>
               <span className="total-value">
                 {totales.totalM3Tipo1.toFixed(2)} m³
               </span>
@@ -113,7 +113,7 @@ const VistaPreviewMaterial = ({ conciliacion, valesAgrupados }) => {
               <span className="total-value">{totales.totalViajesTipo2}</span>
             </div>
             <div className="total-row">
-              <span className="total-label">Total m³ Reales:</span>
+              <span className="total-label">Total m³:</span>
               <span className="total-value">
                 {totales.totalM3Tipo2.toFixed(2)} m³
               </span>

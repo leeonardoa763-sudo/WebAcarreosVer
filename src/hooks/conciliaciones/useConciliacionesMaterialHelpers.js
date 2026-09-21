@@ -13,6 +13,17 @@
  */
 
 /**
+ * m³ que se usa para el "Total m³" / "Precio/m³" del resumen: en un viaje de
+ * ajuste se cobró capacidad_m3, así que ese es el volumen que debe sumar para
+ * que Precio/m³ siga cuadrando con la tarifa. volumen_real_m3 (el dato de la
+ * fila) no se toca — sigue siendo el que se reporta a obra.
+ */
+const volumenFacturado = (detalle) =>
+  detalle.es_viaje_ajuste
+    ? Number(detalle.capacidad_m3 ?? detalle.volumen_real_m3 ?? 0)
+    : Number(detalle.volumen_real_m3 || 0);
+
+/**
  * Hook para funciones auxiliares de conciliaciones de material
  */
 export const useConciliacionesMaterialHelpers = () => {
@@ -88,7 +99,7 @@ export const useConciliacionesMaterialHelpers = () => {
               ? grupos[placas].totalesTipo1
               : grupos[placas].totalesTipo2;
 
-          targetTipo.totalM3 += Number(detalle.volumen_real_m3 || 0);
+          targetTipo.totalM3 += volumenFacturado(detalle);
           targetTipo.totalToneladas += Number(detalle.peso_ton || 0);
           targetTipo.totalViajes += numViajes;
         } else if (idTipo === 3) {
