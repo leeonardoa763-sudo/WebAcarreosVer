@@ -43,6 +43,7 @@ import {
   Download,
   Image as ImageIcon,
   Droplets,
+  Timer,
 } from "lucide-react";
 
 // 3. Recharts
@@ -74,6 +75,10 @@ import {
   FLETE_EVITADO_FLOTA_PROPIA,
   VIABILIDAD_FLOTA_PROPIA,
   RENTA_NO_APROVECHADA,
+  REGISTROS_APRESURADOS,
+  CARGA_VIAJES_RENTA,
+  etiquetaCortaMotivo,
+  resumenRazones,
 } from "../utils/interpretacionIndicadores";
 
 // 6. Estilos
@@ -796,7 +801,9 @@ const GraficaRendimiento = ({ rendimientoPorMaterial }) => (
 );
 
 // ── Top table (residentes, checadores, placas) ─────────────────────
-const TopTable = ({ rows, cols, emptyMsg }) => (
+// `sinMedallas`: ranking neutro (números) para tablas donde el primer lugar
+// no es un logro (p. ej. la obra con menos carga).
+const TopTable = ({ rows, cols, emptyMsg, sinMedallas = false }) => (
   <div className="eg__top-table-wrap">
     <table className="eg__top-table">
       <thead>
@@ -811,7 +818,7 @@ const TopTable = ({ rows, cols, emptyMsg }) => (
         ) : rows.map((row, i) => (
           <tr key={i}>
             <td className="eg__top-rank">
-              {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`}
+              {sinMedallas ? `${i + 1}` : i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`}
             </td>
             {cols.map((c) => (
               <td key={c.key} className={c.numeric ? "eg__top-num" : ""}>
@@ -1251,8 +1258,162 @@ const TarjetaRentaNoAprovechadaObra = ({ datos }) => {
   );
 };
 
+// ── Tarjeta de Registros Apresurados (material) ─────────────────────
+// Un solo bloque a nivel filtro (no por obra): cuántos viajes se registraron
+// antes del tiempo mínimo, de qué material, con qué razón y qué tan lejos
+// quedaron del tiempo normal — ver calcularRegistrosApresurados en
+// useIndicadoresEficiencia.js. "Diferencia" = minutos que faltaban para el
+// mínimo que la app exigía en ese viaje; el porcentaje es sobre ese mínimo.
+const fmtMin = (v) => (v != null ? `${formatNum(v, 0)} min` : "—");
+const fmtDiferencia = (faltante, pct) =>
+  faltante != null ? `−${formatNum(faltante, 0)} min (${formatNum(pct, 0)}%)` : "—";
+
+const TarjetaRegistrosApresurados = ({ datos }) => (
+  <div className="eg__avanzado-card">
+    <div className="eg__avanzado-card-header">
+      <div className="eg__avanzado-card-left">
+        <span className="eg__avanzado-card-eyebrow"><Timer size={11} /> Material</span>
+        <h3 className="eg__avanzado-card-title">
+          {formatNum(datos.totalApresurados, 0)} viajes apresurados
+        </h3>
+      </div>
+      <div className="eg__avanzado-kpis">
+        <div className="eg__avanzado-kpi">
+          <span className="eg__avanzado-kpi-val">{formatNum(datos.totalViajes, 0)}</span>
+          <span className="eg__avanzado-kpi-label">Viajes de Material</span>
+        </div>
+        <div className="eg__avanzado-kpi">
+          <span className="eg__avanzado-kpi-val">{formatNum(datos.pctApresurados, 1)}%</span>
+          <span className="eg__avanzado-kpi-label">Apresurados</span>
+        </div>
+        {datos.conMinutos > 0 && (
+          <>
+            <div className="eg__avanzado-kpi">
+              <span className="eg__avanzado-kpi-val">{fmtMin(datos.minimoProm)}</span>
+              <span className="eg__avanzado-kpi-label">Mínimo Normal Prom.</span>
+            </div>
+            <div className="eg__avanzado-kpi">
+              <span className="eg__avanzado-kpi-val">{fmtMin(datos.registradoProm)}</span>
+              <span className="eg__avanzado-kpi-label">Registrado Prom.</span>
+            </div>
+            <div className="eg__avanzado-kpi">
+              <span className="eg__avanzado-kpi-val">{fmtDiferencia(datos.faltanteProm, datos.pctMenos)}</span>
+              <span className="eg__avanzado-kpi-label">Diferencia Prom.</span>
+            </div>
+          </>
+        )}
+        {datos.cicloNormalProm != null && (
+          <div className="eg__avanzado-kpi">
+            <span className="eg__avanzado-kpi-val">{fmtMin(datos.cicloNormalProm)}</span>
+            <span className="eg__avanzado-kpi-label">Ciclo Normal Prom.</span>
+          </div>
+        )}
+      </div>
+    </div>
+
+    <TopTable
+      rows={datos.porMaterial.map((m) => ({
+        ...m,
+        diferenciaTxt: fmtDiferencia(m.faltanteProm, m.pctMenos),
+        razonesTxt: resumenRazones(m.razones),
+      }))}
+      emptyMsg="Sin registros apresurados en este filtro"
+      cols={[
+        { key: "material", label: "Material" },
+        { key: "viajes", label: "Viajes", numeric: true, format: (v) => formatNum(v, 0) },
+        { key: "apresurados", label: "Apresurados", numeric: true, format: (v) => formatNum(v, 0) },
+        { key: "pct", label: "% del Material", numeric: true, format: (v) => `${formatNum(v, 1)}%` },
+        { key: "minimoProm", label: "Mínimo Normal", numeric: true, format: fmtMin },
+        { key: "registradoProm", label: "Registrado", numeric: true, format: fmtMin },
+        { key: "diferenciaTxt", label: "Diferencia", numeric: true },
+        { key: "cicloNormalProm", label: "Ciclo Normal", numeric: true, format: fmtMin },
+        { key: "razonesTxt", label: "Razones" },
+      ]}
+    />
+
+    {datos.porRazon.length > 0 && (
+      <TopTable
+        rows={datos.porRazon.map((r) => ({ ...r, razon: etiquetaCortaMotivo(r) }))}
+        emptyMsg=""
+        cols={[
+          { key: "razon", label: "Razón" },
+          { key: "count", label: "Viajes", numeric: true, format: (v) => formatNum(v, 0) },
+          { key: "pct", label: "% de Apresurados", numeric: true, format: (v) => `${formatNum(v, 1)}%` },
+          { key: "faltanteProm", label: "Adelanto Prom.", numeric: true, format: (v) => (v != null ? `−${formatNum(v, 0)} min` : "—") },
+        ]}
+      />
+    )}
+  </div>
+);
+
+// ── Tarjeta de Carga de Viajes de Renta ─────────────────────────────
+// Distribución 100/75/50% de la carga declarada por viaje, por obra — ver
+// calcularCargaViajesRenta en useIndicadoresEficiencia.js.
+const celdaNivelCarga = (nivel) =>
+  nivel.count > 0 ? `${formatNum(nivel.count, 0)} (${formatNum(nivel.pctViajes, 0)}%)` : "—";
+
+const TarjetaCargaViajesRenta = ({ datos }) => {
+  const filasObra = datos.porObra.map((o) => ({
+    obra: [o.empresa, o.cc != null ? `CC ${o.cc}` : null, o.obra].filter(Boolean).join(" · "),
+    viajes: o.viajes,
+    cargaPromedio: o.cargaPromedio,
+    n100: celdaNivelCarga(o.niveles[0]),
+    n75: celdaNivelCarga(o.niveles[1]),
+    n50: celdaNivelCarga(o.niveles[2]),
+    sinDato: o.sinDato,
+  }));
+
+  return (
+    <div className="eg__avanzado-card">
+      <div className="eg__avanzado-card-header">
+        <div className="eg__avanzado-card-left">
+          <span className="eg__avanzado-card-eyebrow"><Truck size={11} /> Renta de equipo</span>
+          <h3 className="eg__avanzado-card-title">
+            {datos.cargaPromedio != null
+              ? `Los viajes van al ${formatNum(datos.cargaPromedio, 0)}% de carga en promedio`
+              : "Sin viajes con carga declarada"}
+          </h3>
+        </div>
+        <div className="eg__avanzado-kpis">
+          <div className="eg__avanzado-kpi">
+            <span className="eg__avanzado-kpi-val">{formatNum(datos.viajes, 0)}</span>
+            <span className="eg__avanzado-kpi-label">Viajes de Renta</span>
+          </div>
+          {datos.niveles.map((n) => (
+            <div key={n.pct} className="eg__avanzado-kpi">
+              <span className="eg__avanzado-kpi-val">{formatNum(n.pctViajes, 1)}%</span>
+              <span className="eg__avanzado-kpi-label">Carga {n.pct}%</span>
+            </div>
+          ))}
+          {datos.sinDato > 0 && (
+            <div className="eg__avanzado-kpi">
+              <span className="eg__avanzado-kpi-val">{formatNum(datos.sinDato, 0)}</span>
+              <span className="eg__avanzado-kpi-label">Sin Dato</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <TopTable
+        sinMedallas
+        rows={filasObra}
+        emptyMsg="Sin viajes de renta en este filtro"
+        cols={[
+          { key: "obra", label: "Obra (menor carga primero)" },
+          { key: "viajes", label: "Viajes", numeric: true, format: (v) => formatNum(v, 0) },
+          { key: "cargaPromedio", label: "Carga Prom.", numeric: true, format: (v) => (v != null ? `${formatNum(v, 0)}%` : "—") },
+          { key: "n100", label: "100%", numeric: true },
+          { key: "n75", label: "75%", numeric: true },
+          { key: "n50", label: "50%", numeric: true },
+          { key: "sinDato", label: "Sin Dato", numeric: true, format: (v) => (v > 0 ? formatNum(v, 0) : "—") },
+        ]}
+      />
+    </div>
+  );
+};
+
 // ── Sección Análisis Avanzado ──────────────────────────────────────
-const SeccionPresupuestos = ({ materialRows, rentaRows, hayAlerta, loading, mostrarEncabezado = true }) => {
+const SeccionPresupuestos =({ materialRows, rentaRows, hayAlerta, loading, mostrarEncabezado = true }) => {
   const obrasMaterial = useMemo(() => {
     const map = {};
     materialRows.forEach((p) => {
@@ -1736,6 +1897,8 @@ const EstadisticasGlobales = () => {
     camionesPorDia,
     topCamionerosPorObra,
     rentaNoAprovechada,
+    registrosApresurados,
+    cargaViajesRenta,
     indicadoresEficienciaCargados,
     garantizarIndicadoresEficiencia,
   } = useIndicadoresEficiencia(valesReporteFiltrados, filtros.idTipoMaterial, modosFiltro.idTipoMaterial);
@@ -1904,6 +2067,8 @@ const EstadisticasGlobales = () => {
         camionesPorDia,
         topCamionerosPorObra,
         rentaNoAprovechada,
+        registrosApresurados,
+        cargaViajesRenta,
       });
     } catch (err) {
       console.error("Error al exportar reporte PDF:", err);
@@ -3583,6 +3748,58 @@ const EstadisticasGlobales = () => {
               ))}
               <div className="eg__avanzado-card">
                 <p className="eg__avanzado-card-sub" style={{ padding: "16px" }}>{RENTA_NO_APROVECHADA.nota}</p>
+              </div>
+            </>
+          )}
+
+          {/* Registros Apresurados (material) */}
+          <div className="eg__avanzado-card">
+            <div className="eg__avanzado-card-header">
+              <div className="eg__avanzado-card-left">
+                <span className="eg__avanzado-card-eyebrow"><Timer size={11} /> Calidad de captura</span>
+                <h3 className="eg__avanzado-card-title">{REGISTROS_APRESURADOS.titulo}</h3>
+              </div>
+            </div>
+            <p className="eg__avanzado-card-sub" style={{ padding: "0 16px 16px" }}>{REGISTROS_APRESURADOS.descripcion}</p>
+          </div>
+
+          {registrosApresurados.totalViajes === 0 ? (
+            <div className="eg__avanzado-card">
+              <p className="eg__top-empty" style={{ padding: 20 }}>
+                Sin viajes de material registrados en este filtro.
+              </p>
+            </div>
+          ) : (
+            <>
+              <TarjetaRegistrosApresurados datos={registrosApresurados} />
+              <div className="eg__avanzado-card">
+                <p className="eg__avanzado-card-sub" style={{ padding: "16px" }}>{REGISTROS_APRESURADOS.nota}</p>
+              </div>
+            </>
+          )}
+
+          {/* Carga de los Viajes de Renta */}
+          <div className="eg__avanzado-card">
+            <div className="eg__avanzado-card-header">
+              <div className="eg__avanzado-card-left">
+                <span className="eg__avanzado-card-eyebrow"><Truck size={11} /> Renta de equipo</span>
+                <h3 className="eg__avanzado-card-title">{CARGA_VIAJES_RENTA.titulo}</h3>
+              </div>
+            </div>
+            <p className="eg__avanzado-card-sub" style={{ padding: "0 16px 16px" }}>{CARGA_VIAJES_RENTA.descripcion}</p>
+          </div>
+
+          {cargaViajesRenta.viajes === 0 ? (
+            <div className="eg__avanzado-card">
+              <p className="eg__top-empty" style={{ padding: 20 }}>
+                Sin viajes de renta registrados en este filtro.
+              </p>
+            </div>
+          ) : (
+            <>
+              <TarjetaCargaViajesRenta datos={cargaViajesRenta} />
+              <div className="eg__avanzado-card">
+                <p className="eg__avanzado-card-sub" style={{ padding: "16px" }}>{CARGA_VIAJES_RENTA.nota}</p>
               </div>
             </>
           )}

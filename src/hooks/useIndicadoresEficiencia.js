@@ -4,7 +4,8 @@
  * Los 3 indicadores de eficiencia y oportunidad de Estadísticas Globales
  * (índice de posición, flete evitado por flota propia, jornada de renta no
  * aprovechada) que antes solo existían en un Excel manual (`analisis-kpis/`)
- * y nunca llegaron al sistema.
+ * y nunca llegaron al sistema. Más dos indicadores de calidad de captura:
+ * registros apresurados por material/razón y carga de los viajes de renta.
  *
  * `valesReporteFiltrados` se recibe ya calculado (misma fuente que el resto
  * del reporte PDF, useEstadisticasGlobales) — no se vuelve a pedir vales.
@@ -14,7 +15,7 @@
  *
  * Constante de negocio confirmada con Bruno (2026-09-03): meta_viajes_dia_renta=7.
  *
- * Dependencias: config/supabase, utils/cotizarFlete,
+ * Dependencias: config/supabase, utils/cotizarFlete, utils/excepcionesVale,
  * SINDICATO_TARIFAS_REPORTE de hooks/useEstadisticasGlobales
  * Usado en: pages/EstadisticasGlobales.jsx (también alimenta el reporte PDF,
  * ver utils/exportarReporteEstadisticas.js — indicadoresEficienciaCargados
@@ -26,6 +27,8 @@ import { supabase } from "../config/supabase";
 import { cotizarFleteM3 } from "../utils/cotizarFlete";
 import { SINDICATO_TARIFAS_REPORTE, matchesFiltro } from "./useEstadisticasGlobales";
 import { materialLabelDetalle } from "../utils/rentaMaterial";
+import { MOTIVOS_ANTICIPADO, etiquetaMotivo } from "../utils/excepcionesVale";
+import { viajesConCiclo, nuevoAcumCiclos, acumularCiclo, resumirCiclos } from "../utils/ciclosViajes";
 
 // Flota propia: tarifa intencional de $1/km (esos vales no se cobran a precio
 // de mercado). Ver memoria de negocio — GRUPO GEEM, no CATEM/CITRACON/PRUEBAS.
@@ -565,6 +568,185 @@ const calcularRentaNoAprovechada = (valesRenta) => {
     .sort((a, b) => b.totalDesperdiciado - a.totalDesperdiciado);
 };
 
+// ── Registros apresurados (material) ────────────────────────────────
+// Cuenta, por material, los viajes con `registro_anticipado` y las razones
+// declaradas (`motivo_anticipado_codigo`, catálogo en excepcionesVale.js). El
+// material vive en el detalle (`det.material`), el flag en cada viaje. Solo
+// cuentan filas de `vale_material_viajes` (Tipos 1 y 3): el Tipo 2 no genera
+// filas de viaje, así que no puede ser apresurado ni entra en el denominador.
+// Un código fuera del catálogo (motivo de una versión vieja de la app) se
+// conserva tal cual en vez de mezclarse con "Sin especificar".
+//
+// Cuánto se adelantó el viaje: la app guarda en CADA viaje el tiempo mínimo
+// que aplicaba (`minutos_minimos_calculados`) y, si fue apresurado, cuántos
+// minutos faltaban (`minutos_faltantes_anticipado`). El tiempo realmente
+// transcurrido es mínimo − faltantes. Solo cuentan los viajes que traen ambos
+// datos (los anteriores a 2026-08-04 no); los promedios salen de esos, no de
+// todos los apresurados. Como referencia de "recorrido normal" se agrega el
+// ciclo promedio de los viajes normales del mismo material (utils/ciclosViajes.js).
+const nuevoAcumMinutos = () => ({ n: 0, sumaMinimo: 0, sumaFaltante: 0 });
+
+const acumularMinutos = (acum, viaje) => {
+  const minimo = Number(viaje.minutos_minimos_calculados);
+  const faltante = Number(viaje.minutos_faltantes_anticipado);
+  if (!(minimo > 0) || viaje.minutos_faltantes_anticipado == null) return;
+  acum.n += 1;
+  acum.sumaMinimo += minimo;
+  acum.sumaFaltante += faltante;
+};
+
+const resumirMinutos = (acum, ciclosAcum) => {
+  const minimoProm = acum.n > 0 ? acum.sumaMinimo / acum.n : null;
+  const faltanteProm = acum.n > 0 ? acum.sumaFaltante / acum.n : null;
+  return {
+    conMinutos: acum.n,
+    minimoProm,
+    faltanteProm,
+    registradoProm: minimoProm != null ? minimoProm - faltanteProm : null,
+    pctMenos: acum.sumaMinimo > 0 ? (acum.sumaFaltante / acum.sumaMinimo) * 100 : null,
+    cicloNormalProm: ciclosAcum ? resumirCiclos(ciclosAcum).cicloMinProm : null,
+  };
+};
+
+const calcularRegistrosApresurados = (valesMaterial) => {
+  const porMaterial = {};
+  const porRazon = {};
+  const minutosTotal = nuevoAcumMinutos();
+  const ciclosTotal = nuevoAcumCiclos();
+  let totalViajes = 0;
+  let totalApresurados = 0;
+
+  valesMaterial.forEach((vale) => {
+    (vale.vale_material_detalles || []).forEach((det) => {
+      const material = det.material?.material || "Sin clasificar";
+      if (!porMaterial[material]) {
+        porMaterial[material] = {
+          material, viajes: 0, apresurados: 0, razones: {},
+          minutos: nuevoAcumMinutos(), ciclos: nuevoAcumCiclos(),
+        };
+      }
+      const m = porMaterial[material];
+
+      viajesConCiclo(det.vale_material_viajes).forEach(({ viaje, ciclo }) => {
+        totalViajes += 1;
+        m.viajes += 1;
+        if (ciclo != null) {
+          acumularCiclo(m.ciclos, ciclo, 0, 0);
+          acumularCiclo(ciclosTotal, ciclo, 0, 0);
+        }
+        if (!viaje.registro_anticipado) return;
+
+        totalApresurados += 1;
+        m.apresurados += 1;
+        acumularMinutos(m.minutos, viaje);
+        acumularMinutos(minutosTotal, viaje);
+
+        const codigo = viaje.motivo_anticipado_codigo || null;
+        const clave = codigo ?? "sin_especificar";
+        const label = etiquetaMotivo(MOTIVOS_ANTICIPADO, codigo);
+        m.razones[clave] = m.razones[clave] || { codigo: clave, label, count: 0 };
+        m.razones[clave].count += 1;
+        if (!porRazon[clave]) porRazon[clave] = { codigo: clave, label, count: 0, minutos: nuevoAcumMinutos() };
+        porRazon[clave].count += 1;
+        acumularMinutos(porRazon[clave].minutos, viaje);
+      });
+    });
+  });
+
+  const razonesOrdenadas = (mapa) => Object.values(mapa).sort((a, b) => b.count - a.count);
+
+  return {
+    totalViajes,
+    totalApresurados,
+    pctApresurados: totalViajes > 0 ? (totalApresurados / totalViajes) * 100 : 0,
+    ...resumirMinutos(minutosTotal, ciclosTotal),
+    porRazon: razonesOrdenadas(porRazon).map(({ minutos, ...r }) => ({
+      ...r,
+      pct: totalApresurados > 0 ? (r.count / totalApresurados) * 100 : 0,
+      faltanteProm: resumirMinutos(minutos).faltanteProm,
+    })),
+    porMaterial: Object.values(porMaterial)
+      .filter((m) => m.apresurados > 0)
+      .map((m) => {
+        const razones = razonesOrdenadas(m.razones);
+        return {
+          material: m.material,
+          viajes: m.viajes,
+          apresurados: m.apresurados,
+          pct: (m.apresurados / m.viajes) * 100,
+          razonPrincipal: razones[0]?.label ?? null,
+          razones,
+          ...resumirMinutos(m.minutos, m.ciclos),
+        };
+      })
+      .sort((a, b) => b.apresurados - a.apresurados),
+  };
+};
+
+// ── Carga de los viajes de renta ────────────────────────────────────
+// Distribución de `vale_renta_viajes.carga_porcentaje` (100/75/50, ver
+// ModalRegistrarViaje en la app) por obra. Los viajes sin carga capturada
+// (anteriores al rediseño 2026-09-04) van como "Sin dato" y NO entran al
+// promedio — la app los trata como 100% para sumar volumen, pero para una
+// estadística de "qué tan cargados van" eso inflaría el resultado. Pipas
+// fuera (valesRenta ya las excluye): no declaran carga por viaje.
+const NIVELES_CARGA_RENTA = [100, 75, 50];
+
+const resumirCarga = (acum) => {
+  const conDato = acum.conDato;
+  return {
+    viajes: acum.viajes,
+    conDato,
+    sinDato: acum.viajes - conDato,
+    cargaPromedio: conDato > 0 ? acum.sumaPct / conDato : null,
+    niveles: NIVELES_CARGA_RENTA.map((pct) => ({
+      pct,
+      count: acum.niveles[pct] || 0,
+      pctViajes: conDato > 0 ? ((acum.niveles[pct] || 0) / conDato) * 100 : 0,
+    })),
+  };
+};
+
+const calcularCargaViajesRenta = (valesRenta) => {
+  const global = { viajes: 0, conDato: 0, sumaPct: 0, niveles: {} };
+  const porObra = {};
+
+  valesRenta.forEach((vale) => {
+    const obraId = vale.id_obra;
+    if (!obraId) return;
+
+    (vale.vale_renta_detalle || []).forEach((det) => {
+      (det.vale_renta_viajes || []).forEach((viaje) => {
+        if (!porObra[obraId]) {
+          porObra[obraId] = {
+            obra: vale.obras?.obra || "Sin obra",
+            cc: vale.obras?.cc ?? null,
+            empresa: vale.obras?.empresas?.empresa || null,
+            acum: { viajes: 0, conDato: 0, sumaPct: 0, niveles: {} },
+          };
+        }
+        const pct = Number(viaje.carga_porcentaje);
+        [global, porObra[obraId].acum].forEach((a) => {
+          a.viajes += 1;
+          if (pct > 0) {
+            a.conDato += 1;
+            a.sumaPct += pct;
+            a.niveles[pct] = (a.niveles[pct] || 0) + 1;
+          }
+        });
+      });
+    });
+  });
+
+  return {
+    ...resumirCarga(global),
+    porObra: Object.values(porObra)
+      .map((o) => ({ obra: o.obra, cc: o.cc, empresa: o.empresa, ...resumirCarga(o.acum) }))
+      .filter((o) => o.viajes > 0)
+      .sort((a, b) => (a.cargaPromedio ?? 101) - (b.cargaPromedio ?? 101)),
+  };
+};
+
 export const useIndicadoresEficiencia = (valesReporteFiltrados, filtroTipoMaterial = [], modoTipoMaterial = "incluir") => {
   const [preciosMaterialTodos, setPreciosMaterialTodos] = useState([]);
   const [cargando, setCargando] = useState(false);
@@ -656,12 +838,24 @@ export const useIndicadoresEficiencia = (valesReporteFiltrados, filtroTipoMateri
     [valesRenta]
   );
 
+  const registrosApresurados = useMemo(
+    () => calcularRegistrosApresurados(valesMaterial),
+    [valesMaterial]
+  );
+
+  const cargaViajesRenta = useMemo(
+    () => calcularCargaViajesRenta(valesRenta),
+    [valesRenta]
+  );
+
   return {
     indicePosicionObra,
     fleteEvitadoFlotaPropia,
     camionesPorDia,
     topCamionerosPorObra,
     rentaNoAprovechada,
+    registrosApresurados,
+    cargaViajesRenta,
     cargandoIndicadoresEficiencia: cargando,
     indicadoresEficienciaCargados: cargado,
     garantizarIndicadoresEficiencia,

@@ -22,6 +22,10 @@ import {
   FLETE_EVITADO_FLOTA_PROPIA,
   VIABILIDAD_FLOTA_PROPIA,
   RENTA_NO_APROVECHADA,
+  REGISTROS_APRESURADOS,
+  CARGA_VIAJES_RENTA,
+  etiquetaCortaMotivo,
+  resumenRazones,
 } from "./interpretacionIndicadores";
 
 // ── Layout ────────────────────────────────────────────────────────
@@ -466,16 +470,26 @@ const dibujarBarrasBancos = (doc, x, yPosInicial, width, bancos, colorHex, maxBa
 // Banco/distancia/precio/costo ya vienen resueltos por viaje con el patrón
 // viaje.*_override ?? viaje.* ?? detalle.* (ver agregarBancoMaterialReal en
 // useEstadisticasGlobales.js) — esta función solo dibuja lo que recibe.
+// MIN/VIAJE y KM/H salen de los tiempos registrados entre viajes (ver
+// utils/ciclosViajes.js); no son los del umbral que exige la app.
+const LEYENDA_CICLO_BANCO =
+  "MIN/VIAJE: promedio de minutos entre viajes normales consecutivos del mismo vale " +
+  "(sin apresurados; ciclos de 1 a 300 min). KM/H: velocidad de recorrido calculada = " +
+  "2 × distancia ÷ (ciclo - tiempo de carga y descarga de la obra, 19 min por defecto). " +
+  "Se muestra — con menos de 5 ciclos registrados.";
+
 const dibujarSeccionBancoMaterial = (doc, yPosInicial, tablaBancoMaterial) => {
   let yPos = dibujarTituloSeccion(doc, yPosInicial, "Material por Banco");
 
   const columnas = [
-    { label: "BANCO", width: 55, align: "left" },
-    { label: "M³ TOTAL", width: 25, align: "right" },
-    { label: "VIAJES", width: 20, align: "right" },
-    { label: "DIST. PROM (KM)", width: 30, align: "right" },
-    { label: "PRECIO PROM/M³", width: 30, align: "right" },
-    { label: "IMPORTE + IVA", width: 25, align: "right" },
+    { label: "BANCO", width: 43, align: "left" },
+    { label: "M³ TOTAL", width: 23, align: "right" },
+    { label: "VIAJES", width: 15, align: "right" },
+    { label: "DIST. (KM)", width: 19, align: "right" },
+    { label: "PRECIO/M³", width: 22, align: "right" },
+    { label: "IMPORTE + IVA", width: 26, align: "right" },
+    { label: "MIN/VIAJE", width: 19, align: "right" },
+    { label: "KM/H", width: 18, align: "right" },
   ];
 
   if (!tablaBancoMaterial || tablaBancoMaterial.length === 0) {
@@ -549,7 +563,7 @@ const dibujarSeccionBancoMaterial = (doc, yPosInicial, tablaBancoMaterial) => {
       yPos = dibujarEncabezadoColumnas(doc, yPos, columnas);
     }
 
-    drawRow([grupo.tipoNombre.toUpperCase(), "", "", "", "", ""], {
+    drawRow([grupo.tipoNombre.toUpperCase(), "", "", "", "", "", "", ""], {
       fillHeader: true, bold: true, span: true,
     });
 
@@ -561,6 +575,8 @@ const dibujarSeccionBancoMaterial = (doc, yPosInicial, tablaBancoMaterial) => {
         formatearNumero(b.distanciaKmProm, 1),
         formatearMoneda(b.precioM3Prom),
         formatearMoneda(b.importeIVA),
+        b.cicloMinProm != null ? formatearNumero(b.cicloMinProm, 0) : "—",
+        b.velocidadKmh != null ? formatearNumero(b.velocidadKmh, 1) : "—",
       ], { bold: true });
 
       b.materiales.forEach((m) => {
@@ -571,6 +587,8 @@ const dibujarSeccionBancoMaterial = (doc, yPosInicial, tablaBancoMaterial) => {
           formatearNumero(m.distanciaKmProm, 1),
           formatearMoneda(m.precioM3Prom),
           formatearMoneda(m.importeIVA),
+          m.cicloMinProm != null ? formatearNumero(m.cicloMinProm, 0) : "—",
+          m.velocidadKmh != null ? formatearNumero(m.velocidadKmh, 1) : "—",
         ], { sub: true });
       });
     });
@@ -583,6 +601,8 @@ const dibujarSeccionBancoMaterial = (doc, yPosInicial, tablaBancoMaterial) => {
         "",
         "",
         formatearMoneda(grupo.subtotal.importeIVA),
+        "",
+        "",
       ], { fillSubtotal: true, bold: true });
     }
 
@@ -610,7 +630,11 @@ const dibujarSeccionBancoMaterial = (doc, yPosInicial, tablaBancoMaterial) => {
     "",
     "",
     formatearMoneda(totalGeneral.importeIVA),
+    "",
+    "",
   ], { fillHeader: true, bold: true });
+
+  yPos = dibujarParrafo(doc, MARGIN_LEFT, yPos + 4, LEYENDA_CICLO_BANCO, USABLE_WIDTH, { fontSize: 7 });
 
   yPos += 6;
   yPos = dibujarTablaTarifasBanco(doc, yPos, tablaBancoMaterial);
@@ -1887,12 +1911,151 @@ const dibujarSeccionRentaNoAprovechada = (doc, yPosInicial, rentaNoAprovechada) 
   return dibujarParrafo(doc, MARGIN_LEFT, yPos, RENTA_NO_APROVECHADA.nota, USABLE_WIDTH, { fontSize: 7 }) + 4;
 };
 
+// ── Indicador: Registros Apresurados (material) ─────────────────────────
+const minPDF = (v) => (v != null ? `${formatearNumero(v, 0)} min` : "—");
+const difPDF = (faltante, pct) =>
+  faltante != null ? `-${formatearNumero(faltante, 0)} min (${formatearNumero(pct, 0)}%)` : "—";
+
+const dibujarSeccionRegistrosApresurados = (doc, yPosInicial, registrosApresurados) => {
+  let yPos = dibujarTituloSeccion(doc, yPosInicial, REGISTROS_APRESURADOS.titulo);
+  yPos = dibujarParrafo(doc, MARGIN_LEFT, yPos, REGISTROS_APRESURADOS.descripcion, USABLE_WIDTH) + 3;
+
+  if (!registrosApresurados || registrosApresurados.totalViajes === 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    setTextColor(doc, COLOR_GRAY);
+    doc.text("Sin viajes de material registrados en este filtro.", MARGIN_LEFT, yPos + 4);
+    setTextColor(doc, COLOR_TEXT);
+    return yPos + 12;
+  }
+
+  const r = registrosApresurados;
+  const chips = [
+    { label: "Viajes de Material", value: formatearNumero(r.totalViajes, 0) },
+    { label: "Apresurados", value: formatearNumero(r.totalApresurados, 0), color: r.totalApresurados > 0 ? COLOR_WARNING : undefined },
+    { label: "% Apresurados", value: `${formatearNumero(r.pctApresurados, 1)}%` },
+  ];
+  if (r.conMinutos > 0) {
+    chips.push(
+      { label: "Mínimo Normal Prom.", value: minPDF(r.minimoProm) },
+      { label: "Registrado Prom.", value: minPDF(r.registradoProm) },
+      { label: `Diferencia Prom. (${formatearNumero(r.pctMenos, 0)}%)`, value: `-${formatearNumero(r.faltanteProm, 0)} min`, color: COLOR_WARNING },
+    );
+  }
+  if (r.cicloNormalProm != null) chips.push({ label: "Ciclo Normal Prom.", value: minPDF(r.cicloNormalProm) });
+  yPos = dibujarChipsKpi(doc, yPos, chips);
+
+  const columnasMaterial = [
+    { label: "MATERIAL", width: 36, align: "left" },
+    { label: "VIAJES", width: 14, align: "right" },
+    { label: "APRESUR.", width: 18, align: "right" },
+    { label: "% MAT.", width: 15, align: "right" },
+    { label: "MÍN. NORMAL", width: 23, align: "right" },
+    { label: "REGISTRADO", width: 24, align: "right" },
+    { label: "DIFERENCIA", width: 30, align: "right" },
+    { label: "CICLO NORMAL", width: 25, align: "right" },
+  ];
+  const filasMaterial = r.porMaterial.map((m) => [
+    m.material,
+    formatearNumero(m.viajes, 0),
+    formatearNumero(m.apresurados, 0),
+    `${formatearNumero(m.pct, 1)}%`,
+    minPDF(m.minimoProm),
+    minPDF(m.registradoProm),
+    difPDF(m.faltanteProm, m.pctMenos),
+    minPDF(m.cicloNormalProm),
+  ]);
+  yPos = dibujarTablaGenerica(doc, yPos, columnasMaterial, filasMaterial, "Sin registros apresurados en este filtro.");
+
+  if (r.porRazon.length > 0) {
+    const columnasRazon = [
+      { label: "RAZÓN", width: 85, align: "left" },
+      { label: "VIAJES", width: 30, align: "right" },
+      { label: "% DE APRESURADOS", width: 40, align: "right" },
+      { label: "ADELANTO PROM.", width: 30, align: "right" },
+    ];
+    const filasRazon = r.porRazon.map((x) => [
+      etiquetaCortaMotivo(x),
+      formatearNumero(x.count, 0),
+      `${formatearNumero(x.pct, 1)}%`,
+      x.faltanteProm != null ? `-${formatearNumero(x.faltanteProm, 0)} min` : "—",
+    ]);
+    yPos = dibujarTablaGenerica(doc, yPos, columnasRazon, filasRazon, "");
+
+    // Razones por material: en texto corrido porque la tabla truncaría la lista.
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    yPos = checkPageBreak(doc, yPos, 8, PAGE_HEIGHT, MARGIN_BOTTOM);
+    doc.text("Razones por material", MARGIN_LEFT, yPos + 3);
+    yPos += 8;
+    r.porMaterial.forEach((m) => {
+      yPos = checkPageBreak(doc, yPos, 8, PAGE_HEIGHT, MARGIN_BOTTOM);
+      yPos = dibujarParrafo(
+        doc, MARGIN_LEFT, yPos, `${m.material}: ${resumenRazones(m.razones)}`, USABLE_WIDTH, { fontSize: 7.5 }
+      ) + 1;
+    });
+    yPos += 2;
+  }
+
+  return dibujarParrafo(doc, MARGIN_LEFT, yPos, REGISTROS_APRESURADOS.nota, USABLE_WIDTH, { fontSize: 7 }) + 4;
+};
+
+// ── Indicador: Carga de los Viajes de Renta ─────────────────────────────
+const celdaNivelCargaPDF = (nivel) =>
+  nivel.count > 0 ? `${formatearNumero(nivel.count, 0)} (${formatearNumero(nivel.pctViajes, 0)}%)` : "—";
+
+const dibujarSeccionCargaViajesRenta = (doc, yPosInicial, cargaViajesRenta) => {
+  let yPos = dibujarTituloSeccion(doc, yPosInicial, CARGA_VIAJES_RENTA.titulo);
+  yPos = dibujarParrafo(doc, MARGIN_LEFT, yPos, CARGA_VIAJES_RENTA.descripcion, USABLE_WIDTH) + 3;
+
+  if (!cargaViajesRenta || cargaViajesRenta.viajes === 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    setTextColor(doc, COLOR_GRAY);
+    doc.text("Sin viajes de renta registrados en este filtro.", MARGIN_LEFT, yPos + 4);
+    setTextColor(doc, COLOR_TEXT);
+    return yPos + 12;
+  }
+
+  const c = cargaViajesRenta;
+  const chips = [
+    { label: "Viajes de Renta", value: formatearNumero(c.viajes, 0) },
+    { label: "Carga Promedio", value: c.cargaPromedio != null ? `${formatearNumero(c.cargaPromedio, 0)}%` : "—" },
+    ...c.niveles.map((n) => ({ label: `Carga ${n.pct}%`, value: `${formatearNumero(n.pctViajes, 1)}%` })),
+  ];
+  if (c.sinDato > 0) chips.push({ label: "Sin Dato", value: formatearNumero(c.sinDato, 0) });
+  yPos = dibujarChipsKpi(doc, yPos, chips);
+
+  const columnasObra = [
+    { label: "OBRA", width: 56, align: "left" },
+    { label: "VIAJES", width: 16, align: "right" },
+    { label: "CARGA PROM.", width: 24, align: "right" },
+    { label: "100%", width: 24, align: "right" },
+    { label: "75%", width: 24, align: "right" },
+    { label: "50%", width: 24, align: "right" },
+    { label: "SIN DATO", width: 17, align: "right" },
+  ];
+  const filasObra = c.porObra.map((o) => [
+    formatearObraCompleta(o.empresa, o.cc, o.obra),
+    formatearNumero(o.viajes, 0),
+    o.cargaPromedio != null ? `${formatearNumero(o.cargaPromedio, 0)}%` : "—",
+    celdaNivelCargaPDF(o.niveles[0]),
+    celdaNivelCargaPDF(o.niveles[1]),
+    celdaNivelCargaPDF(o.niveles[2]),
+    o.sinDato > 0 ? formatearNumero(o.sinDato, 0) : "—",
+  ]);
+  yPos = dibujarTablaGenerica(doc, yPos, columnasObra, filasObra, "Sin viajes de renta en este filtro.");
+
+  return dibujarParrafo(doc, MARGIN_LEFT, yPos, CARGA_VIAJES_RENTA.nota, USABLE_WIDTH, { fontSize: 7 }) + 4;
+};
+
 // ── Sección: Indicadores de Eficiencia y Oportunidad (los 4 bloques de
 // arriba, en el mismo orden que la tarjeta colapsable "eficiencia" en la
 // página) ────────────────────────────────────────────────────────────
 const dibujarSeccionIndicadoresEficiencia = (
   doc, yPosInicial,
-  indicePosicionObra, fleteEvitadoFlotaPropia, topCamionerosPorObra, camionesPorDia, rentaNoAprovechada
+  indicePosicionObra, fleteEvitadoFlotaPropia, topCamionerosPorObra, camionesPorDia, rentaNoAprovechada,
+  registrosApresurados, cargaViajesRenta
 ) => {
   let yPos = yPosInicial;
   yPos = dibujarSeccionIndicePosicion(doc, yPos, indicePosicionObra);
@@ -1902,6 +2065,10 @@ const dibujarSeccionIndicadoresEficiencia = (
   yPos = dibujarSeccionViabilidadFlota(doc, yPos, topCamionerosPorObra, camionesPorDia);
   yPos = checkPageBreak(doc, yPos, 24, PAGE_HEIGHT, MARGIN_BOTTOM);
   yPos = dibujarSeccionRentaNoAprovechada(doc, yPos, rentaNoAprovechada);
+  yPos = checkPageBreak(doc, yPos, 24, PAGE_HEIGHT, MARGIN_BOTTOM);
+  yPos = dibujarSeccionRegistrosApresurados(doc, yPos, registrosApresurados);
+  yPos = checkPageBreak(doc, yPos, 24, PAGE_HEIGHT, MARGIN_BOTTOM);
+  yPos = dibujarSeccionCargaViajesRenta(doc, yPos, cargaViajesRenta);
   return yPos;
 };
 
@@ -1941,6 +2108,8 @@ export const generarPDFReporteEstadisticas = (datos) => {
     camionesPorDia = [],
     topCamionerosPorObra = [],
     rentaNoAprovechada = [],
+    registrosApresurados = null,
+    cargaViajesRenta = null,
   } = datos;
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
@@ -2082,12 +2251,15 @@ export const generarPDFReporteEstadisticas = (datos) => {
     indicePosicionObra.length > 0 ||
     fleteEvitadoFlotaPropia.length > 0 ||
     topCamionerosPorObra.length > 0 ||
-    rentaNoAprovechada.length > 0;
+    rentaNoAprovechada.length > 0 ||
+    registrosApresurados?.totalViajes > 0 ||
+    cargaViajesRenta?.viajes > 0;
   if (hayIndicadoresEficiencia) {
     doc.addPage();
     yPos = 12;
     dibujarSeccionIndicadoresEficiencia(
-      doc, yPos, indicePosicionObra, fleteEvitadoFlotaPropia, topCamionerosPorObra, camionesPorDia, rentaNoAprovechada
+      doc, yPos, indicePosicionObra, fleteEvitadoFlotaPropia, topCamionerosPorObra, camionesPorDia, rentaNoAprovechada,
+      registrosApresurados, cargaViajesRenta
     );
   }
 

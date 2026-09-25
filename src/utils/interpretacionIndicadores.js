@@ -96,3 +96,60 @@ export const RENTA_NO_APROVECHADA = {
     "para mover ese día, o si conviene reducir a medio turno o menos equipos " +
     "rentados en esa obra.",
 };
+
+// ── Registros Apresurados (material) ─────────────────────────────────
+// Viajes que el checador capturó antes del tiempo mínimo entre viajes (la app
+// lo permite pero exige un motivo — ver excepcionesVale.js). El indicador
+// cuenta cuántos fueron por material y con qué razones se declararon.
+export const REGISTROS_APRESURADOS = {
+  titulo: "Registros Apresurados",
+  descripcion:
+    "Viajes de material capturados antes del tiempo mínimo entre viajes, " +
+    "cuántos fueron de cada material y con qué razón los declaró el checador. " +
+    "Solo cuenta viajes con registro individual (Tipos 1 y 3). Para cada " +
+    "uno compara el mínimo normal que la app exigía contra el tiempo que " +
+    "realmente pasó (mínimo menos los minutos que faltaban): la diferencia es cuánto " +
+    "se adelantó frente al recorrido normal. El ciclo normal es el promedio " +
+    "de los viajes no apresurados del mismo material. Los viajes anteriores " +
+    "al 2026-08-04 no guardan sus minutos y no entran en esos promedios.",
+  nota:
+    "Un porcentaje alto de \"Se está capturando después, no en campo\" indica " +
+    "captura fuera de tiempo, no viajes reales rápidos: conviene reforzar el " +
+    "registro en campo. \"Viaje final\" y \"Sin señal\" son razones " +
+    "operativas esperables; \"Se corrige un viaje mal registrado\" y " +
+    "\"Otro\" merecen revisión vale por vale.",
+};
+
+// ── Carga de los Viajes de Renta ─────────────────────────────────────
+export const CARGA_VIAJES_RENTA = {
+  titulo: "Carga de los Viajes de Renta",
+  descripcion:
+    "Qué tan cargados van los viajes de renta de equipo, según la carga " +
+    "aproximada (100 / 75 / 50%) que el checador declara al registrar cada " +
+    "viaje. Agrupado por obra, de menor a mayor carga promedio. Las pipas de agua quedan fuera (no declaran " +
+    "carga) y los viajes anteriores al 2026-09-04 no tienen ese dato: se " +
+    "cuentan como \"Sin dato\" y no entran al promedio.",
+  nota:
+    "Un promedio de carga bajo indica camiones saliendo a medias: si es " +
+    "recurrente en una obra, revisa si conviene reducir el número de " +
+    "unidades rentadas o cargar más antes de despachar.",
+};
+
+// Etiquetas cortas de los motivos de registro apresurado, para tablas donde
+// la del catálogo (excepcionesVale.js) no cabe. Un código fuera del mapa cae
+// a la etiqueta completa que ya trae la razón.
+const ETIQUETA_CORTA_MOTIVO_ANTICIPADO = {
+  captura_tardia: "Captura tardía",
+  viaje_final: "Viaje final",
+  viaje_corto: "Recorrido más rápido",
+  sin_senal: "Sin señal",
+  error_ticket: "Corrección de viaje",
+  otro: "Otro",
+};
+
+export const etiquetaCortaMotivo = (razon) =>
+  ETIQUETA_CORTA_MOTIVO_ANTICIPADO[razon.codigo] ?? razon.label;
+
+// "Captura tardía (3) · Viaje final (2)" — razones de un material en una línea.
+export const resumenRazones = (razones) =>
+  razones.map((r) => `${etiquetaCortaMotivo(r)} (${r.count})`).join(" · ");

@@ -22,6 +22,13 @@ import { supabase } from "../config/supabase";
 
 // 4. Utils
 import { materialLabelDetalle } from "../utils/rentaMaterial";
+import {
+  MINUTOS_CARGA_DESCARGA_DEFAULT,
+  viajesConCiclo,
+  nuevoAcumCiclos,
+  acumularCiclo,
+  resumirCiclos,
+} from "../utils/ciclosViajes";
 
 // ── Helper: semana del año ──────────────────────────────────────────
 const getWeekKey = (fechaStr) => {
@@ -297,9 +304,12 @@ const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mo
         tipoMap[tipoId] = { tipoId, tipoNombre, bancoMap: {} };
       }
 
+      const minutosCarga = Number(vale.obras?.minutos_carga_descarga ?? MINUTOS_CARGA_DESCARGA_DEFAULT);
       const viajes = det.vale_material_viajes || [];
       const registros = viajes.length > 0
-        ? viajes.map((v) => ({
+        ? viajesConCiclo(viajes).map(({ viaje: v, ciclo }) => ({
+            ciclo,
+            minutosCarga,
             banco: v.bancos_override?.banco ?? det.bancos?.banco ?? "Sin banco",
             m3: Number(v.volumen_m3 ?? 0),
             distanciaKm: Number(v.distancia_km_override ?? det.distancia_km ?? 0),
@@ -321,14 +331,15 @@ const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mo
             tarifa: det.precios_material ?? det.precios_material_obra ?? null,
           }];
 
-      registros.forEach(({ banco, m3, distanciaKm, importe, tarifa }) => {
+      registros.forEach(({ banco, m3, distanciaKm, importe, tarifa, ciclo = null, minutosCarga: carga }) => {
         const bMap = tipoMap[tipoId].bancoMap;
         if (!bMap[banco]) {
           bMap[banco] = {
             banco, viajes: 0, m3Total: 0, importeIVA: 0, sumaDistancias: 0,
-            tarifasMap: new Map(), materialMap: {},
+            tarifasMap: new Map(), materialMap: {}, ciclos: nuevoAcumCiclos(),
           };
         }
+        if (ciclo != null) acumularCiclo(bMap[banco].ciclos, ciclo, distanciaKm, carga);
         bMap[banco].viajes += 1;
         bMap[banco].m3Total += m3;
         bMap[banco].importeIVA += importe;
@@ -343,8 +354,9 @@ const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mo
 
         const mMap = bMap[banco].materialMap;
         if (!mMap[nombreMat]) {
-          mMap[nombreMat] = { material: nombreMat, viajes: 0, m3Total: 0, importeIVA: 0, sumaDistancias: 0 };
+          mMap[nombreMat] = { material: nombreMat, viajes: 0, m3Total: 0, importeIVA: 0, sumaDistancias: 0, ciclos: nuevoAcumCiclos() };
         }
+        if (ciclo != null) acumularCiclo(mMap[nombreMat].ciclos, ciclo, distanciaKm, carga);
         mMap[nombreMat].viajes += 1;
         mMap[nombreMat].m3Total += m3;
         mMap[nombreMat].importeIVA += importe;
@@ -356,8 +368,9 @@ const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mo
   return Object.values(tipoMap)
     .map(({ tipoId, tipoNombre, bancoMap }) => {
       const bancos = Object.values(bancoMap)
-        .map(({ materialMap, tarifasMap, ...b }) => ({
+        .map(({ materialMap, tarifasMap, ciclos, ...b }) => ({
           ...b,
+          ...resumirCiclos(ciclos),
           distanciaKmProm: b.viajes > 0 ? b.sumaDistancias / b.viajes : 0,
           precioM3Prom: b.m3Total > 0 ? b.importeIVA / 1.16 / b.m3Total : 0,
           // Tarifas (precios_material) realmente usadas en viajes de sindicato
@@ -365,8 +378,9 @@ const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mo
           // materiales o si la tarifa cambió dentro del periodo del reporte.
           tarifas: Array.from(tarifasMap.values()),
           materiales: Object.values(materialMap)
-            .map((m) => ({
+            .map(({ ciclos: ciclosMat, ...m }) => ({
               ...m,
+              ...resumirCiclos(ciclosMat),
               distanciaKmProm: m.viajes > 0 ? m.sumaDistancias / m.viajes : 0,
               precioM3Prom: m.m3Total > 0 ? m.importeIVA / 1.16 / m.m3Total : 0,
             }))
@@ -721,7 +735,7 @@ export const useEstadisticasGlobales = () => {
         .from("vales")
         .select(`
           id_vale, folio, tipo_vale, estado, fecha_creacion, id_obra, id_empresa, id_vehiculo, es_pipa_agua,
-          obras:id_obra (id_obra, obra, cc, empresas:id_empresa (id_empresa, empresa)),
+          obras:id_obra (id_obra, obra, cc, minutos_carga_descarga, empresas:id_empresa (id_empresa, empresa)),
           vehiculos:id_vehiculo (id_vehiculo, placas, capacidad_m3),
           operadores:id_operador (id_operador, id_sindicato, nombre_completo),
           vale_material_detalles (
@@ -743,11 +757,12 @@ export const useEstadisticasGlobales = () => {
               primer_km, km_sub_int1, limite_int1, km_sub_int2, limite_int2
             ),
             vale_material_viajes (
-              id_viaje, hora_registro, volumen_m3,
+              id_viaje, numero_viaje, hora_registro, volumen_m3,
               precio_m3, costo_viaje, id_precios_material, id_precios_material_obra,
               id_banco_override, distancia_km_override,
               precio_m3_override, costo_viaje_override,
               registro_anticipado, motivo_anticipado_codigo, foto_omitida,
+              minutos_minimos_calculados, minutos_faltantes_anticipado,
               bancos_override:id_banco_override (id_banco, banco),
               precios_material:id_precios_material (
                 id_precios_material, numero_de_intervalos,
@@ -769,7 +784,7 @@ export const useEstadisticasGlobales = () => {
             ),
             id_categoria_planeada,
             categoria_planeada:id_categoria_planeada (id_categoria_material_renta, categoria),
-            vale_renta_viajes (id_viaje)
+            vale_renta_viajes (id_viaje, carga_porcentaje)
           )
         `)
         .neq("id_obra", 14)

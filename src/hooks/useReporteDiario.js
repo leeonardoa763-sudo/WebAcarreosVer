@@ -220,13 +220,11 @@ const calcularKpis = (vales) => {
     if (tuvoActividad && idVehiculo != null) vehiculosActivos.add(idVehiculo);
   });
 
-  const subtotal = round2(importeTotal);
   return {
     vehiculosActivos: vehiculosActivos.size,
     materialM3: round2(materialM3),
     totalViajes,
-    importeTotal: subtotal,
-    importeConIva: round2(subtotal * 1.16),
+    importeTotal: round2(importeTotal),
   };
 };
 
@@ -235,7 +233,7 @@ const calcularComparativa = (actual, anterior) => {
     if (!b) return a > 0 ? 100 : 0;
     return Math.round(((a - b) / b) * 100);
   };
-  const campos = ["vehiculosActivos", "materialM3", "totalViajes", "importeConIva"];
+  const campos = ["vehiculosActivos", "materialM3", "totalViajes", "importeTotal"];
   const resultado = {};
   campos.forEach((k) => {
     resultado[k] = {

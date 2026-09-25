@@ -391,9 +391,9 @@ const ReporteSemanal = () => {
             />
             <KpiCard
               icon={DollarSign}
-              label="Importe (+IVA)"
-              value={formatearMoneda(kpis.importeConIva)}
-              comparativa={comparativa?.importeConIva}
+              label="Importe (sin IVA)"
+              value={formatearMoneda(kpis.importeTotal)}
+              comparativa={comparativa?.importeTotal}
               color="#8B5CF6"
             />
           </div>
