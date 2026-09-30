@@ -282,7 +282,7 @@ const construirTablaMaterialAcumuladoPorSindicato = (
 // y CLAUDE.md raíz, "El banco se puede cambiar por viaje"). A diferencia de
 // calcularTotalesPorBanco.js (limitado a Tipo 1/2 de una sola conciliación),
 // aquí se incluyen los 3 tipos y todo el periodo filtrado del reporte.
-const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, modoMaterial = "incluir", modoBanco = "incluir") => {
+const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, modoMaterial = "incluir", modoBanco = "incluir", destino = "obra") => {
   const tipoMap = {};
 
   valesMaterial.forEach((vale) => {
@@ -299,12 +299,16 @@ const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mo
 
       if (!matchesFiltro(filtroMaterial, nombreMat, modoMaterial)) return;
       if (!matchesFiltro(filtroBanco, det.id_banco, modoBanco)) return;
+      // destino: "obra" (entregado en obra) o "planta" (planta de asfaltos)
+      if (!!det.es_planta_asfaltos !== (destino === "planta")) return;
 
       if (!tipoMap[tipoId]) {
         tipoMap[tipoId] = { tipoId, tipoNombre, bancoMap: {} };
       }
 
       const minutosCarga = Number(vale.obras?.minutos_carga_descarga ?? MINUTOS_CARGA_DESCARGA_DEFAULT);
+      // es_planta_asfaltos es del detalle: todos sus viajes van a planta o a obra.
+      const esPlanta = !!det.es_planta_asfaltos;
       const viajes = det.vale_material_viajes || [];
       const registros = viajes.length > 0
         ? viajesConCiclo(viajes).map(({ viaje: v, ciclo }) => ({
@@ -335,13 +339,14 @@ const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mo
         const bMap = tipoMap[tipoId].bancoMap;
         if (!bMap[banco]) {
           bMap[banco] = {
-            banco, viajes: 0, m3Total: 0, importeIVA: 0, sumaDistancias: 0,
+            banco, viajes: 0, m3Total: 0, m3Planta: 0, importeIVA: 0, sumaDistancias: 0,
             tarifasMap: new Map(), materialMap: {}, ciclos: nuevoAcumCiclos(),
           };
         }
         if (ciclo != null) acumularCiclo(bMap[banco].ciclos, ciclo, distanciaKm, carga);
         bMap[banco].viajes += 1;
         bMap[banco].m3Total += m3;
+        if (esPlanta) bMap[banco].m3Planta += m3;
         bMap[banco].importeIVA += importe;
         bMap[banco].sumaDistancias += distanciaKm;
         // Clave prefijada porque id_precios_material e id_precios_material_obra
@@ -354,11 +359,12 @@ const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mo
 
         const mMap = bMap[banco].materialMap;
         if (!mMap[nombreMat]) {
-          mMap[nombreMat] = { material: nombreMat, viajes: 0, m3Total: 0, importeIVA: 0, sumaDistancias: 0, ciclos: nuevoAcumCiclos() };
+          mMap[nombreMat] = { material: nombreMat, viajes: 0, m3Total: 0, m3Planta: 0, importeIVA: 0, sumaDistancias: 0, ciclos: nuevoAcumCiclos() };
         }
         if (ciclo != null) acumularCiclo(mMap[nombreMat].ciclos, ciclo, distanciaKm, carga);
         mMap[nombreMat].viajes += 1;
         mMap[nombreMat].m3Total += m3;
+        if (esPlanta) mMap[nombreMat].m3Planta += m3;
         mMap[nombreMat].importeIVA += importe;
         mMap[nombreMat].sumaDistancias += distanciaKm;
       });
@@ -370,6 +376,7 @@ const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mo
       const bancos = Object.values(bancoMap)
         .map(({ materialMap, tarifasMap, ciclos, ...b }) => ({
           ...b,
+          m3Obra: b.m3Total - b.m3Planta,
           ...resumirCiclos(ciclos),
           distanciaKmProm: b.viajes > 0 ? b.sumaDistancias / b.viajes : 0,
           precioM3Prom: b.m3Total > 0 ? b.importeIVA / 1.16 / b.m3Total : 0,
@@ -391,9 +398,10 @@ const agregarBancoMaterialReal = (valesMaterial, filtroMaterial, filtroBanco, mo
         (acc, b) => ({
           viajes: acc.viajes + b.viajes,
           m3Total: acc.m3Total + b.m3Total,
+          m3Planta: acc.m3Planta + b.m3Planta,
           importeIVA: acc.importeIVA + b.importeIVA,
         }),
-        { viajes: 0, m3Total: 0, importeIVA: 0 }
+        { viajes: 0, m3Total: 0, m3Planta: 0, importeIVA: 0 }
       );
       return { tipoId, tipoNombre, bancos, subtotal };
     })
@@ -2139,6 +2147,19 @@ export const useEstadisticasGlobales = () => {
     [valesReporteFiltrados, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco]
   );
 
+  const tablaBancoPlantaReporte = useMemo(
+    () =>
+      agregarBancoMaterialReal(
+        valesReporteFiltrados.filter((v) => v.tipo_vale === "material"),
+        filtros.material,
+        filtros.idBanco,
+        modosFiltro.material,
+        modosFiltro.idBanco,
+        "planta"
+      ),
+    [valesReporteFiltrados, filtros.material, filtros.idBanco, modosFiltro.material, modosFiltro.idBanco]
+  );
+
   // ── Ahorro estimado vs. proceso anterior en papel ────────────────────
   // `valesReporteFiltrados` ya excluye cancelado/borrador a nivel de query
   // (fetchValesTiempoReal, .not("estado", "in", "(borrador,cancelado)")).
@@ -2572,6 +2593,7 @@ export const useEstadisticasGlobales = () => {
     tablaObraMaterialReporte,
     tablaObraRentaReporte,
     tablaBancoMaterialReporte,
+    tablaBancoPlantaReporte,
     // Ahorro estimado vs. proceso anterior en papel (sección final del PDF)
     ahorroEstimado,
     serieConciliacionesPorMes,

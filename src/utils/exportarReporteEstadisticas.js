@@ -478,8 +478,8 @@ const LEYENDA_CICLO_BANCO =
   "2 × distancia ÷ (ciclo - tiempo de carga y descarga de la obra, 19 min por defecto). " +
   "Se muestra — con menos de 5 ciclos registrados.";
 
-const dibujarSeccionBancoMaterial = (doc, yPosInicial, tablaBancoMaterial) => {
-  let yPos = dibujarTituloSeccion(doc, yPosInicial, "Material por Banco");
+const dibujarSeccionBancoMaterial = (doc, yPosInicial, tablaBancoMaterial, titulo = "Material por Banco", conLeyenda = true) => {
+  let yPos = dibujarTituloSeccion(doc, yPosInicial, titulo);
 
   const columnas = [
     { label: "BANCO", width: 43, align: "left" },
@@ -634,12 +634,11 @@ const dibujarSeccionBancoMaterial = (doc, yPosInicial, tablaBancoMaterial) => {
     "",
   ], { fillHeader: true, bold: true });
 
-  yPos = dibujarParrafo(doc, MARGIN_LEFT, yPos + 4, LEYENDA_CICLO_BANCO, USABLE_WIDTH, { fontSize: 7 });
+  if (conLeyenda) {
+    yPos = dibujarParrafo(doc, MARGIN_LEFT, yPos + 4, LEYENDA_CICLO_BANCO, USABLE_WIDTH, { fontSize: 7 });
+  }
 
-  yPos += 6;
-  yPos = dibujarTablaTarifasBanco(doc, yPos, tablaBancoMaterial);
-
-  return yPos;
+  return yPos + 6;
 };
 
 // ── Tabla: Tarifas por KM por Banco (por banco, agrupado por tipo de
@@ -2084,6 +2083,7 @@ export const generarPDFReporteEstadisticas = (datos) => {
     periodoAnteriorLabel,
     tablaObraMaterial = [],
     tablaBancoMaterial = [],
+    tablaBancoPlanta = [],
     tablaRentaPorObra = [],
     totalesRenta,
     tablaViajesRentaPorEquipo = [],
@@ -2191,10 +2191,22 @@ export const generarPDFReporteEstadisticas = (datos) => {
   // ── Material por Banco (distancia, precio/m³, importe, agrupado por tipo)
   // — siempre en página nueva, igual que Tendencias/Presupuestos, para no
   // partir sus tablas y gráficas contra el final de "Material Movido por Obra" ──
-  if (tablaBancoMaterial.length > 0) {
+  if (tablaBancoMaterial.length > 0 || tablaBancoPlanta.length > 0) {
     doc.addPage();
     yPos = 12;
-    yPos = dibujarSeccionBancoMaterial(doc, yPos, tablaBancoMaterial);
+    if (tablaBancoMaterial.length > 0) {
+      yPos = dibujarSeccionBancoMaterial(doc, yPos, tablaBancoMaterial, "Material por Banco — Entregado en Obra");
+    }
+    if (tablaBancoPlanta.length > 0) {
+      if (tablaBancoMaterial.length > 0) {
+        doc.addPage();
+        yPos = 12;
+      }
+      yPos = dibujarSeccionBancoMaterial(
+        doc, yPos, tablaBancoPlanta, "Material por Banco — Entregado en Planta de Asfaltos", tablaBancoMaterial.length === 0
+      );
+    }
+    yPos = dibujarTablaTarifasBanco(doc, yPos, [...tablaBancoMaterial, ...tablaBancoPlanta]);
   }
 
   // ── Material vs Tiempo (una mini gráfica por material) ──

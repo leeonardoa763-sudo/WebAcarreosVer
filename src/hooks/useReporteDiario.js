@@ -84,8 +84,10 @@ const obtenerFechaEfectiva = (vale) => {
   return new Date(vale.fecha_creacion);
 };
 
-// Excluye obra/empresa de prueba (ID 14 / ID 4), mismo criterio que useDashboardAnalytics
-const esValeReal = (v) => Number(v.id_obra) !== 14 && Number(v.id_empresa) !== 4;
+// Excluye obra/empresa de prueba (ID 14 / ID 4), mismo criterio que useDashboardAnalytics,
+// y vales cancelados (la app de estadísticas tampoco los cuenta)
+const esValeReal = (v) =>
+  Number(v.id_obra) !== 14 && Number(v.id_empresa) !== 4 && v.estado !== "cancelado";
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
@@ -118,19 +120,21 @@ const expandirRegistrosMaterial = (vale) => {
     const distanciaKmDetalle = Number(det.distancia_km || 0);
 
     if (tipoId === 3) {
-      // Tipo 3 (Tepetate/Corte): volumen medido, viajes = tickets físicos
-      const tickets = vale.tickets_material?.length || 0;
+      // Tipo 3 (Tepetate/Corte): volumen medido, viajes = filas de
+      // vale_material_viajes (mismo criterio que la app). Un vale en_proceso
+      // sin viajes cuenta 0, no 1.
+      const viajesTipo3 = det.vale_material_viajes?.length || 0;
       registros.push({
         material,
         idMaterial,
         tipoId,
         m3: Number(det.volumen_real_m3 || det.cantidad_pedida_m3 || 0),
         importe: Number(det.costo_total || 0),
-        viajes: tickets > 0 ? tickets : 1,
+        viajes: viajesTipo3,
         distanciaKm: distanciaKmDetalle,
         esGeem,
         esPlanta,
-        tuvoActividad: tickets > 0,
+        tuvoActividad: viajesTipo3 > 0,
       });
     } else {
       const viajes = det.vale_material_viajes || [];
