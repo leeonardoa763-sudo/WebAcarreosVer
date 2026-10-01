@@ -20,7 +20,14 @@ import { exportToExcel } from "./exportToExcel";
 import { supabase } from "../config/supabase";
 
 // Importar formateadores
-import { formatearFechaCorta } from "./formatters";
+import { fechaExcel, FMT_FECHA } from "./excelFechas";
+
+// Las fechas viajan como serie de Excel; el formato solo define cómo se ven.
+const FORMATOS_FECHA = {
+  "Fecha Inicio": FMT_FECHA,
+  "Fecha Fin": FMT_FECHA,
+  "Fecha Generación": FMT_FECHA,
+};
 
 /**
  * Preparar datos de conciliaciones para exportación
@@ -48,8 +55,8 @@ const prepararDatosParaExcel = (conciliaciones) => {
         (conc.tipo || conc.tipo_conciliacion) === "renta"
           ? "RENTA"
           : "MATERIAL",
-      "Fecha Inicio": formatearFechaCorta(conc.fecha_inicio) || "N/A",
-      "Fecha Fin": formatearFechaCorta(conc.fecha_fin) || "N/A",
+      "Fecha Inicio": fechaExcel(conc.fecha_inicio),
+      "Fecha Fin": fechaExcel(conc.fecha_fin),
       Año: conc.año || "N/A",
       "Número Semana": conc.numero_semana || "N/A",
       Obra: obraFormateada,
@@ -69,7 +76,7 @@ const prepararDatosParaExcel = (conciliaciones) => {
       Retención: retencion.toFixed(2),
       "Total Final": totalFinal.toFixed(2),
       Estado: conc.estado || "N/A",
-      "Fecha Generación": formatearFechaCorta(conc.fecha_generacion) || "N/A",
+      "Fecha Generación": fechaExcel(conc.fecha_generacion),
     };
   });
 };
@@ -352,7 +359,9 @@ export const exportarConciliacionesDashboard = (conciliaciones, tipoActivo) => {
     const fileName = `Conciliaciones_${tipo}_${fecha}`;
 
     // Exportar a Excel
-    exportToExcel(datosFormateados, fileName, "Conciliaciones");
+    exportToExcel(datosFormateados, fileName, "Conciliaciones", {
+      formatos: FORMATOS_FECHA,
+    });
 
     console.log(`✅ ${conciliaciones.length} conciliaciones exportadas`);
   } catch (error) {
@@ -477,7 +486,9 @@ export const exportarConVales = async (conciliaciones, tipoActivo) => {
     const fileName = `Conciliaciones_${tipo}_${fecha}`;
 
     // Exportar a Excel
-    exportToExcel(datosFormateados, fileName, "Conciliaciones");
+    exportToExcel(datosFormateados, fileName, "Conciliaciones", {
+      formatos: FORMATOS_FECHA,
+    });
 
     console.log(`✅ ${conciliaciones.length} conciliaciones exportadas`);
   } catch (error) {
