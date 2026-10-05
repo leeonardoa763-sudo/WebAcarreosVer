@@ -686,6 +686,7 @@ const VisualizarConciliacion = () => {
                     hora_registro,
                     peso_ton,
                     volumen_m3,
+                    es_viaje_ajuste,
                     precio_m3,
                     costo_viaje,
                     folio_vale_fisico,

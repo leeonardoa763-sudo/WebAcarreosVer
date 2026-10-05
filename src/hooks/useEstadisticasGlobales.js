@@ -769,6 +769,7 @@ export const useEstadisticasGlobales = () => {
               precio_m3, costo_viaje, id_precios_material, id_precios_material_obra,
               id_banco_override, distancia_km_override,
               precio_m3_override, costo_viaje_override,
+              es_viaje_ajuste,
               registro_anticipado, motivo_anticipado_codigo, foto_omitida,
               minutos_minimos_calculados, minutos_faltantes_anticipado,
               bancos_override:id_banco_override (id_banco, banco),

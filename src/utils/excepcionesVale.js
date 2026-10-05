@@ -24,7 +24,8 @@
  *   - vale_material_viajes  → tipos 1 y 3, un registro por viaje
  *   - vale_material_detalles / vale_renta_detalle → solo foto_omitida, porque el
  *     tipo 2 (base asfaltica) y la renta no generan filas de viaje
- *   - es_viaje_ajuste vive solo en vale_material_detalles (Tipo 2)
+ *   - es_viaje_ajuste vive en vale_material_detalles (Tipo 2, 1 carga por vale)
+ *     y en vale_material_viajes (Tipo 1, uno por viaje)
  *
  * Dependencias: ninguna
  * Usado en: AvisoExcepciones.jsx, ListaViajesMaterial.jsx, ModalValeDetalle.jsx
@@ -107,9 +108,18 @@ const mapSinFoto = (origen, clave, numeroViaje = null) => ({
  */
 const mapAjuste = (detalle, i) => ({
   clave: `aj-det-${detalle.id_detalle_material ?? i}`,
+  numeroViaje: null,
   capacidad: detalle.capacidad_m3 != null ? Number(detalle.capacidad_m3) : null,
   volumenReal:
     detalle.volumen_real_m3 != null ? Number(detalle.volumen_real_m3) : null,
+});
+
+/** Viaje de ajuste de un viaje (Tipo 1): la capacidad viene del detalle padre. */
+const mapAjusteViaje = (detalle, viaje) => ({
+  clave: `aj-${viaje.id_viaje}`,
+  numeroViaje: viaje.numero_viaje ?? null,
+  capacidad: detalle.capacidad_m3 != null ? Number(detalle.capacidad_m3) : null,
+  volumenReal: viaje.volumen_m3 != null ? Number(viaje.volumen_m3) : null,
 });
 
 /**
@@ -139,6 +149,9 @@ export const recolectarExcepciones = (vale) => {
         sinFoto.push(
           mapSinFoto(viaje, `sf-${viaje.id_viaje}`, viaje.numero_viaje ?? null),
         );
+      }
+      if (viaje.es_viaje_ajuste) {
+        ajustes.push(mapAjusteViaje(detalle, viaje));
       }
     });
 
@@ -222,5 +235,5 @@ export const textoSinFoto = (exc) =>
 export const textoAjuste = (exc) => {
   const capacidad = exc.capacidad != null ? `${exc.capacidad.toFixed(3)} m³` : "la capacidad del camión";
   const volumen = exc.volumenReal != null ? `${exc.volumenReal.toFixed(3)} m³` : "el volumen real";
-  return `Vale: viaje de ajuste — se cobró ${capacidad}, no ${volumen} entregado`;
+  return `${prefijo(exc)}: viaje de ajuste — se cobró ${capacidad}, no ${volumen} entregado`;
 };

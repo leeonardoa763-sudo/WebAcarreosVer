@@ -94,6 +94,7 @@ const SELECT_AUTORIZACION = `
       id_viaje, numero_viaje, hora_registro, peso_ton, volumen_m3,
       precio_m3, costo_viaje, folio_vale_fisico,
       id_banco_override, distancia_km_override, precio_m3_override, costo_viaje_override,
+      es_viaje_ajuste,
       registro_anticipado, minutos_minimos_calculados, minutos_faltantes_anticipado,
       motivo_anticipado_codigo, motivo_anticipado_texto,
       foto_omitida, motivo_sin_foto_codigo, motivo_sin_foto_texto,

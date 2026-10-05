@@ -4,7 +4,9 @@
  * Tabla editable de viajes internos para vales de material tipo 1, 2 y 3.
  *
  * Tipo 1 y 2 (con viajes): edición de toneladas, folio físico y distancia
- *             del detalle. Recálculo automático de m3 y costo.
+ *             del detalle. Recálculo automático de m3 y costo. Cada viaje
+ *             tiene un checkbox "Ajuste" (es_viaje_ajuste): cobra la capacidad
+ *             del camión en vez del volumen real.
  * Tipo 2 sin fila en vale_material_viajes (1 vale = 1 carga): panel de
  *             edición directa del detalle (volumen m³ + folio físico) en vez
  *             de tabla — no hay viajes que agregar/eliminar. La cantidad se
@@ -71,6 +73,7 @@ const FilaViajeT1T2 = ({
   onEliminar,
   onCancelarEliminacion,
   pesoEspecifico,
+  capacidad,
 }) => {
   const [editando, setEditando] = useState(esNuevo);
   const estaDeshabilitado = marcadoEliminar;
@@ -178,6 +181,20 @@ const FilaViajeT1T2 = ({
       {/* Costo del viaje — calculado */}
       <td className="tev__td tev__td--costo">
         <span className="tev__costo">{fmtMoneda(viaje.costo_viaje)}</span>
+        <label
+          className="tev__ajuste-viaje"
+          title={`Cobrar la capacidad del camión (${fmt3(capacidad)} m³) en vez del volumen real`}
+        >
+          <input
+            type="checkbox"
+            checked={!!viaje.es_viaje_ajuste}
+            onChange={(e) =>
+              onEditarCampo(viaje.id_viaje, "es_viaje_ajuste", e.target.checked)
+            }
+            disabled={estaDeshabilitado}
+          />
+          Ajuste
+        </label>
       </td>
 
       {/* Acciones */}
@@ -823,6 +840,7 @@ const TablaEditarViajes = ({
                   onEliminar={onEliminarViaje}
                   onCancelarEliminacion={onCancelarEliminacion}
                   pesoEspecifico={pesoEspecifico}
+                  capacidad={detalle.capacidad_m3}
                 />
               ))
             )}

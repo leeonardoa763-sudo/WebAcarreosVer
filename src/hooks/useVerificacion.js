@@ -246,6 +246,7 @@ export const useVerificacion = () => {
               costo_viaje_override,
               tarifa_primer_km,
               tarifa_subsecuente,
+              es_viaje_ajuste,
               registro_anticipado,
               minutos_minimos_calculados,
               minutos_faltantes_anticipado,

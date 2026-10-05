@@ -87,9 +87,12 @@ const ListaViajesMaterial = ({
             const bancoEfectivo = getBancoEfectivo(viaje);
             const distanciaEfectiva = getDistanciaEfectiva(viaje);
             const costoEfectivo = getCostoEfectivo(viaje);
-            // Viaje de ajuste (Tipo 2): se cobra la capacidad del camión, no
-            // el volumen real entregado — ver CLAUDE.md "Viaje de ajuste".
-            const esAjuste = viaje._esFallback && detalle.es_viaje_ajuste;
+            // Viaje de ajuste: se cobra la capacidad del camión, no el volumen
+            // real entregado — ver CLAUDE.md "Viaje de ajuste". Tipo 2 lo guarda
+            // en el detalle (viaje sintético); Tipo 1 en cada viaje.
+            const esAjuste = viaje._esFallback
+              ? detalle.es_viaje_ajuste || viaje.es_viaje_ajuste
+              : viaje.es_viaje_ajuste;
 
             const fotoUrl = (!viaje._esFallback && viaje.foto_evidencia_url)
               ? viaje.foto_evidencia_url

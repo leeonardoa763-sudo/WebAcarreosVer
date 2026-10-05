@@ -19,6 +19,7 @@ import { materialPetreoStyles } from "../shared/styles/materialPetreoStyles";
 
 // Utils
 import { calcularTotalesPorBanco } from "../calcularTotalesPorBanco";
+import { volumenFacturadoViaje } from "../../volumenFacturado";
 
 // Registrar fuentes
 Font.register({
@@ -85,8 +86,13 @@ const PDFConciliacionMaterialPetreo = ({
 
   // Viajes de ajuste (Tipo 2): se cobra capacidad_m3, no volumen_real_m3 —
   // se marcan con "*" en Importe y se explica al pie de la tabla.
+  // Tipo 2 lo guarda en el detalle; Tipo 1 en cada viaje.
   const hayAjustes = todosLosVales.some((vale) =>
-    vale.vale_material_detalles.some((d) => d.es_viaje_ajuste),
+    vale.vale_material_detalles.some(
+      (d) =>
+        d.es_viaje_ajuste ||
+        (d.vale_material_viajes || []).some((v) => v.es_viaje_ajuste),
+    ),
   );
 
   // Extraer tarifas del primer detalle disponible (todo el archivo usa las mismas)
@@ -301,9 +307,11 @@ const PDFConciliacionMaterialPetreo = ({
                               ${formatearNumero(precioEfectivo)}
                             </Text>
                             <Text style={materialPetreoStyles.colImporte}>
+                              {viaje.es_viaje_ajuste ? "* " : ""}
                               {formatearNumero(
                                 viaje.precio_m3_override != null
-                                  ? Number(viaje.volumen_m3) * Number(viaje.precio_m3_override)
+                                  ? volumenFacturadoViaje(viaje, detalle) *
+                                      Number(viaje.precio_m3_override)
                                   : (viaje.costo_viaje || detalle.costo_total),
                               )}
                             </Text>

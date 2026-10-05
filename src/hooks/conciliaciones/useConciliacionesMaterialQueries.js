@@ -112,6 +112,7 @@ export const useConciliacionesMaterialQueries = () => {
                 hora_registro,
                 peso_ton,
                 volumen_m3,
+                es_viaje_ajuste,
                 folio_vale_fisico,
                 id_banco_override,
                 distancia_km_override,

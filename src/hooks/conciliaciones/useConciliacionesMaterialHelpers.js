@@ -12,16 +12,10 @@
  * Usado en: useConciliacionesMaterial.js
  */
 
-/**
- * m³ que se usa para el "Total m³" / "Precio/m³" del resumen: en un viaje de
- * ajuste se cobró capacidad_m3, así que ese es el volumen que debe sumar para
- * que Precio/m³ siga cuadrando con la tarifa. volumen_real_m3 (el dato de la
- * fila) no se toca — sigue siendo el que se reporta a obra.
- */
-const volumenFacturado = (detalle) =>
-  detalle.es_viaje_ajuste
-    ? Number(detalle.capacidad_m3 ?? detalle.volumen_real_m3 ?? 0)
-    : Number(detalle.volumen_real_m3 || 0);
+import {
+  volumenFacturado,
+  volumenFacturadoViaje,
+} from "../../utils/volumenFacturado";
 
 /**
  * Hook para funciones auxiliares de conciliaciones de material
@@ -83,7 +77,8 @@ export const useConciliacionesMaterialHelpers = () => {
               viaje.precio_m3_override != null
                 ? Number(viaje.precio_m3_override)
                 : Number(detalle.precio_m3 || 0);
-            return suma + Number(viaje.volumen_m3 || 0) * precio;
+            // Viaje de ajuste: se cobra capacidad_m3, no el volumen real
+            return suma + volumenFacturadoViaje(viaje, detalle) * precio;
           }, 0);
         } else {
           costo = Number(detalle.costo_total || 0);

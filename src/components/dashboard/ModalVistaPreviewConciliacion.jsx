@@ -33,6 +33,7 @@ import BotonGenerarPDF from "../conciliaciones/BotonGenerarPDF";
 
 // 6. Utils
 import { formatearFechaCorta } from "../../utils/formatters";
+import { volumenFacturado } from "../../utils/volumenFacturado";
 
 const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
   const { userProfile } = useAuth();
@@ -244,7 +245,8 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
                   folio_vale_fisico,
                   peso_ton,
                   volumen_m3,
-                  costo_viaje
+                  costo_viaje,
+                  es_viaje_ajuste
                 )
               )
             `,
@@ -375,9 +377,7 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
           // el Total m³ del resumen usa lo facturado para que Precio/m³
           // siga cuadrando con la tarifa (ver useConciliacionesMaterialHelpers).
           targetTipo.totalViajes += numViajes;
-          targetTipo.totalM3 += detalle.es_viaje_ajuste
-            ? Number(detalle.capacidad_m3 ?? detalle.volumen_real_m3 ?? 0)
-            : Number(detalle.volumen_real_m3 || 0);
+          targetTipo.totalM3 += volumenFacturado(detalle);
           targetTipo.totalToneladas += Number(detalle.peso_ton || 0);
         } else if (idTipo === 3) {
           // Tipo 3 (corte) registra sus viajes como tickets_material,

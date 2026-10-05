@@ -138,6 +138,7 @@ const construirQueryBase = (tipoVale) => {
               distancia_km_override,
               precio_m3_override,
               costo_viaje_override,
+              es_viaje_ajuste,
               registro_anticipado,
               minutos_minimos_calculados,
               minutos_faltantes_anticipado,

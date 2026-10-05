@@ -215,6 +215,7 @@ const VisualizarVale = () => {
                 latitud_registro,
                 longitud_registro,
                 distancia_obra_metros,
+                es_viaje_ajuste,
                 registro_anticipado,
                 minutos_minimos_calculados,
                 minutos_faltantes_anticipado,

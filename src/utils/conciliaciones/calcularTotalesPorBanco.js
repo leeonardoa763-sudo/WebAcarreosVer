@@ -45,7 +45,14 @@ export const calcularTotalesPorBanco = (vales) => {
                 viaje.precio_m3_override != null
                   ? Number(viaje.precio_m3_override)
                   : Number(detalle.precio_m3 || 0);
-              const m3 = Number(viaje.volumen_m3 ?? detalle.volumen_real_m3 ?? 0);
+              const m3Real = Number(
+                viaje.volumen_m3 ?? detalle.volumen_real_m3 ?? 0
+              );
+              // Viaje de ajuste: se cobró capacidad_m3, así que ese m³ factura
+              // (para que PU cuadre con la tarifa); m3Real queda para peso específico.
+              const m3 = viaje.es_viaje_ajuste
+                ? Number(detalle.capacidad_m3 ?? m3Real)
+                : m3Real;
               const distanciaKm = Number(
                 viaje.distancia_km_override ?? detalle.distancia_km ?? 0
               );
@@ -53,6 +60,7 @@ export const calcularTotalesPorBanco = (vales) => {
               return {
                 banco: nombreBancoViaje(viaje, detalle),
                 m3,
+                m3Real,
                 toneladas: Number(viaje.peso_ton ?? detalle.peso_ton ?? 0),
                 importe:
                   viaje.costo_viaje_override != null
@@ -74,12 +82,13 @@ export const calcularTotalesPorBanco = (vales) => {
             ];
 
       registros.forEach(
-        ({ banco, m3, toneladas, importe, distanciaKm, tarifa }) => {
+        ({ banco, m3, m3Real = m3, toneladas, importe, distanciaKm, tarifa }) => {
           if (!bancos[banco]) {
             bancos[banco] = {
               banco,
               viajes: 0,
               m3: 0,
+              m3Real: 0,
               toneladas: 0,
               importe: 0,
               sumaDistancias: 0,
@@ -88,6 +97,7 @@ export const calcularTotalesPorBanco = (vales) => {
           }
           bancos[banco].viajes += 1;
           bancos[banco].m3 += m3;
+          bancos[banco].m3Real += m3Real;
           bancos[banco].toneladas += toneladas;
           bancos[banco].importe += importe;
           bancos[banco].sumaDistancias += distanciaKm;
@@ -103,8 +113,9 @@ export const calcularTotalesPorBanco = (vales) => {
     .map((b) => ({
       ...b,
       pu: b.m3 > 0 ? b.importe / b.m3 : 0,
-      // peso_especifico = ton / m3 (misma fórmula usada al registrar el viaje)
-      pesoEspecifico: b.m3 > 0 ? b.toneladas / b.m3 : 0,
+      // peso_especifico = ton / m3 reales (misma fórmula usada al registrar el
+      // viaje; un viaje de ajuste no cambia las toneladas ni el volumen real)
+      pesoEspecifico: b.m3Real > 0 ? b.toneladas / b.m3Real : 0,
       // distancia real promedio recorrida para ese banco (dato del viaje, no de la tarifa)
       distanciaKmProm: b.viajes > 0 ? b.sumaDistancias / b.viajes : 0,
       tarifas: Array.from(b.tarifasMap.values()),

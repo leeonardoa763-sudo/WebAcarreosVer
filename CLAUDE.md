@@ -221,6 +221,20 @@ reportes y exports ya leen `costo_total` (pago) y `volumen_real_m3` (cantidad re
 campos independientes en todo el repo, así que el ajuste se refleja en conciliación sin
 tocar ese código.
 
+**Viaje de ajuste por viaje (Tipo 1, `vale_material_viajes.es_viaje_ajuste`).** Misma regla
+pero el Tipo 1 tiene varios viajes por vale, así que el flag vive en cada viaje: checkbox
+"Ajuste" en la celda de costo de `FilaViajeT1T2` (`TablaEditarViajes`). Al marcarlo,
+`costo_viaje = capacidad_m3 (del detalle) × precio_m3` en vez de `volumen_m3 × precio_m3`
+(`calcularCostoViajePeso` en `useEditarValeViajes.js`; se respeta también al editar
+toneladas, distancia o al actualizar tarifa). `volumen_m3` nunca se toca. Como el costo ya
+queda en `costo_viaje`, los totales de pago no cambian de código; lo que sí se ajusta es el
+**m³ facturado** de las conciliaciones (`utils/volumenFacturado.js`,
+`calcularTotalesPorBanco.js`) para que Precio/m³ siga cuadrando, y el peso específico usa
+el m³ real. Los selects de viajes que alimentan esto piden `es_viaje_ajuste` (requiere la
+migración `20261005_viaje_ajuste_por_viaje.sql` aplicada antes del deploy). La fila de
+`vale_material_viajes` no reemplaza el flag del detalle: Tipo 2 sigue usando
+`vale_material_detalles.es_viaje_ajuste`.
+
 ### Fórmulas de precio
 
 ```

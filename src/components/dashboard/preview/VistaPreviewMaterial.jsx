@@ -325,7 +325,17 @@ const TablaMaterialPetreo = ({ valesAgrupados }) => {
                                 detalle.folio_banco ||
                                 "—"}
                             </td>
-                            <td>{detalle.material?.material || "N/A"}</td>
+                            <td>
+                              {detalle.material?.material || "N/A"}
+                              {viaje.es_viaje_ajuste && (
+                                <span
+                                  className="preview-pdf__badge-ajuste"
+                                  title={`Viaje de ajuste: se cobra la capacidad del camión (${detalle.capacidad_m3 ?? "—"} m³), no el volumen real entregado`}
+                                >
+                                  Ajuste
+                                </span>
+                              )}
+                            </td>
                             <td>{detalle.bancos?.banco || "N/A"}</td>
                             <td className="text-center">
                               {Number(detalle.distancia_km).toFixed(1)}

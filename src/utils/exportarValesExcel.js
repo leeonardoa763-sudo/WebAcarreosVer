@@ -281,6 +281,7 @@ const filaViajeMaterial = (vale, det, viaje) => ({
   "Registró viaje": nombrePersona(viaje.personaRegistro),
   // Excepciones que la app declaró con motivo al registrar el viaje. La web
   // solo las lee — el umbral lo calcula la app (ver excepcionesVale.js).
+  "Viaje de ajuste": siNo(viaje.esAjuste),
   "Registro anticipado": siNo(viaje.registroAnticipado),
   "Min. faltantes": num(viaje.minutosFaltantes),
   "Min. mínimos": num(viaje.minutosMinimos),
@@ -336,6 +337,7 @@ const filasViajesDeDetalle = (vale, det, numeroDetalle, tickets) => {
         ticket: tickets.get(v.numero_viaje)?.folio_ticket,
         horaRegistro: v.hora_registro,
         personaRegistro: v.persona_registro,
+        esAjuste: v.es_viaje_ajuste,
         registroAnticipado: v.registro_anticipado,
         minutosFaltantes: v.minutos_faltantes_anticipado,
         minutosMinimos: v.minutos_minimos_calculados,
@@ -381,7 +383,8 @@ const filasViajesDeDetalle = (vale, det, numeroDetalle, tickets) => {
         remision: det.folio_vale_fisico,
         horaRegistro: vale.fecha_completado,
         personaRegistro: vale.persona_completador,
-        // El Tipo 2 declara la foto omitida en el detalle, no en el viaje.
+        // El Tipo 2 declara la foto omitida y el ajuste en el detalle, no en el viaje.
+        esAjuste: det.es_viaje_ajuste,
         fotoOmitida: det.foto_omitida,
         motivoSinFoto: motivoSinFoto(det),
       }),

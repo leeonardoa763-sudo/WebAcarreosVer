@@ -32,6 +32,7 @@ import {
   formatearVolumen,
   formatearPeso,
 } from "../../utils/formatters";
+import { volumenFacturadoViaje } from "../../utils/volumenFacturado";
 
 const TablaConciliacionMaterial = ({ valesAgrupados }) => {
   const [collapsed, setCollapsed] = useState({});
@@ -220,7 +221,9 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
           const precioEfectivo = viaje.precio_m3_override != null
             ? Number(viaje.precio_m3_override)
             : Number(detalle.precio_m3 || 0);
-          const importeViaje = Number(viaje.volumen_m3 || 0) * precioEfectivo;
+          // Viaje de ajuste: se cobró capacidad_m3, no el volumen real
+          const importeViaje =
+            volumenFacturadoViaje(viaje, detalle) * precioEfectivo;
 
           return [
             <tr key={`viaje-${viaje.id_viaje}`} className="tabla-vales__fila-viaje">
@@ -233,6 +236,17 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
                 <div className="tabla-vales__material">
                   <Package size={14} aria-hidden="true" />
                   <span>{detalle.material?.material || "N/A"}</span>
+                  {viaje.es_viaje_ajuste && (
+                    <span
+                      className="tabla-vales__badge-ajuste"
+                      title={`Viaje de ajuste: se cobra la capacidad del camión (${
+                        detalle.capacidad_m3 ?? "—"
+                      } m³), no el volumen real entregado (${formatearVolumen(viaje.volumen_m3)})`}
+                    >
+                      <Truck size={11} aria-hidden="true" />
+                      Ajuste — capacidad
+                    </span>
+                  )}
                 </div>
               </td>
               <td>{detalle.bancos?.banco || "N/A"}</td>

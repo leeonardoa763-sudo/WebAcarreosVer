@@ -771,6 +771,23 @@
   margin-top: 1px;
 }
 
+.tev__ajuste-viaje {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #92400e;
+  cursor: pointer;
+}
+
+.tev__ajuste-viaje input[type="checkbox"] {
+  accent-color: #ff6b35;
+  cursor: pointer;
+}
+
 .tev__costo {
   font-weight: 700;
   font-size: 14px;
