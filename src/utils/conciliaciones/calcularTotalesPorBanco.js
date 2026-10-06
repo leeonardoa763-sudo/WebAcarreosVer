@@ -8,6 +8,8 @@
  * Usado en: PDFConciliacionMaterialPetreo.jsx, VisualizarConciliacion.jsx
  */
 
+import { capacidadCobrable } from "../volumenFacturado";
+
 const nombreBancoViaje = (viaje, detalle) => {
   if (viaje.id_banco_override != null) {
     return (
@@ -51,7 +53,7 @@ export const calcularTotalesPorBanco = (vales) => {
               // Viaje de ajuste: se cobró capacidad_m3, así que ese m³ factura
               // (para que PU cuadre con la tarifa); m3Real queda para peso específico.
               const m3 = viaje.es_viaje_ajuste
-                ? Number(detalle.capacidad_m3 ?? m3Real)
+                ? capacidadCobrable(detalle, vale.vehiculos?.capacidad_m3) ?? m3Real
                 : m3Real;
               const distanciaKm = Number(
                 viaje.distancia_km_override ?? detalle.distancia_km ?? 0

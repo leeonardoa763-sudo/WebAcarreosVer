@@ -78,7 +78,7 @@ export const useConciliacionesMaterialHelpers = () => {
                 ? Number(viaje.precio_m3_override)
                 : Number(detalle.precio_m3 || 0);
             // Viaje de ajuste: se cobra capacidad_m3, no el volumen real
-            return suma + volumenFacturadoViaje(viaje, detalle) * precio;
+            return suma + volumenFacturadoViaje(viaje, detalle, vale.vehiculos?.capacidad_m3) * precio;
           }, 0);
         } else {
           costo = Number(detalle.costo_total || 0);
@@ -94,7 +94,7 @@ export const useConciliacionesMaterialHelpers = () => {
               ? grupos[placas].totalesTipo1
               : grupos[placas].totalesTipo2;
 
-          targetTipo.totalM3 += volumenFacturado(detalle);
+          targetTipo.totalM3 += volumenFacturado(detalle, vale.vehiculos?.capacidad_m3);
           targetTipo.totalToneladas += Number(detalle.peso_ton || 0);
           targetTipo.totalViajes += numViajes;
         } else if (idTipo === 3) {

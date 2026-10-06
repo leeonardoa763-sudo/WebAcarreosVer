@@ -64,7 +64,7 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
   /**
    * Renderizar detalles expandibles de un viaje
    */
-  const renderDetallesViaje = (viaje, detalle) => {
+  const renderDetallesViaje = (viaje, detalle, numeroViaje) => {
     const isExpanded = expandedViajes[viaje.id_viaje];
 
     return (
@@ -88,7 +88,7 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
                 <ChevronRight size={16} />
               )}
               <span className="detalle-viaje__header">
-                Viaje #{viaje.numero_viaje} — {viaje.hora_registro
+                Viaje #{numeroViaje ?? viaje.numero_viaje} — {viaje.hora_registro
                   ? new Date(viaje.hora_registro).toLocaleString("es-MX", {
                       timeZone: "America/Mexico_City",
                       year: "numeric",
@@ -166,7 +166,7 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
   /**
    * Renderizar fila según tipo de material
    */
-  const renderFilaDetalle = (vale, detalle, idx) => {
+  const renderFilaDetalle = (vale, detalle, idx, contador) => {
     const idTipo = detalle.material?.tipo_de_material?.id_tipo_de_material;
 
     // TIPO 1 y 2: 1 fila por viaje registrado
@@ -175,6 +175,7 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
 
       // Sin viajes: fallback con datos del detalle
       if (viajes.length === 0) {
+        contador.n += 1; // el consecutivo de viaje cuenta también este renglón
         return (
           <tr key={`${vale.id_vale}-${idx}-fallback`}>
             <td>{formatearFechaCorta(vale.fecha_creacion)}</td>
@@ -221,9 +222,10 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
           const precioEfectivo = viaje.precio_m3_override != null
             ? Number(viaje.precio_m3_override)
             : Number(detalle.precio_m3 || 0);
+          const numeroConsecutivo = ++contador.n; // "Viaje #N" por placas
           // Viaje de ajuste: se cobró capacidad_m3, no el volumen real
           const importeViaje =
-            volumenFacturadoViaje(viaje, detalle) * precioEfectivo;
+            volumenFacturadoViaje(viaje, detalle, vale.vehiculos?.capacidad_m3) * precioEfectivo;
 
           return [
             <tr key={`viaje-${viaje.id_viaje}`} className="tabla-vales__fila-viaje">
@@ -251,7 +253,7 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
               </td>
               <td>{detalle.bancos?.banco || "N/A"}</td>
               <td>{detalle.distancia_km?.toFixed(1) || 0} km</td>
-              <td className="tabla-vales__viajes">{viaje.numero_viaje}</td>
+              <td className="tabla-vales__viajes">1</td>
               <td>
                 {formatearVolumen(viaje.volumen_m3 || detalle.volumen_real_m3)}
               </td>
@@ -263,7 +265,7 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
                 {formatearMoneda(importeViaje)}
               </td>
             </tr>,
-            renderDetallesViaje(viaje, detalle),
+            renderDetallesViaje(viaje, detalle, numeroConsecutivo),
           ];
         });
     }
@@ -504,11 +506,15 @@ const TablaConciliacionMaterial = ({ valesAgrupados }) => {
                   <table className="tabla-vales">
                     {renderEncabezados(grupo)}
                     <tbody>
-                      {grupo.vales.map((vale) =>
-                        vale.vale_material_detalles.map((detalle, idx) =>
-                          renderFilaDetalle(vale, detalle, idx),
-                        ),
-                      )}
+                      {(() => {
+                        // Consecutivo de viajes dentro de las placas (Tipo 1 y 2)
+                        const contador = { n: 0 };
+                        return grupo.vales.map((vale) =>
+                          vale.vale_material_detalles.map((detalle, idx) =>
+                            renderFilaDetalle(vale, detalle, idx, contador),
+                          ),
+                        );
+                      })()}
                     </tbody>
                   </table>
 

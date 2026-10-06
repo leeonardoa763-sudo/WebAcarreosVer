@@ -310,7 +310,7 @@ const PDFConciliacionMaterialPetreo = ({
                               {viaje.es_viaje_ajuste ? "* " : ""}
                               {formatearNumero(
                                 viaje.precio_m3_override != null
-                                  ? volumenFacturadoViaje(viaje, detalle) *
+                                  ? volumenFacturadoViaje(viaje, detalle, vale.vehiculos?.capacidad_m3) *
                                       Number(viaje.precio_m3_override)
                                   : (viaje.costo_viaje || detalle.costo_total),
                               )}

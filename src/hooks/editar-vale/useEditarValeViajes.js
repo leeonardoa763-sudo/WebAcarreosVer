@@ -99,11 +99,15 @@ const calcularCostoTotalTipo2 = (detalle) => {
  * Costo de un viaje Tipo 1/2 (con peso). Con es_viaje_ajuste del viaje se cobra
  * capacidad_m3 del detalle en vez de volumen_m3; el volumen real no se toca.
  */
-const calcularCostoViajePeso = (viaje, volumen_m3, precio_m3, capacidad_m3) =>
-  calcularCostoViaje(
-    viaje.es_viaje_ajuste ? Number(capacidad_m3 || 0) : volumen_m3,
+const calcularCostoViajePeso = (viaje, volumen_m3, precio_m3, capacidad_m3) => {
+  // Sin capacidad conocida se cobra el volumen real: un costo 0 dejaría el
+  // detalle sin costo_total y la conciliación lo rechaza ("sin costo calculado").
+  const capacidad = Number(capacidad_m3);
+  return calcularCostoViaje(
+    viaje.es_viaje_ajuste && capacidad > 0 ? capacidad : volumen_m3,
     precio_m3,
   );
+};
 
 // ─── Hook principal ───────────────────────────────────────────────────────────
 
@@ -307,6 +311,7 @@ export const useEditarValeViajes = () => {
           folio,
           estado,
           id_obra,
+          vehiculos:id_vehiculo (capacidad_m3),
           fecha_creacion,
           fecha_verificacion,
           fecha_completado,
@@ -322,6 +327,16 @@ export const useEditarValeViajes = () => {
 
       if (dataVale) {
         setVale(dataVale);
+
+        // El detalle a veces no guarda capacidad_m3: se usa la del vehículo
+        // para que el viaje de ajuste cobre la capacidad real del camión.
+        const capacidadVehiculo = dataVale.vehiculos?.capacidad_m3;
+        if (!(Number(dataDetalle.capacidad_m3) > 0) && capacidadVehiculo > 0) {
+          const conCapacidad = (d) =>
+            d ? { ...d, capacidad_m3: capacidadVehiculo } : d;
+          setDetalle(conCapacidad);
+          setDetalleOriginal(conCapacidad);
+        }
 
         // 4. Si está conciliado, buscar la conciliación vinculada
         if (dataVale.estado === "conciliado") {
@@ -1212,6 +1227,11 @@ export const useEditarValeViajes = () => {
         // Tipo 1 y 2: también actualizar peso_ton total
         if (!esTipo3) {
           camposDetalle.peso_ton = totales.peso_ton;
+          // Si el detalle no traía capacidad, se persiste la del vehículo
+          // (cargarDetalle la resolvió) para que el ajuste sea reproducible.
+          if (Number(detalle.capacidad_m3) > 0) {
+            camposDetalle.capacidad_m3 = Number(detalle.capacidad_m3);
+          }
         }
         // Tipo 2 sin fila en vale_material_viajes: el folio físico y el flag
         // de viaje de ajuste se editan directo en el detalle (no hay viaje
