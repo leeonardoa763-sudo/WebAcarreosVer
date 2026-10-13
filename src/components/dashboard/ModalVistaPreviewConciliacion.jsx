@@ -17,7 +17,7 @@
 import { useEffect, useState } from "react";
 
 // 2. Icons
-import { X, Loader2, FileDown, Printer, QrCode } from "lucide-react";
+import { X, Loader2, FileDown, Printer, QrCode, Undo2 } from "lucide-react";
 
 // 3. Config
 import { supabase } from "../../config/supabase";
@@ -30,14 +30,31 @@ import { useAuth } from "../../hooks/useAuth";
 import VistaPreviewRenta from "./preview/VistaPreviewRenta";
 import VistaPreviewMaterial from "./preview/VistaPreviewMaterial";
 import BotonGenerarPDF from "../conciliaciones/BotonGenerarPDF";
+import ModalSolicitudDesconciliacion from "../conciliaciones/ModalSolicitudDesconciliacion";
 
 // 6. Utils
 import { formatearFechaCorta } from "../../utils/formatters";
 import { volumenFacturado } from "../../utils/volumenFacturado";
 
-const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
+const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, onCambio, tipo }) => {
   const { userProfile } = useAuth();
   const esAdmin = userProfile?.roles?.role === "Administrador";
+  const esSindicato = userProfile?.roles?.role === "Sindicato";
+
+  // Solicitudes para deshacer la conciliación
+  const solicitudes = conciliacion.solicitudes_desconciliacion || [];
+  const solicitudPendiente = solicitudes.find((s) => s.estado === "pendiente") ?? null;
+  const solicitudRechazada =
+    solicitudes
+      .filter((s) => s.estado === "rechazada")
+      .sort((a, b) => new Date(b.fecha_respuesta) - new Date(a.fecha_respuesta))[0] ?? null;
+  const puedeSolicitarDeshacer =
+    esAdmin && conciliacion.estado !== "pagada" && !solicitudPendiente;
+  const puedeResponderDeshacer =
+    esSindicato &&
+    !!solicitudPendiente &&
+    Number(conciliacion.id_sindicato) === Number(userProfile?.id_sindicato);
+  const [modoDeshacer, setModoDeshacer] = useState(null); // 'crear' | 'responder' | null
 
   const [valesAgrupados, setValesAgrupados] = useState(null);
   // Guardamos el array plano de vales para el export PDF
@@ -433,11 +450,26 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
    */
   useEffect(() => {
     const handleEsc = (e) => {
-      if (e.key === "Escape") onCerrar();
+      if (e.key === "Escape" && !modoDeshacer) onCerrar();
     };
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
-  }, [onCerrar]);
+  }, [onCerrar, modoDeshacer]);
+
+  /**
+   * Tras solicitar o responder: recargar historial. Si se aprobó, la
+   * conciliación ya no existe y se cierra la vista previa.
+   */
+  const handleDeshacerExitoso = ({ aprobado }) => {
+    setModoDeshacer(null);
+    onCambio?.();
+    if (aprobado) {
+      alert(
+        `Conciliación ${conciliacion.folio} deshecha. Sus vales regresaron a "verificado".`,
+      );
+    }
+    onCerrar();
+  };
 
   /**
    * Prevenir scroll del body cuando modal está abierto
@@ -517,6 +549,38 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
               </button>
             )}
 
+            {/* Deshacer conciliación — Admin solicita, Sindicato responde */}
+            {puedeSolicitarDeshacer && (
+              <button
+                className="modal-preview__btn-export modal-preview__btn-export--deshacer"
+                onClick={() => setModoDeshacer("crear")}
+                title={
+                  solicitudRechazada
+                    ? "El sindicato rechazó la solicitud anterior"
+                    : "Solicitar al sindicato deshacer esta conciliación"
+                }
+              >
+                <Undo2 size={16} />
+                <span>
+                  {solicitudRechazada ? "Deshacer (rechazada)" : "Deshacer"}
+                </span>
+              </button>
+            )}
+            {esAdmin && solicitudPendiente && (
+              <span className="modal-preview__badge-deshacer">
+                Deshacer pendiente
+              </span>
+            )}
+            {puedeResponderDeshacer && (
+              <button
+                className="modal-preview__btn-export modal-preview__btn-export--deshacer"
+                onClick={() => setModoDeshacer("responder")}
+              >
+                <Undo2 size={16} />
+                <span>Responder solicitud</span>
+              </button>
+            )}
+
             {/* Botón cerrar */}
             <button
               className="modal-preview__close"
@@ -560,6 +624,20 @@ const ModalVistaPreviewConciliacion = ({ conciliacion, onCerrar, tipo }) => {
           )}
         </div>
       </div>
+
+      {modoDeshacer && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ModalSolicitudDesconciliacion
+            conciliacion={conciliacion}
+            solicitud={
+              modoDeshacer === "responder" ? solicitudPendiente : solicitudRechazada
+            }
+            modo={modoDeshacer}
+            onCerrar={() => setModoDeshacer(null)}
+            onExitoso={handleDeshacerExitoso}
+          />
+        </div>
+      )}
     </div>
   );
 };

@@ -14,6 +14,11 @@
 | `useConciliacionesMaterialQueries.js` | Material | Fetch vales material, catálogos de obras/semanas/materiales, `guardarConciliacionMaterial()` |
 | `useConciliacionesMaterialHelpers.js` | Material | Agrupar por placas y tipo, calcular subtotal + IVA 16% - retención 4% |
 | `useContabilidad.js` | Contabilidad | Fetch conciliaciones para tabla de contabilidad, `marcarComoPagada()` |
+| `useSolicitudesDesconciliacion.js` | Ambos | RPC `solicitar_desconciliacion` (Admin) / `responder_desconciliacion` (Sindicato). Lo usa directo `ModalSolicitudDesconciliacion` |
+
+## Deshacer conciliación (2026-10-13)
+
+Admin solicita con motivo desde la vista previa del historial; el Sindicato dueño aprueba o rechaza. Al aprobar, los vales vuelven a `verificado` y la conciliación **se borra** (no se marca `cancelada`: estadísticas, contabilidad y export no filtran por estado y duplicarían importes al reconciliar). La foto queda en `solicitudes_desconciliacion.snapshot_conciliacion`. Bloqueado si `estado = 'pagada'`. `fetchConciliacionesSinVales` embebe `solicitudes_desconciliacion` para los badges.
 
 ## Diferencia crítica Renta vs Material
 

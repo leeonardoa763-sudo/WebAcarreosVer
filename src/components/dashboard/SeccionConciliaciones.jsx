@@ -17,9 +17,10 @@ import { useState } from "react";
 
 // 2. Icons
 
-import { Truck, Package, Search, Download } from "lucide-react";
+import { Truck, Package, Search, Download, Undo2 } from "lucide-react";
 
 // 3. Hooks personalizados
+import { useAuth } from "../../hooks/useAuth";
 import { useConciliacionesDashboard } from "../../hooks/dashboard/useConciliacionesDashboard";
 
 // 4. Componentes
@@ -45,7 +46,11 @@ const SeccionConciliaciones = () => {
     cambiarTipo,
     buscarPorFolio,
     totalCount,
+    solicitudesPendientes,
+    recargar,
   } = useConciliacionesDashboard();
+  const { userProfile } = useAuth();
+  const esSindicato = userProfile?.roles?.role === "Sindicato";
 
   // Estado del modal
   const [conciliacionSeleccionada, setConciliacionSeleccionada] =
@@ -200,6 +205,21 @@ const SeccionConciliaciones = () => {
         </p>
       </div>
 
+      {/* Aviso de solicitudes para deshacer conciliación */}
+      {!loading && solicitudesPendientes > 0 && (
+        <div className="seccion-conciliaciones__aviso-desconciliar">
+          <Undo2 size={16} />
+          <span>
+            {solicitudesPendientes === 1
+              ? "1 conciliación tiene"
+              : `${solicitudesPendientes} conciliaciones tienen`}{" "}
+            {esSindicato
+              ? "una solicitud para deshacerse que espera tu respuesta."
+              : "una solicitud para deshacerse pendiente de respuesta del sindicato."}
+          </span>
+        </div>
+      )}
+
       {/* Loading */}
       {loading && (
         <div className="seccion-conciliaciones__loading">
@@ -239,6 +259,7 @@ const SeccionConciliaciones = () => {
         <ModalVistaPreviewConciliacion
           conciliacion={conciliacionSeleccionada}
           onCerrar={handleCerrarModal}
+          onCambio={recargar}
           tipo={tipoActivo}
         />
       )}

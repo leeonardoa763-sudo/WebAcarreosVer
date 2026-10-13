@@ -166,6 +166,13 @@ const ListaConciliacionesPorMes = ({ meses, onSeleccionar, colorTema }) => {
                                       title="Verificada"
                                     />
                                   )}
+                                  {conciliacion.solicitudes_desconciliacion?.some(
+                                    (s) => s.estado === "pendiente",
+                                  ) && (
+                                    <span className="conciliacion-item__deshacer">
+                                      Deshacer pendiente
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="conciliacion-item__info">
                                   <span className="conciliacion-item__obra">

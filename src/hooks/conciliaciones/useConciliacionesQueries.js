@@ -543,6 +543,18 @@ export const useConciliacionesQueries = () => {
               primer_apellido,
               segundo_apellido
             ),
+            solicitudes_desconciliacion (
+              id_solicitud,
+              estado,
+              motivo_solicitud,
+              fecha_solicitud,
+              motivo_respuesta,
+              fecha_respuesta,
+              persona_solicitante:id_persona_solicitante (
+                nombre,
+                primer_apellido
+              )
+            ),
             conciliacion_vales (
               vales (
                 vale_material_detalles (

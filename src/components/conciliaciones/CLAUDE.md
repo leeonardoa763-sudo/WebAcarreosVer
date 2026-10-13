@@ -32,6 +32,7 @@ ModalConciliacionGenerada
 | `ModalConciliacionGenerada.jsx` | Confirmación post-generación con folio asignado |
 | `ModalPagarConciliacion.jsx` | Registra pago de una conciliación — Admin/Finanzas |
 | `TablaContabilidad.jsx` | Tabla de estado de pago — solo para `Contabilidad.jsx` |
+| `ModalSolicitudDesconciliacion.jsx` | Solicitar (Admin) / responder (Sindicato) deshacer una conciliación — se abre desde `ModalVistaPreviewConciliacion`, reutiliza estilos `msd__` |
 | `BatchResults.jsx` | Muestra resultados del proceso batch de verificación (exito/error por archivo) |
 
 ## BotonGenerarPDF — detección automática de tipo

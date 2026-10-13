@@ -160,5 +160,11 @@ export const useConciliacionesDashboard = () => {
 
     // Info para UI
     totalCount: conciliacionesFiltradas.length,
+    solicitudesPendientes: (hookActivo.conciliaciones || []).filter((conc) =>
+      conc.solicitudes_desconciliacion?.some((s) => s.estado === "pendiente"),
+    ).length,
+
+    // Recargar tras solicitar/responder deshacer conciliación
+    recargar: hookActivo.loadHistorial,
   };
 };

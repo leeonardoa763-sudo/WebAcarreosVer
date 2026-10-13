@@ -891,6 +891,48 @@
   background-color: var(--color-primary);
 }
 
+/* Deshacer conciliación (ModalSolicitudDesconciliacion) */
+.modal-preview__btn-export--deshacer {
+  background-color: var(--color-warning);
+}
+
+.modal-preview__badge-deshacer,
+.conciliacion-item__deshacer {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.conciliacion-item__deshacer {
+  margin-left: 8px;
+  padding: 2px 7px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  vertical-align: middle;
+}
+
+.seccion-conciliaciones__aviso-desconciliar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 @keyframes spin {
   from {
     transform: rotate(0deg);
