@@ -1,8 +1,9 @@
 /**
  * src/components/vales/editar/ModalEditarValeRenta.jsx
  *
- * Modal para editar un vale de renta: tipo de renta (día completo, medio día,
- * por horas), notas adicionales y sus viajes (agregar/editar hora/eliminar).
+ * Modal para editar un vale de renta: tarifa del vale (solo este vale, no el
+ * catálogo), tipo de renta (día completo, medio día, por horas), notas
+ * adicionales y sus viajes (agregar/editar hora/eliminar).
  * Pipas de agua (esPipaAgua) también editan aquí el material fijo del vale;
  * renta normal edita material/carga/banco por viaje en vez de eso (ver
  * TablaEditarViajesRenta). Solo visible para Administrador. Bloqueado si el
@@ -79,6 +80,11 @@ const ModalEditarValeRenta = ({
     totalHorasInput,
     notasAdicionales,
     setNotasAdicionales,
+    tarifaDiaInput,
+    setTarifaDiaInput,
+    tarifaHrInput,
+    setTarifaHrInput,
+    tarifaModificada,
     costoPreview,
     materiales,
     bancosSugeridos,
@@ -276,29 +282,59 @@ const ModalEditarValeRenta = ({
             </div>
           )}
 
-          {/* Tarifas de referencia */}
-          {(costo_dia || costo_hr) && (
-            <div className="mer__tarifas">
-              {costo_dia && (
-                <div className="mer__tarifa-item">
-                  <CalendarDays size={14} aria-hidden="true" />
-                  <span className="mer__tarifa-label">Tarifa por día:</span>
-                  <span className="mer__tarifa-valor">
-                    {formatearMoneda(costo_dia)}
-                  </span>
+          {/* Tarifa del vale — editable. Solo afecta a este vale
+              (costo_dia_aplicado / costo_hr_aplicado), no al catálogo. */}
+          <div className="mer__opciones">
+            <p className="mer__opciones-titulo">Tarifa de este vale</p>
+            <div className="mer__tarifas mer__tarifas--editable">
+              <label className="mer__tarifa-item mer__tarifa-item--editable">
+                <span className="mer__tarifa-label">
+                  <CalendarDays size={14} aria-hidden="true" /> Por día
+                </span>
+                <div className="mer__horas-campo">
+                  <span className="mer__horas-sufijo">$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={tarifaDiaInput}
+                    onChange={(e) => setTarifaDiaInput(e.target.value)}
+                    className="mer__horas-input"
+                    placeholder="0.00"
+                    disabled={guardando}
+                    aria-label="Tarifa por día"
+                  />
                 </div>
-              )}
-              {costo_hr && (
-                <div className="mer__tarifa-item">
-                  <Clock size={14} aria-hidden="true" />
-                  <span className="mer__tarifa-label">Tarifa por hora:</span>
-                  <span className="mer__tarifa-valor">
-                    {formatearMoneda(costo_hr)}
-                  </span>
+              </label>
+              <label className="mer__tarifa-item mer__tarifa-item--editable">
+                <span className="mer__tarifa-label">
+                  <Clock size={14} aria-hidden="true" /> Por hora
+                </span>
+                <div className="mer__horas-campo">
+                  <span className="mer__horas-sufijo">$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={tarifaHrInput}
+                    onChange={(e) => setTarifaHrInput(e.target.value)}
+                    className="mer__horas-input"
+                    placeholder="0.00"
+                    disabled={guardando}
+                    aria-label="Tarifa por hora"
+                  />
                 </div>
-              )}
+              </label>
             </div>
-          )}
+            {tarifaModificada && (
+              <p className="mer__tarifa-aviso">
+                Tarifa anterior: {costo_dia != null ? `${formatearMoneda(costo_dia)}/día` : "sin tarifa por día"}
+                {" · "}
+                {costo_hr != null ? `${formatearMoneda(costo_hr)}/hora` : "sin tarifa por hora"}.
+                El cambio solo aplica a este vale; el catálogo de tarifas no se modifica.
+              </p>
+            )}
+          </div>
 
           {/* Opciones de tipo de renta */}
           <div className="mer__opciones">

@@ -15,6 +15,12 @@
  * Nota: precios_renta (costo_hr/costo_dia) depende de id_sindicato, no del
  * material — cambiar el material no requiere recalcular tarifas.
  *
+ * Tarifa del vale (2026-10-13): el Admin puede corregir la tarifa de ESTE
+ * vale. Se guarda en costo_dia_aplicado / costo_hr_aplicado (la tarifa
+ * congelada que ya respeta el trigger calcular_totales_vale_renta) y se
+ * recalcula costo_total. No toca precios_renta ni precios_renta_obra, así que
+ * ningún otro vale cambia. Solo se escribe si el valor cambió.
+ *
  * Dependencias: supabase
  * Usado en: ModalEditarValeRenta.jsx
  */
@@ -81,6 +87,24 @@ const calcularCosto = (opcion, totalHoras, costoDia, costoHr) => {
   return 0;
 };
 
+/**
+ * Tarifa como texto para el input ("" si no hay)
+ * @param {number|null} valor
+ * @returns {string}
+ */
+const tarifaATexto = (valor) => (valor == null ? "" : String(valor));
+
+/**
+ * Texto del input a número, o null si está vacío / no es válido
+ * @param {string} texto
+ * @returns {number|null}
+ */
+const textoATarifa = (texto) => {
+  if (texto === "" || texto == null) return null;
+  const n = Number(texto);
+  return isNaN(n) ? null : n;
+};
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export const useEditarValeRenta = () => {
@@ -95,6 +119,10 @@ export const useEditarValeRenta = () => {
 
   // Notas adicionales del detalle (notas_adicionales)
   const [notasAdicionales, setNotasAdicionales] = useState("");
+
+  // Tarifa del vale (editable) — se inicializa con la tarifa efectiva
+  const [tarifaDiaInput, setTarifaDiaInput] = useState("");
+  const [tarifaHrInput, setTarifaHrInput] = useState("");
 
   // Catálogo de materiales disponibles (para editar el material del detalle
   // en pipas, o el material por viaje en renta normal)
@@ -240,6 +268,9 @@ export const useEditarValeRenta = () => {
       );
       setIdMaterialOriginal(data.id_material);
       setNotasAdicionales(data.notas_adicionales || "");
+      const tarifa = tarifaRentaEfectiva(data);
+      setTarifaDiaInput(tarifaATexto(tarifa.costo_dia));
+      setTarifaHrInput(tarifaATexto(tarifa.costo_hr));
       setViajesOriginales(viajesOrdenados);
       setViajes(viajesOrdenados.map((v) => ({ ...v })));
     } catch (err) {
@@ -393,7 +424,8 @@ export const useEditarValeRenta = () => {
    */
   const costoPreview = (() => {
     if (!detalle) return null;
-    const { costo_dia, costo_hr } = tarifaRentaEfectiva(detalle);
+    const costo_dia = textoATarifa(tarifaDiaInput);
+    const costo_hr = textoATarifa(tarifaHrInput);
     if (costo_dia == null && costo_hr == null) return null;
     return calcularCosto(
       opcionSeleccionada,
@@ -402,6 +434,13 @@ export const useEditarValeRenta = () => {
       costo_hr,
     );
   })();
+
+  // ¿La tarifa capturada difiere de la tarifa efectiva guardada?
+  const tarifaOriginal = tarifaRentaEfectiva(detalle);
+  const tarifaDiaCambio =
+    !!detalle && textoATarifa(tarifaDiaInput) !== (tarifaOriginal.costo_dia ?? null);
+  const tarifaHrCambio =
+    !!detalle && textoATarifa(tarifaHrInput) !== (tarifaOriginal.costo_hr ?? null);
 
   // ── Guardar cambios ────────────────────────────────────────────────────────
 
@@ -431,6 +470,25 @@ export const useEditarValeRenta = () => {
           setError("Ingresa un número de horas válido (mayor a 0).");
           return;
         }
+      }
+
+      // Validar tarifa: la que usa el tipo de renta elegido es obligatoria
+      const tarifaDia = textoATarifa(tarifaDiaInput);
+      const tarifaHr = textoATarifa(tarifaHrInput);
+      if (
+        (tarifaDiaInput !== "" && (tarifaDia == null || tarifaDia < 0)) ||
+        (tarifaHrInput !== "" && (tarifaHr == null || tarifaHr < 0))
+      ) {
+        setError("La tarifa debe ser un número mayor o igual a 0.");
+        return;
+      }
+      if (opcionSeleccionada !== "horas" && tarifaDia == null) {
+        setError("Captura la tarifa por día.");
+        return;
+      }
+      if (opcionSeleccionada === "horas" && tarifaHr == null) {
+        setError("Captura la tarifa por hora.");
+        return;
       }
 
       try {
@@ -507,10 +565,12 @@ export const useEditarValeRenta = () => {
         }
 
         // 4. Payload de vale_renta_detalle (tipo de renta + conteo de viajes)
-        // Tarifa realmente aplicada al vale (obra si existía, si no la del
-        // sindicato) — nunca el default del sindicato a secas, o un vale con
-        // tarifa de obra se reprecia mal al editar horas/días.
-        const { costo_dia, costo_hr } = tarifaRentaEfectiva(detalle);
+        // Tarifa del vale: la capturada en el modal, que arranca con la
+        // efectiva (obra si existía, si no la del sindicato) — nunca el
+        // default del sindicato a secas, o un vale con tarifa de obra se
+        // reprecia mal al editar horas/días.
+        const costo_dia = tarifaDia;
+        const costo_hr = tarifaHr;
         const numeroViajesFinal = viajes.filter(
           (v) => !viajesAEliminar.has(v.id_viaje),
         ).length;
@@ -519,6 +579,11 @@ export const useEditarValeRenta = () => {
           numero_viajes: numeroViajesFinal,
           notas_adicionales: notasAdicionales.trim() || null,
         };
+        // Congelar la tarifa corregida en el vale. El trigger
+        // calcular_totales_vale_renta lee costo_*_aplicado antes que
+        // precios_renta, así que no pisa el costo_total recalculado.
+        if (tarifaDiaCambio) payload.costo_dia_aplicado = costo_dia;
+        if (tarifaHrCambio) payload.costo_hr_aplicado = costo_hr;
         // El material a nivel detalle solo existe para pipas — renta normal
         // ya no fija material al vale (id_material se queda null siempre,
         // ver categoria_planeada y el material por viaje).
@@ -592,6 +657,10 @@ export const useEditarValeRenta = () => {
       opcionSeleccionada,
       totalHorasInput,
       notasAdicionales,
+      tarifaDiaInput,
+      tarifaHrInput,
+      tarifaDiaCambio,
+      tarifaHrCambio,
       viajes,
       viajesEditados,
       viajesNuevos,
@@ -617,6 +686,9 @@ export const useEditarValeRenta = () => {
     setViajesNuevos(new Set());
     setViajesAEliminar(new Set());
     setNotasAdicionales(detalle.notas_adicionales || "");
+    const tarifa = tarifaRentaEfectiva(detalle);
+    setTarifaDiaInput(tarifaATexto(tarifa.costo_dia));
+    setTarifaHrInput(tarifaATexto(tarifa.costo_hr));
     setDetalle((prev) => {
       if (!prev) return prev;
       const materialOriginal = materiales.find(
@@ -646,6 +718,7 @@ export const useEditarValeRenta = () => {
     }
     if (detalle.id_material !== idMaterialOriginal) return true;
     if (notasAdicionales !== (detalle.notas_adicionales || "")) return true;
+    if (tarifaDiaCambio || tarifaHrCambio) return true;
     return (
       viajesEditados.size > 0 || viajesNuevos.size > 0 || viajesAEliminar.size > 0
     );
@@ -658,6 +731,11 @@ export const useEditarValeRenta = () => {
     totalHorasInput,
     notasAdicionales,
     setNotasAdicionales,
+    tarifaDiaInput,
+    setTarifaDiaInput,
+    tarifaHrInput,
+    setTarifaHrInput,
+    tarifaModificada: tarifaDiaCambio || tarifaHrCambio,
     costoPreview,
     materiales,
     bancosSugeridos,
