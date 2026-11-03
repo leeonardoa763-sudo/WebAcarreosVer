@@ -33,7 +33,7 @@
 
 **dateUtils.js:** El domingo es la última jornada de la semana **anterior** (ISO 8601 estricto). Las semanas van de lunes a domingo.
 
-**pdfExtractor.js:** Regex de folio: `/[A-Z]{2,3}-\d{3}-\d{5}/`. `convertPDFToImage(file, scale)` recibe escala como parámetro (default `2.0`). Si el QR no decodifica a 2x, `useVerificacion.js` llama nuevamente con `3.0`.
+**pdfExtractor.js:** Regex de folio: `/[A-Z]{2,3}-\d{1,3}-\d{5}/`. `convertPDFToImage(file, scale)` recibe escala como parámetro (default `2.0`). Si el QR no decodifica a 2x, `useVerificacion.js` llama nuevamente con `3.0`.
 
 **qrDecoder.js:** Siempre usa `inversionAttempts: "attemptBoth"` — intenta imagen normal e invertida automáticamente para QRs con bajo contraste o fondo de color.
 
