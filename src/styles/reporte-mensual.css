@@ -1,0 +1,98 @@
+/* src/styles/reporte-mensual.css — barra de herramientas de ReporteMensual.jsx.
+   El reporte en sí trae su propio CSS (reporte-mensual/plantilla.html). */
+
+.rpm-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f6fafd;
+  font-family: 'Outfit', system-ui, sans-serif;
+}
+
+.rpm-page__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 28px;
+  background: #004e89;
+  flex-wrap: wrap;
+}
+
+.rpm-page__titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.rpm-page__acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rpm-page__mes {
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 13px;
+  color-scheme: dark;
+}
+
+.rpm-page__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #ffffff;
+  color: #004e89;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.rpm-page__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rpm-page__estado {
+  max-width: 1080px;
+  margin: 24px auto 0;
+  padding: 24px;
+  text-align: center;
+  color: #4a5565;
+  font-size: 13px;
+}
+
+.rpm-page__estado--error {
+  border-radius: 12px;
+  background: #fcede7;
+  color: #c2410c;
+}
+
+.rpm-page__estado button {
+  margin-top: 8px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: none;
+  background: #c2410c;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.rpm-page__marco {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  display: block;
+}

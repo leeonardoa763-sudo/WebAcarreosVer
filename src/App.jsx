@@ -31,6 +31,7 @@ import HistorialConciliaciones from "./pages/HistorialConciliaciones";
 import EstadisticasGlobales from "./pages/EstadisticasGlobales";
 import ReporteDiario from "./pages/ReporteDiario";
 import ReporteSemanal from "./pages/ReporteSemanal";
+import ReporteMensual from "./pages/ReporteMensual";
 
 // 5. Estilos
 import "./styles/global.css";
@@ -140,6 +141,17 @@ const App = () => {
                 <Layout>
                   <ReporteSemanal />
                 </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Reporte Mensual - mismos roles, pestaña nueva y sin Layout: el
+              reporte (iframe) ocupa toda la pantalla, igual que el HTML descargado */}
+          <Route
+            path="/reporte-mensual"
+            element={
+              <ProtectedRoute requiredRole={["Administrador", "Gerencia", "Residente"]}>
+                <ReporteMensual />
               </ProtectedRoute>
             }
           />

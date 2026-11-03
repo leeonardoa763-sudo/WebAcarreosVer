@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reporte Mensual de Acarreos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --papel: #F6FAFD; --papel-2: #EAF2F9; --banda: #EEF5FB; --tinta: #1A2332; --tinta-2: #4A5565; --tinta-3: #8A919C;
+    --linea: #DDE7F0; --linea-2: #C5D4E2; --marino: #004E89; --marino-2: #0A3A63; --naranja: #FF6B35; --verde: #1A936F;
+    --tipo-1: #2A6FB0; --tipo-2: #E8692F; --tipo-3: #17A57A; --tipo-4: #D99A00;
+    --etapa-1: #8DB3DB; --etapa-2: #4A83BF; --etapa-3: #174F86;
+    --serie-1: #2A6FB0; --critico: #C2410C; --critico-bg: #FCEEE7; --bueno: #006300;
+    --serif: "Fraunces", Georgia, serif; --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --ease: cubic-bezier(.2,.7,.2,1);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 120px; }
+  body { margin: 0; background: var(--papel); color: var(--tinta); font: 400 15px/1.55 var(--sans); -webkit-font-smoothing: antialiased; }
+  .hoja { max-width: 1120px; margin: 0 auto; padding: 0 40px; }
+  .ico { flex: none; vertical-align: middle; }
+
+  /* ── Portada ── */
+  .portada { position: relative; padding: 52px 0 34px; overflow: hidden; }
+  .portada__curvas { position: absolute; top: -30px; right: -160px; width: 760px; pointer-events: none; }
+  .portada__curvas path { stroke-dasharray: 1400; stroke-dashoffset: 1400; animation: traza 2.76s var(--ease) forwards; }
+  .portada__curvas path:nth-child(2) { animation-delay: .115s } .portada__curvas path:nth-child(3) { animation-delay: .23s } .portada__curvas path:nth-child(4) { animation-delay: .345s }
+  .portada__curvas path:nth-child(5) { animation-delay: .46s } .portada__curvas path:nth-child(6) { animation-delay: .575s } .portada__curvas path:nth-child(7) { animation-delay: .69s }
+  @keyframes traza { to { stroke-dashoffset: 0; } }
+  .portada__eyebrow { font: 500 11px/1 var(--sans); letter-spacing: .18em; text-transform: uppercase; color: var(--marino); display: flex; gap: 10px; align-items: center; }
+  .portada__eyebrow::before { content: ""; width: 28px; height: 2px; background: var(--marino); }
+  .portada h1 { font: 500 clamp(42px, 6vw, 70px)/1.02 var(--serif); letter-spacing: -.02em; margin: 18px 0 12px; font-variation-settings: "opsz" 144; }
+  .portada h1 em { font-style: italic; color: var(--marino); }
+  .portada__meta { display: flex; gap: 22px; flex-wrap: wrap; color: var(--tinta-2); font-size: 13px; }
+  .portada__meta span { display: inline-flex; gap: 6px; align-items: center; }
+  .portada__meta b { color: var(--tinta); font-weight: 600; }
+
+  /* ── Barra fija: filtros + índice de zonas ── */
+  .barra { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--papel) 90%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--tinta); border-bottom: 1px solid var(--linea); }
+  .barra__in { display: grid; gap: 8px; padding: 10px 0 0; }
+  .filtros { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .indice { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; margin: 0 -6px; }
+  .indice a { display: inline-flex; gap: 7px; align-items: center; padding: 7px 10px 9px; font-size: 12px; font-weight: 500; color: var(--tinta-3); text-decoration: none; white-space: nowrap; border-bottom: 2px solid transparent; transition: color .23s, border-color .23s; }
+  .indice a b { font-weight: 600; color: var(--linea-2); transition: color .23s; }
+  .indice a:hover { color: var(--tinta); }
+  .indice a.activo { color: var(--marino); border-color: var(--marino); }
+  .indice a.activo b { color: var(--marino); }
+  .ms { position: relative; }
+  .ms__btn { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border: 1px solid var(--linea-2); border-radius: 999px; background: #fff; color: var(--tinta); font: 500 13px var(--sans); cursor: pointer; max-width: 300px; transition: border-color .23s, background .23s; }
+  .ms__btn .ico { color: var(--tinta-3); }
+  .ms__btn:hover { border-color: var(--tinta-2); }
+  .ms__btn--on { border-color: var(--marino); background: #EAF1F8; }
+  .ms__btn--on .ico { color: var(--marino); }
+  .ms__k { color: var(--tinta-3); }
+  .ms__v { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ms__pop { position: absolute; top: 38px; left: 0; width: 320px; background: #fff; border: 1px solid var(--linea-2); border-radius: 12px; box-shadow: 0 8px 20px -12px rgba(26,35,50,.25); overflow: hidden; animation: pop .207s var(--ease); }
+  @keyframes pop { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+  .ms__buscar { width: 100%; border: 0; border-bottom: 1px solid var(--linea); padding: 11px 14px; font: 14px var(--sans); outline: none; }
+  .ms__lista { max-height: 300px; overflow: auto; padding: 6px; }
+  .ms__op { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .ms__op:hover { background: var(--papel-2); }
+  .ms__op em { margin-left: auto; font-style: normal; font-size: 11px; color: var(--tinta-3); white-space: nowrap; }
+  .ms__op input { accent-color: var(--marino); }
+  .ms__pie { border-top: 1px solid var(--linea); padding: 8px; text-align: right; }
+  .ms__limpiar, .filtros__reset { background: none; border: 0; color: var(--marino); font: 500 13px var(--sans); cursor: pointer; padding: 4px 8px; }
+  .filtros__reset { margin-left: auto; display: inline-flex; gap: 4px; align-items: center; }
+  .filtros__reset::before { content: "×"; font-size: 16px; line-height: 1; }
+  .filtros__reset[hidden] { display: none; }
+
+  /* ── Lo esencial ── */
+  .esencial { display: grid; grid-template-columns: 1fr 1.55fr; gap: 44px; padding: 44px 0 40px; align-items: center; }
+  .esencial__lead { font: 400 25px/1.35 var(--serif); letter-spacing: -.01em; margin: 0; }
+  .esencial__lead b { font-weight: 600; color: var(--marino); }
+  .esencial__lead .alerta { color: var(--critico); font-weight: 600; }
+  .kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .kpi { position: relative; padding: 18px 20px 18px; background: #fff; border: 1px solid var(--linea); border-radius: 14px; overflow: hidden; transition: transform .287s var(--ease), border-color .287s; }
+  .kpi:hover { transform: translateY(-2px); border-color: var(--linea-2); }
+  .kpi__top { display: flex; align-items: center; gap: 10px; }
+  .kpi__ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--papel-2); color: var(--marino); }
+  .kpi__k { font: 600 11px/1.2 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--tinta-3); }
+  .kpi__v { font: 500 36px/1.1 var(--sans); letter-spacing: -.02em; margin: 14px 0 4px; }
+  .kpi__s { font-size: 13px; color: var(--tinta-2); }
+  .kpi--gasto { background: var(--marino); color: #fff; border-color: transparent; }
+  .kpi--gasto .kpi__ic { background: rgba(255,255,255,.12); color: #fff; }
+  .kpi--gasto .kpi__k { color: #B9D1E8; }
+  .kpi--gasto .kpi__s { color: #D6E4F2; }
+  .kpi--gasto .kpi__s b { color: #fff; font-weight: 600; }
+  .kpi__split { display: flex; gap: 2px; height: 6px; margin-top: 12px; border-radius: 3px; overflow: hidden; }
+  .delta { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; font-size: 12px; padding: 1px 6px; border-radius: 4px; background: var(--papel-2); color: var(--tinta-2); }
+  .venta-strip { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px dashed var(--linea-2); border-radius: 12px; font-size: 13px; color: var(--tinta-2); }
+  .venta-strip .ico { color: var(--marino); }
+  .venta-strip b { color: var(--tinta); }
+  .venta-strip a { margin-left: auto; color: var(--marino); font-weight: 500; text-decoration: none; display: inline-flex; gap: 4px; align-items: center; }
+
+  /* ── Zonas (secciones con banda alterna) ── */
+  .zona { position: relative; padding: 56px 0 52px; border-top: 1px solid var(--linea); }
+  .zona--alt { background: var(--banda); }
+  .zona::before { content: attr(data-n); position: absolute; right: max(24px, calc(50% - 560px)); top: 18px; font: 500 120px/1 var(--serif); color: var(--tinta); opacity: .035; pointer-events: none; }
+  .zh { display: grid; grid-template-columns: 52px 1fr auto; gap: 4px 16px; align-items: center; margin-bottom: 28px; }
+  .zh__ic { grid-row: span 2; width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; color: var(--marino); background: #fff; border: 1px solid var(--linea); position: relative; }
+  .zh__ic::after { content: attr(data-n); position: absolute; top: -7px; right: -7px; font: 600 10px/1 var(--sans); background: var(--marino); color: #fff; padding: 4px 5px; border-radius: 6px; }
+  .zh__t { font: 500 30px/1.15 var(--serif); letter-spacing: -.015em; margin: 0; }
+  .zh__d { grid-column: 2; color: var(--tinta-2); margin: 0; font-size: 14px; max-width: 640px; }
+  .zh__aside { grid-row: 1 / span 2; grid-column: 3; font-size: 12px; color: var(--tinta-3); display: inline-flex; gap: 6px; align-items: center; }
+  .dos { display: grid; grid-template-columns: 1.5fr 1fr; gap: 44px; }
+  .dos--par { grid-template-columns: 1fr 1fr; }
+  .sub { font: 600 12px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--tinta-2); margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--linea); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .sub > span:first-child { display: inline-flex; gap: 8px; align-items: center; }
+  .sub small { color: var(--tinta-3); font-weight: 500; letter-spacing: .02em; text-transform: none; font-size: 12px; }
+  .leyenda { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--tinta-2); margin: 0 0 14px; }
+  .leyenda i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .tarjeta { background: #fff; border: 1px solid var(--linea); border-radius: 14px; padding: 20px 22px; }
+
+  /* entrada por zona */
+  .zona .zh, .zona .anim { opacity: 0; transform: translateY(18px); }
+  .zona.visible .zh, .zona.visible .anim { animation: entra .92s var(--ease) both; }
+  .zona.visible .anim { animation-delay: .138s; }
+  .zona.visible .anim--2 { animation-delay: .276s; }
+  .zona.visible .anim--3 { animation-delay: .414s; }
+  @keyframes entra { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+
+  /* barras */
+  .bars { display: grid; gap: 3px; }
+  .bars__row { display: grid; grid-template-columns: minmax(150px, 38%) 1fr 84px; align-items: center; gap: 14px; padding: 5px 8px; border-radius: 8px; outline: none; transition: background .23s; }
+  .bars__row:hover, .bars__row:focus-visible { background: rgba(26,35,50,.045); }
+  .bars__row--clic { cursor: pointer; }
+  .bars__row--clic:hover .bars__label { color: var(--marino); }
+  .bars__row--on { background: #EAF1F8; box-shadow: inset 3px 0 0 var(--marino); }
+  .bars__row--on .bars__label { color: var(--marino); font-weight: 600; }
+  .bars__label { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .23s; }
+  .bars__track { display: flex; gap: 2px; height: 12px; }
+  .bars__track span { height: 100%; transform-origin: left; }
+  .bars__track span:first-child { border-radius: 2px 0 0 2px; }
+  .bars__track span:last-child { border-radius: 0 5px 5px 0; }
+  .bars__value { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--tinta-2); }
+  .visible .bars__track span, .re .bars__track span { animation: crece 1.035s var(--ease) both; animation-delay: calc(var(--i, 0) * 52ms + .172s); }
+  .visible .bars__row, .re .bars__row { animation: aparece .575s var(--ease) both; animation-delay: calc(var(--i, 0) * 52ms + .115s); }
+  .zona:not(.visible) .bars__track span { transform: scaleX(0); }
+  @keyframes crece { from { transform: scaleX(0); } }
+  @keyframes aparece { from { opacity: 0; transform: translateX(-6px); } }
+
+  .emp { margin-bottom: 18px; }
+  .emp__h { display: flex; align-items: center; gap: 10px; padding: 0 8px 6px; margin-bottom: 4px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--tinta-3); font-weight: 600; }
+  .emp__h::after { content: ""; flex: 1; height: 1px; background: var(--linea); }
+  .emp__h b { color: var(--marino); letter-spacing: .1em; }
+  .emp__h span { order: 3; letter-spacing: .02em; text-transform: none; font-weight: 500; }
+
+  /* svg */
+  .viz { width: 100%; height: auto; display: block; overflow: visible; }
+  .viz__grid { stroke: var(--linea); stroke-width: 1; }
+  .viz__axis { stroke: var(--linea-2); stroke-width: 1; }
+  .viz__tick { font: 11px var(--sans); fill: var(--tinta-3); font-variant-numeric: tabular-nums; }
+  .viz__label { font: 600 11px var(--sans); fill: var(--tinta); }
+  .viz__hit { fill: transparent; transition: fill .172s; }
+  .viz__hit:hover { fill: rgba(26,35,50,.05); }
+  .col-anim { transform-box: view-box; }
+  .zona:not(.visible) .col-anim { transform: scaleY(0); }
+  .visible .col-anim, .re .col-anim { animation: sube .862s var(--ease) both; animation-delay: calc(var(--i) * 18ms + .172s); }
+  @keyframes sube { from { transform: scaleY(0); } }
+  .visible .fade-in, .re .fade-in { animation: aparece-o .69s ease both; animation-delay: 1.15s; }
+  @keyframes aparece-o { from { opacity: 0; } }
+
+  /* etapas */
+  .etapas__bar { display: flex; gap: 3px; height: 52px; margin: 6px 0 22px; }
+  .etapas__bar span { outline: none; display: flex; align-items: center; padding-left: 14px; transform-origin: left; min-width: 0; }
+  .etapas__bar span em { font: 600 13px var(--sans); font-style: normal; color: #fff; }
+  .etapas__bar span:first-child em { color: var(--marino-2); }
+  .etapas__bar span:first-child { border-radius: 10px 0 0 10px; }
+  .etapas__bar span:last-child { border-radius: 0 10px 10px 0; }
+  .visible .etapas__bar span, .re .etapas__bar span { animation: crece 1.15s var(--ease) both; }
+  .visible .etapas__bar span:nth-child(2), .re .etapas__bar span:nth-child(2) { animation-delay: .172s; }
+  .visible .etapas__bar span:nth-child(3), .re .etapas__bar span:nth-child(3) { animation-delay: .345s; }
+  .zona:not(.visible) .etapas__bar span { transform: scaleX(0); }
+  .etapas__legend { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .etapas__legend div { display: grid; grid-template-columns: 12px 1fr; gap: 2px 10px; align-items: center; }
+  .etapas__legend i { width: 12px; height: 12px; border-radius: 3px; }
+  .etapas__legend span { font-size: 12px; color: var(--tinta-2); }
+  .etapas__legend b { grid-column: 2; font: 500 26px/1.15 var(--sans); letter-spacing: -.01em; }
+  .etapas__legend em { grid-column: 2; font-style: normal; font-size: 12px; color: var(--tinta-3); }
+
+  /* tablas compactas */
+  .mt { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .mt th { text-align: left; font: 600 11px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-3); padding: 0 8px 8px; border-bottom: 1px solid var(--linea-2); white-space: nowrap; }
+  .mt td { padding: 9px 8px; border-bottom: 1px solid var(--linea); vertical-align: middle; }
+  .mt .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .mt tbody tr { transition: background .172s; }
+  .mt tbody tr:hover td { background: rgba(26,35,50,.035); }
+  .mt tfoot td { font-weight: 600; border-top: 1px solid var(--tinta); border-bottom: 0; }
+  .mt tr.clic { cursor: pointer; }
+  .mt tr.on td { background: #EAF1F8; }
+  .ob { display: block; max-width: 270px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ob small { color: var(--tinta-3); font-size: 11px; margin-right: 6px; }
+  .b100 { display: flex; gap: 2px; width: 100%; min-width: 110px; border-radius: 4px; overflow: hidden; }
+  .b100 span { transform-origin: left; }
+  .b100--vacia { background: repeating-linear-gradient(45deg, var(--papel-2), var(--papel-2) 4px, #fff 4px, #fff 8px); }
+  .visible .b100 span, .re .b100 span { animation: crece 1.035s var(--ease) both; animation-delay: .345s; }
+  .muted { color: var(--tinta-3); }
+
+  /* indicadores */
+  .ind { padding-top: 4px; }
+  .ind__k { display: flex; align-items: center; gap: 8px; font: 600 12px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--tinta-2); }
+  .ind__v { font: 500 46px/1.05 var(--sans); letter-spacing: -.02em; margin: 14px 0 6px; }
+  .ind__v--verde { color: var(--verde); }
+  .ind__v--alerta { color: var(--critico); }
+  .ind__s { color: var(--tinta-2); font-size: 13px; margin: 0 0 18px; }
+  .estado { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--critico); }
+
+  /* renta no aprovechada: calendario + vales con nota */
+  .rna { display: grid; gap: 14px; margin-top: 30px; }
+  .rna__obra { display: grid; grid-template-columns: 230px 1fr; gap: 28px; padding: 20px 22px; background: #fff; border: 1px solid var(--linea); border-left: 3px solid var(--critico); border-radius: 14px; }
+  .rna__h { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--linea); padding-bottom: 12px; }
+  .rna__h h4 { margin: 0; font: 500 18px/1.2 var(--serif); }
+  .rna__h h4 small { font: 600 11px var(--sans); color: var(--tinta-3); letter-spacing: .06em; margin-right: 8px; }
+  .rna__h b { color: var(--critico); font-size: 15px; }
+  .mc__t { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--tinta-3); margin-bottom: 8px; }
+  .mc__sem, .mc__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .mc__sem span { font-size: 10px; color: var(--tinta-3); text-align: center; font-weight: 600; padding-bottom: 2px; }
+  .mc__d { position: relative; aspect-ratio: 1; display: grid; place-items: center; font-size: 11px; color: var(--tinta-2); background: var(--papel-2); border-radius: 6px; font-variant-numeric: tabular-nums; outline: none; }
+  .mc__d--finde { color: var(--tinta-3); background: transparent; box-shadow: inset 0 0 0 1px var(--linea); }
+  .mc__d--vacio { background: transparent; }
+  .mc__d--on { background: var(--critico); color: #fff; font-weight: 600; cursor: default; }
+  .mc__d--on sup { position: absolute; top: 1px; right: 3px; font-size: 8px; }
+  .visible .mc__d--on, .re .mc__d--on { animation: late .575s var(--ease) both; animation-delay: calc(var(--n) * 29ms + .46s); }
+  @keyframes late { 0% { transform: scale(.4); opacity: 0; } 70% { transform: scale(1.12); } }
+  .vales { display: grid; gap: 10px; align-content: start; }
+  .vale { display: grid; grid-template-columns: 92px 1fr auto; gap: 4px 14px; align-items: baseline; padding-bottom: 10px; border-bottom: 1px dashed var(--linea); }
+  .vale:last-child { border-bottom: 0; padding-bottom: 0; }
+  .vale__f { font-size: 12px; font-weight: 600; color: var(--critico); }
+  .vale__e { font-size: 13px; }
+  .vale__e small { color: var(--tinta-3); margin-left: 6px; }
+  .vale__i { font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
+  .vale__i small { display: block; color: var(--tinta-3); font-size: 11px; }
+  .vale__nota { grid-column: 2 / -1; display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; color: var(--tinta-2); background: var(--papel-2); padding: 8px 12px; border-radius: 4px 12px 12px 12px; line-height: 1.45; }
+  .vale__nota .ico { color: var(--marino); margin-top: 1px; }
+  .vale__sin { grid-column: 2 / -1; font-size: 12px; color: var(--tinta-3); font-style: italic; }
+  .chip-n { display: inline-flex; gap: 5px; align-items: center; font-size: 11px; font-weight: 600; color: var(--marino); background: #EAF1F8; padding: 2px 8px; border-radius: 999px; }
+
+  /* renta de equipo */
+  .rkpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; margin-bottom: 28px; background: #fff; border: 1px solid var(--linea); border-radius: 14px; }
+  .rkpis > div { padding: 16px 18px; border-left: 1px solid var(--linea); }
+  .rkpis > div:first-child { border-left: 0; }
+  .rkpis small { display: flex; gap: 6px; align-items: center; font: 600 10.5px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-3); }
+  .rkpis b { display: block; font: 500 26px/1.15 var(--sans); letter-spacing: -.01em; margin: 8px 0 2px; }
+  .rkpis > div > span { font-size: 12px; color: var(--tinta-2); }
+
+  /* desglose */
+  .dg { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .dg th { font: 600 11px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-3); text-align: left; padding: 0 10px 10px; border-bottom: 1px solid var(--tinta); }
+  .dg .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .dg td { padding: 7px 10px; }
+  .dg__obra td { padding-top: 24px; border-bottom: 1px solid var(--linea-2); font-weight: 600; font-size: 14px; }
+  .dg__obra-nombre { font-family: var(--serif); font-weight: 500; font-size: 17px; letter-spacing: -.01em; }
+  .dg__chip { display: inline-block; font: 600 10px/1 var(--sans); letter-spacing: .08em; padding: 4px 7px; border-radius: 4px; background: var(--marino); color: #fff; margin-right: 6px; vertical-align: 3px; }
+  .dg__chip--cc { background: transparent; color: var(--marino); border: 1px solid var(--marino); }
+  .dg__tipo td { font: 600 11px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-3); padding-top: 12px; }
+  .dg__tipo i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 8px; }
+  .dg__mat td { border-bottom: 1px solid var(--linea); }
+  .dg__mat td:first-child { padding-left: 26px; }
+  .dg__mat:hover td { background: rgba(26,35,50,.03); }
+  .dg__sub td { font-weight: 600; background: var(--papel-2); }
+  .dg tfoot td { font-weight: 600; font-size: 14px; border-top: 2px solid var(--tinta); padding-top: 12px; }
+  .dg__geem { font-size: 11px; font-weight: 600; color: var(--verde); letter-spacing: .04em; }
+  .vacio { color: var(--tinta-3); font-style: italic; }
+
+  /* venta */
+  .venta-big { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+  .venta-big b { font: 500 46px/1 var(--sans); letter-spacing: -.02em; }
+  .venta-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0 18px; }
+  .venta-stats div { background: var(--papel-2); border-radius: 10px; padding: 10px 12px; }
+  .venta-stats small { display: block; font-size: 11px; color: var(--tinta-3); letter-spacing: .06em; text-transform: uppercase; font-weight: 600; }
+  .venta-stats strong { font: 500 20px var(--sans); }
+
+  .nota { padding: 28px 0 60px; font-size: 12px; color: var(--tinta-3); display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 40px; }
+  .nota b { color: var(--tinta-2); }
+
+  .tip { position: fixed; z-index: 50; pointer-events: none; background: var(--tinta); color: #fff; padding: 10px 12px; border-radius: 10px; font-size: 12px; min-width: 180px; max-width: 360px; box-shadow: 0 6px 16px -8px rgba(0,0,0,.3); }
+  .tip strong { display: block; margin-bottom: 6px; font-weight: 600; }
+  .tip__row { display: flex; gap: 8px; align-items: center; } .tip__row b { margin-left: auto; font-variant-numeric: tabular-nums; padding-left: 16px; }
+  .tip__row i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+
+  .reveal { animation: entra 1.035s var(--ease) both; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .zona .zh, .zona .anim { opacity: 1; transform: none; } .zona:not(.visible) .bars__track span, .zona:not(.visible) .col-anim, .zona:not(.visible) .etapas__bar span { transform: none; } }
+  @media (max-width: 900px) { .esencial, .dos, .dos--par { grid-template-columns: 1fr; gap: 32px; } .hoja { padding: 0 20px; } .zh { grid-template-columns: 44px 1fr; } .zh__ic { width: 44px; height: 44px; } .zh__aside { display: none; } .rkpis { grid-template-columns: repeat(2, 1fr); } .rna__obra { grid-template-columns: 1fr; } }
+  @media print { .barra { position: static; } .indice { display: none; } .tip { display: none; } body { background: #fff; } .zona .zh, .zona .anim { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<div class="hoja">
+  <header class="portada reveal">
+    <svg class="portada__curvas" viewBox="0 0 720 360" aria-hidden="true" fill="none" stroke="#004E89" stroke-width=".8" opacity=".3">
+      <path d="M40 300 C160 220 260 330 380 250 S600 180 700 230"/><path d="M60 270 C170 200 270 300 390 225 S600 150 700 200"/>
+      <path d="M80 240 C180 180 280 270 400 200 S600 120 700 170"/><path d="M110 210 C200 160 290 240 410 175 S600 95 700 140"/>
+      <path d="M150 180 C220 140 300 210 420 150 S600 70 700 110"/><path d="M200 150 C250 125 320 180 430 125 S600 50 700 80"/>
+      <path d="M260 120 C300 105 340 150 440 100 S600 30 700 50"/>
+    </svg>
+    <div class="portada__eyebrow">Control de Acarreos · Reporte mensual</div>
+    <h1 id="titulo"></h1>
+    <div class="portada__meta"><span id="mEmp"></span><span id="mAnt"></span><span id="mGen"></span></div>
+  </header>
+</div>
+
+<div class="barra">
+  <div class="hoja barra__in">
+    <div class="filtros" id="filtros"></div>
+    <nav class="indice" id="indice" aria-label="Secciones del reporte"></nav>
+  </div>
+</div>
+
+<div class="hoja">
+  <section class="esencial reveal" style="animation-delay:.115s">
+    <p class="esencial__lead" id="lead"></p>
+    <div class="kpis" id="kpis"></div>
+  </section>
+</div>
+
+<main id="zonas"></main>
+
+<div class="hoja"><footer class="nota" id="nota"></footer></div>
+
+<script>/*DATOS*/</script>
+<script>/*COMUN*/</script>
+<script>
+(() => {
+  const { R, T, fmt, esc, icono, grad, TIPOS, TIPO_LABEL, ETAPAS } = RM;
+  const C = RM.PALETA.light;
+  const $ = (id) => document.getElementById(id);
+
+  // ── Zonas del reporte (cada una con su banda, ícono y número) ──
+  const ZONAS = [
+    { id: "material", n: "01", ic: "cubo", corto: "Material", t: "Dónde se fue el material", d: "Metros cúbicos por obra, agrupados por empresa y separados por tipo de material.", aside: "Clic en una obra para filtrar · otra vez para quitar" },
+    { id: "ritmo", n: "02", ic: "pulso", corto: "Ritmo", t: "Ritmo del mes", d: "Volumen diario: sindicato CTM frente a flota propia (GRUPO GEEM)." },
+    { id: "factura", n: "03", ic: "factura", corto: "Conciliación", t: "Del vale a la factura", d: "Importe del mes (flete CTM + renta, sin IVA) según su avance administrativo." },
+    { id: "indicadores", n: "04", ic: "alerta", corto: "Indicadores", t: "Indicadores clave", d: "Lo que ahorró la flota propia y la renta que se pagó con equipo casi parado: en qué obra, qué día y qué explicó el residente." },
+    { id: "renta", n: "05", ic: "reloj", corto: "Renta", t: "Renta de equipo", d: "Días y horas pagados por obra, qué tan eficiente fue cada jornada y qué tan llenos viajaron los camiones." },
+    { id: "bancos", n: "06", ic: "mapa", corto: "Bancos y venta", t: "Bancos y venta de material", d: "De dónde salió el material de las obras, y cuánto material almacenado se vendió (CC 996)." },
+    { id: "desglose", n: "07", ic: "tabla", corto: "Desglose", t: "Desglose por obra", d: "Cuánto y de qué material se consumió en cada obra." },
+  ];
+  $("zonas").innerHTML = ZONAS.map((z, i) => `<section class="zona${i % 2 ? " zona--alt" : ""}" id="${z.id}" data-n="${z.n}"><div class="hoja">
+      <div class="zh"><div class="zh__ic" data-n="${z.n}">${icono(z.ic, 24)}</div><h2 class="zh__t">${z.t}</h2>${z.aside ? `<span class="zh__aside">${icono("flecha", 14)}${z.aside}</span>` : ""}<p class="zh__d">${z.d}</p></div>
+      <div id="c-${z.id}"></div></div></section>`).join("");
+  $("indice").innerHTML = ZONAS.map((z) => `<a href="#${z.id}" data-z="${z.id}"><b>${z.n}</b>${z.corto}</a>`).join("");
+
+  // Índice: resalta la zona que se está leyendo.
+  // Solo desplaza la barra del índice en horizontal: scrollIntoView() movería
+  // la página entera hacia la posición original de la barra fija.
+  const indice = $("indice");
+  const links = [...indice.querySelectorAll("a")];
+  const spy = new IntersectionObserver((ents) => ents.forEach((en) => {
+    if (!en.isIntersecting) return;
+    links.forEach((a) => a.classList.toggle("activo", a.dataset.z === en.target.id));
+    const act = links.find((a) => a.dataset.z === en.target.id);
+    if (act && indice.scrollWidth > indice.clientWidth) {
+      const ri = indice.getBoundingClientRect(), ra = act.getBoundingClientRect();
+      indice.scrollTo({ left: indice.scrollLeft + (ra.left - ri.left) - (ri.width - ra.width) / 2, behavior: "smooth" });
+    }
+  }), { rootMargin: "-45% 0px -50% 0px" });
+  document.querySelectorAll(".zona").forEach((z) => spy.observe(z));
+
+  const [mesNombre, anio] = R.mesLabel.split(" ");
+  document.title = `Reporte Mensual de Acarreos · ${R.mesLabel}`;
+  $("titulo").innerHTML = `${esc(mesNombre)} <em>${esc(anio)}</em>`;
+  $("mEmp").innerHTML = `${icono("edificio", 14)}${R.empresas.map(esc).join(" · ")}`;
+  $("mAnt").innerHTML = `${icono("calendario", 14)}Comparado con <b>${R.anteriorLabel}</b>`;
+  $("mGen").innerHTML = `Generado <b>${new Date(R.generado).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}</b>`;
+
+  const cnt = (v, f, key) => `<span data-count="${v}" data-fmt="${f}" data-key="${key}">${(fmt[f] || fmt.n0)(v)}</span>`;
+  const delta = (a, b) => {
+    const d = fmt.delta(a, b);
+    if (d == null) return `<span class="delta">sin dato previo</span>`;
+    return `<span class="delta">${d >= 0 ? "▲" : "▼"} ${fmt.pct(Math.abs(d))}</span> vs ${R.anteriorLabel.split(" ")[0].toLowerCase()}`;
+  };
+  const obraEtiqueta = (o) => `<span class="ob"><small>${o.cc != null ? "CC " + o.cc : ""}</small>${esc(o.obra)}</span>`;
+  const seleccionada = (iObra) => RM.estado.obras.size === 1 && RM.estado.obras.has(iObra);
+
+  const render = () => {
+    const a = RM.calcular("actual"), p = RM.calcular("anterior");
+    const e = RM.etapas(a), rd = RM.rentaDesperdiciada(a), obrasTodas = RM.porObra(a), obras = obrasTodas.filter((o) => o.m3 > 0);
+    const ve = RM.ventaMaterial(a), veAnt = RM.ventaMaterial(p), rp = RM.rentaPorObra(a);
+
+    // ── Lo esencial ──
+    $("lead").innerHTML = `En ${mesNombre.toLowerCase()} se movieron <b>${fmt.m3(a.m3)}</b> en <b>${a.obrasActivas} ${a.obrasActivas === 1 ? "obra" : "obras"}</b>, con un gasto de <b>${fmt.corto(a.importeTotal)}</b> entre flete y renta. ` +
+      `El <b>${fmt.pct(e.pctFacturado)}</b> ya tiene OC y factura` + (rd.total > 0 ? `, y <span class="alerta">${fmt.corto(rd.total)}</span> de renta se pagó con equipo casi parado.` : ".");
+
+    const kpi = (ic, k, v, s, cls = "", extra = "") => `<div class="kpi ${cls}"><div class="kpi__top"><span class="kpi__ic">${icono(ic, 16)}</span><span class="kpi__k">${k}</span></div><div class="kpi__v">${v}</div><div class="kpi__s">${s}</div>${extra}</div>`;
+    $("kpis").innerHTML =
+      kpi("cubo", "Material movido", cnt(a.m3, "m3", "k-m3"), delta(a.m3, p.m3)) +
+      kpi("billete", "Gasto del mes", cnt(a.importeTotal, "corto", "k-gasto"), `Flete <b>${fmt.corto(a.importeMaterial)}</b> · Renta <b>${fmt.corto(a.importeRenta)}</b> · sin IVA`, "kpi--gasto",
+        `<div class="kpi__split"><span style="flex:${a.importeMaterial || 0};background:#8DB3DB"></span><span style="flex:${a.importeRenta || 0};background:#CFE0F1"></span></div>`) +
+      kpi("factura", "Con OC y factura", cnt(e.pctFacturado || 0, "pct", "k-fac"), `${fmt.corto(e.montos[2])} de ${fmt.corto(e.total)} · conciliado ${fmt.pct(e.pctConciliado)}`) +
+      kpi("camion", "Flete evitado", cnt(a.fleteEvitado, "corto", "k-evit"), `${fmt.m3(a.m3Geem)} con flota propia`) +
+      (ve.aplica && ve.m3 > 0 ? `<div class="venta-strip">${icono("venta", 18)}<span>Además, <b>venta de material: ${fmt.m3(ve.m3)}</b> en ${fmt.n0(ve.vales)} vales (CC 996, no incluida en los totales)</span><a href="#bancos">Ver ${icono("flecha", 14)}</a></div>` : "");
+    RM.animarNumeros($("kpis"));
+
+    // ── 01 Material (agrupado por empresa) ──
+    const maxObra = Math.max(1, ...obras.map((o) => o.m3));
+    let off = 0;
+    const grupos = RM.porEmpresa(obras).map((g) => {
+      const html = `<div class="emp"><div class="emp__h"><b>${esc(g.empresa)}</b><span>${fmt.m3(g.m3)} · ${g.obras.length} ${g.obras.length === 1 ? "obra" : "obras"}</span></div>${RM.barrasH(g.obras, {
+        valor: (o) => o.m3, etiqueta: (o) => fmt.obra(o.obra), max: maxObra, offset: off,
+        segmentos: (o) => TIPOS.map((t, i) => ({ v: o.porTipo[t], color: C.tipos[i] })),
+        clic: (o) => o.iObra, activo: (o) => seleccionada(o.iObra),
+        tip: (o) => RM.tipHtml(fmt.obra(o.obra), [...TIPOS.filter((t) => o.porTipo[t] > 0).map((t) => [TIPO_LABEL[t], fmt.m3(o.porTipo[t]), C.tipos[TIPOS.indexOf(t)]]), ["Total", fmt.m3(o.m3)]]),
+      })}</div>`;
+      off += g.obras.length + 1;
+      return html;
+    }).join("");
+    const mats = RM.porMaterial(a).slice(0, 8);
+    $("c-material").innerHTML = `<div class="leyenda anim">${TIPOS.map((t, i) => `<span><i style="background:${grad(C.tipos[i])}"></i>${TIPO_LABEL[t]}</span>`).join("")}</div>
+      <div class="dos"><div class="anim"><h3 class="sub"><span>${icono("edificio", 14)}Por obra</span><small>${obras.length} obras</small></h3>${grupos || `<p class="vacio">Sin material para los filtros.</p>`}</div>
+      <div class="anim anim--2"><h3 class="sub"><span>${icono("capas", 14)}Por material</span><small>top 8</small></h3>${RM.barrasH(mats, { valor: (m) => m.m3, etiqueta: (m) => m.material, color: (m) => C.tipos[TIPOS.indexOf(m.tipo)], tip: (m) => RM.tipHtml(m.material, [["Volumen", fmt.m3(m.m3)], ["Flete CTM", fmt.mxn(m.importe)]]) })}</div></div>`;
+
+    // ── 02 Ritmo ──
+    $("c-ritmo").innerHTML = `<div class="leyenda anim"><span><i style="background:${grad(C.etapas[2])}"></i>CTM</span><span><i style="background:${grad(C.tipos[2])}"></i>Flota propia</span></div>
+      <div class="tarjeta anim anim--2">${RM.columnasDiarias(RM.porDia(a), [{ key: "ctm", label: "CTM", color: C.etapas[2] }, { key: "geem", label: "Flota propia", color: C.tipos[2] }], { ancho: 1000, alto: 230 })}</div>`;
+
+    // ── 03 Factura ──
+    const conImporte = obrasTodas.filter((o) => o.importe + o.renta > 0).sort((x, y) => (y.importe + y.renta) - (x.importe + x.renta));
+    $("c-factura").innerHTML = `<div class="tarjeta anim">${e.total ? RM.barraEtapas(e, C.etapas) : `<p class="vacio">Sin importe en el periodo.</p>`}</div>
+      <h3 class="sub anim anim--2" style="margin-top:34px"><span>${icono("edificio", 14)}Avance por obra</span><small>importe sin IVA</small></h3>
+      <div class="anim anim--2"><table class="mt"><thead><tr><th>Obra</th><th class="num">Importe</th><th style="width:28%">Avance</th><th class="num">Conciliado</th><th class="num">Con OC y factura</th></tr></thead><tbody>${conImporte.map((o) => {
+        const t = o.etapas[0] + o.etapas[1] + o.etapas[2];
+        return `<tr class="clic${seleccionada(o.iObra) ? " on" : ""}" data-clic="${o.iObra}"><td>${obraEtiqueta(o.obra)}</td><td class="num">${fmt.mxn0(t)}</td><td>${RM.barra100(o.etapas, C.etapas, ETAPAS)}</td><td class="num">${fmt.pct(((o.etapas[1] + o.etapas[2]) / t) * 100)}</td><td class="num"><b>${fmt.pct((o.etapas[2] / t) * 100)}</b></td></tr>`;
+      }).join("")}</tbody></table></div>`;
+
+    // ── 04 Indicadores ──
+    const fp = RM.flotaPropia(a);
+    const rnaObras = rd.obras.map((o) => {
+      const marcados = new Map();
+      o.vales.forEach((v) => { const m = marcados.get(v.dia) || { n: 0, filas: [] }; m.n += 1; m.filas.push([`${v.equipo} · ${fmt.n1(v.ritmo)} viajes/día`, fmt.mxn(v.importe)]); marcados.set(v.dia, m); });
+      marcados.forEach((m, d) => (m.tip = RM.tipHtml(fmt.dia(d), m.filas)));
+      return `<article class="rna__obra anim anim--3"><div class="rna__h"><h4><small>${o.obra.cc != null ? "CC " + o.obra.cc : ""}</small>${esc(o.obra.obra)}</h4><span>${o.vales.length} ${o.vales.length === 1 ? "jornada" : "jornadas"} · <b>${fmt.mxn(o.importe)}</b></span></div>
+        ${RM.miniCalendario(marcados, { titulo: R.mesLabel })}
+        <div class="vales">${o.vales.map((v) => `<div class="vale"><span class="vale__f">${fmt.dia(v.dia)}</span><span class="vale__e">${esc(v.equipo)}<small>${esc(v.folio)}</small></span><span class="vale__i">${fmt.mxn(v.importe)}<small>${fmt.n0(v.viajes)} ${v.viajes === 1 ? "viaje" : "viajes"} · ${fmt.n1(v.ritmo)}/día</small></span>${v.nota ? `<div class="vale__nota">${icono("nota", 14)}<span>${esc(v.nota)}</span></div>` : `<div class="vale__sin">Sin nota del residente</div>`}</div>`).join("")}</div></article>`;
+    }).join("");
+    $("c-indicadores").innerHTML = `<div class="dos dos--par">
+      <div class="ind tarjeta anim"><div class="ind__k">${icono("camion", 16)}Flete evitado · flota propia</div><div class="ind__v ind__v--verde">${cnt(a.fleteEvitado, "corto", "i-evit")}</div>
+        <p class="ind__s">Lo que hubiera cobrado CTM por los ${fmt.m3(a.m3Geem)} que movió GRUPO GEEM (${fmt.pct(a.m3 ? (a.m3Geem / a.m3) * 100 : 0)} del volumen de las obras).</p>
+        ${fp.length ? RM.barrasH(fp.slice(0, 6), { valor: (o) => o.evitado, etiqueta: (o) => fmt.obra(o.obra), formato: fmt.corto, color: () => C.tipos[2], clic: (o) => o.iObra, activo: (o) => seleccionada(o.iObra), tip: (o) => RM.tipHtml(fmt.obra(o.obra), [["Flete evitado", fmt.mxn(o.evitado)], ["Volumen flota propia", fmt.m3(o.m3Geem)], ["% del volumen de la obra", fmt.pct(o.pct)]]) }) : `<p class="vacio">Sin viajes de flota propia.</p>`}</div>
+      <div class="ind tarjeta anim anim--2"><div class="ind__k">${icono("alerta", 16)}Renta no aprovechada</div><div class="ind__v ${rd.total ? "ind__v--alerta" : ""}">${cnt(rd.total, "corto", "i-rna")}</div>
+        <p class="ind__s">${rd.vales.length} ${rd.vales.length === 1 ? "jornada" : "jornadas"} de equipo con 1 a 3 viajes al día (meta: ${RM.META_VIAJES_DIA}) · ${fmt.pct(rd.pct)} de la renta de equipo.</p>
+        ${rd.vales.length ? `<p class="ind__s" style="margin:0"><span class="estado">${icono("calendario", 14)}${rd.obras.length} ${rd.obras.length === 1 ? "obra" : "obras"}</span> &nbsp;<span class="chip-n">${icono("nota", 12)}${rd.conNota} de ${rd.vales.length} con nota del residente</span></p>
+        ${RM.barrasH(rd.obras, { valor: (o) => o.importe, etiqueta: (o) => fmt.obra(o.obra), formato: fmt.corto, color: () => "#C2410C", clic: (o) => o.iObra, activo: (o) => seleccionada(o.iObra) })}` : `<p class="ind__s">Todas las jornadas alcanzaron 4 o más viajes por día.</p>`}</div>
+    </div>${rnaObras ? `<div class="rna">${rnaObras}</div>` : ""}`;
+
+    // ── 05 Renta de equipo ──
+    const tr = rp.total;
+    const sinHoras = (h) => (h > 0 ? fmt.n1(h) : `<span class="muted">—</span>`);
+    $("c-renta").innerHTML = rp.filas.length ? `<div class="rkpis anim">
+        <div><small>${icono("calendario", 13)}Días de renta</small><b>${cnt(tr.dias, "n1", "r-dias")}</b><span>${fmt.n0(tr.vales)} vales</span></div>
+        <div><small>${icono("reloj", 13)}Horas</small><b>${tr.horas > 0 ? cnt(tr.horas, "n1", "r-horas") : "—"}</b><span>${tr.horas > 0 ? "renta por hora" : "toda la renta fue por día"}</span></div>
+        <div><small>${icono("billete", 13)}Importe</small><b>${cnt(tr.importe, "corto", "r-imp")}</b><span>sin IVA</span></div>
+        <div><small>${icono("pulso", 13)}Viajes / día</small><b>${tr.ritmoProm != null ? fmt.n1(tr.ritmoProm) : "—"}</b><span>meta ${RM.META_VIAJES_DIA}</span></div>
+        <div><small>${icono("factura", 13)}En eficiencia</small><b>${fmt.pct(tr.pctEficiente)}</b><span>jornadas con 7+ viajes</span></div>
+        <div><small>${icono("camion", 13)}Carga</small><b>${tr.cargaProm != null ? fmt.pct(tr.cargaProm) : "—"}</b><span>llenado promedio</span></div>
+      </div>
+      <div class="anim anim--2"><table class="mt"><thead><tr><th>Obra</th><th class="num">Vales</th><th class="num">Días</th><th class="num">Horas</th><th class="num">Importe</th><th class="num">Viajes/día</th></tr></thead><tbody>${rp.filas.map((f) => `<tr class="clic${seleccionada(f.iObra) ? " on" : ""}" data-clic="${f.iObra}"><td>${obraEtiqueta(f.obra)}</td><td class="num">${fmt.n0(f.vales)}</td><td class="num">${fmt.n1(f.dias)}</td><td class="num">${sinHoras(f.horas)}</td><td class="num">${fmt.mxn0(f.importe)}</td><td class="num">${f.ritmoProm != null ? `<b style="color:${f.ritmoProm <= 3 ? "var(--critico)" : "inherit"}">${fmt.n1(f.ritmoProm)}</b>` : "—"}</td></tr>`).join("")}</tbody>
+      <tfoot><tr><td>Total</td><td class="num">${fmt.n0(tr.vales)}</td><td class="num">${fmt.n1(tr.dias)}</td><td class="num">${sinHoras(tr.horas)}</td><td class="num">${fmt.mxn0(tr.importe)}</td><td class="num">${tr.ritmoProm != null ? fmt.n1(tr.ritmoProm) : "—"}</td></tr></tfoot></table></div>` : `<p class="vacio">Sin renta de equipo para los filtros seleccionados.</p>`;
+
+    // ── 06 Bancos y venta ──
+    const diasVenta = RM.porDia(a).map((d) => ({ dia: d.dia, venta: d.venta }));
+    $("c-bancos").innerHTML = `<div class="dos dos--par">
+      <div class="anim"><h3 class="sub"><span>${icono("montana", 14)}Bancos de origen</span><small>material de obras</small></h3>${RM.barrasH(RM.porBanco(a), { valor: (b) => b.m3, etiqueta: (b) => b.banco, segmentos: (b) => [{ v: b.m3 - b.geem, color: C.etapas[2] }, { v: b.geem, color: C.tipos[2] }], tip: (b) => RM.tipHtml(b.banco, [["CTM", fmt.m3(b.m3 - b.geem), C.etapas[2]], ["Flota propia", fmt.m3(b.geem), C.tipos[2]], ["Flete CTM", fmt.mxn(b.importe)]]) })}
+        <div class="leyenda" style="margin-top:12px"><span><i style="background:${grad(C.etapas[2])}"></i>CTM</span><span><i style="background:${grad(C.tipos[2])}"></i>Flota propia</span></div></div>
+      <div class="tarjeta anim anim--2"><h3 class="sub"><span>${icono("venta", 14)}Venta de material · CC 996</span><small>sin flete propio</small></h3>
+        ${!ve.aplica ? `<p class="vacio">La venta no pertenece a ninguna obra ni empresa. Quita el filtro de obra o empresa para verla.</p>` : ve.m3 ? `<div class="venta-big"><b>${cnt(ve.m3, "m3", "v-m3")}</b><span class="kpi__s">${delta(ve.m3, veAnt.m3)}</span></div>
+        <div class="venta-stats"><div><small>Vales</small><strong>${fmt.n0(ve.vales)}</strong></div><div><small>Camiones externos</small><strong>${fmt.n0(ve.camiones)}</strong></div><div><small>Días con salidas</small><strong>${fmt.n0(ve.dias)}</strong></div></div>
+        ${RM.columnasDiarias(diasVenta, [{ key: "venta", label: "Venta", color: "#174F86" }], { ancho: 520, alto: 150 })}
+        <p class="ind__s" style="margin:12px 0 0">${ve.porMat.map((m) => `${esc(m.material)}: <b>${fmt.m3(m.m3)}</b>`).join(" · ")}. Material almacenado que se vende; los camiones son de empresas ajenas y el flete no lo paga la empresa.</p>` : `<p class="vacio">Sin ventas para los filtros seleccionados.</p>`}</div>
+    </div>`;
+
+    // ── 07 Desglose ──
+    $("c-desglose").innerHTML = `<div class="anim">${RM.tablaDesglose(RM.desglose(a))}</div>`;
+
+    $("nota").innerHTML = `<div><b>Fuente.</b> Vales del mes por fecha efectiva (completado → programado → creado). Excluye obra/empresa de prueba y vales cancelados. Importes sin IVA salvo en el desglose.</div>
+      <div><b>Venta (CC 996).</b> Material almacenado vendido a camiones de empresas ajenas: solo cuentan los m³; no es flete ni flota propia y no entra en los totales.</div>
+      <div><b>Flete evitado.</b> Volumen de GRUPO GEEM valuado a la tarifa CTM según tipo de material y distancia de cada viaje.</div>
+      <div><b>Renta.</b> Eficiencia = viajes ÷ días de cada vale de equipo (sin pipas). Carga = promedio del llenado registrado en cada viaje (100%, 75% o 50%).</div>`;
+
+    // Zonas ya visibles: reinicia animaciones y cuenta números tras filtrar.
+    document.querySelectorAll(".zona.visible").forEach((z) => { RM.reanimar(z); RM.animarNumeros(z); });
+  };
+
+  RM.montarFiltros($("filtros"));
+  RM.iniciarTooltip();
+  RM.activarClics($("zonas"), RM.filtrarObra);
+  RM.alCambiar(render);
+  render();
+  RM.revelarAlScroll(".zona");
+})();
+</script>
+</body>
+</html>
