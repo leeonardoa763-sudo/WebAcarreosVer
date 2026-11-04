@@ -618,6 +618,15 @@ export const useEditarValeViajes = () => {
   );
 
   /**
+   * Edita la requisición del detalle (texto libre).
+   *
+   * @param {string} requisicion
+   */
+  const editarRequisicionDetalle = useCallback((requisicion) => {
+    setDetalle((prev) => (prev ? { ...prev, requisicion } : prev));
+  }, []);
+
+  /**
    * Edita el banco del detalle (id_banco).
    *
    * @param {number} id_banco
@@ -1223,6 +1232,7 @@ export const useEditarValeViajes = () => {
           id_precios_material: detalle.id_precios_material || null,
           id_precios_material_obra: detalle.id_precios_material_obra || null,
           notas_adicionales: notasAdicionales.trim() || null,
+          requisicion: (detalle.requisicion || "").trim() || null,
         };
         // Tipo 1 y 2: también actualizar peso_ton total
         if (!esTipo3) {
@@ -1310,6 +1320,7 @@ export const useEditarValeViajes = () => {
     (detalle && detalleOriginal && (
       detalle.id_material !== detalleOriginal.id_material ||
       detalle.id_banco !== detalleOriginal.id_banco ||
+      (detalle.requisicion || "") !== (detalleOriginal.requisicion || "") ||
       detalle.distancia_km !== detalleOriginal.distancia_km ||
       detalle.volumen_real_m3 !== detalleOriginal.volumen_real_m3 ||
       Number(detalle.precio_m3) !== Number(detalleOriginal.precio_m3) ||
@@ -1356,6 +1367,7 @@ export const useEditarValeViajes = () => {
     editarCampoDetalleTipo2,
     editarMaterialDetalle,
     editarBancoDetalle,
+    editarRequisicionDetalle,
     actualizarTarifaVigente,
     agregarViaje,
     eliminarViaje,

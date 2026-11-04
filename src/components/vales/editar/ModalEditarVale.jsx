@@ -257,6 +257,7 @@ const ModalEditarVale = ({
     editarCampoDetalleTipo2,
     editarMaterialDetalle,
     editarBancoDetalle,
+    editarRequisicionDetalle,
     actualizarTarifaVigente,
     agregarViaje,
     eliminarViaje,
@@ -452,6 +453,23 @@ const ModalEditarVale = ({
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    {/* Requisición */}
+                    <div className="mev__campo-grupo">
+                      <label className="mev__campo-label" htmlFor="mev-requisicion">
+                        Requisición
+                      </label>
+                      <input
+                        id="mev-requisicion"
+                        type="text"
+                        className="mev__campo-input"
+                        value={detalle.requisicion || ""}
+                        onChange={(e) => editarRequisicionDetalle(e.target.value)}
+                        placeholder="Número de requisición"
+                        maxLength={50}
+                        disabled={guardando}
+                      />
                     </div>
 
                     {/* Distancia — tipo 1 y 2 (tipo 3 la edita por viaje, ver TablaEditarViajes) */}
